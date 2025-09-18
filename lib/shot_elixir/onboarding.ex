@@ -3,7 +3,45 @@ defmodule ShotElixir.Onboarding do
   The Onboarding context for tracking user onboarding progress.
   """
 
+  import Ecto.Query, warn: false
   alias ShotElixir.Repo
+  alias ShotElixir.Onboarding.Progress
+  alias ShotElixir.Accounts.User
+
+  def get_user_onboarding_progress(user_id) do
+    Progress
+    |> where([p], p.user_id == ^user_id)
+    |> Repo.one()
+  end
+
+  def ensure_onboarding_progress!(user) do
+    case get_user_onboarding_progress(user.id) do
+      nil ->
+        case create_progress(user) do
+          {:ok, progress} -> progress
+          {:error, _changeset} -> raise "Failed to create onboarding progress"
+        end
+      progress -> progress
+    end
+  end
+
+  def create_progress(user) do
+    %Progress{}
+    |> Progress.changeset(%{"user_id" => user.id})
+    |> Repo.insert()
+  end
+
+  def update_progress(progress, attrs) do
+    progress
+    |> Progress.changeset(attrs)
+    |> Repo.update()
+  end
+
+  def dismiss_congratulations(progress) do
+    progress
+    |> Progress.changeset(%{"congratulations_dismissed_at" => DateTime.utc_now()})
+    |> Repo.update()
+  end
 
   defmodule Progress do
     use Ecto.Schema
@@ -13,9 +51,14 @@ defmodule ShotElixir.Onboarding do
     @foreign_key_type :binary_id
 
     schema "onboarding_progresses" do
-      field :step, :string, default: "initial"
-      field :completed, :boolean, default: false
-      field :congratulations_dismissed, :boolean, default: false
+      field :first_campaign_created_at, :utc_datetime
+      field :first_campaign_activated_at, :utc_datetime
+      field :first_character_created_at, :utc_datetime
+      field :first_fight_created_at, :utc_datetime
+      field :first_faction_created_at, :utc_datetime
+      field :first_party_created_at, :utc_datetime
+      field :first_site_created_at, :utc_datetime
+      field :congratulations_dismissed_at, :utc_datetime
 
       belongs_to :user, ShotElixir.Accounts.User
 
@@ -24,20 +67,18 @@ defmodule ShotElixir.Onboarding do
 
     def changeset(progress, attrs) do
       progress
-      |> cast(attrs, [:step, :completed, :congratulations_dismissed, :user_id])
+      |> cast(attrs, [
+        :first_campaign_created_at,
+        :first_campaign_activated_at,
+        :first_character_created_at,
+        :first_fight_created_at,
+        :first_faction_created_at,
+        :first_party_created_at,
+        :first_site_created_at,
+        :congratulations_dismissed_at,
+        :user_id
+      ])
       |> validate_required([:user_id])
     end
-  end
-
-  def create_progress(user) do
-    %Progress{}
-    |> Progress.changeset(%{user_id: user.id})
-    |> Repo.insert()
-  end
-
-  def update_progress(progress, attrs) do
-    progress
-    |> Progress.changeset(attrs)
-    |> Repo.update()
   end
 end

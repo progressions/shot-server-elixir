@@ -1,9 +1,350 @@
 defmodule ShotElixirWeb.Api.V2.EncounterController do
   use ShotElixirWeb, :controller
 
-  def show(conn, _params), do: json(conn, %{encounter: %{}})
-  def act(conn, _params), do: json(conn, %{success: true})
-  def apply_combat_action(conn, _params), do: json(conn, %{success: true})
-  def apply_chase_action(conn, _params), do: json(conn, %{success: true})
-  def update_initiatives(conn, _params), do: json(conn, %{success: true})
+  require Logger
+  alias ShotElixir.Fights
+  alias ShotElixir.Shots
+  alias ShotElixir.Campaigns
+  alias ShotElixir.Guardian
+
+  action_fallback ShotElixirWeb.FallbackController
+
+  # GET /api/v2/encounters/:id
+  # Returns encounter data using EncounterSerializer
+  def show(conn, %{"id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    if current_user.current_campaign_id do
+      case Campaigns.get_campaign(current_user.current_campaign_id) do
+        nil ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Campaign not found"})
+
+        campaign ->
+          if authorize_campaign_access(campaign, current_user) do
+            case Fights.get_fight(id) do
+              nil ->
+                conn
+                |> put_status(:not_found)
+                |> json(%{error: "Encounter not found"})
+
+              fight ->
+                if fight.campaign_id == current_user.current_campaign_id do
+                  # TODO: Use proper EncounterSerializer
+                  serialized_fight = serialize_encounter(fight)
+                  json(conn, serialized_fight)
+                else
+                  conn
+                  |> put_status(:not_found)
+                  |> json(%{error: "Encounter not found"})
+                end
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Access denied"})
+          end
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
+    end
+  end
+
+  # POST /api/v2/encounters/:id/act
+  # Handles character/vehicle actions with shot costs and fight events
+  def act(conn, %{"id" => fight_id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    if current_user.current_campaign_id do
+      case get_fight(fight_id, current_user.current_campaign_id) do
+        {:ok, fight} ->
+          if authorize_campaign_modification(fight.campaign_id, current_user) do
+            # Save action_id to Fight if provided
+            if params["action_id"] do
+              Fights.update_fight(fight, %{"action_id" => params["action_id"]})
+            end
+
+            case Shots.get_shot(params["shot_id"]) do
+              nil ->
+                conn
+                |> put_status(:not_found)
+                |> json(%{error: "Shot not found"})
+
+              shot ->
+                if shot.fight_id == fight.id do
+                  shot_cost = params["shots"] || 3 # Default shot count
+                  entity = shot.character || shot.vehicle
+                  entity_name = entity && entity.name || "Unknown"
+
+                  # Update fight timestamp
+                  Fights.touch_fight(fight)
+
+                  # Process the action
+                  case Shots.act_shot(shot, shot_cost) do
+                    {:ok, updated_shot} ->
+                      # TODO: Create fight event for the movement
+                      # fight.fight_events.create!(...)
+
+                      Logger.info("#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}")
+
+                      # Return updated encounter
+                      serialized_fight = serialize_encounter(fight)
+                      json(conn, serialized_fight)
+
+                    {:error, changeset} ->
+                      conn
+                      |> put_status(:bad_request)
+                      |> json(%{errors: translate_errors(changeset)})
+                  end
+                else
+                  conn
+                  |> put_status(:not_found)
+                  |> json(%{error: "Shot not found"})
+                end
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Access denied"})
+          end
+
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Encounter not found"})
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
+    end
+  end
+
+  # POST /api/v2/encounters/:id/update_initiatives
+  # Batch updates shot values with transaction safety
+  def update_initiatives(conn, %{"id" => fight_id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    if current_user.current_campaign_id do
+      case get_fight(fight_id, current_user.current_campaign_id) do
+        {:ok, fight} ->
+          if authorize_campaign_modification(fight.campaign_id, current_user) do
+            shots_data = params["shots"] || []
+
+            Logger.info("🎲 INITIATIVE UPDATE: Updating #{length(shots_data)} shot values for fight #{fight.id}")
+
+            try do
+              # Process shots in transaction
+              Repo.transaction(fn ->
+                Enum.each(shots_data, fn shot_data ->
+                  case Shots.get_shot(shot_data["id"]) do
+                    nil ->
+                      Repo.rollback("Shot #{shot_data["id"]} not found")
+
+                    shot ->
+                      if shot.fight_id == fight.id do
+                        case Shots.update_shot(shot, %{"shot" => shot_data["shot"]}) do
+                          {:ok, updated_shot} ->
+                            entity_name = (updated_shot.character && updated_shot.character.name) ||
+                                         (updated_shot.vehicle && updated_shot.vehicle.name) ||
+                                         "Unknown"
+                            Logger.info("  Updated shot #{shot.id}: #{entity_name} to shot #{shot_data["shot"]}")
+
+                          {:error, changeset} ->
+                            Repo.rollback("Failed to update shot #{shot.id}: #{inspect(changeset.errors)}")
+                        end
+                      else
+                        Repo.rollback("Shot #{shot.id} does not belong to fight #{fight.id}")
+                      end
+                  end
+                end)
+              end)
+
+              # TODO: Broadcast the update after all shots are updated
+              # fight.broadcast_encounter_update!
+
+              # Return updated encounter
+              serialized_fight = serialize_encounter(fight)
+              json(conn, serialized_fight)
+            rescue
+              error ->
+                Logger.error("Error updating initiatives: #{inspect(error)}")
+
+                conn
+                |> put_status(:internal_server_error)
+                |> json(%{error: "Failed to update initiatives"})
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Access denied"})
+          end
+
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Encounter not found"})
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
+    end
+  end
+
+  # POST /api/v2/encounters/:id/apply_combat_action
+  # Processes combat actions including boost, up check, and batched combat updates
+  def apply_combat_action(conn, %{"id" => fight_id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    if current_user.current_campaign_id do
+      case get_fight(fight_id, current_user.current_campaign_id) do
+        {:ok, fight} ->
+          if authorize_campaign_modification(fight.campaign_id, current_user) do
+            try do
+              # Handle different action types
+              result = case params["action_type"] do
+                "boost" ->
+                  Logger.info("💪 BOOST ACTION: Processing boost for fight #{fight.id}")
+                  # TODO: Implement BoostService.apply_boost
+                  fight
+
+                "up_check" ->
+                  Logger.info("🎲 UP CHECK ACTION: Processing Up Check for fight #{fight.id}")
+                  # TODO: Implement UpCheckService.apply_up_check
+                  fight
+
+                _ ->
+                  character_updates = params["character_updates"] || []
+                  Logger.info("🔄 BATCHED COMBAT: Applying #{length(character_updates)} character updates to fight #{fight.id}")
+                  # TODO: Implement CombatActionService.apply_combat_action
+                  fight
+              end
+
+              # Return updated encounter
+              serialized_fight = serialize_encounter(result)
+              json(conn, serialized_fight)
+            rescue
+              error ->
+                Logger.error("Error applying combat action: #{inspect(error)}")
+
+                conn
+                |> put_status(:internal_server_error)
+                |> json(%{error: "Failed to apply combat action"})
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Access denied"})
+          end
+
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Encounter not found"})
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
+    end
+  end
+
+  # POST /api/v2/encounters/:id/apply_chase_action
+  # Handles vehicle chase actions
+  def apply_chase_action(conn, %{"id" => fight_id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    if current_user.current_campaign_id do
+      case get_fight(fight_id, current_user.current_campaign_id) do
+        {:ok, fight} ->
+          if authorize_campaign_modification(fight.campaign_id, current_user) do
+            try do
+              vehicle_updates = params["vehicle_updates"] || []
+
+              Logger.info("🏎️ CHASE ACTION: Applying #{length(vehicle_updates)} vehicle updates to fight #{fight.id}")
+
+              # TODO: Implement ChaseActionService.apply_chase_action
+              result = fight
+
+              # Return updated encounter
+              serialized_fight = serialize_encounter(result)
+              json(conn, serialized_fight)
+            rescue
+              error ->
+                Logger.error("Error applying chase action: #{inspect(error)}")
+
+                conn
+                |> put_status(:internal_server_error)
+                |> json(%{error: "Failed to apply chase action"})
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Access denied"})
+          end
+
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Encounter not found"})
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
+    end
+  end
+
+  # Private helper functions
+  defp authorize_campaign_access(campaign, user) do
+    campaign.user_id == user.id || user.admin ||
+    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+    Campaigns.is_member?(campaign.id, user.id)
+  end
+
+  defp authorize_campaign_modification(campaign_id, user) do
+    case Campaigns.get_campaign(campaign_id) do
+      nil -> false
+      campaign ->
+        campaign.user_id == user.id || user.admin ||
+        (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+    end
+  end
+
+  defp get_fight(fight_id, campaign_id) do
+    case Fights.get_fight(fight_id) do
+      nil -> {:error, :not_found}
+      fight ->
+        if fight.campaign_id == campaign_id do
+          {:ok, fight}
+        else
+          {:error, :not_found}
+        end
+    end
+  end
+
+  defp serialize_encounter(fight) do
+    # TODO: Implement proper EncounterSerializer
+    # For now, return basic fight data
+    %{
+      id: fight.id,
+      name: fight.name,
+      description: fight.description,
+      campaign_id: fight.campaign_id,
+      created_at: fight.created_at,
+      updated_at: fight.updated_at
+    }
+  end
+
+  defp translate_errors(changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", to_string(value))
+      end)
+    end)
+  end
 end
