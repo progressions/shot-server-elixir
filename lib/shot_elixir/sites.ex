@@ -43,7 +43,7 @@ defmodule ShotElixir.Sites do
     |> Site.changeset(attrs)
     |> Repo.update()
     |> case do
-      {:ok, site} -> {:ok, Repo.preload(site, [:faction, :juncture])}
+      {:ok, site} -> {:ok, Repo.preload(site, [:faction, :juncture], force: true)}
       error -> error
     end
   end

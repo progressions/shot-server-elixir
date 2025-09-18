@@ -43,7 +43,7 @@ defmodule ShotElixir.Parties do
     |> Party.changeset(attrs)
     |> Repo.update()
     |> case do
-      {:ok, party} -> {:ok, Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]])}
+      {:ok, party} -> {:ok, Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]], force: true)}
       error -> error
     end
   end
