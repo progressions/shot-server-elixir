@@ -89,8 +89,18 @@ defmodule ShotElixirWeb.Router do
     resources "/weapons", WeaponController
     resources "/schticks", SchticksController
     resources "/junctures", JunctureController
-    resources "/sites", SiteController
-    resources "/parties", PartyController
+
+    # Sites with attunement
+    resources "/sites", SiteController do
+      post "/attune", SiteController, :attune
+      delete "/attune/:character_id", SiteController, :unattune
+    end
+
+    # Parties with membership
+    resources "/parties", PartyController do
+      post "/members", PartyController, :add_member
+      delete "/members/:membership_id", PartyController, :remove_member
+    end
     resources "/factions", FactionController
     resources "/invitations", InvitationController
 

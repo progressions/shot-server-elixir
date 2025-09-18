@@ -32,51 +32,9 @@ defmodule ShotElixir.Weapons.Carry do
   end
 end
 
-defmodule ShotElixir.Sites do
-  defmodule Site do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "sites" do
-      field :name, :string
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
+# Sites moved to sites/ directory
 
-  defmodule Attunement do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "attunements" do
-      belongs_to :character, ShotElixir.Characters.Character
-      belongs_to :site, Site
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
-end
-
-defmodule ShotElixir.Parties do
-  defmodule Party do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "parties" do
-      field :name, :string
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
-
-  defmodule Membership do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "memberships" do
-      belongs_to :party, Party
-      belongs_to :character, ShotElixir.Characters.Character
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
-end
+# Parties moved to parties/ directory
 
 defmodule ShotElixir.Effects do
   defmodule CharacterEffect do
