@@ -71,8 +71,8 @@ defmodule ShotElixirWeb.Router do
     end
 
     # Vehicles
-    resources "/vehicles", VehicleController
     get "/vehicles/archetypes", VehicleController, :archetypes
+    resources "/vehicles", VehicleController
 
     # Fights
     resources "/fights", FightController do

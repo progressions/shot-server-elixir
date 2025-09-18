@@ -1,29 +1,7 @@
 # Placeholder modules to avoid compilation errors
 # These will be replaced with full implementations in Phase 1
 
-defmodule ShotElixir.Factions do
-  defmodule Faction do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "factions" do
-      field :name, :string
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
-end
-
-defmodule ShotElixir.Junctures do
-  defmodule Juncture do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "junctures" do
-      field :name, :string
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
-end
+# Factions and Junctures moved to separate files in factions/ and junctures/ directories
 
 defmodule ShotElixir.Schticks do
   defmodule Schtick do
@@ -48,26 +26,19 @@ defmodule ShotElixir.Schticks do
   end
 end
 
-defmodule ShotElixir.Weapons do
-  defmodule Weapon do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "weapons" do
-      field :name, :string
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
+# Moved to weapons/weapon.ex - remove from stubs
+# defmodule ShotElixir.Weapons do
+#   # Weapon module moved to separate file
+# end
 
-  defmodule Carry do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "carries" do
-      belongs_to :character, ShotElixir.Characters.Character
-      belongs_to :weapon, Weapon
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
+defmodule ShotElixir.Weapons.Carry do
+  use Ecto.Schema
+  @primary_key {:id, :binary_id, autogenerate: true}
+  @foreign_key_type :binary_id
+  schema "carries" do
+    belongs_to :character, ShotElixir.Characters.Character
+    belongs_to :weapon, ShotElixir.Weapons.Weapon
+    timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 end
 
