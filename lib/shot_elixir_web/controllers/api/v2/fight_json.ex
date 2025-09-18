@@ -52,13 +52,21 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
     %{
       id: shot.id,
       shot: shot.shot,
-      acted: shot.acted,
-      hidden: shot.hidden,
+      position: shot.position,
+      count: shot.count,
+      color: shot.color,
+      impairments: shot.impairments,
+      location: shot.location,
+      was_rammed_or_damaged: shot.was_rammed_or_damaged,
       fight_id: shot.fight_id,
       character_id: shot.character_id,
       vehicle_id: shot.vehicle_id,
+      driver_id: shot.driver_id,
+      driving_id: shot.driving_id,
       character: character_summary(shot.character),
       vehicle: vehicle_summary(shot.vehicle),
+      driver: character_summary(shot.driver),
+      driving: vehicle_summary(shot.driving),
       created_at: shot.created_at,
       updated_at: shot.updated_at
     }
@@ -82,8 +90,9 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
     %{
       id: vehicle.id,
       name: vehicle.name,
-      frame: vehicle.frame,
-      image_url: vehicle.image_url
+      color: vehicle.color,
+      image_url: vehicle.image_url,
+      impairments: vehicle.impairments
     }
   end
 end

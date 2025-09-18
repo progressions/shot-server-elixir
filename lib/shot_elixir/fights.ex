@@ -44,13 +44,13 @@ defmodule ShotElixir.Fights do
 
   def end_fight(%Fight{} = fight) do
     fight
-    |> Ecto.Changeset.change(active: false, ended_at: DateTime.utc_now())
+    |> Ecto.Changeset.change(active: false, ended_at: DateTime.utc_now() |> DateTime.truncate(:second))
     |> Repo.update()
   end
 
   def touch_fight(%Fight{} = fight) do
     fight
-    |> Ecto.Changeset.change(updated_at: DateTime.utc_now())
+    |> Ecto.Changeset.change(updated_at: DateTime.utc_now() |> DateTime.truncate(:second))
     |> Repo.update()
   end
 

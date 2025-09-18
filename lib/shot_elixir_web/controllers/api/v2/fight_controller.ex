@@ -41,6 +41,9 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   def create(conn, %{"fight" => fight_params}) do
     current_user = Guardian.Plug.current_resource(conn)
 
+    # Handle JSON string parameters (Rails compatibility)
+    fight_params = parse_json_params(fight_params)
+
     # Add campaign_id if not provided
     fight_params = Map.put_new(fight_params, "campaign_id", current_user.current_campaign_id)
 
@@ -72,9 +75,12 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   def update(conn, %{"id" => id, "fight" => fight_params}) do
     current_user = Guardian.Plug.current_resource(conn)
 
+    # Handle JSON string parameters (Rails compatibility)
+    fight_params = parse_json_params(fight_params)
+
     with {:ok, fight} <- get_fight(id),
          {:ok, campaign} <- get_campaign(fight.campaign_id),
-         :ok <- authorize_gamemaster(current_user, campaign),
+         :ok <- authorize_gamemaster_or_not_found(current_user, campaign),
          {:ok, fight} <- Fights.update_fight(fight, fight_params) do
       render(conn, :show, fight: fight)
     else
@@ -230,6 +236,15 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     end
   end
 
+  # For cross-campaign security, return :not_found for non-members, :forbidden for members
+  defp authorize_gamemaster_or_not_found(user, campaign) do
+    cond do
+      user.id == campaign.user_id || user.admin -> :ok
+      Campaigns.is_member?(campaign.id, user.id) -> {:error, :forbidden}
+      true -> {:error, :not_found}
+    end
+  end
+
   defp authorize_member(user, campaign) do
     # Check if user is gamemaster or a member of the campaign
     if user.id == campaign.user_id ||
@@ -240,4 +255,13 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       {:error, :forbidden}
     end
   end
+
+  # Handle JSON string parameters for Rails compatibility
+  defp parse_json_params(params) when is_binary(params) do
+    case Jason.decode(params) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> params
+    end
+  end
+  defp parse_json_params(params), do: params
 end

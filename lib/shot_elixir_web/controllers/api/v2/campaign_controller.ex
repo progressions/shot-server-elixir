@@ -105,7 +105,10 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def current_fight(conn, %{"campaign_id" => id}) do
-    with %Campaign{} = campaign <- Campaigns.get_campaign(id) do
+    current_user = GuardianPlug.current_resource(conn)
+
+    with %Campaign{} = campaign <- Campaigns.get_campaign(id),
+         :ok <- authorize_campaign_access(campaign, current_user) do
       # Get the most recent active fight for the campaign
       fights = ShotElixir.Fights.list_fights(campaign.id)
       current_fight = List.first(fights)
@@ -114,7 +117,15 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       |> put_view(ShotElixirWeb.Api.V2.CampaignView)
       |> render("current_fight.json", campaign: campaign, fight: current_fight)
     else
-      nil -> {:error, :not_found}
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Campaign not found"})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Not authorized to view this campaign"})
     end
   end
 
