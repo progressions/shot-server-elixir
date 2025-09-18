@@ -3,36 +3,55 @@ defmodule ShotElixir.Campaigns do
   The Campaigns context.
   """
 
-  defmodule Campaign do
-    use Ecto.Schema
+  import Ecto.Query, warn: false
+  alias ShotElixir.Repo
+  alias ShotElixir.Campaigns.Campaign
+  alias ShotElixir.Campaigns.CampaignMembership
 
-    @primary_key {:id, :binary_id, autogenerate: false}
-    @foreign_key_type :binary_id
-
-    schema "campaigns" do
-      field :name, :string
-      field :description, :string
-      field :active, :boolean, default: true
-      field :is_master_template, :boolean, default: false
-      field :seeded_at, :naive_datetime
-
-      belongs_to :user, ShotElixir.Accounts.User
-
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
+  def list_campaigns do
+    Repo.all(Campaign)
   end
 
-  defmodule CampaignMembership do
-    use Ecto.Schema
+  def get_campaign!(id), do: Repo.get!(Campaign, id)
+  def get_campaign(id), do: Repo.get(Campaign, id)
 
-    @primary_key {:id, :binary_id, autogenerate: false}
-    @foreign_key_type :binary_id
+  def get_user_campaigns(user_id) do
+    query = from c in Campaign,
+      left_join: cm in CampaignMembership, on: cm.campaign_id == c.id,
+      where: c.user_id == ^user_id or cm.user_id == ^user_id,
+      distinct: true
 
-    schema "campaign_memberships" do
-      belongs_to :user, ShotElixir.Accounts.User
-      belongs_to :campaign, Campaign
+    Repo.all(query)
+  end
 
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
+  def create_campaign(attrs \\ %{}) do
+    %Campaign{}
+    |> Campaign.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def update_campaign(%Campaign{} = campaign, attrs) do
+    campaign
+    |> Campaign.changeset(attrs)
+    |> Repo.update()
+  end
+
+  def delete_campaign(%Campaign{} = campaign) do
+    campaign
+    |> Ecto.Changeset.change(active: false)
+    |> Repo.update()
+  end
+
+  def add_member(campaign, user) do
+    %CampaignMembership{}
+    |> CampaignMembership.changeset(%{campaign_id: campaign.id, user_id: user.id})
+    |> Repo.insert()
+  end
+
+  def remove_member(campaign, user) do
+    query = from cm in CampaignMembership,
+      where: cm.campaign_id == ^campaign.id and cm.user_id == ^user.id
+
+    Repo.delete_all(query)
   end
 end
