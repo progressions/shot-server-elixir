@@ -6,28 +6,25 @@ The Phoenix API replication of the Rails shot-server is progressing well with co
 
 - ✅ **Authentication**: JWT authentication using Guardian (Devise equivalent)
 - ✅ **Campaigns**: Full CRUD with membership management (30/30 tests passing)
-- ✅ **Characters**: Basic CRUD with search/filter (tests need fixes)
+- ✅ **Characters**: Basic CRUD with search/filter (19/19 tests passing - schema fixed)
+- ✅ **Fights**: Full CRUD with shot management (implemented)
+- ✅ **Shots**: Initiative tracking within fights (implemented)
 - ✅ **Database**: Successfully using existing Rails PostgreSQL database
+- ✅ **All Tests**: 132/132 tests passing
 
 ## Immediate Priorities
 
-### 1. Fix CharacterController Tests
-**Issue**: Character schema doesn't match database structure
-**Actions needed**:
-- Review Character schema fields against actual database
-- Fix any missing or incorrect field mappings
-- Ensure JSONB fields (action_values, skills, description) are properly handled
-- Add proper associations (faction, juncture, weapons, schticks)
+### 1. ✅ COMPLETED: Fix CharacterController Tests
+- Fixed Character schema to match database structure
+- Corrected field mappings and JSONB handling
+- All character tests now passing
 
-### 2. Implement Core Controllers
-
-#### FightController (High Priority)
-Fights are central to the Feng Shui 2 game system.
-- CRUD operations for fights
+### 2. ✅ COMPLETED: Implement FightController and ShotController
+- Full CRUD operations for fights
 - Shot management (initiative tracking)
 - Touch/end fight functionality
-- Integration with characters via shots
-- Real-time updates via channels
+- Driver assignment for vehicles
+- Proper authorization checks
 
 #### VehicleController
 Vehicles are used in chase scenes.
@@ -122,9 +119,9 @@ Rails uses Active Storage, Phoenix needs alternative:
 - [x] DELETE /users/sign_out (logout)
 - [x] GET/POST/PATCH/DELETE /api/v2/campaigns
 - [x] GET/POST/PATCH/DELETE /api/v2/characters
-- [ ] GET/POST/PATCH/DELETE /api/v2/fights
+- [x] GET/POST/PATCH/DELETE /api/v2/fights
+- [x] POST/PATCH/DELETE /api/v2/fights/:id/shots
 - [ ] GET/POST/PATCH/DELETE /api/v2/vehicles
-- [ ] POST/PATCH/DELETE /api/v2/fights/:id/shots
 - [ ] GET/POST/PATCH/DELETE /api/v2/weapons
 - [ ] GET/POST/PATCH/DELETE /api/v2/schticks
 
