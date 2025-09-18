@@ -109,8 +109,8 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       name: fight.name,
       active: fight.active,
       sequence: fight.sequence,
-      shot_counter: fight.shot_counter,
-      fight_type: fight.fight_type,
+      started_at: fight.started_at,
+      ended_at: fight.ended_at,
       created_at: fight.created_at,
       updated_at: fight.updated_at
     }

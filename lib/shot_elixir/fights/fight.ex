@@ -8,14 +8,18 @@ defmodule ShotElixir.Fights.Fight do
   schema "fights" do
     field :name, :string
     field :active, :boolean, default: true
-    field :sequence, :integer, default: 1
-    field :shot_counter, :integer, default: 18
-    field :fight_type, :string, default: "fight"
+    field :sequence, :integer, default: 0
+    field :archived, :boolean, default: false
+    field :description, :string
+    field :started_at, :utc_datetime
     field :ended_at, :utc_datetime
+    field :season, :integer
+    field :session, :integer
+    field :server_id, :integer
+    field :channel_id, :integer
+    field :fight_message_id, :string
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
-    belongs_to :location, ShotElixir.Sites.Site
-    belongs_to :site, ShotElixir.Sites.Site
 
     has_many :shots, ShotElixir.Fights.Shot
     has_many :character_effects, ShotElixir.Effects.CharacterEffect
@@ -25,11 +29,10 @@ defmodule ShotElixir.Fights.Fight do
 
   def changeset(fight, attrs) do
     fight
-    |> cast(attrs, [:name, :active, :sequence, :shot_counter, :fight_type,
-                    :ended_at, :campaign_id, :location_id, :site_id])
+    |> cast(attrs, [:name, :active, :sequence, :archived, :description,
+                    :started_at, :ended_at, :season, :session, :server_id,
+                    :channel_id, :fight_message_id, :campaign_id])
     |> validate_required([:name, :campaign_id])
-    |> validate_inclusion(:fight_type, ["fight", "chase"])
-    |> validate_number(:shot_counter, greater_than_or_equal_to: 0)
-    |> validate_number(:sequence, greater_than_or_equal_to: 1)
+    |> validate_number(:sequence, greater_than_or_equal_to: 0)
   end
 end

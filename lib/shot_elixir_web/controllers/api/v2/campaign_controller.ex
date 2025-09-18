@@ -132,6 +132,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       |> render("membership.json", membership: membership)
     else
       nil -> {:error, :not_found}
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+        |> render("error.json", changeset: changeset)
       {:error, reason} -> {:error, reason}
     end
   end
