@@ -132,6 +132,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   # DELETE /api/v2/parties/:id/members/:membership_id
   def remove_member(conn, params) do
     membership_id = params["membership_id"]
+
     case Parties.remove_member(membership_id) do
       {:ok, _} ->
         send_resp(conn, :no_content, "")

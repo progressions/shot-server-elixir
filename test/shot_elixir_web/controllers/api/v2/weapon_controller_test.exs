@@ -30,29 +30,32 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
 
   setup %{conn: conn} do
     # Create a gamemaster user
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm_weapon@example.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm_weapon@example.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
     # Create a player user
-    {:ok, player} = Accounts.create_user(%{
-      email: "player_weapon@example.com",
-      password: "password123",
-      first_name: "Player",
-      last_name: "One",
-      gamemaster: false
-    })
+    {:ok, player} =
+      Accounts.create_user(%{
+        email: "player_weapon@example.com",
+        password: "password123",
+        first_name: "Player",
+        last_name: "One",
+        gamemaster: false
+      })
 
     # Create a campaign
-    {:ok, campaign} = Campaigns.create_campaign(%{
-      name: "Weapon Test Campaign",
-      description: "Campaign for weapon testing",
-      user_id: gamemaster.id
-    })
+    {:ok, campaign} =
+      Campaigns.create_campaign(%{
+        name: "Weapon Test Campaign",
+        description: "Campaign for weapon testing",
+        user_id: gamemaster.id
+      })
 
     # Set current campaign for users
     {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: campaign.id})
@@ -61,7 +64,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     # Add player to campaign
     Campaigns.add_member(campaign, player)
 
-    {:ok, conn: put_req_header(conn, "accept", "application/json"),
+    {:ok,
+     conn: put_req_header(conn, "accept", "application/json"),
      gamemaster: gamemaster,
      player: player,
      campaign: campaign}
@@ -73,19 +77,30 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
   end
 
   describe "index" do
-    test "lists all weapons for current campaign when authenticated", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
+    test "lists all weapons for current campaign when authenticated", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
       # Create some weapons
-      {:ok, _weapon1} = Weapons.create_weapon(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Pistol 1"
-      }))
+      {:ok, _weapon1} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Pistol 1"
+          })
+        )
 
-      {:ok, _weapon2} = Weapons.create_weapon(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Rifle 2"
-      }))
+      {:ok, _weapon2} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Rifle 2"
+          })
+        )
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/weapons")
 
@@ -97,19 +112,26 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     end
 
     test "filters weapons by category", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      {:ok, _gun} = Weapons.create_weapon(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Gun",
-        category: "guns"
-      }))
+      {:ok, _gun} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Gun",
+            category: "guns"
+          })
+        )
 
-      {:ok, _sword} = Weapons.create_weapon(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Sword",
-        category: "melee"
-      }))
+      {:ok, _sword} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Sword",
+            category: "melee"
+          })
+        )
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/weapons?category=melee")
 
@@ -122,7 +144,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
       # Clear current campaign
       {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: nil})
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/weapons")
 
@@ -137,15 +160,23 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
 
   describe "show" do
     setup %{gamemaster: gamemaster, campaign: campaign} do
-      {:ok, weapon} = Weapons.create_weapon(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, weapon} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       {:ok, weapon: weapon}
     end
 
-    test "shows a weapon when authenticated", %{conn: conn, gamemaster: gamemaster, weapon: weapon} do
-      conn = conn
+    test "shows a weapon when authenticated", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      weapon: weapon
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/weapons/#{weapon.id}")
 
@@ -159,7 +190,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     test "returns 404 for non-existent weapon", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/weapons/#{fake_id}")
 
@@ -173,8 +205,13 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
   end
 
   describe "create" do
-    test "creates weapon with valid attributes", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      conn = conn
+    test "creates weapon with valid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/weapons", weapon: @create_attrs)
 
@@ -188,7 +225,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     end
 
     test "returns errors with invalid attributes", %{conn: conn, gamemaster: gamemaster} do
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/weapons", weapon: @invalid_attrs)
 
@@ -198,7 +236,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     test "validates concealment range", %{conn: conn, gamemaster: gamemaster} do
       invalid_concealment = Map.put(@create_attrs, :concealment, 10)
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/weapons", weapon: invalid_concealment)
 
@@ -209,7 +248,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     test "validates category values", %{conn: conn, gamemaster: gamemaster} do
       invalid_category = Map.put(@create_attrs, :category, "invalid_category")
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/weapons", weapon: invalid_category)
 
@@ -223,7 +263,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     end
 
     test "player can create weapon", %{conn: conn, player: player} do
-      conn = conn
+      conn =
+        conn
         |> authenticate(player)
         |> post("/api/v2/weapons", weapon: @create_attrs)
 
@@ -233,15 +274,23 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
 
   describe "update" do
     setup %{gamemaster: gamemaster, campaign: campaign} do
-      {:ok, weapon} = Weapons.create_weapon(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, weapon} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       {:ok, weapon: weapon}
     end
 
-    test "updates weapon with valid attributes", %{conn: conn, gamemaster: gamemaster, weapon: weapon} do
-      conn = conn
+    test "updates weapon with valid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      weapon: weapon
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/weapons/#{weapon.id}", weapon: @update_attrs)
 
@@ -253,8 +302,13 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
       assert response["category"] == "heavy"
     end
 
-    test "returns errors with invalid attributes", %{conn: conn, gamemaster: gamemaster, weapon: weapon} do
-      conn = conn
+    test "returns errors with invalid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      weapon: weapon
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/weapons/#{weapon.id}", weapon: @invalid_attrs)
 
@@ -264,7 +318,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     test "returns 404 for non-existent weapon", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/weapons/#{fake_id}", weapon: @update_attrs)
 
@@ -279,15 +334,23 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
 
   describe "delete" do
     setup %{gamemaster: gamemaster, campaign: campaign} do
-      {:ok, weapon} = Weapons.create_weapon(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, weapon} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       {:ok, weapon: weapon}
     end
 
-    test "soft deletes weapon (sets active to false)", %{conn: conn, gamemaster: gamemaster, weapon: weapon} do
-      conn = conn
+    test "soft deletes weapon (sets active to false)", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      weapon: weapon
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> delete("/api/v2/weapons/#{weapon.id}")
 
@@ -301,7 +364,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     test "returns 404 for non-existent weapon", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> delete("/api/v2/weapons/#{fake_id}")
 

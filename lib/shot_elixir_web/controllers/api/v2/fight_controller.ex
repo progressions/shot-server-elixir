@@ -61,8 +61,10 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       else
         # Handle JSON string parameters (Rails compatibility)
         parsed_params = parse_json_params(fight_params)
-        params = parsed_params
-        |> Map.put("campaign_id", campaign_id)
+
+        params =
+          parsed_params
+          |> Map.put("campaign_id", campaign_id)
 
         case Fights.create_fight(params) do
           {:ok, fight} ->
@@ -96,14 +98,17 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can update fights"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
+
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -125,15 +130,19 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can delete fights"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -152,15 +161,19 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can touch fights"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -179,18 +192,21 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can end fights"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
-
 
   # Custom endpoints
   def remove_image(conn, %{"id" => id}) do
@@ -240,5 +256,6 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       {:error, _} -> params
     end
   end
+
   defp parse_json_params(params), do: params
 end

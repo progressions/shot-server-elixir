@@ -8,10 +8,11 @@ defmodule ShotElixir.Junctures do
   alias ShotElixir.Junctures.Juncture
 
   def list_junctures(campaign_id) do
-    query = from j in Juncture,
-      where: j.campaign_id == ^campaign_id and j.active == true,
-      order_by: [asc: fragment("lower(?)", j.name)],
-      preload: [:faction]
+    query =
+      from j in Juncture,
+        where: j.campaign_id == ^campaign_id and j.active == true,
+        order_by: [asc: fragment("lower(?)", j.name)],
+        preload: [:faction]
 
     Repo.all(query)
   end

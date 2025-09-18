@@ -17,7 +17,6 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
          :ok <- validate_shot_belongs_to_fight(shot, fight),
          %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user) do
-
       # Handle driver linkage if updating a vehicle shot
       if shot.vehicle_id && Map.has_key?(shot_params, "driver_id") do
         handle_driver_linkage(fight, shot, shot_params["driver_id"])
@@ -26,6 +25,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
       case Fights.update_shot(shot, shot_params) do
         {:ok, _shot} ->
           json(conn, %{success: true})
+
         {:error, changeset} ->
           conn
           |> put_status(:unprocessable_entity)
@@ -36,14 +36,17 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Shot or fight not found"})
+
       {:error, :mismatch} ->
         conn
         |> put_status(:bad_request)
         |> json(%{error: "Shot does not belong to this fight"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can update shots"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
@@ -67,18 +70,22 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Shot or fight not found"})
+
       {:error, :mismatch} ->
         conn
         |> put_status(:bad_request)
         |> json(%{error: "Shot does not belong to this fight"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can delete shots"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Shot or fight not found"})
+
       {:error, _} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -87,7 +94,11 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
   end
 
   # POST /api/v2/fights/:fight_id/shots/:id/assign_driver
-  def assign_driver(conn, %{"fight_id" => fight_id, "id" => id, "driver_shot_id" => driver_shot_id}) do
+  def assign_driver(conn, %{
+        "fight_id" => fight_id,
+        "id" => id,
+        "driver_shot_id" => driver_shot_id
+      }) do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Shot{} = shot <- Fights.get_shot(id),
@@ -95,7 +106,6 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
          :ok <- validate_shot_belongs_to_fight(shot, fight),
          %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user) do
-
       # Validate this is a vehicle shot
       if !shot.vehicle_id do
         conn
@@ -116,7 +126,6 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
             |> put_status(:unprocessable_entity)
             |> json(%{error: "Shot must contain a character to be a driver"})
           else
-
             # Clear any existing driver for this vehicle
             Fights.clear_vehicle_drivers(fight.id, shot.id)
 
@@ -125,6 +134,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
               {:ok, _driver_shot} ->
                 # TODO: Broadcast the update via Phoenix channels
                 json(conn, %{success: true, message: "Driver assigned successfully"})
+
               {:error, _changeset} ->
                 conn
                 |> put_status(:unprocessable_entity)
@@ -138,14 +148,17 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Shot or fight not found"})
+
       {:error, :mismatch} ->
         conn
         |> put_status(:bad_request)
         |> json(%{error: "Shot does not belong to this fight"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can assign drivers"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
@@ -162,7 +175,6 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
          :ok <- validate_shot_belongs_to_fight(shot, fight),
          %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user) do
-
       # Validate this is a vehicle shot
       if !shot.vehicle_id do
         conn
@@ -180,14 +192,17 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Shot or fight not found"})
+
       {:error, :mismatch} ->
         conn
         |> put_status(:bad_request)
         |> json(%{error: "Shot does not belong to this fight"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can remove drivers"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
@@ -224,6 +239,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     # Set up new driver linkage if driver_id is provided and not empty
     if driver_id && driver_id != "" do
       driver_shot = Fights.get_shot(driver_id)
+
       if driver_shot && driver_shot.character_id do
         # Link the driver shot to this vehicle
         Fights.assign_driver(driver_shot, shot.id)

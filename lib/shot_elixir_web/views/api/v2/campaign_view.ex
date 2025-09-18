@@ -1,20 +1,22 @@
 defmodule ShotElixirWeb.Api.V2.CampaignView do
-
   def render("index.json", %{campaigns: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
       %{campaigns: campaigns, meta: meta, is_autocomplete: is_autocomplete} ->
-        campaign_serializer = if is_autocomplete, do: &render_campaign_autocomplete/1, else: &render_campaign/1
+        campaign_serializer =
+          if is_autocomplete, do: &render_campaign_autocomplete/1, else: &render_campaign/1
 
         %{
           campaigns: Enum.map(campaigns, campaign_serializer),
           meta: meta
         }
+
       %{campaigns: campaigns, meta: meta} ->
         %{
           campaigns: Enum.map(campaigns, &render_campaign/1),
           meta: meta
         }
+
       campaigns when is_list(campaigns) ->
         # Legacy format for backward compatibility
         %{
@@ -63,11 +65,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
 
   def render("error.json", %{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -96,20 +99,23 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     base = render_campaign(campaign)
 
     # Add associations if they're loaded
-    members = case Map.get(campaign, :members) do
-      %Ecto.Association.NotLoaded{} -> []
-      members -> Enum.map(members, &render_user_summary/1)
-    end
+    members =
+      case Map.get(campaign, :members) do
+        %Ecto.Association.NotLoaded{} -> []
+        members -> Enum.map(members, &render_user_summary/1)
+      end
 
-    characters = case Map.get(campaign, :characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      characters -> Enum.map(characters, &render_character_summary/1)
-    end
+    characters =
+      case Map.get(campaign, :characters) do
+        %Ecto.Association.NotLoaded{} -> []
+        characters -> Enum.map(characters, &render_character_summary/1)
+      end
 
-    fights = case Map.get(campaign, :fights) do
-      %Ecto.Association.NotLoaded{} -> []
-      fights -> Enum.map(fights, &render_fight/1)
-    end
+    fights =
+      case Map.get(campaign, :fights) do
+        %Ecto.Association.NotLoaded{} -> []
+        fights -> Enum.map(fights, &render_fight/1)
+      end
 
     Map.merge(base, %{
       members: members,

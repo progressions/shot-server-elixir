@@ -18,7 +18,8 @@ defmodule ShotElixir.Sites.Attunement do
     |> foreign_key_constraint(:character_id)
     |> foreign_key_constraint(:site_id)
     |> unique_constraint([:character_id, :site_id],
-        name: :attunements_character_id_site_id_index,
-        message: "Character already attuned to this site")
+      name: :attunements_character_id_site_id_index,
+      message: "Character already attuned to this site"
+    )
   end
 end

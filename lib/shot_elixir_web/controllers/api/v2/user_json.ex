@@ -26,11 +26,12 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
 
   def error(%{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -52,15 +53,17 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
   defp user_json_with_campaigns(user) do
     base = user_json(user)
 
-    campaigns = case Map.get(user, :campaigns) do
-      %Ecto.Association.NotLoaded{} -> []
-      campaigns -> Enum.map(campaigns, &campaign_summary/1)
-    end
+    campaigns =
+      case Map.get(user, :campaigns) do
+        %Ecto.Association.NotLoaded{} -> []
+        campaigns -> Enum.map(campaigns, &campaign_summary/1)
+      end
 
-    player_campaigns = case Map.get(user, :player_campaigns) do
-      %Ecto.Association.NotLoaded{} -> []
-      campaigns -> Enum.map(campaigns, &campaign_summary/1)
-    end
+    player_campaigns =
+      case Map.get(user, :player_campaigns) do
+        %Ecto.Association.NotLoaded{} -> []
+        campaigns -> Enum.map(campaigns, &campaign_summary/1)
+      end
 
     Map.merge(base, %{
       campaigns: campaigns,

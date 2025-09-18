@@ -9,11 +9,12 @@ defmodule ShotElixirWeb.Api.V2.JunctureJSON do
 
   def error(%{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -26,14 +27,15 @@ defmodule ShotElixirWeb.Api.V2.JunctureJSON do
       notion_page_id: juncture.notion_page_id,
       campaign_id: juncture.campaign_id,
       faction_id: juncture.faction_id,
-      faction: if juncture.faction do
-        %{
-          id: juncture.faction.id,
-          name: juncture.faction.name
-        }
-      else
-        nil
-      end,
+      faction:
+        if juncture.faction do
+          %{
+            id: juncture.faction.id,
+            name: juncture.faction.name
+          }
+        else
+          nil
+        end,
       created_at: juncture.created_at,
       updated_at: juncture.updated_at
     }

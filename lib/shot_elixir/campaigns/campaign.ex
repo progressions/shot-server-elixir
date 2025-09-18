@@ -42,17 +42,23 @@ defmodule ShotElixir.Campaigns.Campaign do
 
   defp validate_unique_name_per_user(changeset) do
     case {get_field(changeset, :name), get_field(changeset, :user_id)} do
-      {nil, _} -> changeset
-      {_, nil} -> changeset
+      {nil, _} ->
+        changeset
+
+      {_, nil} ->
+        changeset
+
       {name, user_id} ->
-        existing_query = from c in __MODULE__,
-          where: c.name == ^name and c.user_id == ^user_id
+        existing_query =
+          from c in __MODULE__,
+            where: c.name == ^name and c.user_id == ^user_id
 
         # If we're updating, exclude current record
-        existing_query = case get_field(changeset, :id) do
-          nil -> existing_query
-          id -> from c in existing_query, where: c.id != ^id
-        end
+        existing_query =
+          case get_field(changeset, :id) do
+            nil -> existing_query
+            id -> from c in existing_query, where: c.id != ^id
+          end
 
         if Repo.exists?(existing_query) do
           add_error(changeset, :name, "has already been taken")
@@ -71,7 +77,9 @@ defmodule ShotElixir.Campaigns.Campaign do
             false -> []
           end
         end)
-      _ -> changeset
+
+      _ ->
+        changeset
     end
   end
 end

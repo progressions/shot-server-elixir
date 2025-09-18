@@ -11,11 +11,12 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
 
   def error(%{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -40,10 +41,11 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
   defp fight_json_with_shots(fight) do
     base = fight_json(fight)
 
-    shots = case Map.get(fight, :shots) do
-      %Ecto.Association.NotLoaded{} -> []
-      shots -> Enum.map(shots, &shot_json/1)
-    end
+    shots =
+      case Map.get(fight, :shots) do
+        %Ecto.Association.NotLoaded{} -> []
+        shots -> Enum.map(shots, &shot_json/1)
+      end
 
     Map.put(base, :shots, shots)
   end
@@ -74,6 +76,7 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
 
   defp character_summary(nil), do: nil
   defp character_summary(%Ecto.Association.NotLoaded{}), do: nil
+
   defp character_summary(character) do
     %{
       id: character.id,
@@ -86,6 +89,7 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
 
   defp vehicle_summary(nil), do: nil
   defp vehicle_summary(%Ecto.Association.NotLoaded{}), do: nil
+
   defp vehicle_summary(vehicle) do
     %{
       id: vehicle.id,

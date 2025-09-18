@@ -38,7 +38,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
     current_user = Guardian.Plug.current_resource(conn)
 
     # Add campaign_id if not provided
-    juncture_params = Map.put_new(juncture_params, "campaign_id", current_user.current_campaign_id)
+    juncture_params =
+      Map.put_new(juncture_params, "campaign_id", current_user.current_campaign_id)
 
     case Junctures.create_juncture(juncture_params) do
       {:ok, juncture} ->

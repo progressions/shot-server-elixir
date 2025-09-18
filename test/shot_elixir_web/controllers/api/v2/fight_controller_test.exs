@@ -1,6 +1,17 @@
 defmodule ShotElixirWeb.Api.V2.FightControllerTest do
   use ShotElixirWeb.ConnCase
-  alias ShotElixir.{Fights, Campaigns, Accounts, Characters, Vehicles, Factions, Junctures, Parties}
+
+  alias ShotElixir.{
+    Fights,
+    Campaigns,
+    Accounts,
+    Characters,
+    Vehicles,
+    Factions,
+    Junctures,
+    Parties
+  }
+
   alias ShotElixir.Guardian
 
   @create_attrs %{
@@ -23,29 +34,32 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   setup %{conn: conn} do
     # Create gamemaster user
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm@test.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm@test.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
     # Create player user
-    {:ok, player} = Accounts.create_user(%{
-      email: "player@test.com",
-      password: "password123",
-      first_name: "Player",
-      last_name: "One",
-      gamemaster: false
-    })
+    {:ok, player} =
+      Accounts.create_user(%{
+        email: "player@test.com",
+        password: "password123",
+        first_name: "Player",
+        last_name: "One",
+        gamemaster: false
+      })
 
     # Create a campaign
-    {:ok, campaign} = Campaigns.create_campaign(%{
-      name: "Test Campaign",
-      description: "Campaign for fight testing",
-      user_id: gamemaster.id
-    })
+    {:ok, campaign} =
+      Campaigns.create_campaign(%{
+        name: "Test Campaign",
+        description: "Campaign for fight testing",
+        user_id: gamemaster.id
+      })
 
     # Set current campaign for users
     {:ok, gm_with_campaign} = Accounts.set_current_campaign(gamemaster, campaign.id)
@@ -55,31 +69,35 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
     {:ok, _} = Campaigns.add_member(campaign, player)
 
     # Create test data for complex filtering
-    {:ok, faction} = Factions.create_faction(%{
-      name: "Test Faction",
-      description: "A test faction",
-      campaign_id: campaign.id
-    })
+    {:ok, faction} =
+      Factions.create_faction(%{
+        name: "Test Faction",
+        description: "A test faction",
+        campaign_id: campaign.id
+      })
 
-    {:ok, juncture} = Junctures.create_juncture(%{
-      name: "Modern",
-      description: "Modern times",
-      campaign_id: campaign.id
-    })
+    {:ok, juncture} =
+      Junctures.create_juncture(%{
+        name: "Modern",
+        description: "Modern times",
+        campaign_id: campaign.id
+      })
 
-    {:ok, character} = Characters.create_character(%{
-      name: "Test Character",
-      campaign_id: campaign.id,
-      user_id: player.id,
-      action_values: %{"Type" => "PC"}
-    })
+    {:ok, character} =
+      Characters.create_character(%{
+        name: "Test Character",
+        campaign_id: campaign.id,
+        user_id: player.id,
+        action_values: %{"Type" => "PC"}
+      })
 
-    {:ok, vehicle} = Vehicles.create_vehicle(%{
-      name: "Test Vehicle",
-      action_values: %{},
-      campaign_id: campaign.id,
-      user_id: player.id
-    })
+    {:ok, vehicle} =
+      Vehicles.create_vehicle(%{
+        name: "Test Vehicle",
+        action_values: %{},
+        campaign_id: campaign.id,
+        user_id: player.id
+      })
 
     conn = put_req_header(conn, "accept", "application/json")
 
@@ -102,15 +120,21 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "index" do
     test "lists all active fights for campaign", %{conn: conn, gamemaster: gm, campaign: campaign} do
-      {:ok, fight1} = Fights.create_fight(Map.merge(@create_attrs, %{
-        name: "Fight 1",
-        campaign_id: campaign.id
-      }))
+      {:ok, fight1} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            name: "Fight 1",
+            campaign_id: campaign.id
+          })
+        )
 
-      {:ok, fight2} = Fights.create_fight(Map.merge(@create_attrs, %{
-        name: "Fight 2",
-        campaign_id: campaign.id
-      }))
+      {:ok, fight2} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            name: "Fight 2",
+            campaign_id: campaign.id
+          })
+        )
 
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/fights")
@@ -133,13 +157,14 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
     end
 
     test "returns error when no campaign selected", %{conn: conn} do
-      {:ok, user} = Accounts.create_user(%{
-        email: "nocampaign@test.com",
-        password: "password123",
-        first_name: "No",
-        last_name: "Campaign",
-        gamemaster: true
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "nocampaign@test.com",
+          password: "password123",
+          first_name: "No",
+          last_name: "Campaign",
+          gamemaster: true
+        })
 
       conn = authenticate(conn, user)
       conn = get(conn, ~p"/api/v2/fights")
@@ -154,9 +179,12 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "show" do
     setup %{gamemaster: gm, campaign: campaign} do
-      {:ok, fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{fight: fight}
     end
@@ -207,11 +235,17 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert response["fight"]["active"] == true
     end
 
-    test "creates fight with character and vehicle associations", %{conn: conn, gamemaster: gm, character: character, vehicle: vehicle} do
-      fight_attrs = Map.merge(@create_attrs, %{
-        character_ids: [character.id],
-        vehicle_ids: [vehicle.id]
-      })
+    test "creates fight with character and vehicle associations", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character,
+      vehicle: vehicle
+    } do
+      fight_attrs =
+        Map.merge(@create_attrs, %{
+          character_ids: [character.id],
+          vehicle_ids: [vehicle.id]
+        })
 
       conn = authenticate(conn, gm)
       conn = post(conn, ~p"/api/v2/fights", fight: fight_attrs)
@@ -252,9 +286,12 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "update" do
     setup %{gamemaster: gm, campaign: campaign} do
-      {:ok, fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{fight: fight}
     end
@@ -271,11 +308,18 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert response["fight"]["session"] == @update_attrs.session
     end
 
-    test "updates fight with character and vehicle associations", %{conn: conn, gamemaster: gm, fight: fight, character: character, vehicle: vehicle} do
-      update_attrs = Map.merge(@update_attrs, %{
-        character_ids: [character.id],
-        vehicle_ids: [vehicle.id]
-      })
+    test "updates fight with character and vehicle associations", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      character: character,
+      vehicle: vehicle
+    } do
+      update_attrs =
+        Map.merge(@update_attrs, %{
+          character_ids: [character.id],
+          vehicle_ids: [vehicle.id]
+        })
 
       conn = authenticate(conn, gm)
       conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: update_attrs)
@@ -330,9 +374,12 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "delete" do
     setup %{gamemaster: gm, campaign: campaign} do
-      {:ok, fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{fight: fight}
     end
@@ -368,9 +415,12 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "touch" do
     setup %{gamemaster: gm, campaign: campaign} do
-      {:ok, fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{fight: fight}
     end
@@ -405,9 +455,12 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "end_fight" do
     setup %{gamemaster: gm, campaign: campaign} do
-      {:ok, fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{fight: fight}
     end
@@ -442,14 +495,22 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "current_fight" do
     setup %{gamemaster: gm, campaign: campaign} do
-      {:ok, fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{fight: fight}
     end
 
-    test "returns current fight for campaign", %{conn: conn, gamemaster: gm, campaign: campaign, fight: fight} do
+    test "returns current fight for campaign", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign,
+      fight: fight
+    } do
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
       response = json_response(conn, 200)
@@ -459,11 +520,12 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
     end
 
     test "returns 404 when no active fight found", %{conn: conn, gamemaster: gm} do
-      {:ok, empty_campaign} = Campaigns.create_campaign(%{
-        name: "Empty Campaign",
-        description: "No fights",
-        user_id: gm.id
-      })
+      {:ok, empty_campaign} =
+        Campaigns.create_campaign(%{
+          name: "Empty Campaign",
+          description: "No fights",
+          user_id: gm.id
+        })
 
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/campaigns/#{empty_campaign.id}/current_fight")
@@ -472,7 +534,12 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert response["campaign"]["id"] == empty_campaign.id
     end
 
-    test "allows campaign members to view current fight", %{conn: conn, player: player, campaign: campaign, fight: fight} do
+    test "allows campaign members to view current fight", %{
+      conn: conn,
+      player: player,
+      campaign: campaign,
+      fight: fight
+    } do
       conn = authenticate(conn, player)
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
       response = json_response(conn, 200)
@@ -489,13 +556,14 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
     end
 
     test "returns 403 for non-member access", %{conn: conn, campaign: campaign} do
-      {:ok, other_user} = Accounts.create_user(%{
-        email: "other@test.com",
-        password: "password123",
-        first_name: "Other",
-        last_name: "User",
-        gamemaster: false
-      })
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "other@test.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User",
+          gamemaster: false
+        })
 
       conn = authenticate(conn, other_user)
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
@@ -510,42 +578,61 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
   describe "authorization" do
     setup %{gamemaster: gm, campaign: campaign} do
-      {:ok, admin} = Accounts.create_user(%{
-        email: "admin@test.com",
-        password: "password123",
-        first_name: "Admin",
-        last_name: "User",
-        gamemaster: false,
-        admin: true
-      })
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin@test.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          gamemaster: false,
+          admin: true
+        })
 
-      {:ok, other_gm} = Accounts.create_user(%{
-        email: "othergm@test.com",
-        password: "password123",
-        first_name: "Other",
-        last_name: "GM",
-        gamemaster: true
-      })
+      {:ok, other_gm} =
+        Accounts.create_user(%{
+          email: "othergm@test.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "GM",
+          gamemaster: true
+        })
 
-      {:ok, other_campaign} = Campaigns.create_campaign(%{
-        name: "Other Campaign",
-        description: "Different campaign",
-        user_id: other_gm.id
-      })
+      {:ok, other_campaign} =
+        Campaigns.create_campaign(%{
+          name: "Other Campaign",
+          description: "Different campaign",
+          user_id: other_gm.id
+        })
 
-      {:ok, fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
-      {:ok, other_fight} = Fights.create_fight(Map.merge(@create_attrs, %{
-        name: "Other Fight",
-        campaign_id: other_campaign.id
-      }))
+      {:ok, other_fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            name: "Other Fight",
+            campaign_id: other_campaign.id
+          })
+        )
 
-      %{admin: admin, other_gm: other_gm, other_campaign: other_campaign, fight: fight, other_fight: other_fight}
+      %{
+        admin: admin,
+        other_gm: other_gm,
+        other_campaign: other_campaign,
+        fight: fight,
+        other_fight: other_fight
+      }
     end
 
-    test "admin can manage fights in any campaign", %{conn: conn, admin: admin, other_fight: other_fight} do
+    test "admin can manage fights in any campaign", %{
+      conn: conn,
+      admin: admin,
+      other_fight: other_fight
+    } do
       conn = authenticate(conn, admin)
       conn = patch(conn, ~p"/api/v2/fights/#{other_fight.id}", fight: %{name: "Admin Updated"})
       response = json_response(conn, 200)
@@ -553,7 +640,11 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert response["fight"]["name"] == "Admin Updated"
     end
 
-    test "gamemaster cannot manage fights in other campaigns", %{conn: conn, gamemaster: gm, other_fight: other_fight} do
+    test "gamemaster cannot manage fights in other campaigns", %{
+      conn: conn,
+      gamemaster: gm,
+      other_fight: other_fight
+    } do
       conn = authenticate(conn, gm)
       conn = patch(conn, ~p"/api/v2/fights/#{other_fight.id}", fight: %{name: "Unauthorized"})
       assert json_response(conn, 404)["error"] == "Fight not found"

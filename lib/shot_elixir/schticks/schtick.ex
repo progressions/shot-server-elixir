@@ -27,26 +27,58 @@ defmodule ShotElixir.Schticks.Schtick do
 
   def changeset(schtick, attrs) do
     schtick
-    |> cast(attrs, [:name, :description, :category, :path, :color,
-                    :image_url, :bonus, :archetypes, :active,
-                    :campaign_id, :prerequisite_id])
+    |> cast(attrs, [
+      :name,
+      :description,
+      :category,
+      :path,
+      :color,
+      :image_url,
+      :bonus,
+      :archetypes,
+      :active,
+      :campaign_id,
+      :prerequisite_id
+    ])
     |> validate_required([:name, :campaign_id])
     |> validate_inclusion(:category, categories())
     |> validate_inclusion(:path, paths())
     |> foreign_key_constraint(:prerequisite_id)
     |> unique_constraint([:category, :name, :campaign_id],
-                        name: :index_schticks_on_category_name_and_campaign)
+      name: :index_schticks_on_category_name_and_campaign
+    )
   end
 
   def categories do
-    ["fu", "guns", "driving", "scroungetech", "sorcery", "creature",
-     "foe", "transformed", "magic", "genome", "awesoming_up"]
+    [
+      "fu",
+      "guns",
+      "driving",
+      "scroungetech",
+      "sorcery",
+      "creature",
+      "foe",
+      "transformed",
+      "magic",
+      "genome",
+      "awesoming_up"
+    ]
   end
 
   def paths do
-    ["Path of the Warrior", "Path of the Bandit", "Path of the Driver",
-     "Path of the Cop", "Path of the Sword", "Path of the Gun",
-     "Path of the Shield", "Path of the Dragon", "Path of the Tiger",
-     "Path of the Phoenix", "Path of the Ninja", "Path of the Samurai"]
+    [
+      "Path of the Warrior",
+      "Path of the Bandit",
+      "Path of the Driver",
+      "Path of the Cop",
+      "Path of the Sword",
+      "Path of the Gun",
+      "Path of the Shield",
+      "Path of the Dragon",
+      "Path of the Tiger",
+      "Path of the Phoenix",
+      "Path of the Ninja",
+      "Path of the Samurai"
+    ]
   end
 end

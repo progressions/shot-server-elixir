@@ -36,29 +36,32 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
 
   setup %{conn: conn} do
     # Create a gamemaster user
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm_vehicle@example.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm_vehicle@example.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
     # Create a player user
-    {:ok, player} = Accounts.create_user(%{
-      email: "player_vehicle@example.com",
-      password: "password123",
-      first_name: "Player",
-      last_name: "One",
-      gamemaster: false
-    })
+    {:ok, player} =
+      Accounts.create_user(%{
+        email: "player_vehicle@example.com",
+        password: "password123",
+        first_name: "Player",
+        last_name: "One",
+        gamemaster: false
+      })
 
     # Create a campaign
-    {:ok, campaign} = Campaigns.create_campaign(%{
-      name: "Vehicle Test Campaign",
-      description: "Campaign for vehicle testing",
-      user_id: gamemaster.id
-    })
+    {:ok, campaign} =
+      Campaigns.create_campaign(%{
+        name: "Vehicle Test Campaign",
+        description: "Campaign for vehicle testing",
+        user_id: gamemaster.id
+      })
 
     # Set current campaign for users
     {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: campaign.id})
@@ -67,7 +70,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
     # Add player to campaign
     Campaigns.add_member(campaign, player)
 
-    {:ok, conn: put_req_header(conn, "accept", "application/json"),
+    {:ok,
+     conn: put_req_header(conn, "accept", "application/json"),
      gamemaster: gamemaster,
      player: player,
      campaign: campaign}
@@ -79,21 +83,32 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
   end
 
   describe "index" do
-    test "lists all vehicles for current campaign when authenticated", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
+    test "lists all vehicles for current campaign when authenticated", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
       # Create some vehicles
-      {:ok, vehicle1} = Vehicles.create_vehicle(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        user_id: gamemaster.id,
-        name: "Vehicle 1"
-      }))
+      {:ok, vehicle1} =
+        Vehicles.create_vehicle(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gamemaster.id,
+            name: "Vehicle 1"
+          })
+        )
 
-      {:ok, vehicle2} = Vehicles.create_vehicle(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        user_id: gamemaster.id,
-        name: "Vehicle 2"
-      }))
+      {:ok, vehicle2} =
+        Vehicles.create_vehicle(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gamemaster.id,
+            name: "Vehicle 2"
+          })
+        )
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/vehicles")
 
@@ -108,7 +123,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
       # Clear current campaign
       {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: nil})
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/vehicles")
 
@@ -123,7 +139,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
 
   describe "archetypes" do
     test "lists vehicle archetypes", %{conn: conn, gamemaster: gamemaster} do
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/vehicles/archetypes")
 
@@ -143,16 +160,24 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
 
   describe "show" do
     setup %{gamemaster: gamemaster, campaign: campaign} do
-      {:ok, vehicle} = Vehicles.create_vehicle(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        user_id: gamemaster.id
-      }))
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gamemaster.id
+          })
+        )
 
       {:ok, vehicle: vehicle}
     end
 
-    test "shows a vehicle when authenticated", %{conn: conn, gamemaster: gamemaster, vehicle: vehicle} do
-      conn = conn
+    test "shows a vehicle when authenticated", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      vehicle: vehicle
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/vehicles/#{vehicle.id}")
 
@@ -165,7 +190,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
     test "returns 404 for non-existent vehicle", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/vehicles/#{fake_id}")
 
@@ -179,8 +205,13 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
   end
 
   describe "create" do
-    test "creates vehicle with valid attributes", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      conn = conn
+    test "creates vehicle with valid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/vehicles", vehicle: @create_attrs)
 
@@ -194,7 +225,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
     end
 
     test "returns errors with invalid attributes", %{conn: conn, gamemaster: gamemaster} do
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/vehicles", vehicle: @invalid_attrs)
 
@@ -207,7 +239,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
     end
 
     test "player can create vehicle", %{conn: conn, player: player} do
-      conn = conn
+      conn =
+        conn
         |> authenticate(player)
         |> post("/api/v2/vehicles", vehicle: @create_attrs)
 
@@ -217,16 +250,24 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
 
   describe "update" do
     setup %{gamemaster: gamemaster, campaign: campaign} do
-      {:ok, vehicle} = Vehicles.create_vehicle(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        user_id: gamemaster.id
-      }))
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gamemaster.id
+          })
+        )
 
       {:ok, vehicle: vehicle}
     end
 
-    test "updates vehicle with valid attributes", %{conn: conn, gamemaster: gamemaster, vehicle: vehicle} do
-      conn = conn
+    test "updates vehicle with valid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      vehicle: vehicle
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/vehicles/#{vehicle.id}", vehicle: @update_attrs)
 
@@ -237,8 +278,13 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
       assert response["impairments"] == 2
     end
 
-    test "returns errors with invalid attributes", %{conn: conn, gamemaster: gamemaster, vehicle: vehicle} do
-      conn = conn
+    test "returns errors with invalid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      vehicle: vehicle
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/vehicles/#{vehicle.id}", vehicle: @invalid_attrs)
 
@@ -248,7 +294,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
     test "returns 404 for non-existent vehicle", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/vehicles/#{fake_id}", vehicle: @update_attrs)
 
@@ -263,16 +310,24 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
 
   describe "delete" do
     setup %{gamemaster: gamemaster, campaign: campaign} do
-      {:ok, vehicle} = Vehicles.create_vehicle(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        user_id: gamemaster.id
-      }))
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gamemaster.id
+          })
+        )
 
       {:ok, vehicle: vehicle}
     end
 
-    test "soft deletes vehicle (sets active to false)", %{conn: conn, gamemaster: gamemaster, vehicle: vehicle} do
-      conn = conn
+    test "soft deletes vehicle (sets active to false)", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      vehicle: vehicle
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> delete("/api/v2/vehicles/#{vehicle.id}")
 
@@ -286,7 +341,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
     test "returns 404 for non-existent vehicle", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> delete("/api/v2/vehicles/#{fake_id}")
 

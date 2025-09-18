@@ -8,10 +8,11 @@ defmodule ShotElixir.Parties do
   alias ShotElixir.Parties.{Party, Membership}
 
   def list_parties(campaign_id) do
-    query = from p in Party,
-      where: p.campaign_id == ^campaign_id and p.active == true,
-      order_by: [asc: fragment("lower(?)", p.name)],
-      preload: [:faction, :juncture, memberships: [:character, :vehicle]]
+    query =
+      from p in Party,
+        where: p.campaign_id == ^campaign_id and p.active == true,
+        order_by: [asc: fragment("lower(?)", p.name)],
+        preload: [:faction, :juncture, memberships: [:character, :vehicle]]
 
     Repo.all(query)
   end
@@ -33,8 +34,11 @@ defmodule ShotElixir.Parties do
     |> Party.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, party} -> {:ok, Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]])}
-      error -> error
+      {:ok, party} ->
+        {:ok, Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]])}
+
+      error ->
+        error
     end
   end
 
@@ -43,8 +47,14 @@ defmodule ShotElixir.Parties do
     |> Party.changeset(attrs)
     |> Repo.update()
     |> case do
-      {:ok, party} -> {:ok, Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]], force: true)}
-      error -> error
+      {:ok, party} ->
+        {:ok,
+         Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]],
+           force: true
+         )}
+
+      error ->
+        error
     end
   end
 
@@ -77,22 +87,25 @@ defmodule ShotElixir.Parties do
   end
 
   def get_membership_by_party_and_member(party_id, character_id, vehicle_id) do
-    query = from m in Membership,
-      where: m.party_id == ^party_id
+    query =
+      from m in Membership,
+        where: m.party_id == ^party_id
 
-    query = if character_id do
-      where(query, [m], m.character_id == ^character_id)
-    else
-      where(query, [m], m.vehicle_id == ^vehicle_id)
-    end
+    query =
+      if character_id do
+        where(query, [m], m.character_id == ^character_id)
+      else
+        where(query, [m], m.vehicle_id == ^vehicle_id)
+      end
 
     Repo.one(query)
   end
 
   def list_party_memberships(party_id) do
-    query = from m in Membership,
-      where: m.party_id == ^party_id,
-      preload: [:character, :vehicle]
+    query =
+      from m in Membership,
+        where: m.party_id == ^party_id,
+        preload: [:character, :vehicle]
 
     Repo.all(query)
   end

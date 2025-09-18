@@ -6,9 +6,9 @@ defmodule ShotElixirWeb.HealthControllerTest do
       conn = get(conn, "/health")
 
       assert json_response(conn, 200) == %{
-        "status" => "ok",
-        "service" => "shot_elixir"
-      }
+               "status" => "ok",
+               "service" => "shot_elixir"
+             }
     end
   end
 end

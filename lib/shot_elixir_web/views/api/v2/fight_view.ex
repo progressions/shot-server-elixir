@@ -1,22 +1,24 @@
 defmodule ShotElixirWeb.Api.V2.FightView do
-
   def render("index.json", %{fights: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
       %{fights: fights, seasons: seasons, meta: meta, is_autocomplete: is_autocomplete} ->
-        fight_serializer = if is_autocomplete, do: &render_fight_autocomplete/1, else: &render_fight/1
+        fight_serializer =
+          if is_autocomplete, do: &render_fight_autocomplete/1, else: &render_fight/1
 
         %{
           fights: Enum.map(fights, fight_serializer),
           seasons: seasons,
           meta: meta
         }
+
       %{fights: fights, seasons: seasons, meta: meta} ->
         %{
           fights: Enum.map(fights, &render_fight/1),
           seasons: seasons,
           meta: meta
         }
+
       fights when is_list(fights) ->
         # Legacy format for backward compatibility
         %{
@@ -38,11 +40,12 @@ defmodule ShotElixirWeb.Api.V2.FightView do
 
   def render("error.json", %{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -74,10 +77,11 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     base = render_fight(fight)
 
     # Add associations if they're loaded
-    shots = case Map.get(fight, :shots) do
-      %Ecto.Association.NotLoaded{} -> []
-      shots -> Enum.map(shots, &render_shot/1)
-    end
+    shots =
+      case Map.get(fight, :shots) do
+        %Ecto.Association.NotLoaded{} -> []
+        shots -> Enum.map(shots, &render_shot/1)
+      end
 
     Map.merge(base, %{
       shots: shots

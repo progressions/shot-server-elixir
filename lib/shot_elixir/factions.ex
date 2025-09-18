@@ -8,9 +8,10 @@ defmodule ShotElixir.Factions do
   alias ShotElixir.Factions.Faction
 
   def list_factions(campaign_id) do
-    query = from f in Faction,
-      where: f.campaign_id == ^campaign_id and f.active == true,
-      order_by: [asc: fragment("lower(?)", f.name)]
+    query =
+      from f in Faction,
+        where: f.campaign_id == ^campaign_id and f.active == true,
+        order_by: [asc: fragment("lower(?)", f.name)]
 
     Repo.all(query)
   end

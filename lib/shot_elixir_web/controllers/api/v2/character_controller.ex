@@ -49,9 +49,10 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> put_status(:bad_request)
       |> json(%{error: "No current campaign set"})
     else
-      params = character_params
-      |> Map.put("campaign_id", campaign_id)
-      |> Map.put("user_id", current_user.id)
+      params =
+        character_params
+        |> Map.put("campaign_id", campaign_id)
+        |> Map.put("user_id", current_user.id)
 
       case Characters.create_character(params) do
         {:ok, character} ->
@@ -79,9 +80,15 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
       |> render("show.json", character: updated_character)
     else
-      nil -> {:error, :not_found}
-      {:error, :forbidden} -> {:error, :forbidden}
-      {:error, :unauthorized} -> {:error, :forbidden}
+      nil ->
+        {:error, :not_found}
+
+      {:error, :forbidden} ->
+        {:error, :forbidden}
+
+      {:error, :unauthorized} ->
+        {:error, :forbidden}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)

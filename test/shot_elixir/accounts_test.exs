@@ -104,18 +104,22 @@ defmodule ShotElixir.AccountsTest do
     test "authenticate_user/2 with valid credentials" do
       {:ok, user} = Accounts.create_user(@valid_attrs)
 
-      assert {:ok, authenticated_user} = Accounts.authenticate_user("test@example.com", "password123")
+      assert {:ok, authenticated_user} =
+               Accounts.authenticate_user("test@example.com", "password123")
+
       assert authenticated_user.id == user.id
     end
 
     test "authenticate_user/2 with invalid password" do
       {:ok, _user} = Accounts.create_user(@valid_attrs)
 
-      assert {:error, :invalid_credentials} = Accounts.authenticate_user("test@example.com", "wrongpassword")
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_user("test@example.com", "wrongpassword")
     end
 
     test "authenticate_user/2 with non-existent user" do
-      assert {:error, :invalid_credentials} = Accounts.authenticate_user("nonexistent@example.com", "password123")
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_user("nonexistent@example.com", "password123")
     end
 
     test "get_user_by_email/1 finds user by email" do

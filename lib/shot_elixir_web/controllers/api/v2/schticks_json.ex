@@ -11,11 +11,12 @@ defmodule ShotElixirWeb.Api.V2.SchticksJSON do
 
   def error(%{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -33,15 +34,16 @@ defmodule ShotElixirWeb.Api.V2.SchticksJSON do
       active: schtick.active,
       campaign_id: schtick.campaign_id,
       prerequisite_id: schtick.prerequisite_id,
-      prerequisite: if schtick.prerequisite do
-        %{
-          id: schtick.prerequisite.id,
-          name: schtick.prerequisite.name,
-          category: schtick.prerequisite.category
-        }
-      else
-        nil
-      end,
+      prerequisite:
+        if schtick.prerequisite do
+          %{
+            id: schtick.prerequisite.id,
+            name: schtick.prerequisite.name,
+            category: schtick.prerequisite.category
+          }
+        else
+          nil
+        end,
       created_at: schtick.created_at,
       updated_at: schtick.updated_at
     }

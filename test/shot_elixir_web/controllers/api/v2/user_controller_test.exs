@@ -23,20 +23,22 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
   describe "index" do
     test "lists all users when authenticated as admin", %{conn: conn} do
-      {:ok, admin} = Accounts.create_user(%{
-        email: "admin@example.com",
-        password: "password123",
-        first_name: "Admin",
-        last_name: "User",
-        admin: true
-      })
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin@example.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          admin: true
+        })
 
-      {:ok, _user1} = Accounts.create_user(%{
-        email: "user1@example.com",
-        password: "password123",
-        first_name: "User",
-        last_name: "One"
-      })
+      {:ok, _user1} =
+        Accounts.create_user(%{
+          email: "user1@example.com",
+          password: "password123",
+          first_name: "User",
+          last_name: "One"
+        })
 
       conn = authenticate(conn, admin)
       conn = get(conn, ~p"/api/v2/users")
@@ -52,13 +54,14 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "returns forbidden when not admin", %{conn: conn} do
-      {:ok, user} = Accounts.create_user(%{
-        email: "regular@example.com",
-        password: "password123",
-        first_name: "Regular",
-        last_name: "User",
-        admin: false
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "regular@example.com",
+          password: "password123",
+          first_name: "Regular",
+          last_name: "User",
+          admin: false
+        })
 
       conn = authenticate(conn, user)
       conn = get(conn, ~p"/api/v2/users")
@@ -68,19 +71,21 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
   describe "show" do
     setup do
-      {:ok, user} = Accounts.create_user(%{
-        email: "show@example.com",
-        password: "password123",
-        first_name: "Show",
-        last_name: "User"
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "show@example.com",
+          password: "password123",
+          first_name: "Show",
+          last_name: "User"
+        })
 
-      {:ok, other_user} = Accounts.create_user(%{
-        email: "other@example.com",
-        password: "password123",
-        first_name: "Other",
-        last_name: "User"
-      })
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "other@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User"
+        })
 
       %{user: user, other_user: other_user}
     end
@@ -96,13 +101,14 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "returns user data when authenticated as admin", %{conn: conn, user: user} do
-      {:ok, admin} = Accounts.create_user(%{
-        email: "admin2@example.com",
-        password: "password123",
-        first_name: "Admin",
-        last_name: "User",
-        admin: true
-      })
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin2@example.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          admin: true
+        })
 
       conn = authenticate(conn, admin)
       conn = get(conn, ~p"/api/v2/users/#{user.id}")
@@ -111,7 +117,11 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       assert response["user"]["id"] == user.id
     end
 
-    test "returns forbidden when accessing other user", %{conn: conn, user: user, other_user: other_user} do
+    test "returns forbidden when accessing other user", %{
+      conn: conn,
+      user: user,
+      other_user: other_user
+    } do
       conn = authenticate(conn, user)
       conn = get(conn, ~p"/api/v2/users/#{other_user.id}")
       assert json_response(conn, 403)["error"] == "Forbidden"
@@ -150,12 +160,13 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
   describe "update" do
     setup do
-      {:ok, user} = Accounts.create_user(%{
-        email: "update@example.com",
-        password: "password123",
-        first_name: "Update",
-        last_name: "User"
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "update@example.com",
+          password: "password123",
+          first_name: "Update",
+          last_name: "User"
+        })
 
       %{user: user}
     end
@@ -171,13 +182,14 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "updates user when authenticated as admin", %{conn: conn, user: user} do
-      {:ok, admin} = Accounts.create_user(%{
-        email: "admin3@example.com",
-        password: "password123",
-        first_name: "Admin",
-        last_name: "User",
-        admin: true
-      })
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin3@example.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          admin: true
+        })
 
       conn = authenticate(conn, admin)
       conn = patch(conn, ~p"/api/v2/users/#{user.id}", user: @update_attrs)
@@ -187,12 +199,13 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "returns forbidden when updating other user", %{conn: conn, user: user} do
-      {:ok, other_user} = Accounts.create_user(%{
-        email: "other2@example.com",
-        password: "password123",
-        first_name: "Other",
-        last_name: "User"
-      })
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "other2@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User"
+        })
 
       conn = authenticate(conn, user)
       conn = patch(conn, ~p"/api/v2/users/#{other_user.id}", user: @update_attrs)
@@ -208,12 +221,13 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
   describe "delete" do
     setup do
-      {:ok, user} = Accounts.create_user(%{
-        email: "delete@example.com",
-        password: "password123",
-        first_name: "Delete",
-        last_name: "User"
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "delete@example.com",
+          password: "password123",
+          first_name: "Delete",
+          last_name: "User"
+        })
 
       %{user: user}
     end
@@ -229,13 +243,14 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "deletes user when authenticated as admin", %{conn: conn, user: user} do
-      {:ok, admin} = Accounts.create_user(%{
-        email: "admin4@example.com",
-        password: "password123",
-        first_name: "Admin",
-        last_name: "User",
-        admin: true
-      })
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin4@example.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          admin: true
+        })
 
       conn = authenticate(conn, admin)
       conn = delete(conn, ~p"/api/v2/users/#{user.id}")
@@ -243,12 +258,13 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "returns forbidden when deleting other user", %{conn: conn, user: user} do
-      {:ok, other_user} = Accounts.create_user(%{
-        email: "other3@example.com",
-        password: "password123",
-        first_name: "Other",
-        last_name: "User"
-      })
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "other3@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User"
+        })
 
       conn = authenticate(conn, user)
       conn = delete(conn, ~p"/api/v2/users/#{other_user.id}")
@@ -258,12 +274,13 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
   describe "current" do
     test "returns current user when authenticated", %{conn: conn} do
-      {:ok, user} = Accounts.create_user(%{
-        email: "current@example.com",
-        password: "password123",
-        first_name: "Current",
-        last_name: "User"
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "current@example.com",
+          password: "password123",
+          first_name: "Current",
+          last_name: "User"
+        })
 
       conn = authenticate(conn, user)
       conn = get(conn, ~p"/api/v2/users/current")
@@ -283,12 +300,13 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
   describe "profile" do
     test "returns user profile when authenticated", %{conn: conn} do
-      {:ok, user} = Accounts.create_user(%{
-        email: "profile@example.com",
-        password: "password123",
-        first_name: "Profile",
-        last_name: "User"
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "profile@example.com",
+          password: "password123",
+          first_name: "Profile",
+          last_name: "User"
+        })
 
       conn = authenticate(conn, user)
       conn = get(conn, ~p"/api/v2/users/#{user.id}/profile")
@@ -301,19 +319,21 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "returns forbidden when accessing other user's profile", %{conn: conn} do
-      {:ok, user} = Accounts.create_user(%{
-        email: "user@example.com",
-        password: "password123",
-        first_name: "User",
-        last_name: "One"
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "user@example.com",
+          password: "password123",
+          first_name: "User",
+          last_name: "One"
+        })
 
-      {:ok, other} = Accounts.create_user(%{
-        email: "other@example.com",
-        password: "password123",
-        first_name: "Other",
-        last_name: "User"
-      })
+      {:ok, other} =
+        Accounts.create_user(%{
+          email: "other@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User"
+        })
 
       conn = authenticate(conn, user)
       conn = get(conn, ~p"/api/v2/users/#{other.id}/profile")
@@ -321,20 +341,22 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "admin can access any user's profile", %{conn: conn} do
-      {:ok, admin} = Accounts.create_user(%{
-        email: "admin5@example.com",
-        password: "password123",
-        first_name: "Admin",
-        last_name: "User",
-        admin: true
-      })
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin5@example.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          admin: true
+        })
 
-      {:ok, user} = Accounts.create_user(%{
-        email: "regular5@example.com",
-        password: "password123",
-        first_name: "Regular",
-        last_name: "User"
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "regular5@example.com",
+          password: "password123",
+          first_name: "Regular",
+          last_name: "User"
+        })
 
       conn = authenticate(conn, admin)
       conn = get(conn, ~p"/api/v2/users/#{user.id}/profile")

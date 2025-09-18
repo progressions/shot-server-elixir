@@ -1,24 +1,30 @@
 defmodule ShotElixirWeb.Api.V2.CharacterView do
-
   def render("index.json", %{characters: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
       %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
-        character_serializer = if is_autocomplete, do: &render_character_autocomplete/1, else: &render_character_lite/1
+        character_serializer =
+          if is_autocomplete, do: &render_character_autocomplete/1, else: &render_character_lite/1
 
         %{
           characters: Enum.map(characters, character_serializer),
-          factions: [], # TODO: Include factions from query
-          archetypes: [], # TODO: Include archetypes from query
+          # TODO: Include factions from query
+          factions: [],
+          # TODO: Include archetypes from query
+          archetypes: [],
           meta: meta
         }
+
       %{characters: characters, meta: meta} ->
         %{
           characters: Enum.map(characters, &render_character_lite/1),
-          factions: [], # TODO: Include factions from query
-          archetypes: [], # TODO: Include archetypes from query
+          # TODO: Include factions from query
+          factions: [],
+          # TODO: Include archetypes from query
+          archetypes: [],
           meta: meta
         }
+
       characters when is_list(characters) ->
         # Legacy format for backward compatibility
         %{
@@ -61,11 +67,12 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
 
   def render("error.json", %{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -94,25 +101,29 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     base = render_character_lite(character)
 
     # Add associations if they're loaded
-    faction = case Map.get(character, :faction) do
-      %Ecto.Association.NotLoaded{} -> nil
-      faction -> render_faction_lite(faction)
-    end
+    faction =
+      case Map.get(character, :faction) do
+        %Ecto.Association.NotLoaded{} -> nil
+        faction -> render_faction_lite(faction)
+      end
 
-    juncture = case Map.get(character, :juncture) do
-      %Ecto.Association.NotLoaded{} -> nil
-      juncture -> render_juncture_lite(juncture)
-    end
+    juncture =
+      case Map.get(character, :juncture) do
+        %Ecto.Association.NotLoaded{} -> nil
+        juncture -> render_juncture_lite(juncture)
+      end
 
-    schticks = case Map.get(character, :schticks) do
-      %Ecto.Association.NotLoaded{} -> []
-      schticks -> Enum.map(schticks, &render_schtick_lite/1)
-    end
+    schticks =
+      case Map.get(character, :schticks) do
+        %Ecto.Association.NotLoaded{} -> []
+        schticks -> Enum.map(schticks, &render_schtick_lite/1)
+      end
 
-    weapons = case Map.get(character, :weapons) do
-      %Ecto.Association.NotLoaded{} -> []
-      weapons -> Enum.map(weapons, &render_weapon_lite/1)
-    end
+    weapons =
+      case Map.get(character, :weapons) do
+        %Ecto.Association.NotLoaded{} -> []
+        weapons -> Enum.map(weapons, &render_weapon_lite/1)
+      end
 
     Map.merge(base, %{
       faction: faction,

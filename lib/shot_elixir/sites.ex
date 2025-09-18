@@ -8,10 +8,11 @@ defmodule ShotElixir.Sites do
   alias ShotElixir.Sites.{Site, Attunement}
 
   def list_sites(campaign_id) do
-    query = from s in Site,
-      where: s.campaign_id == ^campaign_id and s.active == true,
-      order_by: [asc: fragment("lower(?)", s.name)],
-      preload: [:faction, :juncture]
+    query =
+      from s in Site,
+        where: s.campaign_id == ^campaign_id and s.active == true,
+        order_by: [asc: fragment("lower(?)", s.name)],
+        preload: [:faction, :juncture]
 
     Repo.all(query)
   end
@@ -75,9 +76,10 @@ defmodule ShotElixir.Sites do
   end
 
   def list_site_attunements(site_id) do
-    query = from a in Attunement,
-      where: a.site_id == ^site_id,
-      preload: [:character]
+    query =
+      from a in Attunement,
+        where: a.site_id == ^site_id,
+        preload: [:character]
 
     Repo.all(query)
   end

@@ -43,8 +43,16 @@ defmodule ShotElixir.Accounts.User do
 
   def changeset(user, attrs) do
     user
-    |> cast(attrs, [:email, :password, :first_name, :last_name, :admin, :gamemaster,
-                    :current_campaign_id, :pending_invitation_id])
+    |> cast(attrs, [
+      :email,
+      :password,
+      :first_name,
+      :last_name,
+      :admin,
+      :gamemaster,
+      :current_campaign_id,
+      :pending_invitation_id
+    ])
     |> validate_required([:email, :first_name, :last_name])
     |> validate_format(:email, ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/)
     |> validate_length(:first_name, min: 2)
@@ -76,7 +84,9 @@ defmodule ShotElixir.Accounts.User do
 
   defp set_name(changeset) do
     case {get_change(changeset, :first_name), get_change(changeset, :last_name)} do
-      {nil, nil} -> changeset
+      {nil, nil} ->
+        changeset
+
       _ ->
         first = get_field(changeset, :first_name) || ""
         last = get_field(changeset, :last_name) || ""

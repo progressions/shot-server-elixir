@@ -17,12 +17,13 @@ defmodule ShotElixirWeb.AuthenticationTest do
     end
 
     test "signs in user with valid credentials", %{conn: conn, user: user} do
-      conn = post(conn, ~p"/users/sign_in", %{
-        user: %{
-          email: user.email,
-          password: "password123"
-        }
-      })
+      conn =
+        post(conn, ~p"/users/sign_in", %{
+          user: %{
+            email: user.email,
+            password: "password123"
+          }
+        })
 
       response = json_response(conn, 200)
       assert response["user"]["id"] == user.id
@@ -35,24 +36,26 @@ defmodule ShotElixirWeb.AuthenticationTest do
     end
 
     test "returns error with invalid password", %{conn: conn, user: user} do
-      conn = post(conn, ~p"/users/sign_in", %{
-        user: %{
-          email: user.email,
-          password: "wrongpassword"
-        }
-      })
+      conn =
+        post(conn, ~p"/users/sign_in", %{
+          user: %{
+            email: user.email,
+            password: "wrongpassword"
+          }
+        })
 
       response = json_response(conn, 401)
       assert response["error"] == "Invalid email or password"
     end
 
     test "returns error with non-existent email", %{conn: conn} do
-      conn = post(conn, ~p"/users/sign_in", %{
-        user: %{
-          email: "nonexistent@example.com",
-          password: "password123"
-        }
-      })
+      conn =
+        post(conn, ~p"/users/sign_in", %{
+          user: %{
+            email: "nonexistent@example.com",
+            password: "password123"
+          }
+        })
 
       response = json_response(conn, 401)
       assert response["error"] == "Invalid email or password"
@@ -66,14 +69,15 @@ defmodule ShotElixirWeb.AuthenticationTest do
 
   describe "sign_up" do
     test "creates new user and returns token", %{conn: conn} do
-      conn = post(conn, ~p"/users/sign_up", %{
-        user: %{
-          email: "newuser@example.com",
-          password: "password123",
-          first_name: "New",
-          last_name: "User"
-        }
-      })
+      conn =
+        post(conn, ~p"/users/sign_up", %{
+          user: %{
+            email: "newuser@example.com",
+            password: "password123",
+            first_name: "New",
+            last_name: "User"
+          }
+        })
 
       response = json_response(conn, 201)
       assert response["user"]["email"] == "newuser@example.com"
@@ -87,12 +91,13 @@ defmodule ShotElixirWeb.AuthenticationTest do
     end
 
     test "returns error with invalid data", %{conn: conn} do
-      conn = post(conn, ~p"/users/sign_up", %{
-        user: %{
-          email: "invalid-email",
-          password: "short"
-        }
-      })
+      conn =
+        post(conn, ~p"/users/sign_up", %{
+          user: %{
+            email: "invalid-email",
+            password: "short"
+          }
+        })
 
       response = json_response(conn, 422)
       assert response["errors"]
@@ -103,9 +108,10 @@ defmodule ShotElixirWeb.AuthenticationTest do
     test "returns error when email is already taken", %{conn: conn} do
       {:ok, _} = Accounts.create_user(@valid_user_attrs)
 
-      conn = post(conn, ~p"/users/sign_up", %{
-        user: @valid_user_attrs
-      })
+      conn =
+        post(conn, ~p"/users/sign_up", %{
+          user: @valid_user_attrs
+        })
 
       response = json_response(conn, 422)
       assert response["errors"]["email"]
@@ -125,9 +131,10 @@ defmodule ShotElixirWeb.AuthenticationTest do
     end
 
     test "signs out authenticated user", %{conn: conn, token: token} do
-      conn = conn
-             |> put_req_header("authorization", "Bearer #{token}")
-             |> delete(~p"/users/sign_out")
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> delete(~p"/users/sign_out")
 
       assert json_response(conn, 200)["message"] == "Signed out successfully"
     end
@@ -146,9 +153,10 @@ defmodule ShotElixirWeb.AuthenticationTest do
     end
 
     test "allows access with valid token", %{conn: conn, user: user, token: token} do
-      conn = conn
-             |> put_req_header("authorization", "Bearer #{token}")
-             |> get(~p"/api/v2/users/current")
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> get(~p"/api/v2/users/current")
 
       response = json_response(conn, 200)
       assert response["id"] == user.id
@@ -160,17 +168,19 @@ defmodule ShotElixirWeb.AuthenticationTest do
     end
 
     test "denies access with invalid token", %{conn: conn} do
-      conn = conn
-             |> put_req_header("authorization", "Bearer invalid_token")
-             |> get(~p"/api/v2/users/current")
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer invalid_token")
+        |> get(~p"/api/v2/users/current")
 
       assert json_response(conn, 401)["error"] == "Invalid token"
     end
 
     test "denies access with malformed authorization header", %{conn: conn} do
-      conn = conn
-             |> put_req_header("authorization", "InvalidFormat token")
-             |> get(~p"/api/v2/users/current")
+      conn =
+        conn
+        |> put_req_header("authorization", "InvalidFormat token")
+        |> get(~p"/api/v2/users/current")
 
       assert json_response(conn, 401)["error"] == "Not authenticated"
     end

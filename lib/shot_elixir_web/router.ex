@@ -39,6 +39,7 @@ defmodule ShotElixirWeb.Router do
 
     # User registration (public)
     post "/users", UserController, :create
+    post "/users/register", UserController, :register
   end
 
   # API V2 endpoints - Authenticated
@@ -50,6 +51,7 @@ defmodule ShotElixirWeb.Router do
     get "/users/profile", UserController, :profile
     get "/users/:id/profile", UserController, :profile
     patch "/users/profile", UserController, :update_profile
+    delete "/users/:id/remove_image", UserController, :remove_image
     resources "/users", UserController, except: [:create]
 
     # Campaigns
@@ -59,11 +61,13 @@ defmodule ShotElixirWeb.Router do
       post "/members", CampaignController, :add_member
       delete "/members/:user_id", CampaignController, :remove_member
     end
+
     post "/campaigns/current", CampaignController, :set_current
 
     # Characters
     get "/characters/names", CharacterController, :autocomplete
     post "/characters/pdf", CharacterController, :import
+
     resources "/characters", CharacterController do
       post "/sync", CharacterController, :sync
       post "/duplicate", CharacterController, :duplicate
@@ -72,6 +76,7 @@ defmodule ShotElixirWeb.Router do
 
     # Vehicles
     get "/vehicles/archetypes", VehicleController, :archetypes
+
     resources "/vehicles", VehicleController do
       delete "/remove_image", VehicleController, :remove_image
       patch "/update_chase_state", VehicleController, :update_chase_state
@@ -90,7 +95,14 @@ defmodule ShotElixirWeb.Router do
 
     # Other resources
     resources "/weapons", WeaponController
+
+    # Schticks with custom routes
+    get "/schticks/batch", SchticksController, :batch
+    get "/schticks/categories", SchticksController, :categories
+    get "/schticks/paths", SchticksController, :paths
+    post "/schticks/import", SchticksController, :import
     resources "/schticks", SchticksController
+
     resources "/junctures", JunctureController
 
     # Sites with attunement
@@ -104,6 +116,7 @@ defmodule ShotElixirWeb.Router do
       post "/members", PartyController, :add_member
       delete "/members/:membership_id", PartyController, :remove_member
     end
+
     resources "/factions", FactionController
     resources "/invitations", InvitationController
 

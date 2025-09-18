@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.ErrorView do
-
   def render("401.json", _assigns) do
     %{error: "Not authenticated"}
   end
@@ -22,11 +21,12 @@ defmodule ShotElixirWeb.ErrorView do
 
   def render("error.json", %{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 

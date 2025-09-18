@@ -25,9 +25,20 @@ defmodule ShotElixir.Weapons.Weapon do
 
   def changeset(weapon, attrs) do
     weapon
-    |> cast(attrs, [:name, :description, :damage, :concealment, :reload_value,
-                    :juncture, :mook_bonus, :category, :kachunk, :image_url,
-                    :active, :campaign_id])
+    |> cast(attrs, [
+      :name,
+      :description,
+      :damage,
+      :concealment,
+      :reload_value,
+      :juncture,
+      :mook_bonus,
+      :category,
+      :kachunk,
+      :image_url,
+      :active,
+      :campaign_id
+    ])
     |> validate_required([:name, :damage, :campaign_id])
     |> validate_number(:damage, greater_than_or_equal_to: 0)
     |> validate_number(:concealment, greater_than_or_equal_to: 0, less_than_or_equal_to: 5)

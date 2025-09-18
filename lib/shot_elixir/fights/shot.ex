@@ -25,9 +25,20 @@ defmodule ShotElixir.Fights.Shot do
 
   def changeset(shot, attrs) do
     shot
-    |> cast(attrs, [:shot, :position, :count, :color, :impairments, :location,
-                    :was_rammed_or_damaged, :fight_id, :character_id, :vehicle_id,
-                    :driver_id, :driving_id])
+    |> cast(attrs, [
+      :shot,
+      :position,
+      :count,
+      :color,
+      :impairments,
+      :location,
+      :was_rammed_or_damaged,
+      :fight_id,
+      :character_id,
+      :vehicle_id,
+      :driver_id,
+      :driving_id
+    ])
     |> validate_required([:shot, :fight_id])
     |> validate_number(:shot, greater_than_or_equal_to: 0)
     |> validate_number(:count, greater_than_or_equal_to: 0)
@@ -42,8 +53,10 @@ defmodule ShotElixir.Fights.Shot do
     cond do
       character_id == nil and vehicle_id == nil ->
         add_error(changeset, :base, "must have either character or vehicle")
+
       character_id != nil and vehicle_id != nil ->
         add_error(changeset, :base, "cannot have both character and vehicle")
+
       true ->
         changeset
     end

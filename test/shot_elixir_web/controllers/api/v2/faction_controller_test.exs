@@ -17,20 +17,22 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
   setup %{conn: conn} do
     # Create gamemaster user
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm@test.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm@test.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
     # Create a campaign
-    {:ok, campaign} = Campaigns.create_campaign(%{
-      name: "Faction Test Campaign",
-      description: "Campaign for faction testing",
-      user_id: gamemaster.id
-    })
+    {:ok, campaign} =
+      Campaigns.create_campaign(%{
+        name: "Faction Test Campaign",
+        description: "Campaign for faction testing",
+        user_id: gamemaster.id
+      })
 
     # Set current campaign for gamemaster
     {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: campaign.id})
@@ -54,15 +56,21 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
   describe "index" do
     test "lists all factions for campaign", %{conn: conn, campaign: campaign} do
-      {:ok, faction1} = Factions.create_faction(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Faction 1"
-      }))
+      {:ok, faction1} =
+        Factions.create_faction(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Faction 1"
+          })
+        )
 
-      {:ok, faction2} = Factions.create_faction(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Faction 2"
-      }))
+      {:ok, faction2} =
+        Factions.create_faction(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Faction 2"
+          })
+        )
 
       conn = get(conn, ~p"/api/v2/factions")
       response = json_response(conn, 200)
@@ -97,9 +105,12 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
   describe "show" do
     setup %{campaign: campaign} do
-      {:ok, faction} = Factions.create_faction(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, faction} =
+        Factions.create_faction(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{faction: faction}
     end
@@ -150,9 +161,12 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
   describe "update" do
     setup %{campaign: campaign} do
-      {:ok, faction} = Factions.create_faction(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, faction} =
+        Factions.create_faction(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{faction: faction}
     end
@@ -185,9 +199,12 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
   describe "delete" do
     setup %{campaign: campaign} do
-      {:ok, faction} = Factions.create_faction(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, faction} =
+        Factions.create_faction(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{faction: faction}
     end

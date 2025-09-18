@@ -17,20 +17,22 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
   setup %{conn: conn} do
     # Create gamemaster user
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm@test.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm@test.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
     # Create a campaign
-    {:ok, campaign} = Campaigns.create_campaign(%{
-      name: "Juncture Test Campaign",
-      description: "Campaign for juncture testing",
-      user_id: gamemaster.id
-    })
+    {:ok, campaign} =
+      Campaigns.create_campaign(%{
+        name: "Juncture Test Campaign",
+        description: "Campaign for juncture testing",
+        user_id: gamemaster.id
+      })
 
     # Set current campaign for gamemaster
     {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: campaign.id})
@@ -54,15 +56,21 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
   describe "index" do
     test "lists all junctures for campaign", %{conn: conn, campaign: campaign} do
-      {:ok, juncture1} = Junctures.create_juncture(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Contemporary"
-      }))
+      {:ok, juncture1} =
+        Junctures.create_juncture(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Contemporary"
+          })
+        )
 
-      {:ok, juncture2} = Junctures.create_juncture(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Ancient"
-      }))
+      {:ok, juncture2} =
+        Junctures.create_juncture(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Ancient"
+          })
+        )
 
       conn = get(conn, ~p"/api/v2/junctures")
       response = json_response(conn, 200)
@@ -97,9 +105,12 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
   describe "show" do
     setup %{campaign: campaign} do
-      {:ok, juncture} = Junctures.create_juncture(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, juncture} =
+        Junctures.create_juncture(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{juncture: juncture}
     end
@@ -150,9 +161,12 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
   describe "update" do
     setup %{campaign: campaign} do
-      {:ok, juncture} = Junctures.create_juncture(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, juncture} =
+        Junctures.create_juncture(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{juncture: juncture}
     end
@@ -185,9 +199,12 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
   describe "delete" do
     setup %{campaign: campaign} do
-      {:ok, juncture} = Junctures.create_juncture(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, juncture} =
+        Junctures.create_juncture(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       %{juncture: juncture}
     end

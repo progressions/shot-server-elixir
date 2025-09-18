@@ -75,11 +75,28 @@ defmodule ShotElixir.Characters.Character do
 
   def changeset(character, attrs) do
     character
-    |> cast(attrs, [:name, :active, :defense, :impairments, :color,
-                    :action_values, :description, :skills, :status,
-                    :image_url, :task, :summary, :wealth, :is_template,
-                    :notion_page_id, :last_synced_to_notion_at,
-                    :user_id, :campaign_id, :faction_id, :juncture_id])
+    |> cast(attrs, [
+      :name,
+      :active,
+      :defense,
+      :impairments,
+      :color,
+      :action_values,
+      :description,
+      :skills,
+      :status,
+      :image_url,
+      :task,
+      :summary,
+      :wealth,
+      :is_template,
+      :notion_page_id,
+      :last_synced_to_notion_at,
+      :user_id,
+      :campaign_id,
+      :faction_id,
+      :juncture_id
+    ])
     |> validate_required([:name, :campaign_id])
     |> validate_number(:impairments, greater_than_or_equal_to: 0)
     |> validate_character_type()

@@ -5,12 +5,13 @@ defmodule ShotElixirWeb.AuthErrorHandler do
 
   @impl Guardian.Plug.ErrorHandler
   def auth_error(conn, {type, reason}, _opts) do
-    message = case {type, reason} do
-      {:invalid_token, _} -> "Invalid token"
-      {:unauthenticated, _} -> "Not authenticated"
-      {:no_resource_found, _} -> "Not authenticated"
-      _ -> "Not authenticated"
-    end
+    message =
+      case {type, reason} do
+        {:invalid_token, _} -> "Invalid token"
+        {:unauthenticated, _} -> "Not authenticated"
+        {:no_resource_found, _} -> "Not authenticated"
+        _ -> "Not authenticated"
+      end
 
     body = Jason.encode!(%{error: message})
 

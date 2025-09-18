@@ -6,20 +6,22 @@ defmodule ShotElixir.CampaignsTest do
 
   describe "campaigns" do
     setup do
-      {:ok, user} = Accounts.create_user(%{
-        email: "gm@example.com",
-        password: "password123",
-        first_name: "Game",
-        last_name: "Master",
-        gamemaster: true
-      })
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "gm@example.com",
+          password: "password123",
+          first_name: "Game",
+          last_name: "Master",
+          gamemaster: true
+        })
 
-      {:ok, player} = Accounts.create_user(%{
-        email: "player@example.com",
-        password: "password123",
-        first_name: "Player",
-        last_name: "One"
-      })
+      {:ok, player} =
+        Accounts.create_user(%{
+          email: "player@example.com",
+          password: "password123",
+          first_name: "Player",
+          last_name: "One"
+        })
 
       {:ok, user: user, player: player}
     end
@@ -62,11 +64,13 @@ defmodule ShotElixir.CampaignsTest do
 
     test "get_user_campaigns/1 returns campaigns owned by user", %{user: user} do
       {:ok, campaign1} = Campaigns.create_campaign(Map.put(@valid_attrs, :user_id, user.id))
-      {:ok, campaign2} = Campaigns.create_campaign(%{
-        name: "Another Campaign",
-        description: "Another test",
-        user_id: user.id
-      })
+
+      {:ok, campaign2} =
+        Campaigns.create_campaign(%{
+          name: "Another Campaign",
+          description: "Another test",
+          user_id: user.id
+        })
 
       campaigns = Campaigns.get_user_campaigns(user.id)
       campaign_ids = Enum.map(campaigns, & &1.id)
@@ -106,11 +110,13 @@ defmodule ShotElixir.CampaignsTest do
       attrs1 = Map.merge(@valid_attrs, %{user_id: user.id, is_master_template: true})
       {:ok, _} = Campaigns.create_campaign(attrs1)
 
-      attrs2 = Map.merge(@valid_attrs, %{
-        name: "Second Campaign",
-        user_id: user.id,
-        is_master_template: true
-      })
+      attrs2 =
+        Map.merge(@valid_attrs, %{
+          name: "Second Campaign",
+          user_id: user.id,
+          is_master_template: true
+        })
+
       assert {:error, %Ecto.Changeset{} = changeset} = Campaigns.create_campaign(attrs2)
       errors = Ecto.Changeset.traverse_errors(changeset, fn {msg, _} -> msg end)
       assert errors[:is_master_template]
@@ -157,10 +163,12 @@ defmodule ShotElixir.CampaignsTest do
       assert {1, nil} = Campaigns.remove_member(campaign, player)
 
       # Verify member was removed
-      memberships = Repo.all(
-        from cm in CampaignMembership,
-        where: cm.campaign_id == ^campaign.id and cm.user_id == ^player.id
-      )
+      memberships =
+        Repo.all(
+          from cm in CampaignMembership,
+            where: cm.campaign_id == ^campaign.id and cm.user_id == ^player.id
+        )
+
       assert memberships == []
     end
 

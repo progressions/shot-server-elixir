@@ -28,9 +28,23 @@ defmodule ShotElixir.Vehicles.Vehicle do
 
   def changeset(vehicle, attrs) do
     vehicle
-    |> cast(attrs, [:name, :action_values, :color, :impairments, :active,
-                    :image_url, :task, :notion_page_id, :last_synced_to_notion_at,
-                    :summary, :description, :user_id, :campaign_id, :faction_id, :juncture_id])
+    |> cast(attrs, [
+      :name,
+      :action_values,
+      :color,
+      :impairments,
+      :active,
+      :image_url,
+      :task,
+      :notion_page_id,
+      :last_synced_to_notion_at,
+      :summary,
+      :description,
+      :user_id,
+      :campaign_id,
+      :faction_id,
+      :juncture_id
+    ])
     |> validate_required([:name, :action_values, :campaign_id])
   end
 end

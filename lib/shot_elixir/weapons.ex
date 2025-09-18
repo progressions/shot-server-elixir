@@ -8,9 +8,10 @@ defmodule ShotElixir.Weapons do
   alias ShotElixir.Weapons.Weapon
 
   def list_weapons(campaign_id, filters \\ %{}) do
-    query = from w in Weapon,
-      where: w.campaign_id == ^campaign_id and w.active == true,
-      order_by: [asc: fragment("lower(?)", w.name)]
+    query =
+      from w in Weapon,
+        where: w.campaign_id == ^campaign_id and w.active == true,
+        order_by: [asc: fragment("lower(?)", w.name)]
 
     query = apply_filters(query, filters)
     Repo.all(query)
@@ -23,11 +24,13 @@ defmodule ShotElixir.Weapons do
   end
 
   defp filter_by_category(query, nil), do: query
+
   defp filter_by_category(query, category) do
     from w in query, where: w.category == ^category
   end
 
   defp filter_by_juncture(query, nil), do: query
+
   defp filter_by_juncture(query, juncture) do
     from w in query, where: w.juncture == ^juncture
   end

@@ -19,31 +19,35 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
   @invalid_attrs %{name: nil, user_id: nil}
 
   setup %{conn: conn} do
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm@example.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm@example.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
-    {:ok, player} = Accounts.create_user(%{
-      email: "player@example.com",
-      password: "password123",
-      first_name: "Player",
-      last_name: "One",
-      gamemaster: false
-    })
+    {:ok, player} =
+      Accounts.create_user(%{
+        email: "player@example.com",
+        password: "password123",
+        first_name: "Player",
+        last_name: "One",
+        gamemaster: false
+      })
 
-    {:ok, other_gm} = Accounts.create_user(%{
-      email: "other_gm@example.com",
-      password: "password123",
-      first_name: "Other",
-      last_name: "GM",
-      gamemaster: true
-    })
+    {:ok, other_gm} =
+      Accounts.create_user(%{
+        email: "other_gm@example.com",
+        password: "password123",
+        first_name: "Other",
+        last_name: "GM",
+        gamemaster: true
+      })
 
-    {:ok, conn: put_req_header(conn, "accept", "application/json"),
+    {:ok,
+     conn: put_req_header(conn, "accept", "application/json"),
      gamemaster: gamemaster,
      player: player,
      other_gm: other_gm}
@@ -51,17 +55,19 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "index" do
     test "lists all user's campaigns when authenticated", %{conn: conn, gamemaster: gm} do
-      {:ok, campaign1} = Campaigns.create_campaign(%{
-        name: "Campaign 1",
-        description: "First campaign",
-        user_id: gm.id
-      })
+      {:ok, campaign1} =
+        Campaigns.create_campaign(%{
+          name: "Campaign 1",
+          description: "First campaign",
+          user_id: gm.id
+        })
 
-      {:ok, campaign2} = Campaigns.create_campaign(%{
-        name: "Campaign 2",
-        description: "Second campaign",
-        user_id: gm.id
-      })
+      {:ok, campaign2} =
+        Campaigns.create_campaign(%{
+          name: "Campaign 2",
+          description: "Second campaign",
+          user_id: gm.id
+        })
 
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/campaigns")
@@ -75,18 +81,24 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert "Campaign 2" in campaign_names
     end
 
-    test "includes campaigns where user is a member", %{conn: conn, gamemaster: gm, player: player} do
-      {:ok, owned_campaign} = Campaigns.create_campaign(%{
-        name: "Player's Campaign",
-        description: "Campaign owned by player",
-        user_id: player.id
-      })
+    test "includes campaigns where user is a member", %{
+      conn: conn,
+      gamemaster: gm,
+      player: player
+    } do
+      {:ok, owned_campaign} =
+        Campaigns.create_campaign(%{
+          name: "Player's Campaign",
+          description: "Campaign owned by player",
+          user_id: player.id
+        })
 
-      {:ok, gm_campaign} = Campaigns.create_campaign(%{
-        name: "GM's Campaign",
-        description: "Campaign owned by GM",
-        user_id: gm.id
-      })
+      {:ok, gm_campaign} =
+        Campaigns.create_campaign(%{
+          name: "GM's Campaign",
+          description: "Campaign owned by GM",
+          user_id: gm.id
+        })
 
       # Add player as member to GM's campaign
       {:ok, _} = Campaigns.add_member(gm_campaign, player)
@@ -108,11 +120,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "show" do
     setup %{gamemaster: gm} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Test Campaign",
-        description: "A test campaign",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Test Campaign",
+          description: "A test campaign",
+          user_id: gm.id
+        })
 
       %{campaign: campaign}
     end
@@ -137,7 +150,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert response["campaign"]["id"] == campaign.id
     end
 
-    test "returns forbidden when user has no access", %{conn: conn, other_gm: other_gm, campaign: campaign} do
+    test "returns forbidden when user has no access", %{
+      conn: conn,
+      other_gm: other_gm,
+      campaign: campaign
+    } do
       conn = authenticate(conn, other_gm)
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
       assert json_response(conn, 403)["error"] == "Forbidden"
@@ -189,11 +206,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "update" do
     setup %{gamemaster: gm} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Original Campaign",
-        description: "Original description",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Original Campaign",
+          description: "Original description",
+          user_id: gm.id
+        })
 
       %{campaign: campaign}
     end
@@ -209,7 +227,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert response["campaign"]["active"] == false
     end
 
-    test "returns forbidden when user is not owner", %{conn: conn, player: player, campaign: campaign} do
+    test "returns forbidden when user is not owner", %{
+      conn: conn,
+      player: player,
+      campaign: campaign
+    } do
       # Even if player is a member, they can't update
       {:ok, _} = Campaigns.add_member(campaign, player)
 
@@ -234,16 +256,21 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "delete" do
     setup %{gamemaster: gm} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Campaign to Delete",
-        description: "Will be deleted",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign to Delete",
+          description: "Will be deleted",
+          user_id: gm.id
+        })
 
       %{campaign: campaign}
     end
 
-    test "soft deletes campaign when user is owner", %{conn: conn, gamemaster: gm, campaign: campaign} do
+    test "soft deletes campaign when user is owner", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
       conn = authenticate(conn, gm)
       conn = delete(conn, ~p"/api/v2/campaigns/#{campaign.id}")
       assert response(conn, 204)
@@ -253,7 +280,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert deleted_campaign.active == false
     end
 
-    test "returns forbidden when user is not owner", %{conn: conn, player: player, campaign: campaign} do
+    test "returns forbidden when user is not owner", %{
+      conn: conn,
+      player: player,
+      campaign: campaign
+    } do
       conn = authenticate(conn, player)
       conn = delete(conn, ~p"/api/v2/campaigns/#{campaign.id}")
       assert json_response(conn, 403)["error"] == "Forbidden"
@@ -269,11 +300,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "set current campaign" do
     setup %{gamemaster: gm} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Campaign to Set",
-        description: "Will be set as current",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign to Set",
+          description: "Will be set as current",
+          user_id: gm.id
+        })
 
       %{campaign: campaign}
     end
@@ -291,7 +323,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert updated_user.current_campaign_id == campaign.id
     end
 
-    test "allows member to set campaign as current", %{conn: conn, player: player, campaign: campaign} do
+    test "allows member to set campaign as current", %{
+      conn: conn,
+      player: player,
+      campaign: campaign
+    } do
       {:ok, _} = Campaigns.add_member(campaign, player)
 
       conn = authenticate(conn, player)
@@ -301,7 +337,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert response["user"]["current_campaign_id"] == campaign.id
     end
 
-    test "returns forbidden when user has no access", %{conn: conn, other_gm: other_gm, campaign: campaign} do
+    test "returns forbidden when user has no access", %{
+      conn: conn,
+      other_gm: other_gm,
+      campaign: campaign
+    } do
       conn = authenticate(conn, other_gm)
       conn = patch(conn, ~p"/api/v2/campaigns/#{campaign.id}/set")
       assert json_response(conn, 403)["error"] == "Forbidden"
@@ -310,16 +350,21 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "set_current via POST" do
     setup %{gamemaster: gm} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Campaign for POST",
-        description: "Set via POST endpoint",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign for POST",
+          description: "Set via POST endpoint",
+          user_id: gm.id
+        })
 
       %{campaign: campaign}
     end
 
-    test "sets current campaign via POST endpoint", %{conn: conn, gamemaster: gm, campaign: campaign} do
+    test "sets current campaign via POST endpoint", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
       conn = authenticate(conn, gm)
       conn = post(conn, ~p"/api/v2/campaigns/current", %{campaign_id: campaign.id})
       response = json_response(conn, 200)
@@ -331,21 +376,23 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "current_fight" do
     setup %{gamemaster: gm} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Campaign with Fight",
-        description: "Has a fight",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign with Fight",
+          description: "Has a fight",
+          user_id: gm.id
+        })
 
       %{campaign: campaign}
     end
 
     test "returns current fight for campaign", %{conn: conn, gamemaster: gm, campaign: campaign} do
       # Create a fight for the campaign
-      {:ok, fight} = ShotElixir.Fights.create_fight(%{
-        name: "Test Fight",
-        campaign_id: campaign.id
-      })
+      {:ok, fight} =
+        ShotElixir.Fights.create_fight(%{
+          name: "Test Fight",
+          campaign_id: campaign.id
+        })
 
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
@@ -368,16 +415,22 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "add_member" do
     setup %{gamemaster: gm} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Campaign for Members",
-        description: "Testing membership",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign for Members",
+          description: "Testing membership",
+          user_id: gm.id
+        })
 
       %{campaign: campaign}
     end
 
-    test "adds user as campaign member", %{conn: conn, gamemaster: gm, campaign: campaign, player: player} do
+    test "adds user as campaign member", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign,
+      player: player
+    } do
       conn = authenticate(conn, gm)
       conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/members", %{user_id: player.id})
       response = json_response(conn, 201)
@@ -390,13 +443,23 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert Enum.any?(campaigns, fn c -> c.id == campaign.id end)
     end
 
-    test "returns forbidden when not owner", %{conn: conn, player: player, campaign: campaign, other_gm: other_gm} do
+    test "returns forbidden when not owner", %{
+      conn: conn,
+      player: player,
+      campaign: campaign,
+      other_gm: other_gm
+    } do
       conn = authenticate(conn, player)
       conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/members", %{user_id: other_gm.id})
       assert json_response(conn, 403)["error"] == "Forbidden"
     end
 
-    test "returns error for duplicate membership", %{conn: conn, gamemaster: gm, campaign: campaign, player: player} do
+    test "returns error for duplicate membership", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign,
+      player: player
+    } do
       # Add member first time
       {:ok, _} = Campaigns.add_member(campaign, player)
 
@@ -409,18 +472,24 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
 
   describe "remove_member" do
     setup %{gamemaster: gm, player: player} do
-      {:ok, campaign} = Campaigns.create_campaign(%{
-        name: "Campaign with Member",
-        description: "Has a member to remove",
-        user_id: gm.id
-      })
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign with Member",
+          description: "Has a member to remove",
+          user_id: gm.id
+        })
 
       {:ok, _} = Campaigns.add_member(campaign, player)
 
       %{campaign: campaign}
     end
 
-    test "removes user from campaign", %{conn: conn, gamemaster: gm, campaign: campaign, player: player} do
+    test "removes user from campaign", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign,
+      player: player
+    } do
       conn = authenticate(conn, gm)
       conn = delete(conn, ~p"/api/v2/campaigns/#{campaign.id}/members/#{player.id}")
       assert response(conn, 204)
@@ -436,7 +505,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert json_response(conn, 403)["error"] == "Forbidden"
     end
 
-    test "returns 204 even if member doesn't exist", %{conn: conn, gamemaster: gm, campaign: campaign, other_gm: other_gm} do
+    test "returns 204 even if member doesn't exist", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign,
+      other_gm: other_gm
+    } do
       conn = authenticate(conn, gm)
       conn = delete(conn, ~p"/api/v2/campaigns/#{campaign.id}/members/#{other_gm.id}")
       assert response(conn, 204)

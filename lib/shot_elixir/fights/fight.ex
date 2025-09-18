@@ -29,9 +29,21 @@ defmodule ShotElixir.Fights.Fight do
 
   def changeset(fight, attrs) do
     fight
-    |> cast(attrs, [:name, :active, :sequence, :archived, :description,
-                    :started_at, :ended_at, :season, :session, :server_id,
-                    :channel_id, :fight_message_id, :campaign_id])
+    |> cast(attrs, [
+      :name,
+      :active,
+      :sequence,
+      :archived,
+      :description,
+      :started_at,
+      :ended_at,
+      :season,
+      :session,
+      :server_id,
+      :channel_id,
+      :fight_message_id,
+      :campaign_id
+    ])
     |> validate_required([:name, :campaign_id])
     |> validate_number(:sequence, greater_than_or_equal_to: 0)
   end

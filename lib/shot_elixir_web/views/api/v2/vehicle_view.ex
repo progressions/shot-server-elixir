@@ -1,10 +1,17 @@
 defmodule ShotElixirWeb.Api.V2.VehicleView do
-
   def render("index.json", %{vehicles: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
-      %{vehicles: vehicles, factions: factions, archetypes: archetypes, types: types, meta: meta, is_autocomplete: is_autocomplete} ->
-        vehicle_serializer = if is_autocomplete, do: &render_vehicle_autocomplete/1, else: &render_vehicle/1
+      %{
+        vehicles: vehicles,
+        factions: factions,
+        archetypes: archetypes,
+        types: types,
+        meta: meta,
+        is_autocomplete: is_autocomplete
+      } ->
+        vehicle_serializer =
+          if is_autocomplete, do: &render_vehicle_autocomplete/1, else: &render_vehicle/1
 
         %{
           vehicles: Enum.map(vehicles, vehicle_serializer),
@@ -13,6 +20,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
           types: types,
           meta: meta
         }
+
       %{vehicles: vehicles, factions: factions, archetypes: archetypes, types: types, meta: meta} ->
         %{
           vehicles: Enum.map(vehicles, &render_vehicle/1),
@@ -21,6 +29,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
           types: types,
           meta: meta
         }
+
       vehicles when is_list(vehicles) ->
         # Legacy format for backward compatibility
         %{
@@ -48,11 +57,12 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
 
   def render("error.json", %{changeset: changeset}) do
     %{
-      errors: Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
         end)
-      end)
     }
   end
 
@@ -84,15 +94,17 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     base = render_vehicle(vehicle)
 
     # Add associations if they're loaded
-    user = case Map.get(vehicle, :user) do
-      %Ecto.Association.NotLoaded{} -> nil
-      user -> render_user(user)
-    end
+    user =
+      case Map.get(vehicle, :user) do
+        %Ecto.Association.NotLoaded{} -> nil
+        user -> render_user(user)
+      end
 
-    faction = case Map.get(vehicle, :faction) do
-      %Ecto.Association.NotLoaded{} -> nil
-      faction -> render_faction(faction)
-    end
+    faction =
+      case Map.get(vehicle, :faction) do
+        %Ecto.Association.NotLoaded{} -> nil
+        faction -> render_faction(faction)
+      end
 
     Map.merge(base, %{
       user: user,
@@ -101,6 +113,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
   end
 
   defp render_user(nil), do: nil
+
   defp render_user(user) do
     %{
       id: user.id,
@@ -110,6 +123,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
   end
 
   defp render_faction(nil), do: nil
+
   defp render_faction(faction) do
     %{
       id: faction.id,

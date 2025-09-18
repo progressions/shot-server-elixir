@@ -43,10 +43,12 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Vehicle not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Not authorized to view this vehicle"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
@@ -74,8 +76,10 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
       else
         # Handle JSON string parameters (Rails compatibility)
         parsed_params = parse_json_params(vehicle_params)
-        params = parsed_params
-        |> Map.put("campaign_id", campaign_id)
+
+        params =
+          parsed_params
+          |> Map.put("campaign_id", campaign_id)
 
         case Vehicles.create_vehicle(params) do
           {:ok, vehicle} ->
@@ -100,7 +104,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
          :ok <- authorize_vehicle_edit(vehicle, current_user),
-         {:ok, updated_vehicle} <- Vehicles.update_vehicle(vehicle, parse_json_params(vehicle_params)) do
+         {:ok, updated_vehicle} <-
+           Vehicles.update_vehicle(vehicle, parse_json_params(vehicle_params)) do
       conn
       |> put_view(ShotElixirWeb.Api.V2.VehicleView)
       |> render("show.json", vehicle: updated_vehicle)
@@ -109,14 +114,17 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Vehicle not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can update vehicles"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Vehicle not found"})
+
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -138,15 +146,19 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Vehicle not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can delete vehicles"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Vehicle not found"})
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -190,19 +202,23 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Vehicle not found"})
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Only gamemaster can update vehicle chase state"})
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Vehicle not found"})
+
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)
         |> put_view(ShotElixirWeb.Api.V2.VehicleView)
         |> render("error.json", changeset: changeset)
+
       {:error, reason} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -242,5 +258,6 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
       {:error, _} -> params
     end
   end
+
   defp parse_json_params(params), do: params
 end

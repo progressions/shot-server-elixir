@@ -28,29 +28,32 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
 
   setup %{conn: conn} do
     # Create a gamemaster user
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm_schtick@example.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm_schtick@example.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
     # Create a player user
-    {:ok, player} = Accounts.create_user(%{
-      email: "player_schtick@example.com",
-      password: "password123",
-      first_name: "Player",
-      last_name: "One",
-      gamemaster: false
-    })
+    {:ok, player} =
+      Accounts.create_user(%{
+        email: "player_schtick@example.com",
+        password: "password123",
+        first_name: "Player",
+        last_name: "One",
+        gamemaster: false
+      })
 
     # Create a campaign
-    {:ok, campaign} = Campaigns.create_campaign(%{
-      name: "Schtick Test Campaign",
-      description: "Campaign for schtick testing",
-      user_id: gamemaster.id
-    })
+    {:ok, campaign} =
+      Campaigns.create_campaign(%{
+        name: "Schtick Test Campaign",
+        description: "Campaign for schtick testing",
+        user_id: gamemaster.id
+      })
 
     # Set current campaign for users
     {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: campaign.id})
@@ -59,7 +62,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     # Add player to campaign
     Campaigns.add_member(campaign, player)
 
-    {:ok, conn: put_req_header(conn, "accept", "application/json"),
+    {:ok,
+     conn: put_req_header(conn, "accept", "application/json"),
      gamemaster: gamemaster,
      player: player,
      campaign: campaign}
@@ -71,20 +75,31 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
   end
 
   describe "index" do
-    test "lists all schticks for current campaign when authenticated", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
+    test "lists all schticks for current campaign when authenticated", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
       # Create some schticks
-      {:ok, _schtick1} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Schtick 1"
-      }))
+      {:ok, _schtick1} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Schtick 1"
+          })
+        )
 
-      {:ok, _schtick2} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Schtick 2",
-        category: "guns"
-      }))
+      {:ok, _schtick2} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Schtick 2",
+            category: "guns"
+          })
+        )
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks")
 
@@ -96,19 +111,26 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     end
 
     test "filters schticks by category", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      {:ok, _fu} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Fu Schtick",
-        category: "fu"
-      }))
+      {:ok, _fu} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Fu Schtick",
+            category: "fu"
+          })
+        )
 
-      {:ok, _guns} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Guns Schtick",
-        category: "guns"
-      }))
+      {:ok, _guns} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Guns Schtick",
+            category: "guns"
+          })
+        )
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks?category=fu")
 
@@ -121,7 +143,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       # Clear current campaign
       {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: nil})
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks")
 
@@ -136,15 +159,23 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
 
   describe "show" do
     setup %{campaign: campaign} do
-      {:ok, schtick} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, schtick} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       {:ok, schtick: schtick}
     end
 
-    test "shows a schtick when authenticated", %{conn: conn, gamemaster: gamemaster, schtick: schtick} do
-      conn = conn
+    test "shows a schtick when authenticated", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      schtick: schtick
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks/#{schtick.id}")
 
@@ -155,19 +186,30 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       assert response["prerequisite"] == nil
     end
 
-    test "shows schtick with prerequisite", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      {:ok, prereq} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Prerequisite"
-      }))
+    test "shows schtick with prerequisite", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      {:ok, prereq} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Prerequisite"
+          })
+        )
 
-      {:ok, schtick} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Advanced",
-        prerequisite_id: prereq.id
-      }))
+      {:ok, schtick} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Advanced",
+            prerequisite_id: prereq.id
+          })
+        )
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks/#{schtick.id}")
 
@@ -179,7 +221,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     test "returns 404 for non-existent schtick", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks/#{fake_id}")
 
@@ -193,8 +236,13 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
   end
 
   describe "create" do
-    test "creates schtick with valid attributes", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      conn = conn
+    test "creates schtick with valid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/schticks", schtick: @create_attrs)
 
@@ -207,16 +255,25 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       assert schtick.campaign_id == campaign.id
     end
 
-    test "creates schtick with prerequisite", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      {:ok, prereq} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Basic"
-      }))
+    test "creates schtick with prerequisite", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      {:ok, prereq} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Basic"
+          })
+        )
 
-      advanced_attrs = Map.put(@create_attrs, :prerequisite_id, prereq.id)
-                      |> Map.put(:name, "Advanced")
+      advanced_attrs =
+        Map.put(@create_attrs, :prerequisite_id, prereq.id)
+        |> Map.put(:name, "Advanced")
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/schticks", schtick: advanced_attrs)
 
@@ -225,7 +282,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     end
 
     test "returns errors with invalid attributes", %{conn: conn, gamemaster: gamemaster} do
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/schticks", schtick: @invalid_attrs)
 
@@ -235,7 +293,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     test "validates category values", %{conn: conn, gamemaster: gamemaster} do
       invalid_category = Map.put(@create_attrs, :category, "invalid_category")
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> post("/api/v2/schticks", schtick: invalid_category)
 
@@ -249,7 +308,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     end
 
     test "player can create schtick", %{conn: conn, player: player} do
-      conn = conn
+      conn =
+        conn
         |> authenticate(player)
         |> post("/api/v2/schticks", schtick: @create_attrs)
 
@@ -259,15 +319,23 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
 
   describe "update" do
     setup %{campaign: campaign} do
-      {:ok, schtick} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, schtick} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       {:ok, schtick: schtick}
     end
 
-    test "updates schtick with valid attributes", %{conn: conn, gamemaster: gamemaster, schtick: schtick} do
-      conn = conn
+    test "updates schtick with valid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      schtick: schtick
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/schticks/#{schtick.id}", schtick: @update_attrs)
 
@@ -278,8 +346,13 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       assert response["path"] == "Path of the Gun"
     end
 
-    test "returns errors with invalid attributes", %{conn: conn, gamemaster: gamemaster, schtick: schtick} do
-      conn = conn
+    test "returns errors with invalid attributes", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      schtick: schtick
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/schticks/#{schtick.id}", schtick: @invalid_attrs)
 
@@ -289,7 +362,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     test "returns 404 for non-existent schtick", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> patch("/api/v2/schticks/#{fake_id}", schtick: @update_attrs)
 
@@ -304,15 +378,23 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
 
   describe "delete" do
     setup %{campaign: campaign} do
-      {:ok, schtick} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id
-      }))
+      {:ok, schtick} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id
+          })
+        )
 
       {:ok, schtick: schtick}
     end
 
-    test "soft deletes schtick (sets active to false)", %{conn: conn, gamemaster: gamemaster, schtick: schtick} do
-      conn = conn
+    test "soft deletes schtick (sets active to false)", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      schtick: schtick
+    } do
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> delete("/api/v2/schticks/#{schtick.id}")
 
@@ -323,19 +405,30 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       assert updated_schtick.active == false
     end
 
-    test "prevents deletion of schtick with dependents", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
-      {:ok, prereq} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Basic"
-      }))
+    test "prevents deletion of schtick with dependents", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      {:ok, prereq} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Basic"
+          })
+        )
 
-      {:ok, _dependent} = Schticks.create_schtick(Map.merge(@create_attrs, %{
-        campaign_id: campaign.id,
-        name: "Advanced",
-        prerequisite_id: prereq.id
-      }))
+      {:ok, _dependent} =
+        Schticks.create_schtick(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Advanced",
+            prerequisite_id: prereq.id
+          })
+        )
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> delete("/api/v2/schticks/#{prereq.id}")
 
@@ -345,7 +438,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     test "returns 404 for non-existent schtick", %{conn: conn, gamemaster: gamemaster} do
       fake_id = Ecto.UUID.generate()
 
-      conn = conn
+      conn =
+        conn
         |> authenticate(gamemaster)
         |> delete("/api/v2/schticks/#{fake_id}")
 

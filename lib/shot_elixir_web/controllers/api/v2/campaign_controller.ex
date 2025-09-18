@@ -19,12 +19,14 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   def show(conn, %{"id" => id}) do
     current_user = GuardianPlug.current_resource(conn)
 
-    campaign = if id == "current" do
-      # Get current campaign from user
-      current_user.current_campaign_id && Campaigns.get_campaign(current_user.current_campaign_id)
-    else
-      Campaigns.get_campaign(id)
-    end
+    campaign =
+      if id == "current" do
+        # Get current campaign from user
+        current_user.current_campaign_id &&
+          Campaigns.get_campaign(current_user.current_campaign_id)
+      else
+        Campaigns.get_campaign(id)
+      end
 
     with %Campaign{} = campaign <- campaign,
          :ok <- authorize_campaign_access(campaign, current_user) do
@@ -89,12 +91,16 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
           |> render("error.json", changeset: changeset)
       end
     else
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Forbidden"})
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -116,12 +122,16 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
         end
       end
     else
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Forbidden"})
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -131,12 +141,14 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
     case current_user.current_campaign_id do
       nil ->
         conn |> json(nil)
+
       campaign_id ->
         case Campaigns.get_campaign(campaign_id) do
           %Campaign{} = campaign ->
             conn
             |> put_view(ShotElixirWeb.Api.V2.CampaignView)
             |> render("show.json", campaign: campaign)
+
           nil ->
             conn |> json(nil)
         end
@@ -150,7 +162,8 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
          :ok <- authorize_campaign_access(campaign, current_user),
-         {:ok, updated_user} <- ShotElixir.Accounts.set_current_campaign(current_user, campaign.id) do
+         {:ok, updated_user} <-
+           ShotElixir.Accounts.set_current_campaign(current_user, campaign.id) do
       conn
       |> put_view(ShotElixirWeb.Api.V2.CampaignView)
       |> render("set_current.json", campaign: campaign, user: updated_user)
@@ -202,13 +215,17 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       |> put_view(ShotElixirWeb.Api.V2.CampaignView)
       |> render("membership.json", membership: membership)
     else
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)
         |> put_view(ShotElixirWeb.Api.V2.CampaignView)
         |> render("error.json", changeset: changeset)
-      {:error, reason} -> {:error, reason}
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 
@@ -264,5 +281,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       {:error, _} -> params
     end
   end
+
   defp parse_json_params(params), do: params
 end

@@ -9,7 +9,9 @@ defmodule ShotElixir.Guardian do
 
   def resource_from_claims(%{"sub" => id, "jti" => jti}) do
     case Accounts.get_user(id) do
-      nil -> {:error, :user_not_found}
+      nil ->
+        {:error, :user_not_found}
+
       user ->
         # Verify JTI matches for revocation support
         if user.jti == jti do

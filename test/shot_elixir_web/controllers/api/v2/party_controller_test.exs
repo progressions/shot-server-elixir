@@ -5,33 +5,37 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
   setup %{conn: conn} do
     # Create gamemaster user
-    {:ok, gamemaster} = Accounts.create_user(%{
-      email: "gm@test.com",
-      password: "password123",
-      first_name: "Game",
-      last_name: "Master",
-      gamemaster: true
-    })
+    {:ok, gamemaster} =
+      Accounts.create_user(%{
+        email: "gm@test.com",
+        password: "password123",
+        first_name: "Game",
+        last_name: "Master",
+        gamemaster: true
+      })
 
     # Create a campaign
-    {:ok, campaign} = Campaigns.create_campaign(%{
-      name: "Party Test Campaign",
-      description: "Campaign for party testing",
-      user_id: gamemaster.id
-    })
+    {:ok, campaign} =
+      Campaigns.create_campaign(%{
+        name: "Party Test Campaign",
+        description: "Campaign for party testing",
+        user_id: gamemaster.id
+      })
 
     # Set current campaign for gamemaster
     {:ok, gamemaster} = Accounts.update_user(gamemaster, %{current_campaign_id: campaign.id})
 
-    {:ok, faction} = Factions.create_faction(%{
-      name: "Test Faction",
-      campaign_id: campaign.id
-    })
+    {:ok, faction} =
+      Factions.create_faction(%{
+        name: "Test Faction",
+        campaign_id: campaign.id
+      })
 
-    {:ok, juncture} = Junctures.create_juncture(%{
-      name: "Contemporary",
-      campaign_id: campaign.id
-    })
+    {:ok, juncture} =
+      Junctures.create_juncture(%{
+        name: "Contemporary",
+        campaign_id: campaign.id
+      })
 
     conn =
       conn
@@ -54,11 +58,13 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
   describe "index" do
     test "lists all parties for campaign", %{conn: conn, campaign: campaign} do
-      {:ok, party} = Parties.create_party(%{
-        name: "Heroes of Justice",
-        campaign_id: campaign.id,
-        description: "A brave group"
-      })
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Heroes of Justice",
+          campaign_id: campaign.id,
+          description: "A brave group"
+        })
+
       conn = get(conn, ~p"/api/v2/parties")
       assert %{"parties" => [returned_party]} = json_response(conn, 200)
       assert returned_party["id"] == party.id
@@ -72,21 +78,25 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
     test "returns error when no campaign selected", %{conn: conn, user: user} do
       {:ok, user_without_campaign} = Accounts.update_user(user, %{current_campaign_id: nil})
+
       conn =
         conn
         |> authenticate(user_without_campaign)
         |> get(~p"/api/v2/parties")
+
       assert %{"error" => "No active campaign selected"} = json_response(conn, 422)
     end
   end
 
   describe "show" do
     setup %{campaign: campaign} do
-      {:ok, party} = Parties.create_party(%{
-        name: "Heroes of Justice",
-        campaign_id: campaign.id,
-        description: "A brave group"
-      })
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Heroes of Justice",
+          campaign_id: campaign.id,
+          description: "A brave group"
+        })
+
       %{party: party}
     end
 
@@ -102,20 +112,28 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       assert %{"error" => "Party not found"} = json_response(conn, 404)
     end
 
-    test "includes characters and vehicles in show response", %{conn: conn, party: party, campaign: campaign} do
-      {:ok, character} = Characters.create_character(%{
-        name: "Test Character",
-        campaign_id: campaign.id
-      })
-      {:ok, vehicle} = Vehicles.create_vehicle(%{
-        name: "Test Vehicle",
-        campaign_id: campaign.id,
-        action_values: %{
-          "frame" => 10,
-          "handling" => 8,
-          "squeal" => 12
-        }
-      })
+    test "includes characters and vehicles in show response", %{
+      conn: conn,
+      party: party,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Test Character",
+          campaign_id: campaign.id
+        })
+
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Test Vehicle",
+          campaign_id: campaign.id,
+          action_values: %{
+            "frame" => 10,
+            "handling" => 8,
+            "squeal" => 12
+          }
+        })
+
       {:ok, _char_membership} = Parties.add_member(party.id, %{"character_id" => character.id})
       {:ok, _veh_membership} = Parties.add_member(party.id, %{"vehicle_id" => vehicle.id})
 
@@ -131,7 +149,12 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
   end
 
   describe "create" do
-    test "creates party with valid data", %{conn: conn, campaign: campaign, faction: faction, juncture: juncture} do
+    test "creates party with valid data", %{
+      conn: conn,
+      campaign: campaign,
+      faction: faction,
+      juncture: juncture
+    } do
       party_params = %{
         "name" => "Brave Warriors",
         "description" => "A courageous band",
@@ -157,19 +180,25 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
   describe "update" do
     setup %{campaign: campaign, faction: faction} do
-      {:ok, party} = Parties.create_party(%{
-        name: "Party",
-        campaign_id: campaign.id
-      })
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Party",
+          campaign_id: campaign.id
+        })
+
       %{party: party}
     end
 
     test "updates party with valid data", %{conn: conn, party: party, faction: faction} do
-      conn = patch(conn, ~p"/api/v2/parties/#{party.id}", party: %{
-        "name" => "Updated Party",
-        "description" => "New description",
-        "faction_id" => faction.id
-      })
+      conn =
+        patch(conn, ~p"/api/v2/parties/#{party.id}",
+          party: %{
+            "name" => "Updated Party",
+            "description" => "New description",
+            "faction_id" => faction.id
+          }
+        )
+
       assert %{"party" => updated_party} = json_response(conn, 200)
       assert updated_party["name"] == "Updated Party"
       assert updated_party["description"] == "New description"
@@ -190,10 +219,12 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
   describe "delete" do
     setup %{campaign: campaign} do
-      {:ok, party} = Parties.create_party(%{
-        name: "Party",
-        campaign_id: campaign.id
-      })
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Party",
+          campaign_id: campaign.id
+        })
+
       %{party: party}
     end
 
@@ -213,23 +244,29 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
   describe "add_member" do
     setup %{campaign: campaign} do
-      {:ok, party} = Parties.create_party(%{
-        name: "Party",
-        campaign_id: campaign.id
-      })
-      {:ok, character} = Characters.create_character(%{
-        name: "Test Character",
-        campaign_id: campaign.id
-      })
-      {:ok, vehicle} = Vehicles.create_vehicle(%{
-        name: "Test Vehicle",
-        campaign_id: campaign.id,
-        action_values: %{
-          "frame" => 10,
-          "handling" => 8,
-          "squeal" => 12
-        }
-      })
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Party",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Test Character",
+          campaign_id: campaign.id
+        })
+
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Test Vehicle",
+          campaign_id: campaign.id,
+          action_values: %{
+            "frame" => 10,
+            "handling" => 8,
+            "squeal" => 12
+          }
+        })
+
       %{party: party, character: character, vehicle: vehicle}
     end
 
@@ -250,17 +287,28 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
     end
 
     test "returns error when party not found", %{conn: conn, character: character} do
-      conn = post(conn, ~p"/api/v2/parties/#{Ecto.UUID.generate()}/members", character_id: character.id)
+      conn =
+        post(conn, ~p"/api/v2/parties/#{Ecto.UUID.generate()}/members",
+          character_id: character.id
+        )
+
       assert %{"error" => "Party not found"} = json_response(conn, 404)
     end
 
-    test "returns error for duplicate membership", %{conn: conn, party: party, character: character} do
+    test "returns error for duplicate membership", %{
+      conn: conn,
+      party: party,
+      character: character
+    } do
       {:ok, _} = Parties.add_member(party.id, %{"character_id" => character.id})
       conn = post(conn, ~p"/api/v2/parties/#{party.id}/members", character_id: character.id)
       assert %{"errors" => _} = json_response(conn, 422)
     end
 
-    test "returns error when neither character_id nor vehicle_id provided", %{conn: conn, party: party} do
+    test "returns error when neither character_id nor vehicle_id provided", %{
+      conn: conn,
+      party: party
+    } do
       conn = post(conn, ~p"/api/v2/parties/#{party.id}/members", %{})
       assert %{"errors" => _} = json_response(conn, 422)
     end
@@ -268,14 +316,18 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
   describe "remove_member" do
     setup %{campaign: campaign} do
-      {:ok, party} = Parties.create_party(%{
-        name: "Party",
-        campaign_id: campaign.id
-      })
-      {:ok, character} = Characters.create_character(%{
-        name: "Test Character",
-        campaign_id: campaign.id
-      })
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Party",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Test Character",
+          campaign_id: campaign.id
+        })
+
       {:ok, membership} = Parties.add_member(party.id, %{"character_id" => character.id})
       %{party: party, character: character, membership: membership}
     end
