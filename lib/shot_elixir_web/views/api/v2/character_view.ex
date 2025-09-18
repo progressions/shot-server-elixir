@@ -1,14 +1,36 @@
 defmodule ShotElixirWeb.Api.V2.CharacterView do
 
-  def render("index.json", %{characters: characters}) do
-    %{
-      characters: Enum.map(characters, &render_character_lite/1),
-      meta: %{
-        total: length(characters),
-        page: 1,
-        per_page: 15
-      }
-    }
+  def render("index.json", %{characters: data}) do
+    # Handle both old format (list) and new format (map with meta)
+    case data do
+      %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
+        character_serializer = if is_autocomplete, do: &render_character_autocomplete/1, else: &render_character_lite/1
+
+        %{
+          characters: Enum.map(characters, character_serializer),
+          factions: [], # TODO: Include factions from query
+          archetypes: [], # TODO: Include archetypes from query
+          meta: meta
+        }
+      %{characters: characters, meta: meta} ->
+        %{
+          characters: Enum.map(characters, &render_character_lite/1),
+          factions: [], # TODO: Include factions from query
+          archetypes: [], # TODO: Include archetypes from query
+          meta: meta
+        }
+      characters when is_list(characters) ->
+        # Legacy format for backward compatibility
+        %{
+          characters: Enum.map(characters, &render_character_lite/1),
+          meta: %{
+            current_page: 1,
+            per_page: 15,
+            total_count: length(characters),
+            total_pages: 1
+          }
+        }
+    end
   end
 
   def render("show.json", %{character: character}) do

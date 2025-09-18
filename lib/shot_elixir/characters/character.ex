@@ -48,7 +48,7 @@ defmodule ShotElixir.Characters.Character do
     field :task, :boolean
     field :summary, :string
     field :wealth, :string
-    field :is_template, :boolean
+    field :is_template, :boolean, default: false
     field :notion_page_id, Ecto.UUID
     field :last_synced_to_notion_at, :utc_datetime
 

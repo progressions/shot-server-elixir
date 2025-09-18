@@ -7,9 +7,9 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
 
   action_fallback ShotElixirWeb.FallbackController
 
-  def index(conn, _params) do
+  def index(conn, params) do
     current_user = GuardianPlug.current_resource(conn)
-    campaigns = Campaigns.get_user_campaigns(current_user.id)
+    campaigns = Campaigns.list_user_campaigns(current_user.id, params, current_user)
 
     conn
     |> put_view(ShotElixirWeb.Api.V2.CampaignView)
@@ -19,7 +19,14 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   def show(conn, %{"id" => id}) do
     current_user = GuardianPlug.current_resource(conn)
 
-    with %Campaign{} = campaign <- Campaigns.get_campaign(id),
+    campaign = if id == "current" do
+      # Get current campaign from user
+      current_user.current_campaign_id && Campaigns.get_campaign(current_user.current_campaign_id)
+    else
+      Campaigns.get_campaign(id)
+    end
+
+    with %Campaign{} = campaign <- campaign,
          :ok <- authorize_campaign_access(campaign, current_user) do
       conn
       |> put_view(ShotElixirWeb.Api.V2.CampaignView)
@@ -33,53 +40,106 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   def create(conn, %{"campaign" => campaign_params}) do
     current_user = GuardianPlug.current_resource(conn)
 
-    params = Map.put(campaign_params, "user_id", current_user.id)
+    with :ok <- authorize_gamemaster_or_admin(current_user) do
+      # Handle JSON string parameters for Rails compatibility
+      parsed_params = parse_json_params(campaign_params)
 
-    case Campaigns.create_campaign(params) do
-      {:ok, campaign} ->
-        conn
-        |> put_status(:created)
-        |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-        |> render("show.json", campaign: campaign)
+      params = Map.put(parsed_params, "user_id", current_user.id)
 
-      {:error, changeset} ->
+      case Campaigns.create_campaign(params) do
+        {:ok, campaign} ->
+          conn
+          |> put_status(:created)
+          |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+          |> render("show.json", campaign: campaign)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+          |> render("error.json", changeset: changeset)
+      end
+    else
+      {:error, :forbidden} ->
         conn
-        |> put_status(:unprocessable_entity)
-        |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-        |> render("error.json", changeset: changeset)
+        |> put_status(:forbidden)
+        |> json(%{error: "Gamemaster or admin access required"})
     end
   end
 
   def update(conn, %{"id" => id, "campaign" => campaign_params}) do
     current_user = GuardianPlug.current_resource(conn)
 
-    with %Campaign{} = campaign <- Campaigns.get_campaign(id),
-         :ok <- authorize_campaign_owner(campaign, current_user),
-         {:ok, updated_campaign} <- Campaigns.update_campaign(campaign, campaign_params) do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-      |> render("show.json", campaign: updated_campaign)
+    with :ok <- authorize_gamemaster_or_admin(current_user),
+         %Campaign{} = campaign <- Campaigns.get_campaign(id),
+         :ok <- authorize_campaign_owner(campaign, current_user) do
+      # Handle JSON string parameters for Rails compatibility
+      parsed_params = parse_json_params(campaign_params)
+
+      case Campaigns.update_campaign(campaign, parsed_params) do
+        {:ok, updated_campaign} ->
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+          |> render("show.json", campaign: updated_campaign)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+          |> render("error.json", changeset: changeset)
+      end
     else
       nil -> {:error, :not_found}
-      {:error, reason} when is_atom(reason) -> {:error, reason}
-      {:error, changeset} ->
+      {:error, :forbidden} ->
         conn
-        |> put_status(:unprocessable_entity)
-        |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-        |> render("error.json", changeset: changeset)
+        |> put_status(:forbidden)
+        |> json(%{error: "Gamemaster or admin access required"})
+      {:error, reason} -> {:error, reason}
     end
   end
 
   def delete(conn, %{"id" => id}) do
     current_user = GuardianPlug.current_resource(conn)
 
-    with %Campaign{} = campaign <- Campaigns.get_campaign(id),
-         :ok <- authorize_campaign_owner(campaign, current_user),
-         {:ok, _} <- Campaigns.delete_campaign(campaign) do
-      send_resp(conn, :no_content, "")
+    with :ok <- authorize_gamemaster_or_admin(current_user),
+         %Campaign{} = campaign <- Campaigns.get_campaign(id),
+         :ok <- authorize_campaign_owner(campaign, current_user) do
+      # Check if trying to delete current campaign
+      if campaign.id == current_user.current_campaign_id do
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "Cannot destroy the current campaign"})
+      else
+        case Campaigns.delete_campaign(campaign) do
+          {:ok, _} -> send_resp(conn, :no_content, "")
+          {:error, reason} -> {:error, reason}
+        end
+      end
     else
       nil -> {:error, :not_found}
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Gamemaster or admin access required"})
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  def current(conn, _params) do
+    current_user = GuardianPlug.current_resource(conn)
+
+    case current_user.current_campaign_id do
+      nil ->
+        conn |> json(nil)
+      campaign_id ->
+        case Campaigns.get_campaign(campaign_id) do
+          %Campaign{} = campaign ->
+            conn
+            |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+            |> render("show.json", campaign: campaign)
+          nil ->
+            conn |> json(nil)
+        end
     end
   end
 
@@ -170,13 +230,22 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   defp authorize_campaign_access(campaign, user) do
     cond do
       campaign.user_id == user.id -> :ok
+      user.admin -> :ok
       member_of_campaign?(campaign, user) -> :ok
       true -> {:error, :forbidden}
     end
   end
 
   defp authorize_campaign_owner(campaign, user) do
-    if campaign.user_id == user.id do
+    cond do
+      campaign.user_id == user.id -> :ok
+      user.admin -> :ok
+      true -> {:error, :forbidden}
+    end
+  end
+
+  defp authorize_gamemaster_or_admin(user) do
+    if user.gamemaster || user.admin do
       :ok
     else
       {:error, :forbidden}
@@ -187,4 +256,13 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
     campaigns = Campaigns.get_user_campaigns(user.id)
     Enum.any?(campaigns, fn c -> c.id == campaign.id end)
   end
+
+  # Handle JSON string parameters for Rails compatibility
+  defp parse_json_params(params) when is_binary(params) do
+    case Jason.decode(params) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> params
+    end
+  end
+  defp parse_json_params(params), do: params
 end

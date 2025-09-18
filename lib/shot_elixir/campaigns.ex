@@ -24,6 +24,130 @@ defmodule ShotElixir.Campaigns do
     Repo.all(query)
   end
 
+  def list_user_campaigns(user_id, params \\ %{}, current_user \\ nil) do
+    # Get pagination parameters - handle both string and integer params
+    per_page = case params["per_page"] do
+      nil -> 15
+      value when is_integer(value) -> value
+      value when is_binary(value) -> String.to_integer(value)
+    end
+
+    page = case params["page"] do
+      nil -> 1
+      value when is_integer(value) -> value
+      value when is_binary(value) -> String.to_integer(value)
+    end
+
+    offset = (page - 1) * per_page
+
+    # Base query for user's campaigns (both owned and member)
+    query = from c in Campaign,
+      left_join: cm in CampaignMembership, on: cm.campaign_id == c.id,
+      where: (c.user_id == ^user_id or cm.user_id == ^user_id) and c.active == true,
+      distinct: true
+
+    # Apply basic filters
+    query = if params["id"] do
+      from c in query, where: c.id == ^params["id"]
+    else
+      query
+    end
+
+    query = if params["ids"] do
+      ids = parse_ids(params["ids"])
+      from c in query, where: c.id in ^ids
+    else
+      query
+    end
+
+    query = if params["search"] do
+      from c in query, where: ilike(c.name, ^"%#{params["search"]}%")
+    else
+      query
+    end
+
+    # Association-based filters
+    query = if params["character_id"] do
+      from c in query,
+        join: ch in "characters", on: ch.campaign_id == c.id,
+        where: ch.id == ^params["character_id"]
+    else
+      query
+    end
+
+    query = if params["vehicle_id"] do
+      from c in query,
+        join: v in "vehicles", on: v.campaign_id == c.id,
+        where: v.id == ^params["vehicle_id"]
+    else
+      query
+    end
+
+    # Apply visibility filtering (default to active only)
+    query = apply_visibility_filter(query, params)
+
+    # Apply sorting
+    query = apply_sorting(query, params)
+
+    # Get total count for pagination
+    total_count = Repo.aggregate(query, :count, :id)
+
+    # Apply pagination
+    campaigns = query
+    |> limit(^per_page)
+    |> offset(^offset)
+    |> Repo.all()
+
+    # Return campaigns with pagination metadata
+    %{
+      campaigns: campaigns,
+      meta: %{
+        current_page: page,
+        per_page: per_page,
+        total_count: total_count,
+        total_pages: div(total_count + per_page - 1, per_page)
+      },
+      is_autocomplete: params["autocomplete"] == "true" || params["autocomplete"] == true
+    }
+  end
+
+  defp apply_visibility_filter(query, params) do
+    case params["visibility"] do
+      "hidden" ->
+        from c in query, where: c.active == false
+      "all" ->
+        query
+      _ ->
+        # Default to visible (active) only
+        from c in query, where: c.active == true
+    end
+  end
+
+  defp parse_ids(ids_param) when is_binary(ids_param) do
+    ids_param
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+  defp parse_ids(ids_param) when is_list(ids_param), do: ids_param
+  defp parse_ids(_), do: []
+
+  defp apply_sorting(query, params) do
+    sort = params["sort"] || "created_at"
+    order = if params["order"] == "ASC", do: :asc, else: :desc
+
+    case sort do
+      "name" ->
+        order_by(query, [c], [{^order, fragment("LOWER(?)", c.name)}])
+      "created_at" ->
+        order_by(query, [c], [{^order, c.created_at}])
+      "updated_at" ->
+        order_by(query, [c], [{^order, c.updated_at}])
+      _ ->
+        order_by(query, [c], [desc: c.created_at])
+    end
+  end
+
   def create_campaign(attrs \\ %{}) do
     %Campaign{}
     |> Campaign.changeset(attrs)

@@ -1,7 +1,32 @@
 defmodule ShotElixirWeb.Api.V2.CampaignView do
 
-  def render("index.json", %{campaigns: campaigns}) do
-    %{campaigns: Enum.map(campaigns, &render_campaign/1)}
+  def render("index.json", %{campaigns: data}) do
+    # Handle both old format (list) and new format (map with meta)
+    case data do
+      %{campaigns: campaigns, meta: meta, is_autocomplete: is_autocomplete} ->
+        campaign_serializer = if is_autocomplete, do: &render_campaign_autocomplete/1, else: &render_campaign/1
+
+        %{
+          campaigns: Enum.map(campaigns, campaign_serializer),
+          meta: meta
+        }
+      %{campaigns: campaigns, meta: meta} ->
+        %{
+          campaigns: Enum.map(campaigns, &render_campaign/1),
+          meta: meta
+        }
+      campaigns when is_list(campaigns) ->
+        # Legacy format for backward compatibility
+        %{
+          campaigns: Enum.map(campaigns, &render_campaign/1),
+          meta: %{
+            current_page: 1,
+            per_page: 15,
+            total_count: length(campaigns),
+            total_pages: 1
+          }
+        }
+    end
   end
 
   def render("show.json", %{campaign: campaign}) do
@@ -56,6 +81,14 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       user_id: campaign.user_id,
       created_at: campaign.created_at,
       updated_at: campaign.updated_at
+    }
+  end
+
+  defp render_campaign_autocomplete(campaign) do
+    %{
+      id: campaign.id,
+      name: campaign.name,
+      active: campaign.active
     }
   end
 
