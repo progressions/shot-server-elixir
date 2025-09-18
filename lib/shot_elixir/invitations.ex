@@ -6,7 +6,7 @@ defmodule ShotElixir.Invitations do
   defmodule Invitation do
     use Ecto.Schema
 
-    @primary_key {:id, :binary_id, autogenerate: false}
+    @primary_key {:id, :binary_id, autogenerate: true}
     @foreign_key_type :binary_id
 
     schema "invitations" do

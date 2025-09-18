@@ -4,7 +4,7 @@ defmodule ShotElixir.Campaigns.Campaign do
   import Ecto.Query
   alias ShotElixir.Repo
 
-  @primary_key {:id, :binary_id, autogenerate: false}
+  @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
   schema "campaigns" do

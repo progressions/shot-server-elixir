@@ -3,7 +3,7 @@ defmodule ShotElixir.Accounts.User do
   import Ecto.Changeset
   alias ShotElixir.Campaigns.Campaign
 
-  @primary_key {:id, :binary_id, autogenerate: false}
+  @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
 
   schema "users" do
@@ -49,7 +49,7 @@ defmodule ShotElixir.Accounts.User do
     |> validate_length(:first_name, min: 2)
     |> validate_length(:last_name, min: 2)
     |> validate_length(:password, min: 6, message: "should be at least 6 characters")
-    |> unique_constraint(:email)
+    |> unique_constraint(:email, name: :index_users_on_email)
     |> set_name()
     |> hash_password()
   end
@@ -69,7 +69,7 @@ defmodule ShotElixir.Accounts.User do
     |> validate_format(:email, ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/)
     |> validate_length(:first_name, min: 2)
     |> validate_length(:last_name, min: 2)
-    |> unique_constraint(:email)
+    |> unique_constraint(:email, name: :index_users_on_email)
     |> set_name()
   end
 
