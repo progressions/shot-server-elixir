@@ -13,6 +13,7 @@ defmodule ShotElixir.Accounts.User do
     field :first_name, :string
     field :last_name, :string
     field :name, :string
+    field :active, :boolean, default: true
     field :admin, :boolean, default: false
     field :gamemaster, :boolean, default: true
     field :jti, :string

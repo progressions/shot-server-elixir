@@ -43,7 +43,9 @@ defmodule ShotElixir.Accounts do
   end
 
   def delete_user(%User{} = user) do
-    Repo.delete(user)
+    user
+    |> Ecto.Changeset.change(active: false)
+    |> Repo.update()
   end
 
   def change_user(%User{} = user, attrs \\ %{}) do
@@ -100,6 +102,22 @@ defmodule ShotElixir.Accounts do
     user
     |> Ecto.Changeset.change(changes)
     |> Repo.update()
+  end
+
+  def generate_auth_token(user) do
+    ShotElixir.Guardian.encode_and_sign(user)
+  end
+
+  def validate_token(token) do
+    case ShotElixir.Guardian.decode_and_verify(token) do
+      {:ok, claims} ->
+        case get_user(claims["sub"]) do
+          nil -> {:error, :user_not_found}
+          user -> {:ok, user}
+        end
+      {:error, reason} ->
+        {:error, reason}
+    end
   end
 
   def generate_confirmation_token(%User{} = user) do
