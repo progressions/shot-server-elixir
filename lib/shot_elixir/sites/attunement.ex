@@ -2,12 +2,11 @@ defmodule ShotElixir.Sites.Attunement do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @primary_key {:id, :binary_id, autogenerate: true}
-  @foreign_key_type :binary_id
+  @primary_key {:id, :id, autogenerate: true}
 
   schema "attunements" do
-    belongs_to :character, ShotElixir.Characters.Character
-    belongs_to :site, ShotElixir.Sites.Site
+    belongs_to :character, ShotElixir.Characters.Character, type: :binary_id
+    belongs_to :site, ShotElixir.Sites.Site, type: :binary_id
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end

@@ -100,7 +100,8 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   end
 
   # POST /api/v2/parties/:id/members
-  def add_member(conn, %{"id" => id} = params) do
+  def add_member(conn, params) do
+    id = params["id"] || params["party_id"]
     party = Parties.get_party(id)
 
     cond do

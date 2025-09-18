@@ -100,7 +100,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   end
 
   # POST /api/v2/sites/:id/attune
-  def attune(conn, %{"id" => id, "character_id" => character_id}) do
+  def attune(conn, params) do
+    id = params["id"] || params["site_id"]
+    character_id = params["character_id"]
     site = Sites.get_site(id)
 
     cond do
@@ -124,7 +126,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   end
 
   # DELETE /api/v2/sites/:id/attune/:character_id
-  def unattune(conn, %{"id" => id, "character_id" => character_id}) do
+  def unattune(conn, params) do
+    id = params["id"] || params["site_id"]
+    character_id = params["character_id"]
     attunement = Sites.get_attunement_by_character_and_site(character_id, id)
 
     cond do
