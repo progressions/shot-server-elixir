@@ -16,6 +16,42 @@ defmodule ShotElixir.Characters do
     Repo.all(query)
   end
 
+  def list_campaign_characters(campaign_id, params \\ %{}) do
+    query = from c in Character,
+      where: c.campaign_id == ^campaign_id and c.active == true
+
+    # Apply filters
+    query = if params["search"] do
+      from c in query, where: ilike(c.name, ^"%#{params["search"]}%")
+    else
+      query
+    end
+
+    query = if params["character_type"] do
+      from c in query, where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
+    else
+      query
+    end
+
+    query = if params["faction_id"] do
+      from c in query, where: c.faction_id == ^params["faction_id"]
+    else
+      query
+    end
+
+    Repo.all(query |> order_by([c], asc: c.name))
+  end
+
+  def search_characters(campaign_id, search_term) do
+    query = from c in Character,
+      where: c.campaign_id == ^campaign_id and c.active == true,
+      where: ilike(c.name, ^"%#{search_term}%"),
+      limit: 10,
+      order_by: [asc: c.name]
+
+    Repo.all(query)
+  end
+
   def get_character!(id), do: Repo.get!(Character, id)
   def get_character(id), do: Repo.get(Character, id)
 
@@ -37,11 +73,14 @@ defmodule ShotElixir.Characters do
     |> Repo.update()
   end
 
-  def duplicate_character(%Character{} = character, new_name) do
+  def duplicate_character(%Character{} = character, user) do
     attrs = Map.from_struct(character)
     |> Map.delete(:id)
     |> Map.delete(:__meta__)
-    |> Map.put(:name, new_name)
+    |> Map.delete(:created_at)
+    |> Map.delete(:updated_at)
+    |> Map.put(:name, "#{character.name} (Copy)")
+    |> Map.put(:user_id, user.id)
 
     create_character(attrs)
   end
