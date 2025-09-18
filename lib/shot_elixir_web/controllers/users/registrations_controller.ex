@@ -25,6 +25,13 @@ defmodule ShotElixirWeb.Users.RegistrationsController do
     end
   end
 
+  # Handle missing user data
+  def create(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing user data"})
+  end
+
   defp render_user(user) do
     %{
       id: user.id,

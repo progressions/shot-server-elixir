@@ -25,13 +25,29 @@ defmodule ShotElixirWeb.Users.SessionsController do
     end
   end
 
+  # Handle missing or invalid parameters
+  def create(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing user credentials"})
+  end
+
   # DELETE /users/sign_out
   def delete(conn, _params) do
-    # In JWT strategy, we don't need server-side logout
-    # The client just removes the token
-    conn
-    |> put_status(:ok)
-    |> json(%{message: "Logged out successfully"})
+    # Check if user is authenticated
+    case Guardian.Plug.current_resource(conn) do
+      nil ->
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "Not authenticated"})
+
+      _user ->
+        # In JWT strategy, we don't need server-side logout
+        # The client just removes the token
+        conn
+        |> put_status(:ok)
+        |> json(%{message: "Signed out successfully"})
+    end
   end
 
   defp render_user(user) do

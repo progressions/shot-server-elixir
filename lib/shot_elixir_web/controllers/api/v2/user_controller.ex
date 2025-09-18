@@ -2,20 +2,46 @@ defmodule ShotElixirWeb.Api.V2.UserController do
   use ShotElixirWeb, :controller
 
   alias ShotElixir.Accounts
-  alias ShotElixir.Accounts.User
+  alias ShotElixir.Guardian
+  alias ShotElixirWeb.ErrorJSON
 
   action_fallback ShotElixirWeb.FallbackController
 
   # GET /api/v2/users
   def index(conn, _params) do
-    users = Accounts.list_users()
-    render(conn, "index.json", users: users)
+    current_user = Guardian.Plug.current_resource(conn)
+
+    if current_user.admin do
+      users = Accounts.list_users()
+      render(conn, :index, users: users)
+    else
+      conn
+      |> put_status(:forbidden)
+      |> json(%{error: "Forbidden"})
+    end
   end
 
   # GET /api/v2/users/:id
   def show(conn, %{"id" => id}) do
-    user = Accounts.get_user!(id)
-    render(conn, "show.json", user: user)
+    current_user = Guardian.Plug.current_resource(conn)
+
+    # First check if the user exists
+    case Accounts.get_user(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Not found"})
+
+      user ->
+        # Then check authorization
+        if current_user.admin || current_user.id == id do
+          render(conn, :show, user: user)
+        else
+          conn
+          |> put_status(:forbidden)
+          |> json(%{error: "Forbidden"})
+        end
+    end
   end
 
   # GET /api/v2/users/current
@@ -25,7 +51,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     if user do
       # Preload associations if needed
       user = user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
-      render(conn, "current.json", user: user)
+      render(conn, :current, user: user)
     else
       conn
       |> put_status(:unauthorized)
@@ -33,13 +59,34 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     end
   end
 
-  # GET /api/v2/users/profile
-  def profile(conn, _params) do
-    user = Guardian.Plug.current_resource(conn)
+  # GET /api/v2/users/profile or /api/v2/users/:id/profile
+  def profile(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
 
-    if user do
-      user = user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
-      render(conn, "profile.json", user: user)
+    if current_user do
+      case params do
+        %{"id" => id} ->
+          # Accessing a specific user's profile
+          if current_user.admin || current_user.id == id do
+            case Accounts.get_user(id) do
+              nil ->
+                conn
+                |> put_status(:not_found)
+                |> json(%{error: "Not found"})
+              user ->
+                user = user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
+                render(conn, :profile, user: user)
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Forbidden"})
+          end
+        _ ->
+          # Accessing own profile - always allowed
+          user = current_user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
+          render(conn, :profile, user: user)
+      end
     else
       conn
       |> put_status(:unauthorized)
@@ -53,11 +100,11 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
     case Accounts.update_user(user, user_params) do
       {:ok, updated_user} ->
-        render(conn, "show.json", user: updated_user)
+        render(conn, :show, user: updated_user)
       {:error, changeset} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> render("error.json", changeset: changeset)
+        |> render(:error, changeset: changeset)
     end
   end
 
@@ -65,16 +112,16 @@ defmodule ShotElixirWeb.Api.V2.UserController do
   def create(conn, %{"user" => user_params}) do
     case Accounts.create_user(user_params) do
       {:ok, user} ->
-        {:ok, token, _claims} = ShotElixir.Guardian.encode_and_sign(user)
+        {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
         conn
         |> put_status(:created)
         |> put_resp_header("authorization", "Bearer #{token}")
-        |> render("show.json", user: user, token: token)
+        |> render(:show, user: user, token: token)
       {:error, changeset} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> render("error.json", changeset: changeset)
+        |> render(:error, changeset: changeset)
     end
   end
 
@@ -87,32 +134,38 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     if current_user.admin || current_user.id == user.id do
       case Accounts.update_user(user, user_params) do
         {:ok, updated_user} ->
-          render(conn, "show.json", user: updated_user)
+          render(conn, :show, user: updated_user)
         {:error, changeset} ->
           conn
           |> put_status(:unprocessable_entity)
-          |> render("error.json", changeset: changeset)
+          |> render(:error, changeset: changeset)
       end
     else
       conn
       |> put_status(:forbidden)
-      |> json(%{error: "Not authorized"})
+      |> json(%{error: "Forbidden"})
     end
   end
 
   # DELETE /api/v2/users/:id
   def delete(conn, %{"id" => id}) do
-    user = Accounts.get_user!(id)
     current_user = Guardian.Plug.current_resource(conn)
+    user = Accounts.get_user(id)
 
-    # Only admin can delete users
-    if current_user.admin do
-      {:ok, _user} = Accounts.delete_user(user)
-      send_resp(conn, :no_content, "")
-    else
-      conn
-      |> put_status(:forbidden)
-      |> json(%{error: "Not authorized"})
+    cond do
+      # Only admin can delete other users, users can delete themselves
+      is_nil(user) ->
+        conn
+        |> put_status(:not_found)
+        |> put_view(ErrorJSON)
+        |> render("404.json")
+      current_user.admin || current_user.id == user.id ->
+        {:ok, _user} = Accounts.delete_user(user)
+        send_resp(conn, :no_content, "")
+      true ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Forbidden"})
     end
   end
 end

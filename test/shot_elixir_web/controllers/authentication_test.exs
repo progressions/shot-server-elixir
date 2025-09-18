@@ -43,7 +43,7 @@ defmodule ShotElixirWeb.AuthenticationTest do
       })
 
       response = json_response(conn, 401)
-      assert response["error"] == "Invalid credentials"
+      assert response["error"] == "Invalid email or password"
     end
 
     test "returns error with non-existent email", %{conn: conn} do
@@ -55,7 +55,7 @@ defmodule ShotElixirWeb.AuthenticationTest do
       })
 
       response = json_response(conn, 401)
-      assert response["error"] == "Invalid credentials"
+      assert response["error"] == "Invalid email or password"
     end
 
     test "returns error with missing credentials", %{conn: conn} do

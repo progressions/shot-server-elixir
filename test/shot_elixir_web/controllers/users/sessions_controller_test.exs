@@ -61,11 +61,15 @@ defmodule ShotElixirWeb.Users.SessionsControllerTest do
   end
 
   describe "DELETE /users/sign_out" do
-    test "logs out successfully", %{conn: conn} do
-      conn = delete(conn, "/users/sign_out")
+    test "logs out successfully", %{conn: conn, user: user} do
+      {:ok, token, _} = ShotElixir.Guardian.encode_and_sign(user)
+
+      conn = conn
+             |> put_req_header("authorization", "Bearer #{token}")
+             |> delete("/users/sign_out")
 
       assert json_response(conn, 200) == %{
-        "message" => "Logged out successfully"
+        "message" => "Signed out successfully"
       }
     end
   end

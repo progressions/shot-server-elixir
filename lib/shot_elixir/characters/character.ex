@@ -28,38 +28,29 @@ defmodule ShotElixir.Characters.Character do
     "Damage" => 0
   }
 
-  @character_types ["PC", "Ally", "Mook", "Featured Foe", "Boss", "Uber-Boss"]
+  @character_types ["PC", "NPC", "Ally", "Mook", "Featured Foe", "Boss", "Uber-Boss"]
 
   schema "characters" do
     field :name, :string
-    field :archetype, :string
-    field :character_type, :string, default: "PC"
     field :active, :boolean, default: true
-
-    # Core attributes
+    field :defense, :integer
     field :impairments, :integer, default: 0
-    field :category, :string
-    field :full_name, :string
-    field :catchphrase, :string
+    field :color, :string
 
-    # Action values stored as JSON
+    # JSONB fields
     field :action_values, :map, default: @default_action_values
     field :description, :map, default: %{}
     field :skills, :map, default: %{}
+    field :status, {:array, :map}, default: []
 
-    # Specific stats
-    field :fortune, :integer, default: 0
-    field :max_fortune, :integer, default: 0
-    field :wounds, :integer, default: 0
-    field :marks_of_death, :integer, default: 0
-    field :defense, :integer, default: 13
-    field :toughness, :integer, default: 5
-    field :speed, :integer, default: 5
-    field :damage, :integer, default: 7
-
-    # AI-generated content
-    field :notion_page_id, :string
-    field :driver_id, :string
+    # Additional fields from database
+    field :image_url, :string
+    field :task, :boolean
+    field :summary, :string
+    field :wealth, :string
+    field :is_template, :boolean
+    field :notion_page_id, Ecto.UUID
+    field :last_synced_to_notion_at, :utc_datetime
 
     belongs_to :user, ShotElixir.Accounts.User
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
@@ -84,22 +75,32 @@ defmodule ShotElixir.Characters.Character do
 
   def changeset(character, attrs) do
     character
-    |> cast(attrs, [:name, :archetype, :character_type, :active, :impairments,
-                    :category, :full_name, :catchphrase, :action_values, :description,
-                    :skills, :fortune, :max_fortune, :wounds, :marks_of_death,
-                    :defense, :toughness, :speed, :damage, :notion_page_id,
-                    :driver_id, :user_id, :campaign_id, :faction_id, :juncture_id])
+    |> cast(attrs, [:name, :active, :defense, :impairments, :color,
+                    :action_values, :description, :skills, :status,
+                    :image_url, :task, :summary, :wealth, :is_template,
+                    :notion_page_id, :last_synced_to_notion_at,
+                    :user_id, :campaign_id, :faction_id, :juncture_id])
     |> validate_required([:name, :campaign_id])
-    |> validate_inclusion(:character_type, @character_types)
     |> validate_number(:impairments, greater_than_or_equal_to: 0)
+    |> validate_character_type()
     |> unique_constraint([:name, :campaign_id])
     |> ensure_default_values()
+  end
+
+  defp validate_character_type(changeset) do
+    action_values = get_field(changeset, :action_values) || %{}
+    character_type = Map.get(action_values, "Type", "PC")
+
+    if character_type in @character_types do
+      changeset
+    else
+      add_error(changeset, :action_values, "invalid character type")
+    end
   end
 
   defp ensure_default_values(changeset) do
     changeset
     |> put_change_if_nil(:action_values, @default_action_values)
-    |> put_change_if_nil(:character_type, "PC")
   end
 
   defp put_change_if_nil(changeset, key, value) do

@@ -22,19 +22,35 @@ defmodule ShotElixirWeb.Router do
     pipe_through :api
 
     post "/sign_in", SessionsController, :create
+    post "/sign_up", RegistrationsController, :create
     post "/", RegistrationsController, :create
+  end
+
+  # Authenticated endpoints
+  scope "/users", ShotElixirWeb.Users do
+    pipe_through [:api, :authenticated]
+
     delete "/sign_out", SessionsController, :delete
   end
 
-  # API V2 endpoints
+  # API V2 endpoints - Public (no auth required)
+  scope "/api/v2", ShotElixirWeb.Api.V2 do
+    pipe_through :api
+
+    # User registration (public)
+    post "/users", UserController, :create
+  end
+
+  # API V2 endpoints - Authenticated
   scope "/api/v2", ShotElixirWeb.Api.V2 do
     pipe_through [:api, :authenticated]
 
     # Users
-    resources "/users", UserController
     get "/users/current", UserController, :current
     get "/users/profile", UserController, :profile
+    get "/users/:id/profile", UserController, :profile
     patch "/users/profile", UserController, :update_profile
+    resources "/users", UserController, except: [:create]
 
     # Campaigns
     resources "/campaigns", CampaignController do
@@ -46,13 +62,13 @@ defmodule ShotElixirWeb.Router do
     post "/campaigns/current", CampaignController, :set_current
 
     # Characters
+    get "/characters/names", CharacterController, :autocomplete
+    post "/characters/pdf", CharacterController, :import
     resources "/characters", CharacterController do
       post "/sync", CharacterController, :sync
       post "/duplicate", CharacterController, :duplicate
       get "/pdf", CharacterController, :pdf
     end
-    get "/characters/names", CharacterController, :autocomplete
-    post "/characters/pdf", CharacterController, :import
 
     # Vehicles
     resources "/vehicles", VehicleController

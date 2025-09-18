@@ -80,6 +80,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> render("show.json", character: updated_character)
     else
       nil -> {:error, :not_found}
+      {:error, :forbidden} -> {:error, :forbidden}
       {:error, :unauthorized} -> {:error, :forbidden}
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
@@ -103,7 +104,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   # Custom endpoints
-  def duplicate(conn, %{"id" => id}) do
+  def duplicate(conn, %{"character_id" => id}) do
     current_user = GuardianPlug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
@@ -149,7 +150,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
-  def import(conn, params) do
+  def import(conn, _params) do
     current_user = GuardianPlug.current_resource(conn)
     campaign_id = current_user.current_campaign_id
 
