@@ -280,4 +280,21 @@ defmodule ShotElixir.Fights do
 
     :ok
   end
+
+  # Driver assignment functions for Rails compatibility
+  def clear_vehicle_drivers(fight_id, vehicle_shot_id) do
+    from(s in Shot,
+      where: s.fight_id == ^fight_id and s.driving_id == ^vehicle_shot_id,
+      update: [set: [driving_id: nil]]
+    )
+    |> Repo.update_all([])
+
+    :ok
+  end
+
+  def assign_driver(driver_shot, vehicle_shot_id) do
+    driver_shot
+    |> Ecto.Changeset.change(driving_id: vehicle_shot_id)
+    |> Repo.update()
+  end
 end
