@@ -21,4 +21,11 @@ defmodule ShotElixirWeb.FallbackController do
     |> put_view(ShotElixirWeb.ErrorView)
     |> render("401.json")
   end
+
+  def call(conn, {:error, :forbidden}) do
+    conn
+    |> put_status(:forbidden)
+    |> put_view(ShotElixirWeb.ErrorView)
+    |> render("403.json")
+  end
 end

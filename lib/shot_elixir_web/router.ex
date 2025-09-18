@@ -40,6 +40,8 @@ defmodule ShotElixirWeb.Router do
     resources "/campaigns", CampaignController do
       patch "/set", CampaignController, :set
       get "/current_fight", CampaignController, :current_fight
+      post "/members", CampaignController, :add_member
+      delete "/members/:user_id", CampaignController, :remove_member
     end
     post "/campaigns/current", CampaignController, :set_current
 

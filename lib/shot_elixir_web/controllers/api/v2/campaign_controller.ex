@@ -84,7 +84,8 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   # Custom endpoints
-  def set(conn, %{"id" => id}) do
+  def set(conn, params) do
+    id = params["campaign_id"] || params["id"]
     current_user = GuardianPlug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
@@ -103,7 +104,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
     set(conn, %{"id" => campaign_id})
   end
 
-  def current_fight(conn, %{"id" => id}) do
+  def current_fight(conn, %{"campaign_id" => id}) do
     with %Campaign{} = campaign <- Campaigns.get_campaign(id) do
       # Get the most recent active fight for the campaign
       fights = ShotElixir.Fights.list_fights(campaign.id)
@@ -118,7 +119,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   # Membership management
-  def add_member(conn, %{"id" => id, "user_id" => user_id}) do
+  def add_member(conn, %{"campaign_id" => id, "user_id" => user_id}) do
     current_user = GuardianPlug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
@@ -135,7 +136,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
     end
   end
 
-  def remove_member(conn, %{"id" => id, "user_id" => user_id}) do
+  def remove_member(conn, %{"campaign_id" => id, "user_id" => user_id}) do
     current_user = GuardianPlug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),

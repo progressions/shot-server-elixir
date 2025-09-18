@@ -36,7 +36,7 @@ defmodule ShotElixir.Campaigns.Campaign do
     campaign
     |> cast(attrs, [:name, :description, :active, :is_master_template, :user_id])
     |> validate_required([:name, :user_id])
-    |> unique_constraint([:name, :user_id])
+    |> unique_constraint([:name, :user_id], name: :index_campaigns_on_name_and_user_id)
     |> validate_only_one_master_template()
   end
 

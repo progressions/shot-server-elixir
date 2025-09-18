@@ -5,7 +5,7 @@ defmodule ShotElixirWeb.AuthErrorHandler do
 
   @impl Guardian.Plug.ErrorHandler
   def auth_error(conn, {type, _reason}, _opts) do
-    body = Jason.encode!(%{error: to_string(type), message: "Authentication required"})
+    body = Jason.encode!(%{error: "Not authenticated"})
 
     conn
     |> put_resp_content_type("application/json")

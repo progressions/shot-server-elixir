@@ -16,6 +16,6 @@ defmodule ShotElixir.Campaigns.CampaignMembership do
     membership
     |> cast(attrs, [:user_id, :campaign_id])
     |> validate_required([:user_id, :campaign_id])
-    |> unique_constraint([:user_id, :campaign_id])
+    |> unique_constraint([:user_id, :campaign_id], name: :index_campaign_memberships_on_user_id_and_campaign_id)
   end
 end
