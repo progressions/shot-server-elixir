@@ -15,7 +15,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     with %Shot{} = shot <- Fights.get_shot(id),
          %{} = fight <- Fights.get_fight(fight_id),
          :ok <- validate_shot_belongs_to_fight(shot, fight),
-         %{} = campaign <- Campaigns.get_campaign(fight.campaign_id),
+         %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user) do
 
       # Handle driver linkage if updating a vehicle shot
@@ -58,7 +58,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     with %Shot{} = shot <- Fights.get_shot(id),
          %{} = fight <- Fights.get_fight(fight_id),
          :ok <- validate_shot_belongs_to_fight(shot, fight),
-         %{} = campaign <- Campaigns.get_campaign(fight.campaign_id),
+         %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user),
          {:ok, _shot} <- Fights.delete_shot(shot) do
       send_resp(conn, :no_content, "")
@@ -93,44 +93,45 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     with %Shot{} = shot <- Fights.get_shot(id),
          %{} = fight <- Fights.get_fight(fight_id),
          :ok <- validate_shot_belongs_to_fight(shot, fight),
-         %{} = campaign <- Campaigns.get_campaign(fight.campaign_id),
+         %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user) do
 
       # Validate this is a vehicle shot
-      unless shot.vehicle_id do
-        return conn
+      if !shot.vehicle_id do
+        conn
         |> put_status(:unprocessable_entity)
         |> json(%{error: "Shot must contain a vehicle"})
-      end
+      else
+        driver_shot = Fights.get_shot(driver_shot_id)
 
-      driver_shot = Fights.get_shot(driver_shot_id)
-
-      # Validate driver shot exists
-      unless driver_shot do
-        return conn
-        |> put_status(:not_found)
-        |> json(%{error: "Driver shot not found"})
-      end
-
-      # Validate driver shot contains a character
-      unless driver_shot.character_id do
-        return conn
-        |> put_status(:unprocessable_entity)
-        |> json(%{error: "Shot must contain a character to be a driver"})
-      end
-
-      # Clear any existing driver for this vehicle
-      Fights.clear_vehicle_drivers(fight.id, shot.id)
-
-      # Assign the new driver
-      case Fights.assign_driver(driver_shot, shot.id) do
-        {:ok, _driver_shot} ->
-          # TODO: Broadcast the update via Phoenix channels
-          json(conn, %{success: true, message: "Driver assigned successfully"})
-        {:error, _changeset} ->
+        # Validate driver shot exists
+        if !driver_shot do
           conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "Failed to assign driver"})
+          |> put_status(:not_found)
+          |> json(%{error: "Driver shot not found"})
+        else
+          # Validate driver shot contains a character
+          if !driver_shot.character_id do
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Shot must contain a character to be a driver"})
+          else
+
+            # Clear any existing driver for this vehicle
+            Fights.clear_vehicle_drivers(fight.id, shot.id)
+
+            # Assign the new driver
+            case Fights.assign_driver(driver_shot, shot.id) do
+              {:ok, _driver_shot} ->
+                # TODO: Broadcast the update via Phoenix channels
+                json(conn, %{success: true, message: "Driver assigned successfully"})
+              {:error, _changeset} ->
+                conn
+                |> put_status(:unprocessable_entity)
+                |> json(%{error: "Failed to assign driver"})
+            end
+          end
+        end
       end
     else
       nil ->
@@ -159,21 +160,21 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     with %Shot{} = shot <- Fights.get_shot(id),
          %{} = fight <- Fights.get_fight(fight_id),
          :ok <- validate_shot_belongs_to_fight(shot, fight),
-         %{} = campaign <- Campaigns.get_campaign(fight.campaign_id),
+         %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user) do
 
       # Validate this is a vehicle shot
-      unless shot.vehicle_id do
-        return conn
+      if !shot.vehicle_id do
+        conn
         |> put_status(:unprocessable_entity)
         |> json(%{error: "Shot must contain a vehicle"})
+      else
+        # Clear any driver for this vehicle
+        Fights.clear_vehicle_drivers(fight.id, shot.id)
+
+        # TODO: Broadcast the update via Phoenix channels
+        json(conn, %{success: true, message: "Driver removed successfully"})
       end
-
-      # Clear any driver for this vehicle
-      Fights.clear_vehicle_drivers(fight.id, shot.id)
-
-      # TODO: Broadcast the update via Phoenix channels
-      json(conn, %{success: true, message: "Driver removed successfully"})
     else
       nil ->
         conn
