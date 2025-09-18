@@ -3,26 +3,16 @@
 
 # Factions and Junctures moved to separate files in factions/ and junctures/ directories
 
-defmodule ShotElixir.Schticks do
-  defmodule Schtick do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "schticks" do
-      field :name, :string
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
+# Schticks moved to schticks/ directory
 
-  defmodule CharacterSchtick do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "character_schticks" do
-      belongs_to :character, ShotElixir.Characters.Character
-      belongs_to :schtick, Schtick
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
+defmodule ShotElixir.Schticks.CharacterSchtick do
+  use Ecto.Schema
+  @primary_key {:id, :binary_id, autogenerate: true}
+  @foreign_key_type :binary_id
+  schema "character_schticks" do
+    belongs_to :character, ShotElixir.Characters.Character
+    belongs_to :schtick, ShotElixir.Schticks.Schtick
+    timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 end
 
