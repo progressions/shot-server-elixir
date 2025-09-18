@@ -17,8 +17,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
 
     unless campaign_id do
       conn
-      |> put_status(:bad_request)
-      |> json(%{error: "No current campaign set"})
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
     else
       fights_data = Fights.list_campaign_fights(campaign_id, params, current_user)
 
@@ -48,26 +48,35 @@ defmodule ShotElixirWeb.Api.V2.FightController do
 
     unless campaign_id do
       conn
-      |> put_status(:bad_request)
-      |> json(%{error: "No current campaign set"})
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
     else
-      # Handle JSON string parameters (Rails compatibility)
-      parsed_params = parse_json_params(fight_params)
-      params = parsed_params
-      |> Map.put("campaign_id", campaign_id)
+      campaign = ShotElixir.Campaigns.get_campaign(campaign_id)
 
-      case Fights.create_fight(params) do
-        {:ok, fight} ->
-          conn
-          |> put_status(:created)
-          |> put_view(ShotElixirWeb.Api.V2.FightView)
-          |> render("show.json", fight: fight)
+      # Only gamemaster can create fights
+      unless campaign.user_id == current_user.id || current_user.gamemaster do
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can create fights"})
+      else
+        # Handle JSON string parameters (Rails compatibility)
+        parsed_params = parse_json_params(fight_params)
+        params = parsed_params
+        |> Map.put("campaign_id", campaign_id)
 
-        {:error, %Ecto.Changeset{} = changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> put_view(ShotElixirWeb.Api.V2.FightView)
-          |> render("error.json", changeset: changeset)
+        case Fights.create_fight(params) do
+          {:ok, fight} ->
+            conn
+            |> put_status(:created)
+            |> put_view(ShotElixirWeb.Api.V2.FightView)
+            |> render("show.json", fight: fight)
+
+          {:error, %Ecto.Changeset{} = changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> put_view(ShotElixirWeb.Api.V2.FightView)
+            |> render("error.json", changeset: changeset)
+        end
       end
     end
   end
@@ -83,9 +92,18 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       |> put_view(ShotElixirWeb.Api.V2.FightView)
       |> render("show.json", fight: updated_fight)
     else
-      nil -> {:error, :not_found}
-      {:error, :forbidden} -> {:error, :forbidden}
-      {:error, :unauthorized} -> {:error, :forbidden}
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can update fights"})
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -103,7 +121,18 @@ defmodule ShotElixirWeb.Api.V2.FightController do
          {:ok, _} <- Fights.delete_fight(fight) do
       send_resp(conn, :no_content, "")
     else
-      nil -> {:error, :not_found}
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can delete fights"})
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
       {:error, reason} -> {:error, reason}
     end
   end
@@ -113,13 +142,24 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Fight{} = fight <- Fights.get_fight(id),
-         :ok <- authorize_fight_access(fight, current_user),
+         :ok <- authorize_fight_edit(fight, current_user),
          {:ok, fight} <- Fights.touch_fight(fight) do
       conn
       |> put_view(ShotElixirWeb.Api.V2.FightView)
       |> render("show.json", fight: fight)
     else
-      nil -> {:error, :not_found}
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can touch fights"})
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
       {:error, reason} -> {:error, reason}
     end
   end
@@ -135,7 +175,18 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       |> put_view(ShotElixirWeb.Api.V2.FightView)
       |> render("show.json", fight: fight)
     else
-      nil -> {:error, :not_found}
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can end fights"})
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
       {:error, reason} -> {:error, reason}
     end
   end
@@ -172,10 +223,13 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   defp authorize_fight_edit(fight, user) do
     campaign = ShotElixir.Campaigns.get_campaign(fight.campaign_id)
 
+    # For cross-campaign security, return :not_found for non-members, :forbidden for members
     cond do
       campaign.user_id == user.id -> :ok
-      user.gamemaster -> :ok
-      true -> {:error, :forbidden}
+      user.admin -> :ok
+      user.gamemaster && ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> :ok
+      ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> {:error, :forbidden}
+      true -> {:error, :not_found}
     end
   end
 

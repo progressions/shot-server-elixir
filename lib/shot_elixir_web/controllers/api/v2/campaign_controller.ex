@@ -63,7 +63,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
-        |> json(%{error: "Gamemaster or admin access required"})
+        |> json(%{error: "Forbidden"})
     end
   end
 
@@ -93,7 +93,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
-        |> json(%{error: "Gamemaster or admin access required"})
+        |> json(%{error: "Forbidden"})
       {:error, reason} -> {:error, reason}
     end
   end
@@ -120,7 +120,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       {:error, :forbidden} ->
         conn
         |> put_status(:forbidden)
-        |> json(%{error: "Gamemaster or admin access required"})
+        |> json(%{error: "Forbidden"})
       {:error, reason} -> {:error, reason}
     end
   end

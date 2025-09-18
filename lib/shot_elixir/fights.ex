@@ -123,10 +123,13 @@ defmodule ShotElixir.Fights do
     # Get total count for pagination
     total_count = Repo.aggregate(query, :count, :id)
 
-    # Get seasons for filtering UI
-    seasons = query
-    |> select([f], f.season)
-    |> distinct(true)
+    # Get seasons for filtering UI - separate query to avoid DISTINCT/ORDER BY issues
+    seasons_query = from f in Fight,
+      where: f.campaign_id == ^campaign_id and f.active == true,
+      select: f.season,
+      distinct: true
+
+    seasons = seasons_query
     |> Repo.all()
     |> Enum.reject(&is_nil/1)
     |> Enum.uniq()

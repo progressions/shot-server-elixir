@@ -44,7 +44,7 @@ defmodule ShotElixir.Campaigns do
     query = from c in Campaign,
       left_join: cm in CampaignMembership, on: cm.campaign_id == c.id,
       where: (c.user_id == ^user_id or cm.user_id == ^user_id) and c.active == true,
-      distinct: true
+      group_by: c.id
 
     # Apply basic filters
     query = if params["id"] do
@@ -89,8 +89,50 @@ defmodule ShotElixir.Campaigns do
     # Apply sorting
     query = apply_sorting(query, params)
 
-    # Get total count for pagination
-    total_count = Repo.aggregate(query, :count, :id)
+    # Get total count for pagination (separate query without group_by)
+    count_query = from c in Campaign,
+      left_join: cm in CampaignMembership, on: cm.campaign_id == c.id,
+      where: (c.user_id == ^user_id or cm.user_id == ^user_id) and c.active == true,
+      distinct: c.id
+
+    # Apply same filters to count query
+    count_query = if params["id"] do
+      from c in count_query, where: c.id == ^params["id"]
+    else
+      count_query
+    end
+
+    count_query = if params["ids"] do
+      ids = parse_ids(params["ids"])
+      from c in count_query, where: c.id in ^ids
+    else
+      count_query
+    end
+
+    count_query = if params["search"] do
+      from c in count_query, where: ilike(c.name, ^"%#{params["search"]}%")
+    else
+      count_query
+    end
+
+    count_query = if params["character_id"] do
+      from c in count_query,
+        join: ch in "characters", on: ch.campaign_id == c.id,
+        where: ch.id == ^params["character_id"]
+    else
+      count_query
+    end
+
+    count_query = if params["vehicle_id"] do
+      from c in count_query,
+        join: v in "vehicles", on: v.campaign_id == c.id,
+        where: v.id == ^params["vehicle_id"]
+    else
+      count_query
+    end
+
+    count_query = apply_visibility_filter(count_query, params)
+    total_count = Repo.aggregate(count_query, :count, :id)
 
     # Apply pagination
     campaigns = query
