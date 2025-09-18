@@ -54,4 +54,11 @@ defmodule ShotElixir.Campaigns do
 
     Repo.delete_all(query)
   end
+
+  def is_member?(campaign_id, user_id) do
+    query = from cm in CampaignMembership,
+      where: cm.campaign_id == ^campaign_id and cm.user_id == ^user_id
+
+    Repo.exists?(query)
+  end
 end

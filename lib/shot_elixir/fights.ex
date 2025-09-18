@@ -76,4 +76,26 @@ defmodule ShotElixir.Fights do
     |> Ecto.Changeset.change(acted: true)
     |> Repo.update()
   end
+
+  def get_shot(id), do: Repo.get(Shot, id)
+
+  def get_shot_with_drivers(id) do
+    Shot
+    |> Repo.get(id)
+    |> Repo.preload(:shot_drivers)
+  end
+
+  # Shot driver management
+  def create_shot_driver(attrs \\ %{}) do
+    %ShotElixir.Fights.ShotDriver{}
+    |> ShotElixir.Fights.ShotDriver.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  def remove_shot_drivers(shot_id) do
+    from(sd in ShotElixir.Fights.ShotDriver, where: sd.shot_id == ^shot_id)
+    |> Repo.delete_all()
+
+    :ok
+  end
 end
