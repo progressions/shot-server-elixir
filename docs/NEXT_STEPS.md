@@ -5,12 +5,15 @@
 The Phoenix API replication of the Rails shot-server is progressing well with core functionality implemented:
 
 - ✅ **Authentication**: JWT authentication using Guardian (Devise equivalent)
-- ✅ **Campaigns**: Full CRUD with membership management (30/30 tests passing)
-- ✅ **Characters**: Basic CRUD with search/filter (19/19 tests passing - schema fixed)
+- ✅ **Campaigns**: Full CRUD with membership management (30 tests passing)
+- ✅ **Characters**: Basic CRUD with search/filter (19 tests passing)
+- ✅ **Vehicles**: Full CRUD with archetype management (18 tests passing)
+- ✅ **Weapons**: Full CRUD with damage/concealment attributes (20 tests passing)
+- ✅ **Schticks**: Full CRUD with prerequisite management (22 tests passing)
 - ✅ **Fights**: Full CRUD with shot management (implemented)
 - ✅ **Shots**: Initiative tracking within fights (implemented)
 - ✅ **Database**: Successfully using existing Rails PostgreSQL database
-- ✅ **All Tests**: 132/132 tests passing
+- ✅ **All Tests**: 192/192 tests passing (100% pass rate)
 
 ## Immediate Priorities
 
@@ -19,38 +22,34 @@ The Phoenix API replication of the Rails shot-server is progressing well with co
 - Corrected field mappings and JSONB handling
 - All character tests now passing
 
-### 2. ✅ COMPLETED: Implement FightController and ShotController
+### 2. ✅ COMPLETED: Core Controllers Implementation
+
+#### ✅ FightController and ShotController
 - Full CRUD operations for fights
 - Shot management (initiative tracking)
 - Touch/end fight functionality
 - Driver assignment for vehicles
 - Proper authorization checks
 
-#### VehicleController
-Vehicles are used in chase scenes.
-- CRUD operations
-- Archetype management
+#### ✅ VehicleController (18 tests passing)
+- CRUD operations with soft delete
+- Archetype management endpoint
 - Integration with fights/chases
-- Driver assignment functionality
+- Campaign-scoped queries
 
-#### ShotController
-Manages character positions in fight initiative.
-- Create/update/delete shots
-- Act on shot (mark as acted)
-- Assign/remove drivers for vehicles
-- Real-time shot counter updates
-
-### 3. Implement Supporting Controllers
-
-#### WeaponController
-- CRUD for weapons
+#### ✅ WeaponController (20 tests passing)
+- Full CRUD with validation
 - Damage/concealment attributes
-- Category management (guns, melee, etc.)
+- Category filtering (guns, melee, etc.)
+- Juncture support
 
-#### SchtickController
-- CRUD for character abilities
-- Prerequisite management
-- Category filtering (fu, guns, driving, etc.)
+#### ✅ SchtickController (22 tests passing)
+- CRUD with prerequisite management
+- Self-referential relationships
+- Dependency protection on delete
+- Category and path filtering
+
+### 3. Next: Implement Remaining Controllers
 
 #### FactionController & JunctureController
 - Simple CRUD for campaign world-building
@@ -121,9 +120,13 @@ Rails uses Active Storage, Phoenix needs alternative:
 - [x] GET/POST/PATCH/DELETE /api/v2/characters
 - [x] GET/POST/PATCH/DELETE /api/v2/fights
 - [x] POST/PATCH/DELETE /api/v2/fights/:id/shots
-- [ ] GET/POST/PATCH/DELETE /api/v2/vehicles
-- [ ] GET/POST/PATCH/DELETE /api/v2/weapons
-- [ ] GET/POST/PATCH/DELETE /api/v2/schticks
+- [x] GET/POST/PATCH/DELETE /api/v2/vehicles
+- [x] GET/POST/PATCH/DELETE /api/v2/weapons
+- [x] GET/POST/PATCH/DELETE /api/v2/schticks
+- [ ] GET/POST/PATCH/DELETE /api/v2/factions
+- [ ] GET/POST/PATCH/DELETE /api/v2/junctures
+- [ ] GET/POST/PATCH/DELETE /api/v2/sites
+- [ ] GET/POST/PATCH/DELETE /api/v2/parties
 
 ### Advanced Features
 - [ ] Character PDF generation
