@@ -13,7 +13,7 @@ The Phoenix API replication of the Rails shot-server is progressing well with co
 - ✅ **Fights**: Full CRUD with shot management (implemented)
 - ✅ **Shots**: Initiative tracking within fights (implemented)
 - ✅ **Database**: Successfully using existing Rails PostgreSQL database
-- ✅ **All Tests**: 192/192 tests passing (100% pass rate)
+- ✅ **All Tests**: 264/264 tests passing (100% pass rate)
 
 ## Immediate Priorities
 
@@ -49,16 +49,17 @@ The Phoenix API replication of the Rails shot-server is progressing well with co
 - Dependency protection on delete
 - Category and path filtering
 
-### 3. Next: Implement Remaining Controllers
+### 3. ✅ COMPLETED: Implement All Core Controllers
 
-#### FactionController & JunctureController
+#### ✅ SiteController & PartyController (18 tests each)
+- Site CRUD with attunement management
+- Party CRUD with membership tracking
+- Proper unique constraints for duplicates
+
+#### ✅ FactionController & JunctureController (17 tests each)
 - Simple CRUD for campaign world-building
-- Image attachments support
-
-#### SiteController & PartyController
-- Location and group management
-- Attunement system for sites
-- Party membership tracking
+- Campaign-scoped queries with soft delete
+- Full test coverage for all endpoints
 
 ## Technical Debt & Improvements
 
@@ -123,10 +124,10 @@ Rails uses Active Storage, Phoenix needs alternative:
 - [x] GET/POST/PATCH/DELETE /api/v2/vehicles
 - [x] GET/POST/PATCH/DELETE /api/v2/weapons
 - [x] GET/POST/PATCH/DELETE /api/v2/schticks
-- [ ] GET/POST/PATCH/DELETE /api/v2/factions
-- [ ] GET/POST/PATCH/DELETE /api/v2/junctures
-- [ ] GET/POST/PATCH/DELETE /api/v2/sites
-- [ ] GET/POST/PATCH/DELETE /api/v2/parties
+- [x] GET/POST/PATCH/DELETE /api/v2/factions
+- [x] GET/POST/PATCH/DELETE /api/v2/junctures
+- [x] GET/POST/PATCH/DELETE /api/v2/sites
+- [x] GET/POST/PATCH/DELETE /api/v2/parties
 
 ### Advanced Features
 - [ ] Character PDF generation
@@ -240,7 +241,7 @@ Rails uses `created_at/updated_at`, Phoenix uses `inserted_at/updated_at`.
 
 ## Success Metrics
 
-- [ ] All controller tests passing (100% coverage)
+- [x] All controller tests passing (100% coverage)
 - [ ] Response times < 100ms for standard requests
 - [ ] Real-time updates < 50ms latency
 - [ ] Frontend fully functional with Phoenix API
