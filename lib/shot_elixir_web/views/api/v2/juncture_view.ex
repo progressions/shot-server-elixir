@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.JunctureView do
-
   def render("index.json", %{data: data}) do
     juncture_serializer =
       if data.is_autocomplete, do: &render_juncture_autocomplete/1, else: &render_juncture_index/1
@@ -13,7 +12,9 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
   end
 
   def render("show.json", %{juncture: juncture}) do
-    render_juncture_detail(juncture)
+    %{
+      juncture: render_juncture_detail(juncture)
+    }
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -68,6 +69,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
   end
 
   defp render_association(:faction, nil), do: nil
+
   defp render_association(:faction, faction) do
     %{
       id: faction.id,

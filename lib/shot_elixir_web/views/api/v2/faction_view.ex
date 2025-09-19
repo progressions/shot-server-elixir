@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.FactionView do
-
   def render("index.json", %{data: data}) do
     faction_serializer =
       if data.is_autocomplete, do: &render_faction_autocomplete/1, else: &render_faction_index/1
@@ -12,7 +11,9 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
   end
 
   def render("show.json", %{faction: faction}) do
-    render_faction_detail(faction)
+    %{
+      faction: render_faction_detail(faction)
+    }
   end
 
   def render("error.json", %{changeset: changeset}) do

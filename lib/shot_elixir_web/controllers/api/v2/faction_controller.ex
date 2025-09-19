@@ -20,7 +20,13 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
-            result = Factions.list_campaign_factions(current_user.current_campaign_id, params, current_user)
+            result =
+              Factions.list_campaign_factions(
+                current_user.current_campaign_id,
+                params,
+                current_user
+              )
+
             render(conn, :index, factions: result)
           else
             conn
@@ -269,12 +275,12 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
-    Campaigns.is_member?(campaign.id, user.id)
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 
   defp authorize_campaign_modification(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
 end

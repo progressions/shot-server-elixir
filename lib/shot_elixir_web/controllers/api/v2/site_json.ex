@@ -40,23 +40,37 @@ defmodule ShotElixirWeb.Api.V2.SiteJSON do
       juncture_id: Map.get(site, :juncture_id),
       faction:
         case Map.get(site, :faction) do
-          %Ecto.Association.NotLoaded{} -> nil
-          nil -> nil
-          faction when is_map(faction) -> %{
-            id: Map.get(faction, :id),
-            name: Map.get(faction, :name)
-          }
-          _ -> nil
+          %Ecto.Association.NotLoaded{} ->
+            nil
+
+          nil ->
+            nil
+
+          faction when is_map(faction) ->
+            %{
+              id: Map.get(faction, :id),
+              name: Map.get(faction, :name)
+            }
+
+          _ ->
+            nil
         end,
       juncture:
         case Map.get(site, :juncture) do
-          %Ecto.Association.NotLoaded{} -> nil
-          nil -> nil
-          juncture when is_map(juncture) -> %{
-            id: Map.get(juncture, :id),
-            name: Map.get(juncture, :name)
-          }
-          _ -> nil
+          %Ecto.Association.NotLoaded{} ->
+            nil
+
+          nil ->
+            nil
+
+          juncture when is_map(juncture) ->
+            %{
+              id: Map.get(juncture, :id),
+              name: Map.get(juncture, :name)
+            }
+
+          _ ->
+            nil
         end,
       created_at: Map.get(site, :created_at),
       updated_at: Map.get(site, :updated_at)

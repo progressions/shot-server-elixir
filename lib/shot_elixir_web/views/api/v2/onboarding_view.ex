@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.OnboardingView do
-
   def render("success.json", %{onboarding_progress: progress}) do
     %{
       success: true,

@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.SchticksJSON do
-
   def index(%{schticks: data}) when is_map(data) do
     # Handle paginated response with metadata
     %{
@@ -34,14 +33,21 @@ defmodule ShotElixirWeb.Api.V2.SchticksJSON do
   defp schtick_json(schtick) when is_map(schtick) do
     prerequisite =
       case Map.get(schtick, :prerequisite) do
-        %Ecto.Association.NotLoaded{} -> nil
-        nil -> nil
-        prerequisite when is_map(prerequisite) -> %{
-          id: Map.get(prerequisite, :id),
-          name: Map.get(prerequisite, :name),
-          category: Map.get(prerequisite, :category)
-        }
-        _ -> nil
+        %Ecto.Association.NotLoaded{} ->
+          nil
+
+        nil ->
+          nil
+
+        prerequisite when is_map(prerequisite) ->
+          %{
+            id: Map.get(prerequisite, :id),
+            name: Map.get(prerequisite, :name),
+            category: Map.get(prerequisite, :category)
+          }
+
+        _ ->
+          nil
       end
 
     %{

@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.ShotJSON do
-
   def show(%{shot: shot}) do
     %{shot: shot_json(shot)}
   end

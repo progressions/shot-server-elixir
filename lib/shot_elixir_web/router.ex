@@ -51,7 +51,7 @@ defmodule ShotElixirWeb.Router do
     get "/users/profile", UserController, :profile
     get "/users/:id/profile", UserController, :profile
     patch "/users/profile", UserController, :update_profile
-    delete "/users/:id/remove_image", UserController, :remove_image
+    delete "/users/:id/image", UserController, :remove_image
     resources "/users", UserController, except: [:create]
 
     # Campaigns
@@ -78,14 +78,15 @@ defmodule ShotElixirWeb.Router do
     get "/vehicles/archetypes", VehicleController, :archetypes
 
     resources "/vehicles", VehicleController do
-      delete "/remove_image", VehicleController, :remove_image
-      patch "/update_chase_state", VehicleController, :update_chase_state
+      delete "/image", VehicleController, :remove_image
+      patch "/chase_state", VehicleController, :update_chase_state
     end
 
     # Fights
     resources "/fights", FightController do
       patch "/touch", FightController, :touch
       patch "/end_fight", FightController, :end_fight
+      delete "/image", FightController, :remove_image
 
       resources "/shots", ShotController, only: [:update, :delete] do
         post "/assign_driver", ShotController, :assign_driver
@@ -94,14 +95,22 @@ defmodule ShotElixirWeb.Router do
     end
 
     # Other resources
-    resources "/weapons", WeaponController
+    resources "/weapons", WeaponController do
+      post "/batch", WeaponController, :batch
+      get "/junctures", WeaponController, :junctures
+      get "/categories", WeaponController, :categories
+      delete "/image", WeaponController, :remove_image
+    end
 
     # Schticks with custom routes
-    get "/schticks/batch", SchticksController, :batch
+    post "/schticks/batch", SchticksController, :batch
     get "/schticks/categories", SchticksController, :categories
     get "/schticks/paths", SchticksController, :paths
     post "/schticks/import", SchticksController, :import
-    resources "/schticks", SchticksController
+
+    resources "/schticks", SchticksController do
+      delete "/image", SchticksController, :remove_image
+    end
 
     resources "/junctures", JunctureController
 
@@ -109,15 +118,20 @@ defmodule ShotElixirWeb.Router do
     resources "/sites", SiteController do
       post "/attune", SiteController, :attune
       delete "/attune/:character_id", SiteController, :unattune
+      delete "/image", SiteController, :remove_image
     end
 
     # Parties with membership
     resources "/parties", PartyController do
       post "/members", PartyController, :add_member
       delete "/members/:membership_id", PartyController, :remove_member
+      delete "/image", PartyController, :remove_image
     end
 
-    resources "/factions", FactionController
+    resources "/factions", FactionController do
+      delete "/image", FactionController, :remove_image
+    end
+
     resources "/invitations", InvitationController
 
     # Encounters
@@ -136,6 +150,13 @@ defmodule ShotElixirWeb.Router do
     resources "/ai_images", AiImageController, only: [:create] do
       post "/attach", AiImageController, :attach
     end
+
+    resources "/chase_relationships", ChaseRelationshipController, except: [:new, :edit]
+
+    get "/image_positions/:positionable_type/:positionable_id", ImagePositionController, :show
+    patch "/image_positions/:positionable_type/:positionable_id", ImagePositionController, :update
+    put "/image_positions/:positionable_type/:positionable_id", ImagePositionController, :update
+    resources "/image_positions", ImagePositionController, only: [:create]
 
     # Onboarding
     scope "/onboarding" do

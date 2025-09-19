@@ -168,18 +168,20 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
-    Campaigns.is_member?(campaign.id, user.id)
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 
   defp authorize_campaign_modification(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
 
   defp get_entity("Character", entity_id, campaign_id) do
     case Characters.get_character(entity_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       character ->
         if character.campaign_id == campaign_id do
           {:ok, character}
@@ -191,7 +193,9 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
   defp get_entity("Vehicle", entity_id, campaign_id) do
     case Vehicles.get_vehicle(entity_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       vehicle ->
         if vehicle.campaign_id == campaign_id do
           {:ok, vehicle}

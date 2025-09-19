@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.SiteView do
-
   def render("index.json", %{data: data}) do
     site_serializer =
       if data.is_autocomplete, do: &render_site_autocomplete/1, else: &render_site_index/1
@@ -13,7 +12,9 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
   end
 
   def render("show.json", %{site: site}) do
-    render_site_detail(site)
+    %{
+      site: render_site_detail(site)
+    }
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -72,6 +73,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
   end
 
   defp render_association(:faction, nil), do: nil
+
   defp render_association(:faction, faction) do
     %{
       id: faction.id,
@@ -81,6 +83,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
   end
 
   defp render_association(:juncture, nil), do: nil
+
   defp render_association(:juncture, juncture) do
     %{
       id: juncture.id,

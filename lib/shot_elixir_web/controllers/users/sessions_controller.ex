@@ -14,6 +14,7 @@ defmodule ShotElixirWeb.Users.SessionsController do
 
         # Match Rails JWT structure exactly
         now = System.system_time(:second)
+
         jwt_payload = %{
           "jti" => jti,
           "user" => %{
@@ -31,7 +32,8 @@ defmodule ShotElixirWeb.Users.SessionsController do
           "scp" => "user",
           "aud" => nil,
           "iat" => now,
-          "exp" => now + 7 * 24 * 60 * 60  # 7 days expiry like Rails
+          # 7 days expiry like Rails
+          "exp" => now + 7 * 24 * 60 * 60
         }
 
         # Generate token using Guardian but with Rails-compatible claims
@@ -42,23 +44,8 @@ defmodule ShotElixirWeb.Users.SessionsController do
         |> put_resp_header("access-control-expose-headers", "Authorization")
         |> put_status(:ok)
         |> json(%{
-          code: 200,
-          message: "User signed in successfully",
-          data: render_user_data(user, jti),
-          payload: %{
-            jti: jti,
-            user: %{
-              email: user.email,
-              admin: user.admin,
-              first_name: user.first_name,
-              last_name: user.last_name,
-              gamemaster: user.gamemaster,
-              current_campaign: user.current_campaign_id,
-              created_at: DateTime.to_iso8601(user.created_at),
-              updated_at: DateTime.to_iso8601(user.updated_at),
-              image_url: image_url
-            }
-          }
+          user: render_user(user),
+          token: token
         })
 
       {:error, :invalid_credentials} ->
@@ -93,8 +80,7 @@ defmodule ShotElixirWeb.Users.SessionsController do
     end
   end
 
-
-  defp render_user_data(user, jti) do
+  defp render_user(user) do
     %{
       id: user.id,
       first_name: user.first_name,
@@ -102,14 +88,13 @@ defmodule ShotElixirWeb.Users.SessionsController do
       email: user.email,
       created_at: DateTime.to_iso8601(user.created_at),
       updated_at: DateTime.to_iso8601(user.updated_at),
-      jti: jti,
-      avatar_url: nil,  # TODO: implement avatar URL
+      avatar_url: nil,
       admin: user.admin,
       gamemaster: user.gamemaster,
       current_campaign_id: user.current_campaign_id,
       name: user.name,
       active: user.active,
-      pending_invitation_id: nil  # TODO: implement pending invitations
+      pending_invitation_id: nil
     }
   end
 
@@ -126,6 +111,7 @@ defmodule ShotElixirWeb.Users.SessionsController do
     case user.email do
       "progressions@gmail.com" ->
         "https://ik.imagekit.io/nvqgwnjgv/chi-war-development/DALL_E_2023-10-24_14.26.08_-_Illustration_of_Hang_Choi__a_Hong_Kong_butcher_with_a_fierce_gaze__set_against_a_solid_black_background._His_apron_is_covered_in_red_jelly__and_he_fir_cYKKk5iHY.png"
+
       _ ->
         Map.get(user, :image_url)
     end

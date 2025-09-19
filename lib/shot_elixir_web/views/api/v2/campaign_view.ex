@@ -32,16 +32,14 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   def render("show.json", %{campaign: campaign}) do
-    render_campaign_detail(campaign)
+    %{
+      campaign: render_campaign_detail(campaign)
+    }
   end
 
-  def render("set_current.json", %{campaign: campaign, user: user}) do
+  def render("set_current.json", %{campaign: campaign}) do
     %{
-      campaign: render_campaign(campaign),
-      user: %{
-        id: user.id,
-        current_campaign_id: user.current_campaign_id
-      }
+      campaign: render_campaign_detail(campaign)
     }
   end
 

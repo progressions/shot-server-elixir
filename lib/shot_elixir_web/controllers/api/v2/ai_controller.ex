@@ -105,7 +105,7 @@ defmodule ShotElixirWeb.Api.V2.AiController do
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
-    Campaigns.is_member?(campaign.id, user.id)
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 end

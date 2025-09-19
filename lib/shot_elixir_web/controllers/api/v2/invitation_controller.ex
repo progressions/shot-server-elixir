@@ -46,44 +46,46 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
     # Rate limiting check
     # Rate limiting always returns :ok for now
     :ok = Invitations.check_invitation_rate_limit(current_user.id)
-        if current_user.current_campaign_id do
-          # Verify user has access to campaign and is gamemaster
-          case Campaigns.get_campaign(current_user.current_campaign_id) do
-            nil ->
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "No active campaign selected"})
 
-            campaign ->
-              if authorize_gamemaster_access(campaign, current_user) do
-                invitation_params = Map.merge(
-                  params["invitation"] || %{},
-                  %{
-                    "user_id" => current_user.id,
-                    "campaign_id" => current_user.current_campaign_id
-                  }
-                )
-
-                case Invitations.create_invitation(invitation_params) do
-                  {:ok, invitation} ->
-                    # TODO: Send invitation email
-                    # UserMailer.with(invitation: invitation).invitation.deliver_later!
-                    conn
-                    |> put_status(:created)
-                    |> render(:show, invitation: invitation)
-
-                end
-              else
-                conn
-                |> put_status(:forbidden)
-                |> json(%{error: "Unauthorized"})
-              end
-          end
-        else
+    if current_user.current_campaign_id do
+      # Verify user has access to campaign and is gamemaster
+      case Campaigns.get_campaign(current_user.current_campaign_id) do
+        nil ->
           conn
           |> put_status(:unprocessable_entity)
           |> json(%{error: "No active campaign selected"})
-        end  end
+
+        campaign ->
+          if authorize_gamemaster_access(campaign, current_user) do
+            invitation_params =
+              Map.merge(
+                params["invitation"] || %{},
+                %{
+                  "user_id" => current_user.id,
+                  "campaign_id" => current_user.current_campaign_id
+                }
+              )
+
+            case Invitations.create_invitation(invitation_params) do
+              {:ok, invitation} ->
+                # TODO: Send invitation email
+                # UserMailer.with(invitation: invitation).invitation.deliver_later!
+                conn
+                |> put_status(:created)
+                |> render(:show, invitation: invitation)
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Unauthorized"})
+          end
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
+    end
+  end
 
   # POST /api/v2/invitations/:id/resend
   # Resends invitation email
@@ -93,43 +95,45 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
     # Rate limiting check
     # Rate limiting always returns :ok for now
     :ok = Invitations.check_invitation_rate_limit(current_user.id)
-        if current_user.current_campaign_id do
-          case Campaigns.get_campaign(current_user.current_campaign_id) do
-            nil ->
-              conn
-              |> put_status(:not_found)
-              |> json(%{error: "Campaign not found"})
 
-            campaign ->
-              if authorize_gamemaster_access(campaign, current_user) do
-                case Invitations.get_invitation(id) do
-                  nil ->
-                    conn
-                    |> put_status(:not_found)
-                    |> json(%{error: "Invitation not found"})
-
-                  invitation ->
-                    if invitation.campaign_id == current_user.current_campaign_id do
-                      # TODO: Send invitation email
-                      # UserMailer.with(invitation: invitation).invitation.deliver_later!
-                      render(conn, :show, invitation: invitation)
-                    else
-                      conn
-                      |> put_status(:not_found)
-                      |> json(%{error: "Invitation not found"})
-                    end
-                end
-              else
-                conn
-                |> put_status(:forbidden)
-                |> json(%{error: "Unauthorized"})
-              end
-          end
-        else
+    if current_user.current_campaign_id do
+      case Campaigns.get_campaign(current_user.current_campaign_id) do
+        nil ->
           conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "No active campaign selected"})
-        end  end
+          |> put_status(:not_found)
+          |> json(%{error: "Campaign not found"})
+
+        campaign ->
+          if authorize_gamemaster_access(campaign, current_user) do
+            case Invitations.get_invitation(id) do
+              nil ->
+                conn
+                |> put_status(:not_found)
+                |> json(%{error: "Invitation not found"})
+
+              invitation ->
+                if invitation.campaign_id == current_user.current_campaign_id do
+                  # TODO: Send invitation email
+                  # UserMailer.with(invitation: invitation).invitation.deliver_later!
+                  render(conn, :show, invitation: invitation)
+                else
+                  conn
+                  |> put_status(:not_found)
+                  |> json(%{error: "Invitation not found"})
+                end
+            end
+          else
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "Unauthorized"})
+          end
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
+    end
+  end
 
   # GET /api/v2/invitations/:id
   # Returns invitation details (public endpoint for redemption page)
@@ -180,6 +184,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
             {:error, :already_member} ->
               campaign = Campaigns.get_campaign(invitation.campaign_id)
+
               conn
               |> put_status(:conflict)
               |> render("already_member.json", %{
@@ -211,72 +216,75 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
         # Rate limiting check
         # Rate limiting always returns :ok for now
         :ok = Invitations.check_registration_rate_limit(ip_address, invitation.email)
-            # Only allow registration for invitations without existing users
-            if invitation.pending_user do
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{
-                error: "User already exists for this email address",
-                has_account: true
-              })
-            else
-              # Validate email matches invitation
-              if params["email"] && params["email"] != invitation.email do
+        # Only allow registration for invitations without existing users
+        if invitation.pending_user do
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{
+            error: "User already exists for this email address",
+            has_account: true
+          })
+        else
+          # Validate email matches invitation
+          if params["email"] && params["email"] != invitation.email do
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{
+              error: "Email must match invitation email",
+              invitation_email: invitation.email
+            })
+          else
+            # Additional security validations
+            cond do
+              not Invitations.valid_email_format?(invitation.email) ->
                 conn
                 |> put_status(:unprocessable_entity)
-                |> json(%{
-                  error: "Email must match invitation email",
-                  invitation_email: invitation.email
+                |> render("error.json", %{
+                  error: "Invalid email format",
+                  field: "email"
                 })
-              else
-                # Additional security validations
-                cond do
-                  not Invitations.valid_email_format?(invitation.email) ->
+
+              not Invitations.valid_password?(params["password"]) ->
+                conn
+                |> put_status(:unprocessable_entity)
+                |> render("error.json", %{
+                  error:
+                    "Password must be at least 8 characters long and contain letters and numbers",
+                  field: "password"
+                })
+
+              true ->
+                # Create new user
+                user_attrs = %{
+                  "email" => invitation.email,
+                  "first_name" => Invitations.sanitize_name_field(params["first_name"]),
+                  "last_name" => Invitations.sanitize_name_field(params["last_name"]),
+                  "password" => params["password"],
+                  "password_confirmation" => params["password_confirmation"],
+                  "pending_invitation_id" => invitation.id
+                }
+
+                case Accounts.create_user(user_attrs) do
+                  {:ok, user} ->
+                    # TODO: Devise sends confirmation email automatically
                     conn
-                    |> put_status(:unprocessable_entity)
-                    |> render("error.json", %{
-                      error: "Invalid email format",
-                      field: "email"
+                    |> put_status(:created)
+                    |> render("register.json", %{
+                      message:
+                        "Account created! Check #{invitation.email} for confirmation email.",
+                      requires_confirmation: true,
+                      user: user
                     })
 
-                  not Invitations.valid_password?(params["password"]) ->
+                  {:error, changeset} ->
                     conn
                     |> put_status(:unprocessable_entity)
-                    |> render("error.json", %{
-                      error: "Password must be at least 8 characters long and contain letters and numbers",
-                      field: "password"
-                    })
-
-                  true ->
-                    # Create new user
-                    user_attrs = %{
-                      "email" => invitation.email,
-                      "first_name" => Invitations.sanitize_name_field(params["first_name"]),
-                      "last_name" => Invitations.sanitize_name_field(params["last_name"]),
-                      "password" => params["password"],
-                      "password_confirmation" => params["password_confirmation"],
-                      "pending_invitation_id" => invitation.id
-                    }
-
-                    case Accounts.create_user(user_attrs) do
-                      {:ok, user} ->
-                        # TODO: Devise sends confirmation email automatically
-                        conn
-                        |> put_status(:created)
-                        |> render("register.json", %{
-                          message: "Account created! Check #{invitation.email} for confirmation email.",
-                          requires_confirmation: true,
-                          user: user
-                        })
-
-                      {:error, changeset} ->
-                        conn
-                        |> put_status(:unprocessable_entity)
-                        |> render(:error, changeset: changeset)
-                    end
+                    |> render(:error, changeset: changeset)
                 end
-              end
-            end    end
+            end
+          end
+        end
+    end
   end
 
   # DELETE /api/v2/invitations/:id

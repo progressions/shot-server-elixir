@@ -12,11 +12,76 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
     if current_user.current_campaign_id do
       weapons = Weapons.list_weapons(current_user.current_campaign_id, params)
-      render(conn, :index, weapons: weapons)
+      render(conn, :index, weapons)
     else
       conn
       |> put_status(:unprocessable_entity)
       |> json(%{error: "No active campaign selected"})
+    end
+  end
+
+  # POST /api/v2/weapons/batch
+  def batch(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, campaign_id} <- ensure_campaign(current_user),
+         ids when is_list(ids) <- parse_ids(params["ids"]),
+         {:ok, weapons} <- fetch_batch(campaign_id, ids) do
+      serialized = Enum.map(weapons, &serialize_batch_weapon/1)
+      json(conn, %{weapons: serialized})
+    else
+      {:error, :unauthorized} ->
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "Not authenticated"})
+
+      {:error, :no_campaign} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+
+      {:error, :invalid_request} ->
+        json(conn, %{weapons: []})
+    end
+  end
+
+  # GET /api/v2/weapons/categories
+  def categories(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, campaign_id} <- ensure_campaign(current_user) do
+      categories = Weapons.list_categories(campaign_id, params["search"])
+      json(conn, %{categories: categories})
+    else
+      {:error, :unauthorized} ->
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "Not authenticated"})
+
+      {:error, :no_campaign} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+    end
+  end
+
+  # GET /api/v2/weapons/junctures
+  def junctures(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, campaign_id} <- ensure_campaign(current_user) do
+      junctures = Weapons.list_junctures(campaign_id, params["search"])
+      json(conn, %{junctures: junctures})
+    else
+      {:error, :unauthorized} ->
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "Not authenticated"})
+
+      {:error, :no_campaign} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
     end
   end
 
@@ -96,6 +161,94 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
             |> put_status(:unprocessable_entity)
             |> json(%{error: "Failed to delete weapon"})
         end
+    end
+  end
+
+  # DELETE /api/v2/weapons/:id/image
+  def remove_image(conn, %{"id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, campaign_id} <- ensure_campaign(current_user),
+         %{} = weapon <- Weapons.get_weapon(id),
+         true <- weapon.campaign_id == campaign_id,
+         :ok <- require_gamemaster(current_user),
+         {:ok, weapon} <- Weapons.remove_image(weapon) do
+      render(conn, :show, weapon: weapon)
+    else
+      {:error, :unauthorized} ->
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "Not authenticated"})
+
+      {:error, :no_campaign} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+
+      false ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Weapon not found"})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemasters can perform this action"})
+
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Weapon not found"})
+    end
+  end
+
+  defp ensure_campaign(nil), do: {:error, :unauthorized}
+  defp ensure_campaign(%{current_campaign_id: nil}), do: {:error, :no_campaign}
+  defp ensure_campaign(%{current_campaign_id: campaign_id}), do: {:ok, campaign_id}
+
+  defp parse_ids(nil), do: []
+
+  defp parse_ids("") do
+    []
+  end
+
+  defp parse_ids(ids) when is_list(ids), do: ids
+
+  defp parse_ids(ids) when is_binary(ids) do
+    ids
+    |> String.split(",")
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
+  defp parse_ids(_), do: []
+
+  defp fetch_batch(_campaign_id, []), do: {:error, :invalid_request}
+
+  defp fetch_batch(campaign_id, ids) do
+    weapons = Weapons.get_weapons_batch(campaign_id, ids)
+    {:ok, weapons}
+  end
+
+  defp serialize_batch_weapon(weapon) do
+    %{
+      id: weapon.id,
+      name: weapon.name,
+      description: weapon.description,
+      image_url: weapon.image_url,
+      damage: weapon.damage,
+      concealment: weapon.concealment,
+      reload_value: weapon.reload_value,
+      mook_bonus: weapon.mook_bonus,
+      kachunk: weapon.kachunk
+    }
+  end
+
+  defp require_gamemaster(user) do
+    if user.admin || user.gamemaster do
+      :ok
+    else
+      {:error, :forbidden}
     end
   end
 end

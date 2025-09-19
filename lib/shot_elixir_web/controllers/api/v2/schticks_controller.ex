@@ -23,6 +23,36 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
     end
   end
 
+  # DELETE /api/v2/schticks/:id/image
+  def remove_image(conn, %{"id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case get_current_campaign(current_user) do
+      nil ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+
+      campaign ->
+        case Schticks.get_schtick(id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Schtick not found"})
+
+          schtick ->
+            if schtick.campaign_id == campaign.id do
+              # Image removal handled by Rails Active Storage; mirror response for parity.
+              render(conn, :show, schtick: schtick)
+            else
+              conn
+              |> put_status(:not_found)
+              |> json(%{error: "Schtick not found"})
+            end
+        end
+    end
+  end
+
   # GET /api/v2/schticks/batch
   def batch(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)

@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.PartyView do
-
   def render("index.json", %{data: data}) do
     party_serializer =
       if data.is_autocomplete, do: &render_party_autocomplete/1, else: &render_party_index/1
@@ -13,7 +12,9 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   end
 
   def render("show.json", %{party: party}) do
-    render_party_detail(party)
+    %{
+      party: render_party_detail(party)
+    }
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -72,6 +73,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   end
 
   defp render_association(:faction, nil), do: nil
+
   defp render_association(:faction, faction) do
     %{
       id: faction.id,
@@ -81,6 +83,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   end
 
   defp render_association(:juncture, nil), do: nil
+
   defp render_association(:juncture, juncture) do
     %{
       id: juncture.id,
@@ -98,15 +101,16 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
         vehicle_id: membership.vehicle_id
       }
 
-      base = if Ecto.assoc_loaded?(membership.character) && membership.character do
-        Map.put(base, :character, %{
-          id: membership.character.id,
-          name: membership.character.name,
-          archetype: membership.character.archetype
-        })
-      else
-        base
-      end
+      base =
+        if Ecto.assoc_loaded?(membership.character) && membership.character do
+          Map.put(base, :character, %{
+            id: membership.character.id,
+            name: membership.character.name,
+            archetype: membership.character.archetype
+          })
+        else
+          base
+        end
 
       if Ecto.assoc_loaded?(membership.vehicle) && membership.vehicle do
         Map.put(base, :vehicle, %{

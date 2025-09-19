@@ -160,16 +160,26 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
     id = params["campaign_id"] || params["id"]
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %Campaign{} = campaign <- Campaigns.get_campaign(id),
-         :ok <- authorize_campaign_access(campaign, current_user),
-         {:ok, updated_user} <-
-           ShotElixir.Accounts.set_current_campaign(current_user, campaign.id) do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-      |> render("set_current.json", campaign: campaign, user: updated_user)
-    else
-      nil -> {:error, :not_found}
-      {:error, reason} -> {:error, reason}
+    cond do
+      is_nil(id) ->
+        with {:ok, _user} <- ShotElixir.Accounts.set_current_campaign(current_user, nil) do
+          conn |> json(nil)
+        else
+          {:error, reason} -> {:error, reason}
+        end
+
+      true ->
+        with %Campaign{} = campaign <- Campaigns.get_campaign(id),
+             :ok <- authorize_campaign_access(campaign, current_user),
+             {:ok, _updated_user} <-
+               ShotElixir.Accounts.set_current_campaign(current_user, campaign.id) do
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+          |> render("set_current.json", campaign: campaign)
+        else
+          nil -> {:error, :not_found}
+          {:error, reason} -> {:error, reason}
+        end
     end
   end
 

@@ -19,7 +19,9 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
       render(conn, "success.json", onboarding_progress: updated_progress)
     rescue
       error ->
-        Logger.error("Failed to dismiss congratulations for user #{current_user.id}: #{inspect(error)}")
+        Logger.error(
+          "Failed to dismiss congratulations for user #{current_user.id}: #{inspect(error)}"
+        )
 
         conn
         |> put_status(:internal_server_error)
@@ -40,7 +42,9 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
       render(conn, "success.json", onboarding_progress: updated_progress)
     rescue
       error ->
-        Logger.error("Failed to update onboarding progress for user #{current_user.id}: #{inspect(error)}")
+        Logger.error(
+          "Failed to update onboarding progress for user #{current_user.id}: #{inspect(error)}"
+        )
 
         conn
         |> put_status(:internal_server_error)
@@ -55,16 +59,17 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
     # Convert datetime strings to DateTime structs if needed
     Enum.reduce(onboarding_progress_params, %{}, fn {key, value}, acc ->
       case key do
-        key when key in [
-          "first_campaign_created_at",
-          "first_campaign_activated_at",
-          "first_character_created_at",
-          "first_fight_created_at",
-          "first_faction_created_at",
-          "first_party_created_at",
-          "first_site_created_at",
-          "congratulations_dismissed_at"
-        ] ->
+        key
+        when key in [
+               "first_campaign_created_at",
+               "first_campaign_activated_at",
+               "first_character_created_at",
+               "first_fight_created_at",
+               "first_faction_created_at",
+               "first_party_created_at",
+               "first_site_created_at",
+               "congratulations_dismissed_at"
+             ] ->
           parsed_value = parse_datetime(value)
           Map.put(acc, key, parsed_value)
 
@@ -76,7 +81,9 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
 
   defp parse_datetime(value) when is_binary(value) do
     case DateTime.from_iso8601(value) do
-      {:ok, datetime, _} -> datetime
+      {:ok, datetime, _} ->
+        datetime
+
       {:error, _} ->
         # Try parsing without timezone
         case NaiveDateTime.from_iso8601(value) do
@@ -85,5 +92,6 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
         end
     end
   end
+
   defp parse_datetime(value), do: value
 end

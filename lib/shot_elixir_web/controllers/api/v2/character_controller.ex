@@ -79,7 +79,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user) do
-
       # Handle image upload if present
       # TODO: Implement image upload functionality
       # For now, just use the original character

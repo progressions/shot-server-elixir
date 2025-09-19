@@ -124,13 +124,11 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
       end
 
       # Make functions overridable
-      defoverridable [
-        upload_image: 2,
-        image_url: 1,
-        clear_image_cache: 1,
-        delete_image: 1,
-        with_image_url: 1
-      ]
+      defoverridable upload_image: 2,
+                     image_url: 1,
+                     clear_image_cache: 1,
+                     delete_image: 1,
+                     with_image_url: 1
     end
   end
 end

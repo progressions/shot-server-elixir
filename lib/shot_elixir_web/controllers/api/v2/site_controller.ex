@@ -21,7 +21,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
-            result = Sites.list_campaign_sites(current_user.current_campaign_id, params, current_user)
+            result =
+              Sites.list_campaign_sites(current_user.current_campaign_id, params, current_user)
+
             render(conn, :index, sites: result)
           else
             conn
@@ -361,12 +363,12 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
-    Campaigns.is_member?(campaign.id, user.id)
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 
   defp authorize_campaign_modification(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
 end

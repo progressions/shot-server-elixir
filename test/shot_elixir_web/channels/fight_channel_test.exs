@@ -64,6 +64,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       {:ok, _reply, socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
 
       shot = insert(:shot, fight: fight)
+
       payload = %{
         "shot_id" => shot.id,
         "updates" => %{
@@ -85,6 +86,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       {:ok, _reply, socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
 
       shot = insert(:shot, fight: fight)
+
       payload = %{
         "shot_id" => shot.id,
         "updates" => %{"shot" => 10}
@@ -103,6 +105,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       {:ok, _reply, socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
 
       character = insert(:character)
+
       payload = %{
         "character_id" => character.id,
         "action" => "attack"

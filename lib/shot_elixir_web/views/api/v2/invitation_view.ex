@@ -1,11 +1,12 @@
 defmodule ShotElixirWeb.Api.V2.InvitationView do
-
   def render("index.json", %{invitations: invitations}) do
     Enum.map(invitations, &render_invitation_index/1)
   end
 
   def render("show.json", %{invitation: invitation}) do
-    render_invitation_detail(invitation)
+    %{
+      invitation: render_invitation_detail(invitation)
+    }
   end
 
   def render("redeem.json", %{campaign: campaign, message: message}) do
@@ -15,7 +16,11 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
     }
   end
 
-  def render("register.json", %{user: user, message: message, requires_confirmation: requires_confirmation}) do
+  def render("register.json", %{
+        user: user,
+        message: message,
+        requires_confirmation: requires_confirmation
+      }) do
     %{
       message: message,
       requires_confirmation: requires_confirmation,
@@ -40,7 +45,11 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
     %{error: error, field: field}
   end
 
-  def render("mismatch.json", %{error: error, current_user_email: current_email, invitation_email: invitation_email}) do
+  def render("mismatch.json", %{
+        error: error,
+        current_user_email: current_email,
+        invitation_email: invitation_email
+      }) do
     %{
       error: error,
       current_user_email: current_email,
@@ -109,6 +118,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
   end
 
   defp render_association(:user, nil), do: nil
+
   defp render_association(:user, user) do
     %{
       id: user.id,
@@ -119,6 +129,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
   end
 
   defp render_association(:pending_user, nil), do: nil
+
   defp render_association(:pending_user, user) do
     %{
       id: user.id,
@@ -129,6 +140,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
   end
 
   defp render_association(:campaign, nil), do: nil
+
   defp render_association(:campaign, campaign) do
     render_campaign_basic(campaign)
   end

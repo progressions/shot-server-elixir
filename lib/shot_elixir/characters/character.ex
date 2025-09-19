@@ -2,6 +2,7 @@ defmodule ShotElixir.Characters.Character do
   use Ecto.Schema
   import Ecto.Changeset
   use Arc.Ecto.Schema
+  alias ShotElixir.ImagePositions.ImagePosition
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -45,8 +46,7 @@ defmodule ShotElixir.Characters.Character do
     field :status, {:array, :map}, default: []
 
     # Additional fields from database
-    # Note: image storage handled by Rails app, not in this schema
-    field :image_url, :string, virtual: true
+    field :image_url, :string
     field :task, :boolean
     field :summary, :string
     field :wealth, :string
@@ -71,6 +71,10 @@ defmodule ShotElixir.Characters.Character do
     has_many :parties, through: [:memberships, :party]
     has_many :attunements, ShotElixir.Sites.Attunement
     has_many :sites, through: [:attunements, :site]
+
+    has_many :image_positions, ImagePosition,
+      foreign_key: :positionable_id,
+      where: [positionable_type: "Character"]
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end

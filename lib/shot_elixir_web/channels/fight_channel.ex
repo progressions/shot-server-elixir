@@ -26,11 +26,12 @@ defmodule ShotElixirWeb.FightChannel do
           |> assign(:fight, fight)
 
         # Track presence
-        {:ok, _} = Presence.track(socket, user.id, %{
-          user_id: user.id,
-          user_name: get_user_name(user),
-          joined_at: DateTime.utc_now()
-        })
+        {:ok, _} =
+          Presence.track(socket, user.id, %{
+            user_id: user.id,
+            user_name: get_user_name(user),
+            joined_at: DateTime.utc_now()
+          })
 
         Logger.info("User #{user.id} joined fight:#{fight_id}")
 
@@ -78,6 +79,7 @@ defmodule ShotElixirWeb.FightChannel do
               "shot" => serialize_shot(updated_shot),
               "updated_by" => socket.assigns.user_id
             })
+
             {:reply, :ok, socket}
 
           {:error, _changeset} ->
@@ -95,6 +97,7 @@ defmodule ShotElixirWeb.FightChannel do
       "acted_by" => socket.assigns.user_id,
       "timestamp" => DateTime.utc_now()
     })
+
     {:reply, :ok, socket}
   end
 
@@ -109,6 +112,7 @@ defmodule ShotElixirWeb.FightChannel do
           shot_counter: updated_fight.sequence,
           sequence: updated_fight.sequence
         })
+
         {:reply, :ok, assign(socket, :fight, updated_fight)}
 
       {:error, reason} ->
@@ -126,6 +130,7 @@ defmodule ShotElixirWeb.FightChannel do
           shot_counter: updated_fight.sequence,
           sequence: updated_fight.sequence
         })
+
         {:reply, :ok, assign(socket, :fight, updated_fight)}
 
       {:error, reason} ->
@@ -137,10 +142,12 @@ defmodule ShotElixirWeb.FightChannel do
   def handle_in("sync_request", _payload, socket) do
     fight = socket.assigns.fight
 
-    {:reply, {:ok, %{
-      "fight_id" => fight.id,
-      "timestamp" => DateTime.utc_now()
-    }}, socket}
+    {:reply,
+     {:ok,
+      %{
+        "fight_id" => fight.id,
+        "timestamp" => DateTime.utc_now()
+      }}, socket}
   end
 
   @impl true

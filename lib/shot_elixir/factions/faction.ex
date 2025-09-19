@@ -3,6 +3,7 @@ defmodule ShotElixir.Factions.Faction do
   import Ecto.Changeset
   use Arc.Ecto.Schema
 
+  alias ShotElixir.ImagePositions.ImagePosition
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -15,6 +16,10 @@ defmodule ShotElixir.Factions.Faction do
     field :image_url, :string, virtual: true
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
+
+    has_many :image_positions, ImagePosition,
+      foreign_key: :positionable_id,
+      where: [positionable_type: "Faction"]
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end

@@ -21,7 +21,13 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
-            result = Parties.list_campaign_parties(current_user.current_campaign_id, params, current_user)
+            result =
+              Parties.list_campaign_parties(
+                current_user.current_campaign_id,
+                params,
+                current_user
+              )
+
             render(conn, :index, parties: result)
           else
             conn
@@ -395,13 +401,13 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
-    Campaigns.is_member?(campaign.id, user.id)
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 
   defp authorize_campaign_modification(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
 
   defp validate_same_campaign(campaign_id1, campaign_id2) do

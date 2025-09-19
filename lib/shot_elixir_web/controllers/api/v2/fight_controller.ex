@@ -224,7 +224,6 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     end
   end
 
-
   defp authorize_fight_edit(fight, user) do
     campaign = Campaigns.get_campaign(fight.campaign_id)
 

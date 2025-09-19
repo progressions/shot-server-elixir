@@ -33,23 +33,26 @@ defmodule ShotElixir.Invitations do
 
   def create_invitation(attrs \\ %{}) do
     # Find pending user if exists
-    pending_user = if attrs["email"] do
-      User |> where([u], u.email == ^attrs["email"]) |> Repo.one()
-    else
-      nil
-    end
+    pending_user =
+      if attrs["email"] do
+        User |> where([u], u.email == ^attrs["email"]) |> Repo.one()
+      else
+        nil
+      end
 
-    invitation_attrs = attrs
-    |> Map.put("pending_user_id", pending_user && pending_user.id)
+    invitation_attrs =
+      attrs
+      |> Map.put("pending_user_id", pending_user && pending_user.id)
 
     # TODO: Fix struct reference issue
-    {:ok, %{
-      id: Ecto.UUID.generate(),
-      email: invitation_attrs["email"],
-      user_id: invitation_attrs["user_id"],
-      campaign_id: invitation_attrs["campaign_id"],
-      pending_user_id: invitation_attrs["pending_user_id"]
-    }}
+    {:ok,
+     %{
+       id: Ecto.UUID.generate(),
+       email: invitation_attrs["email"],
+       user_id: invitation_attrs["user_id"],
+       campaign_id: invitation_attrs["campaign_id"],
+       pending_user_id: invitation_attrs["pending_user_id"]
+     }}
   end
 
   def redeem_invitation(invitation, user_id) do
@@ -112,17 +115,19 @@ defmodule ShotElixir.Invitations do
   # Validation functions
   def valid_email_format?(email) when is_binary(email) do
     String.length(email) <= 254 and
-    String.contains?(email, "@") and
-    String.split(email, "@") |> length() == 2 and
-    email =~ ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/
+      String.contains?(email, "@") and
+      String.split(email, "@") |> length() == 2 and
+      email =~ ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/
   end
+
   def valid_email_format?(_), do: false
 
   def valid_password?(password) when is_binary(password) do
     String.length(password) >= 8 and
-    password =~ ~r/[a-zA-Z]/ and
-    password =~ ~r/[0-9]/
+      password =~ ~r/[a-zA-Z]/ and
+      password =~ ~r/[0-9]/
   end
+
   def valid_password?(_), do: false
 
   def sanitize_name_field(name) when is_binary(name) do
@@ -131,13 +136,15 @@ defmodule ShotElixir.Invitations do
     |> String.slice(0..49)
     |> strip_html_tags()
   end
+
   def sanitize_name_field(_), do: nil
 
   # Simple HTML tag stripper - removes anything between < and >
   defp strip_html_tags(text) do
     text
     |> String.replace(~r/<[^>]*>/, "")
-    |> String.replace(~r/&[^;]+;/, "")  # Also strip HTML entities like &amp;
+    # Also strip HTML entities like &amp;
+    |> String.replace(~r/&[^;]+;/, "")
     |> String.trim()
   end
 
@@ -167,7 +174,8 @@ defmodule ShotElixir.Invitations do
       |> validate_format(:email, ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/)
       |> validate_length(:email, max: 254)
       |> unique_constraint([:email, :campaign_id],
-         message: "An invitation for this email already exists for this campaign")
+        message: "An invitation for this email already exists for this campaign"
+      )
     end
   end
 end

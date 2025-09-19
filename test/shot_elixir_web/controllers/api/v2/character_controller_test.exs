@@ -209,7 +209,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       assert response["character"]["user_id"] == gm.id
     end
 
-    test "broadcasts character creation via WebSocket", %{conn: conn, gamemaster: gm, campaign: campaign} do
+    test "broadcasts character creation via WebSocket", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
       conn = authenticate(conn, gm)
       conn = post(conn, ~p"/api/v2/characters", character: @create_attrs)
       response = json_response(conn, 201)

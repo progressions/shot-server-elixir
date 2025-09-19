@@ -3,6 +3,7 @@ defmodule ShotElixir.Sites.Site do
   import Ecto.Changeset
   use Arc.Ecto.Schema
 
+  alias ShotElixir.ImagePositions.ImagePosition
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -18,6 +19,10 @@ defmodule ShotElixir.Sites.Site do
     belongs_to :faction, ShotElixir.Factions.Faction
     belongs_to :juncture, ShotElixir.Junctures.Juncture
     has_many :attunements, ShotElixir.Sites.Attunement
+
+    has_many :image_positions, ImagePosition,
+      foreign_key: :positionable_id,
+      where: [positionable_type: "Site"]
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end

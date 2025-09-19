@@ -29,6 +29,7 @@ defmodule ShotElixirWeb.CampaignChannel do
       user_id: socket.assigns.user_id,
       user_name: get_user_name(socket.assigns.user)
     })
+
     {:noreply, socket}
   end
 
@@ -51,6 +52,7 @@ defmodule ShotElixirWeb.CampaignChannel do
       updated_by: socket.assigns.user_id,
       timestamp: DateTime.utc_now()
     })
+
     {:noreply, socket}
   end
 
@@ -62,6 +64,7 @@ defmodule ShotElixirWeb.CampaignChannel do
       updated_by: socket.assigns.user_id,
       timestamp: DateTime.utc_now()
     })
+
     {:noreply, socket}
   end
 

@@ -75,9 +75,10 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
               shot ->
                 if shot.fight_id == fight.id do
-                  shot_cost = params["shots"] || 3 # Default shot count
+                  # Default shot count
+                  shot_cost = params["shots"] || 3
                   entity = shot.character || shot.vehicle
-                  entity_name = entity && entity.name || "Unknown"
+                  entity_name = (entity && entity.name) || "Unknown"
 
                   # Update fight timestamp
                   Fights.touch_fight(fight)
@@ -88,7 +89,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       # TODO: Create fight event for the movement
                       # fight.fight_events.create!(...)
 
-                      Logger.info("#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}")
+                      Logger.info(
+                        "#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}"
+                      )
 
                       # Return updated encounter
                       serialized_fight = serialize_encounter(fight)
@@ -134,7 +137,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
           if authorize_campaign_modification(fight.campaign_id, current_user) do
             shots_data = params["shots"] || []
 
-            Logger.info("🎲 INITIATIVE UPDATE: Updating #{length(shots_data)} shot values for fight #{fight.id}")
+            Logger.info(
+              "🎲 INITIATIVE UPDATE: Updating #{length(shots_data)} shot values for fight #{fight.id}"
+            )
 
             try do
               # Process shots in transaction
@@ -148,13 +153,19 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       if shot.fight_id == fight.id do
                         case Fights.update_shot(shot, %{"shot" => shot_data["shot"]}) do
                           {:ok, updated_shot} ->
-                            entity_name = (updated_shot.character && updated_shot.character.name) ||
-                                         (updated_shot.vehicle && updated_shot.vehicle.name) ||
-                                         "Unknown"
-                            Logger.info("  Updated shot #{shot.id}: #{entity_name} to shot #{shot_data["shot"]}")
+                            entity_name =
+                              (updated_shot.character && updated_shot.character.name) ||
+                                (updated_shot.vehicle && updated_shot.vehicle.name) ||
+                                "Unknown"
+
+                            Logger.info(
+                              "  Updated shot #{shot.id}: #{entity_name} to shot #{shot_data["shot"]}"
+                            )
 
                           {:error, changeset} ->
-                            Repo.rollback("Failed to update shot #{shot.id}: #{inspect(changeset.errors)}")
+                            Repo.rollback(
+                              "Failed to update shot #{shot.id}: #{inspect(changeset.errors)}"
+                            )
                         end
                       else
                         Repo.rollback("Shot #{shot.id} does not belong to fight #{fight.id}")
@@ -206,23 +217,28 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
           if authorize_campaign_modification(fight.campaign_id, current_user) do
             try do
               # Handle different action types
-              result = case params["action_type"] do
-                "boost" ->
-                  Logger.info("💪 BOOST ACTION: Processing boost for fight #{fight.id}")
-                  # TODO: Implement BoostService.apply_boost
-                  fight
+              result =
+                case params["action_type"] do
+                  "boost" ->
+                    Logger.info("💪 BOOST ACTION: Processing boost for fight #{fight.id}")
+                    # TODO: Implement BoostService.apply_boost
+                    fight
 
-                "up_check" ->
-                  Logger.info("🎲 UP CHECK ACTION: Processing Up Check for fight #{fight.id}")
-                  # TODO: Implement UpCheckService.apply_up_check
-                  fight
+                  "up_check" ->
+                    Logger.info("🎲 UP CHECK ACTION: Processing Up Check for fight #{fight.id}")
+                    # TODO: Implement UpCheckService.apply_up_check
+                    fight
 
-                _ ->
-                  character_updates = params["character_updates"] || []
-                  Logger.info("🔄 BATCHED COMBAT: Applying #{length(character_updates)} character updates to fight #{fight.id}")
-                  # TODO: Implement CombatActionService.apply_combat_action
-                  fight
-              end
+                  _ ->
+                    character_updates = params["character_updates"] || []
+
+                    Logger.info(
+                      "🔄 BATCHED COMBAT: Applying #{length(character_updates)} character updates to fight #{fight.id}"
+                    )
+
+                    # TODO: Implement CombatActionService.apply_combat_action
+                    fight
+                end
 
               # Return updated encounter
               serialized_fight = serialize_encounter(result)
@@ -265,7 +281,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
             try do
               vehicle_updates = params["vehicle_updates"] || []
 
-              Logger.info("🏎️ CHASE ACTION: Applying #{length(vehicle_updates)} vehicle updates to fight #{fight.id}")
+              Logger.info(
+                "🏎️ CHASE ACTION: Applying #{length(vehicle_updates)} vehicle updates to fight #{fight.id}"
+              )
 
               # TODO: Implement ChaseActionService.apply_chase_action
               result = fight
@@ -302,22 +320,26 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
-    Campaigns.is_member?(campaign.id, user.id)
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 
   defp authorize_campaign_modification(campaign_id, user) do
     case Campaigns.get_campaign(campaign_id) do
-      nil -> false
+      nil ->
+        false
+
       campaign ->
         campaign.user_id == user.id || user.admin ||
-        (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+          (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
     end
   end
 
   defp get_fight(fight_id, campaign_id) do
     case Fights.get_fight(fight_id) do
-      nil -> {:error, :not_found}
+      nil ->
+        {:error, :not_found}
+
       fight ->
         if fight.campaign_id == campaign_id do
           {:ok, fight}

@@ -32,13 +32,20 @@ defmodule ShotElixirWeb.Api.V2.JunctureJSON do
     # Handle both struct and map format
     faction =
       case Map.get(juncture, :faction) do
-        %Ecto.Association.NotLoaded{} -> nil
-        nil -> nil
-        faction when is_map(faction) -> %{
-          id: Map.get(faction, :id),
-          name: Map.get(faction, :name)
-        }
-        _ -> nil
+        %Ecto.Association.NotLoaded{} ->
+          nil
+
+        nil ->
+          nil
+
+        faction when is_map(faction) ->
+          %{
+            id: Map.get(faction, :id),
+            name: Map.get(faction, :name)
+          }
+
+        _ ->
+          nil
       end
 
     %{

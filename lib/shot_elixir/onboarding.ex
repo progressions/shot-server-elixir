@@ -18,7 +18,9 @@ defmodule ShotElixir.Onboarding do
         case create_progress(user) do
           {:ok, progress} -> progress
         end
-      progress -> progress
+
+      progress ->
+        progress
     end
   end
 

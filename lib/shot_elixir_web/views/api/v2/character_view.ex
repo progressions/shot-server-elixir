@@ -4,7 +4,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     case data do
       %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
         character_serializer =
-          if is_autocomplete, do: &render_character_autocomplete/1, else: &render_character_index/1
+          if is_autocomplete,
+            do: &render_character_autocomplete/1,
+            else: &render_character_index/1
 
         %{
           characters: Enum.map(characters, character_serializer),
@@ -40,7 +42,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
   end
 
   def render("show.json", %{character: character}) do
-    render_character_full(character)
+    %{
+      character: render_character_full(character)
+    }
   end
 
   def render("autocomplete.json", %{characters: characters}) do
@@ -51,7 +55,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
 
   def render("sync.json", %{character: character, status: status}) do
     %{
-      character_id: character.id,
+      character: render_character_full(character),
       status: status,
       message: "Character sync to Notion queued"
     }
@@ -59,7 +63,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
 
   def render("pdf.json", %{character: character, url: url}) do
     %{
-      character_id: character.id,
+      character: render_character_full(character),
       pdf_url: url,
       message: if(url, do: "PDF generated successfully", else: "PDF generation pending")
     }

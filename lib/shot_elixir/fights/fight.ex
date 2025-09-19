@@ -1,6 +1,7 @@
 defmodule ShotElixir.Fights.Fight do
   use Ecto.Schema
   import Ecto.Changeset
+  alias ShotElixir.ImagePositions.ImagePosition
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -18,11 +19,16 @@ defmodule ShotElixir.Fights.Fight do
     field :server_id, :integer
     field :channel_id, :integer
     field :fight_message_id, :string
+    field :action_id, Ecto.UUID
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
 
     has_many :shots, ShotElixir.Fights.Shot
     has_many :character_effects, ShotElixir.Effects.CharacterEffect
+
+    has_many :image_positions, ImagePosition,
+      foreign_key: :positionable_id,
+      where: [positionable_type: "Fight"]
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
@@ -42,6 +48,7 @@ defmodule ShotElixir.Fights.Fight do
       :server_id,
       :channel_id,
       :fight_message_id,
+      :action_id,
       :campaign_id
     ])
     |> validate_required([:name, :campaign_id])

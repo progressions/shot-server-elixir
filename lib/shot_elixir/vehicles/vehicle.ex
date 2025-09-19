@@ -3,6 +3,7 @@ defmodule ShotElixir.Vehicles.Vehicle do
   import Ecto.Changeset
   use Arc.Ecto.Schema
 
+  alias ShotElixir.ImagePositions.ImagePosition
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -13,8 +14,7 @@ defmodule ShotElixir.Vehicles.Vehicle do
     field :color, :string
     field :impairments, :integer, default: 0
     field :active, :boolean, default: true
-    # Note: image storage handled by Rails app, not in this schema
-    field :image_url, :string, virtual: true
+    field :image_url, :string
     field :task, :boolean, default: false
     field :notion_page_id, :binary_id
     field :last_synced_to_notion_at, :utc_datetime
@@ -25,6 +25,10 @@ defmodule ShotElixir.Vehicles.Vehicle do
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction
     belongs_to :juncture, ShotElixir.Junctures.Juncture
+
+    has_many :image_positions, ImagePosition,
+      foreign_key: :positionable_id,
+      where: [positionable_type: "Vehicle"]
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end

@@ -74,7 +74,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
           |> put_status(:not_found)
           |> json(%{error: "Campaign not found"})
 
-        campaign.user_id != current_user.id && !current_user.gamemaster && !Campaigns.is_member?(campaign.id, current_user.id) ->
+        campaign.user_id != current_user.id && !current_user.gamemaster &&
+            !Campaigns.is_member?(campaign.id, current_user.id) ->
           conn
           |> put_status(:forbidden)
           |> json(%{error: "Only gamemaster can create vehicles"})
@@ -111,7 +112,6 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
          :ok <- authorize_vehicle_edit(vehicle, current_user) do
-
       # Handle image upload if present
       updated_vehicle =
         case Map.get(vehicle_params, "image") do
@@ -120,6 +120,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
               {:ok, v} -> v
               _ -> vehicle
             end
+
           _ ->
             vehicle
         end

@@ -3,6 +3,7 @@ defmodule ShotElixir.Campaigns.Campaign do
   import Ecto.Changeset
   import Ecto.Query
   alias ShotElixir.Repo
+  alias ShotElixir.ImagePositions.ImagePosition
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -28,6 +29,10 @@ defmodule ShotElixir.Campaigns.Campaign do
     has_many :sites, ShotElixir.Sites.Site
     has_many :factions, ShotElixir.Factions.Faction
     has_many :junctures, ShotElixir.Junctures.Juncture
+
+    has_many :image_positions, ImagePosition,
+      foreign_key: :positionable_id,
+      where: [positionable_type: "Campaign"]
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end

@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.FightJSON do
-
   def index(%{fights: fights}) do
     %{fights: Enum.map(fights, &fight_json/1)}
   end

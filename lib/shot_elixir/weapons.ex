@@ -4,17 +4,57 @@ defmodule ShotElixir.Weapons do
   """
 
   import Ecto.Query, warn: false
+  alias Ecto.Changeset
   alias ShotElixir.Repo
   alias ShotElixir.Weapons.Weapon
 
   def list_weapons(campaign_id, filters \\ %{}) do
+    per_page = max(parse_int(filters["per_page"], 15), 1)
+    page = parse_int(filters["page"], 1)
+    offset = max(page - 1, 0) * per_page
+
     query =
       from w in Weapon,
-        where: w.campaign_id == ^campaign_id and w.active == true,
-        order_by: [asc: fragment("lower(?)", w.name)]
+        where: w.campaign_id == ^campaign_id and w.active == true
 
-    query = apply_filters(query, filters)
-    Repo.all(query)
+    filtered_query = apply_filters(query, filters)
+    ordered_query = order_by(filtered_query, [w], fragment("lower(?)", w.name))
+
+    total_count = Repo.aggregate(ordered_query, :count, :id)
+
+    categories =
+      filtered_query
+      |> select([w], w.category)
+      |> where([w], not is_nil(w.category) and w.category != "")
+      |> distinct(true)
+      |> Repo.all()
+      |> Enum.sort()
+
+    junctures =
+      filtered_query
+      |> select([w], w.juncture)
+      |> where([w], not is_nil(w.juncture) and w.juncture != "")
+      |> distinct(true)
+      |> Repo.all()
+      |> Enum.sort()
+
+    weapons =
+      ordered_query
+      |> limit(^per_page)
+      |> offset(^offset)
+      |> Repo.all()
+
+    %{
+      weapons: weapons,
+      categories: categories,
+      junctures: junctures,
+      meta: %{
+        current_page: page,
+        per_page: per_page,
+        total_count: total_count,
+        total_pages: total_pages(total_count, per_page)
+      }
+    }
   end
 
   defp apply_filters(query, filters) do
@@ -62,5 +102,75 @@ defmodule ShotElixir.Weapons do
 
   def junctures do
     ["Ancient", "1850s", "Contemporary", "Future"]
+  end
+
+  def list_categories(campaign_id), do: list_categories(campaign_id, nil)
+
+  def list_categories(campaign_id, search) do
+    Weapon
+    |> where([w], w.campaign_id == ^campaign_id)
+    |> select([w], w.category)
+    |> where([w], not is_nil(w.category) and w.category != "")
+    |> distinct(true)
+    |> Repo.all()
+    |> maybe_filter_by_search(search)
+    |> Enum.sort()
+  end
+
+  def list_junctures(campaign_id), do: list_junctures(campaign_id, nil)
+
+  def list_junctures(campaign_id, search) do
+    Weapon
+    |> where([w], w.campaign_id == ^campaign_id)
+    |> select([w], w.juncture)
+    |> where([w], not is_nil(w.juncture) and w.juncture != "")
+    |> distinct(true)
+    |> Repo.all()
+    |> maybe_filter_by_search(search)
+    |> Enum.sort()
+  end
+
+  def get_weapons_batch(campaign_id, ids) when is_list(ids) do
+    Weapon
+    |> where([w], w.campaign_id == ^campaign_id and w.id in ^ids)
+    |> Repo.all()
+  end
+
+  def remove_image(%Weapon{} = weapon) do
+    weapon
+    |> Changeset.change(image_url: nil)
+    |> Repo.update()
+  end
+
+  defp maybe_filter_by_search(values, nil), do: values
+
+  defp maybe_filter_by_search(values, search) when is_binary(search) do
+    search_downcase = String.downcase(search)
+
+    Enum.filter(values, fn value ->
+      value
+      |> String.downcase()
+      |> String.contains?(search_downcase)
+    end)
+  end
+
+  defp maybe_filter_by_search(values, _), do: values
+
+  defp parse_int(nil, default), do: default
+  defp parse_int(value, _default) when is_integer(value), do: value
+
+  defp parse_int(value, default) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> default
+    end
+  end
+
+  defp parse_int(_, default), do: default
+
+  defp total_pages(0, _per_page), do: 0
+
+  defp total_pages(total_count, per_page) when per_page > 0 do
+    div(total_count + per_page - 1, per_page)
   end
 end

@@ -21,7 +21,13 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
 
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
-            result = Junctures.list_campaign_junctures(current_user.current_campaign_id, params, current_user)
+            result =
+              Junctures.list_campaign_junctures(
+                current_user.current_campaign_id,
+                params,
+                current_user
+              )
+
             render(conn, :index, junctures: result)
           else
             conn
@@ -270,12 +276,12 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
-    Campaigns.is_member?(campaign.id, user.id)
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 
   defp authorize_campaign_modification(campaign, user) do
     campaign.user_id == user.id || user.admin ||
-    (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
 end

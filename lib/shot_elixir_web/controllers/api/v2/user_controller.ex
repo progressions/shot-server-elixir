@@ -127,7 +127,6 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     end
   end
 
-
   # POST /api/v2/users - Public registration endpoint
   def create(conn, user_params) do
     # Handle JSON string parsing like Rails
