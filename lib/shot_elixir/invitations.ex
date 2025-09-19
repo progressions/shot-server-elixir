@@ -129,9 +129,17 @@ defmodule ShotElixir.Invitations do
     name
     |> String.trim()
     |> String.slice(0..49)
-    |> HtmlSanitizeEx.strip_tags()
+    |> strip_html_tags()
   end
   def sanitize_name_field(_), do: nil
+
+  # Simple HTML tag stripper - removes anything between < and >
+  defp strip_html_tags(text) do
+    text
+    |> String.replace(~r/<[^>]*>/, "")
+    |> String.replace(~r/&[^;]+;/, "")  # Also strip HTML entities like &amp;
+    |> String.trim()
+  end
 
   defmodule Invitation do
     use Ecto.Schema
