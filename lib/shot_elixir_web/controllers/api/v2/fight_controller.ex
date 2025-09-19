@@ -224,17 +224,6 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     end
   end
 
-  # Authorization helpers
-  defp authorize_fight_access(fight, user) do
-    campaign_id = fight.campaign_id
-    campaigns = Campaigns.get_user_campaigns(user.id)
-
-    if Enum.any?(campaigns, fn c -> c.id == campaign_id end) do
-      :ok
-    else
-      {:error, :forbidden}
-    end
-  end
 
   defp authorize_fight_edit(fight, user) do
     campaign = Campaigns.get_campaign(fight.campaign_id)

@@ -15,15 +15,8 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
     try do
       progress = Onboarding.ensure_onboarding_progress!(current_user)
 
-      case Onboarding.dismiss_congratulations(progress) do
-        {:ok, updated_progress} ->
-          render(conn, "success.json", onboarding_progress: updated_progress)
-
-        {:error, changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> render("error.json", errors: changeset)
-      end
+      {:ok, updated_progress} = Onboarding.dismiss_congratulations(progress)
+      render(conn, "success.json", onboarding_progress: updated_progress)
     rescue
       error ->
         Logger.error("Failed to dismiss congratulations for user #{current_user.id}: #{inspect(error)}")
@@ -43,15 +36,8 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
       progress = Onboarding.ensure_onboarding_progress!(current_user)
       onboarding_params = extract_onboarding_params(params)
 
-      case Onboarding.update_progress(progress, onboarding_params) do
-        {:ok, updated_progress} ->
-          render(conn, "success.json", onboarding_progress: updated_progress)
-
-        {:error, changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> render("error.json", errors: changeset)
-      end
+      {:ok, updated_progress} = Onboarding.update_progress(progress, onboarding_params)
+      render(conn, "success.json", onboarding_progress: updated_progress)
     rescue
       error ->
         Logger.error("Failed to update onboarding progress for user #{current_user.id}: #{inspect(error)}")

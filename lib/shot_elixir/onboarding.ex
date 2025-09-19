@@ -17,7 +17,6 @@ defmodule ShotElixir.Onboarding do
       nil ->
         case create_progress(user) do
           {:ok, progress} -> progress
-          {:error, _changeset} -> raise "Failed to create onboarding progress"
         end
       progress -> progress
     end

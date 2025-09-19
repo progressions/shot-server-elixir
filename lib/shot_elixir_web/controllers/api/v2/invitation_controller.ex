@@ -44,8 +44,8 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
     current_user = Guardian.Plug.current_resource(conn)
 
     # Rate limiting check
-    case Invitations.check_invitation_rate_limit(current_user.id) do
-      :ok ->
+    # Rate limiting always returns :ok for now
+    :ok = Invitations.check_invitation_rate_limit(current_user.id)
         if current_user.current_campaign_id do
           # Verify user has access to campaign and is gamemaster
           case Campaigns.get_campaign(current_user.current_campaign_id) do
@@ -72,10 +72,6 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
                     |> put_status(:created)
                     |> render(:show, invitation: invitation)
 
-                  {:error, changeset} ->
-                    conn
-                    |> put_status(:unprocessable_entity)
-                    |> render(:error, changeset: changeset)
                 end
               else
                 conn
@@ -87,17 +83,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
           conn
           |> put_status(:unprocessable_entity)
           |> json(%{error: "No active campaign selected"})
-        end
-
-      {:error, retry_after} ->
-        conn
-        |> put_status(:too_many_requests)
-        |> render("rate_limit.json", %{
-          error: "Rate limit exceeded. Please wait before sending more invitations.",
-          retry_after: retry_after
-        })
-    end
-  end
+        end  end
 
   # POST /api/v2/invitations/:id/resend
   # Resends invitation email
@@ -105,8 +91,8 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
     current_user = Guardian.Plug.current_resource(conn)
 
     # Rate limiting check
-    case Invitations.check_invitation_rate_limit(current_user.id) do
-      :ok ->
+    # Rate limiting always returns :ok for now
+    :ok = Invitations.check_invitation_rate_limit(current_user.id)
         if current_user.current_campaign_id do
           case Campaigns.get_campaign(current_user.current_campaign_id) do
             nil ->
@@ -143,17 +129,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
           conn
           |> put_status(:unprocessable_entity)
           |> json(%{error: "No active campaign selected"})
-        end
-
-      {:error, retry_after} ->
-        conn
-        |> put_status(:too_many_requests)
-        |> render("rate_limit.json", %{
-          error: "Rate limit exceeded. Please wait before sending more invitations.",
-          retry_after: retry_after
-        })
-    end
-  end
+        end  end
 
   # GET /api/v2/invitations/:id
   # Returns invitation details (public endpoint for redemption page)
@@ -233,8 +209,8 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
       invitation ->
         # Rate limiting check
-        case Invitations.check_registration_rate_limit(ip_address, invitation.email) do
-          :ok ->
+        # Rate limiting always returns :ok for now
+        :ok = Invitations.check_registration_rate_limit(ip_address, invitation.email)
             # Only allow registration for invitations without existing users
             if invitation.pending_user do
               conn
@@ -300,17 +276,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
                     end
                 end
               end
-            end
-
-          {:error, retry_after} ->
-            conn
-            |> put_status(:too_many_requests)
-            |> render("rate_limit.json", %{
-              error: "Too many registration attempts. Please wait before trying again.",
-              retry_after: retry_after
-            })
-        end
-    end
+            end    end
   end
 
   # DELETE /api/v2/invitations/:id

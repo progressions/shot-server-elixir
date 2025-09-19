@@ -81,16 +81,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
          :ok <- authorize_character_edit(character, current_user) do
 
       # Handle image upload if present
-      updated_character =
-        case Map.get(character_params, "image") do
-          %Plug.Upload{} = upload ->
-            case character.upload_image(upload) do
-              {:ok, char_with_image} -> char_with_image
-              _ -> character
-            end
-          _ ->
-            character
-        end
+      # TODO: Implement image upload functionality
+      # For now, just use the original character
+      updated_character = character
 
       # Continue with normal update
       case Characters.update_character(updated_character, character_params) do
