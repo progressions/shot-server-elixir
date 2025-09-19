@@ -35,7 +35,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
   end
 
   def render("show.json", %{fight: fight}) do
-    %{fight: render_fight_detail(fight)}
+    render_fight_detail(fight)
   end
 
   def render("error.json", %{changeset: changeset}) do
