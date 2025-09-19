@@ -121,7 +121,8 @@ defmodule ShotElixir.Fights do
           from f in query,
             join: s in "shots",
             on: s.fight_id == f.id,
-            where: s.character_id == ^character_id
+            where: s.character_id == ^character_id,
+            distinct: true
       end
 
     # Vehicle filtering
@@ -134,7 +135,8 @@ defmodule ShotElixir.Fights do
           from f in query,
             join: s in "shots",
             on: s.fight_id == f.id,
-            where: s.vehicle_id == ^vehicle_id
+            where: s.vehicle_id == ^vehicle_id,
+            distinct: true
       end
 
     # User filtering (characters owned by user)
@@ -149,14 +151,27 @@ defmodule ShotElixir.Fights do
             on: s.fight_id == f.id,
             join: c in "characters",
             on: s.character_id == c.id,
-            where: c.user_id == ^user_id
+            where: c.user_id == ^user_id,
+            distinct: true
       end
 
-    # Apply sorting
-    query = apply_sorting(query, params)
+    # Get total count for pagination BEFORE applying sorting
+    # This avoids the DISTINCT/ORDER BY conflict in PostgreSQL
+    total_count =
+      if params["character_id"] || params["vehicle_id"] || params["user_id"] do
+        # For distinct queries with joins, we need a special count approach
+        # The query already has distinct: true from the joins above
+        query
+        |> exclude(:order_by)  # Remove any ordering for the count
+        |> select([f], f.id)
+        |> Repo.all()
+        |> length()
+      else
+        Repo.aggregate(query, :count, :id)
+      end
 
-    # Get total count for pagination
-    total_count = Repo.aggregate(query, :count, :id)
+    # Apply sorting AFTER getting the count
+    query = apply_sorting(query, params)
 
     # Get seasons for filtering UI - separate query to avoid DISTINCT/ORDER BY issues
     seasons_query =

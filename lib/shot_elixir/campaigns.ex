@@ -12,8 +12,8 @@ defmodule ShotElixir.Campaigns do
     Repo.all(Campaign)
   end
 
-  def get_campaign!(id), do: Repo.get!(Campaign, id)
-  def get_campaign(id), do: Repo.get(Campaign, id)
+  def get_campaign!(id), do: Repo.get!(Campaign, id) |> Repo.preload(:user)
+  def get_campaign(id), do: Repo.get(Campaign, id) |> Repo.preload(:user)
 
   def get_user_campaigns(user_id) do
     query =
