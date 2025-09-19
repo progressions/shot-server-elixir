@@ -74,16 +74,22 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     }
   end
 
+  # Rails CampaignSerializer format
   defp render_campaign(campaign) do
     %{
       id: campaign.id,
       name: campaign.name,
       description: campaign.description,
-      active: campaign.active,
-      is_master_template: campaign.is_master_template,
-      user_id: campaign.user_id,
+      gamemaster_id: campaign.user_id,
+      gamemaster: render_gamemaster_if_loaded(campaign),
       created_at: campaign.created_at,
-      updated_at: campaign.updated_at
+      updated_at: campaign.updated_at,
+      users: render_users_if_loaded(campaign),
+      user_ids: get_user_ids(campaign),
+      image_url: get_image_url(campaign),
+      entity_class: "Campaign",
+      active: campaign.active,
+      image_positions: render_image_positions_if_loaded(campaign)
     }
   end
 
@@ -91,7 +97,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     %{
       id: campaign.id,
       name: campaign.name,
-      active: campaign.active
+      entity_class: "Campaign"
     }
   end
 
@@ -153,5 +159,74 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       created_at: fight.created_at,
       updated_at: fight.updated_at
     }
+  end
+
+  # Helper functions for Rails-compatible associations
+  defp render_gamemaster_if_loaded(campaign) do
+    case Map.get(campaign, :user) do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      user -> render_user_full(user)
+    end
+  end
+
+  defp render_users_if_loaded(campaign) do
+    case Map.get(campaign, :members) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      users -> Enum.map(users, &render_user_full/1)
+    end
+  end
+
+  defp render_image_positions_if_loaded(campaign) do
+    case Map.get(campaign, :image_positions) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      positions -> Enum.map(positions, &render_image_position/1)
+    end
+  end
+
+  defp get_user_ids(campaign) do
+    case Map.get(campaign, :members) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      users -> Enum.map(users, & &1.id)
+    end
+  end
+
+  # Rails UserSerializer format
+  defp render_user_full(user) do
+    %{
+      id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      image_url: get_image_url(user),
+      email: user.email,
+      name: "#{user.first_name} #{user.last_name}",
+      gamemaster: user.gamemaster,
+      admin: user.admin,
+      entity_class: "User",
+      active: user.active,
+      created_at: user.created_at,
+      updated_at: user.updated_at
+    }
+  end
+
+  # Rails ImagePositionSerializer format
+  defp render_image_position(position) do
+    %{
+      id: position.id,
+      context: position.context,
+      x_position: position.x_position,
+      y_position: position.y_position,
+      style_overrides: position.style_overrides
+    }
+  end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) do
+    # TODO: Implement proper image attachment checking
+    # For now, return nil like Rails when no image is attached
+    Map.get(record, :image_url)
   end
 end

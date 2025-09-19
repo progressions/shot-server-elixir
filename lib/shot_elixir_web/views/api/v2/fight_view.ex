@@ -49,19 +49,28 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     }
   end
 
+  # Rails FightSerializer format
   defp render_fight(fight) do
     %{
       id: fight.id,
       name: fight.name,
       description: fight.description,
-      campaign_id: fight.campaign_id,
+      image_url: get_image_url(fight),
+      created_at: fight.created_at,
+      updated_at: fight.updated_at,
+      active: fight.active,
+      sequence: fight.sequence,
+      characters: render_characters_if_loaded(fight),
+      character_ids: get_association_ids(fight, :characters),
+      vehicles: render_vehicles_if_loaded(fight),
+      vehicle_ids: get_association_ids(fight, :vehicles),
+      entity_class: "Fight",
       started_at: fight.started_at,
       ended_at: fight.ended_at,
-      active: fight.active,
       season: fight.season,
       session: fight.session,
-      created_at: fight.created_at,
-      updated_at: fight.updated_at
+      campaign_id: fight.campaign_id,
+      image_positions: render_image_positions_if_loaded(fight)
     }
   end
 
@@ -69,7 +78,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     %{
       id: fight.id,
       name: fight.name,
-      active: fight.active
+      entity_class: "Fight"
     }
   end
 
@@ -97,5 +106,76 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       acted: shot.acted,
       sequence: shot.sequence
     }
+  end
+
+  # Helper functions for Rails-compatible associations
+  defp render_characters_if_loaded(fight) do
+    case Map.get(fight, :characters) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      characters -> Enum.map(characters, &render_character_autocomplete/1)
+    end
+  end
+
+  defp render_vehicles_if_loaded(fight) do
+    case Map.get(fight, :vehicles) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      vehicles -> Enum.map(vehicles, &render_vehicle_lite/1)
+    end
+  end
+
+  defp render_image_positions_if_loaded(fight) do
+    case Map.get(fight, :image_positions) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      positions -> Enum.map(positions, &render_image_position/1)
+    end
+  end
+
+  defp get_association_ids(record, association) do
+    case Map.get(record, association) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      items when is_list(items) -> Enum.map(items, & &1.id)
+      _ -> []
+    end
+  end
+
+  # Rails CharacterAutocompleteSerializer format
+  defp render_character_autocomplete(character) do
+    %{
+      id: character.id,
+      name: character.name,
+      image_url: get_image_url(character),
+      entity_class: "Character"
+    }
+  end
+
+  # Rails VehicleLiteSerializer format
+  defp render_vehicle_lite(vehicle) do
+    %{
+      id: vehicle.id,
+      name: vehicle.name,
+      entity_class: "Vehicle"
+    }
+  end
+
+  # Rails ImagePositionSerializer format
+  defp render_image_position(position) do
+    %{
+      id: position.id,
+      context: position.context,
+      x_position: position.x_position,
+      y_position: position.y_position,
+      style_overrides: position.style_overrides
+    }
+  end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) do
+    # TODO: Implement proper image attachment checking
+    # For now, return nil like Rails when no image is attached
+    Map.get(record, :image_url)
   end
 end

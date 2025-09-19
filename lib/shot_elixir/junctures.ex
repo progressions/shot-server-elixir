@@ -187,10 +187,11 @@ defmodule ShotElixir.Junctures do
 
     factions =
       if Enum.any?(faction_ids) do
-        from f in "factions",
+        from(f in "factions",
           where: f.id in ^faction_ids,
           select: %{id: f.id, name: f.name},
           order_by: [asc: fragment("LOWER(?)", f.name)]
+        )
         |> Repo.all()
       else
         []

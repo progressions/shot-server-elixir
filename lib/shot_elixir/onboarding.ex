@@ -5,7 +5,6 @@ defmodule ShotElixir.Onboarding do
 
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
-  alias ShotElixir.Onboarding.Progress
   alias ShotElixir.Accounts.User
 
   def get_user_onboarding_progress(user_id) do
