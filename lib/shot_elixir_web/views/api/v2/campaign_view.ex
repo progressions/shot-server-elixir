@@ -32,15 +32,17 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   def render("show.json", %{campaign: campaign}) do
-    %{
-      campaign: render_campaign_detail(campaign)
-    }
+    render_campaign_detail(campaign)
+  end
+
+  def render("current.json", %{campaign: campaign}) do
+    # Return campaign directly for /current endpoint (Rails compatibility)
+    # Don't wrap in {campaign: ...}, just return the campaign object itself
+    render_campaign_detail(campaign)
   end
 
   def render("set_current.json", %{campaign: campaign}) do
-    %{
-      campaign: render_campaign_detail(campaign)
-    }
+    render_campaign_detail(campaign)
   end
 
   def render("current_fight.json", %{campaign: campaign, fight: fight}) do

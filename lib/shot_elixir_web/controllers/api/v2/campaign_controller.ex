@@ -145,9 +145,10 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       campaign_id ->
         case Campaigns.get_campaign(campaign_id) do
           %Campaign{} = campaign ->
+            # Return campaign directly for Rails compatibility
             conn
             |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-            |> render("show.json", campaign: campaign)
+            |> render("current.json", campaign: campaign)
 
           nil ->
             conn |> json(nil)
