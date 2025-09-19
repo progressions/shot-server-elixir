@@ -15,6 +15,10 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
     render_faction_detail(faction)
   end
 
+  def render("error.json", %{changeset: changeset}) do
+    %{errors: translate_errors(changeset)}
+  end
+
   def render_faction_index(faction) do
     %{
       id: faction.id,
@@ -43,10 +47,6 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       active: faction.active,
       campaign_id: faction.campaign_id
     }
-  end
-
-  def render("error.json", %{changeset: changeset}) do
-    %{errors: translate_errors(changeset)}
   end
 
   defp translate_errors(changeset) do

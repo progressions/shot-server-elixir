@@ -50,6 +50,17 @@ defmodule ShotElixirWeb.Api.V2.UserView do
     %{user: render_user_detail(user)}
   end
 
+  def render("error.json", %{changeset: changeset}) do
+    %{
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
+        end)
+    }
+  end
+
   # Rails UserSerializer format
   defp render_user(user) do
     %{
@@ -119,17 +130,6 @@ defmodule ShotElixirWeb.Api.V2.UserView do
       description: campaign.description,
       active: campaign.active,
       user_id: campaign.user_id
-    }
-  end
-
-  def render("error.json", %{changeset: changeset}) do
-    %{
-      errors:
-        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-          Enum.reduce(opts, msg, fn {key, value}, acc ->
-            String.replace(acc, "%{#{key}}", to_string(value))
-          end)
-        end)
     }
   end
 

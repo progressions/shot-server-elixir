@@ -16,6 +16,10 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
     render_juncture_detail(juncture)
   end
 
+  def render("error.json", %{changeset: changeset}) do
+    %{errors: translate_errors(changeset)}
+  end
+
   def render_juncture_index(juncture) do
     %{
       id: juncture.id,
@@ -50,10 +54,6 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
     # Add associations if loaded
     base
     |> add_if_loaded(:faction, juncture.faction)
-  end
-
-  def render("error.json", %{changeset: changeset}) do
-    %{errors: translate_errors(changeset)}
   end
 
   defp add_if_loaded(base, key, association) do

@@ -16,6 +16,10 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     render_party_detail(party)
   end
 
+  def render("error.json", %{changeset: changeset}) do
+    %{errors: translate_errors(changeset)}
+  end
+
   def render_party_index(party) do
     %{
       id: party.id,
@@ -54,10 +58,6 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     |> add_if_loaded(:faction, party.faction)
     |> add_if_loaded(:juncture, party.juncture)
     |> add_if_loaded(:memberships, party.memberships)
-  end
-
-  def render("error.json", %{changeset: changeset}) do
-    %{errors: translate_errors(changeset)}
   end
 
   defp add_if_loaded(base, key, association) do
