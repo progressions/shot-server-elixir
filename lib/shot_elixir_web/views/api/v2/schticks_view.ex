@@ -76,7 +76,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
       prerequisite_id: schtick.prerequisite_id,
       active: schtick.active,
       created_at: schtick.created_at,
-      updated_at: schtick.updated_at
+      updated_at: schtick.updated_at,
+      entity_class: "Schtick"
     }
   end
 
@@ -85,7 +86,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
       id: schtick.id,
       name: schtick.name,
       category: schtick.category,
-      active: schtick.active
+      active: schtick.active,
+      entity_class: "Schtick"
     }
   end
 
@@ -95,7 +97,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
       name: schtick.name,
       description: schtick.description,
       category: schtick.category,
-      path: schtick.path
+      path: schtick.path,
+      entity_class: "Schtick"
     }
   end
 

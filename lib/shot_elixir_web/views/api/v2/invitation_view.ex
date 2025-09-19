@@ -71,7 +71,8 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
       redeemed: invitation.redeemed,
       redeemed_at: invitation.redeemed_at,
       created_at: invitation.created_at,
-      updated_at: invitation.updated_at
+      updated_at: invitation.updated_at,
+      entity_class: "Invitation"
     }
 
     # Add associations if loaded
@@ -88,7 +89,8 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
       redeemed: invitation.redeemed,
       redeemed_at: invitation.redeemed_at,
       created_at: invitation.created_at,
-      updated_at: invitation.updated_at
+      updated_at: invitation.updated_at,
+      entity_class: "Invitation"
     }
 
     # Add associations if loaded

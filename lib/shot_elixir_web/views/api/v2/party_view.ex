@@ -29,14 +29,16 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       juncture_id: party.juncture_id,
       created_at: party.created_at,
       updated_at: party.updated_at,
-      active: party.active
+      active: party.active,
+      entity_class: "Party"
     }
   end
 
   def render_party_autocomplete(party) do
     %{
       id: party.id,
-      name: party.name
+      name: party.name,
+      entity_class: "Party"
     }
   end
 
@@ -50,7 +52,8 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       created_at: party.created_at,
       updated_at: party.updated_at,
       active: party.active,
-      campaign_id: party.campaign_id
+      campaign_id: party.campaign_id,
+      entity_class: "Party"
     }
 
     # Add associations if loaded

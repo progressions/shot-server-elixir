@@ -26,14 +26,16 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       description: faction.description,
       created_at: faction.created_at,
       updated_at: faction.updated_at,
-      active: faction.active
+      active: faction.active,
+      entity_class: "Faction"
     }
   end
 
   def render_faction_autocomplete(faction) do
     %{
       id: faction.id,
-      name: faction.name
+      name: faction.name,
+      entity_class: "Faction"
     }
   end
 
@@ -45,7 +47,8 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       created_at: faction.created_at,
       updated_at: faction.updated_at,
       active: faction.active,
-      campaign_id: faction.campaign_id
+      campaign_id: faction.campaign_id,
+      entity_class: "Faction"
     }
   end
 

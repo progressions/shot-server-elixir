@@ -80,7 +80,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
       action_values: vehicle.action_values,
       active: vehicle.active,
       created_at: vehicle.created_at,
-      updated_at: vehicle.updated_at
+      updated_at: vehicle.updated_at,
+      entity_class: "Vehicle"
     }
   end
 
@@ -88,7 +89,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     %{
       id: vehicle.id,
       name: vehicle.name,
-      active: vehicle.active
+      active: vehicle.active,
+      entity_class: "Vehicle"
     }
   end
 

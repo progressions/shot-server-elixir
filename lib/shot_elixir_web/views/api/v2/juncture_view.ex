@@ -28,14 +28,16 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
       faction_id: juncture.faction_id,
       created_at: juncture.created_at,
       updated_at: juncture.updated_at,
-      active: juncture.active
+      active: juncture.active,
+      entity_class: "Juncture"
     }
   end
 
   def render_juncture_autocomplete(juncture) do
     %{
       id: juncture.id,
-      name: juncture.name
+      name: juncture.name,
+      entity_class: "Juncture"
     }
   end
 
@@ -48,7 +50,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
       created_at: juncture.created_at,
       updated_at: juncture.updated_at,
       active: juncture.active,
-      campaign_id: juncture.campaign_id
+      campaign_id: juncture.campaign_id,
+      entity_class: "Juncture"
     }
 
     # Add associations if loaded
