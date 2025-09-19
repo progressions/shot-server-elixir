@@ -74,11 +74,33 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     current_user = GuardianPlug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
-         :ok <- authorize_character_edit(character, current_user),
-         {:ok, updated_character} <- Characters.update_character(character, character_params) do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-      |> render("show.json", character: updated_character)
+         :ok <- authorize_character_edit(character, current_user) do
+
+      # Handle image upload if present
+      updated_character =
+        case Map.get(character_params, "image") do
+          %Plug.Upload{} = upload ->
+            case character.upload_image(upload) do
+              {:ok, char_with_image} -> char_with_image
+              _ -> character
+            end
+          _ ->
+            character
+        end
+
+      # Continue with normal update
+      case Characters.update_character(updated_character, character_params) do
+        {:ok, final_character} ->
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("show.json", character: final_character)
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("error.json", changeset: changeset)
+      end
     else
       nil ->
         {:error, :not_found}
@@ -88,12 +110,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       {:error, :unauthorized} ->
         {:error, :forbidden}
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-        |> render("error.json", changeset: changeset)
     end
   end
 

@@ -12,6 +12,8 @@ defmodule ShotElixir.Application do
       ShotElixir.Repo,
       {DNSCluster, query: Application.get_env(:shot_elixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ShotElixir.PubSub},
+      # Cachex for image URL caching
+      {Cachex, name: :image_cache},
       # Start a worker by calling: ShotElixir.Worker.start_link(arg)
       # {ShotElixir.Worker, arg},
       # Start to serve requests, typically the last entry

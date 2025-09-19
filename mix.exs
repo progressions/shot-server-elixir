@@ -51,7 +51,21 @@ defmodule ShotElixir.MixProject do
       {:bandit, "~> 1.5"},
       {:guardian, "~> 2.3"},
       {:bcrypt_elixir, "~> 3.0"},
-      {:cors_plug, "~> 3.0"}
+      {:cors_plug, "~> 3.0"},
+
+      # File upload and ImageKit integration
+      {:arc, "~> 0.11.0"},
+      {:arc_ecto, "~> 0.11.3"},
+      {:sweet_xml, "~> 0.7"},
+
+      # HTTP client for ImageKit API
+      {:req, "~> 0.5"},
+
+      # Caching for image URLs
+      {:cachex, "~> 3.6"},
+
+      # Image processing (optional)
+      {:image, "~> 0.54"}
     ]
   end
 

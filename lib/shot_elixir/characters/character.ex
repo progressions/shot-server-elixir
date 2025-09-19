@@ -1,6 +1,10 @@
 defmodule ShotElixir.Characters.Character do
   use Ecto.Schema
   import Ecto.Changeset
+  use Arc.Ecto.Schema
+
+  alias ShotElixir.Uploaders.ImageUploader
+  alias ShotElixir.Services.ImagekitService
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -44,7 +48,9 @@ defmodule ShotElixir.Characters.Character do
     field :status, {:array, :map}, default: []
 
     # Additional fields from database
-    field :image_url, :string
+    field :image, ImageUploader.Type
+    field :image_url, :string, virtual: true
+    field :image_data, :map, default: %{}
     field :task, :boolean
     field :summary, :string
     field :wealth, :string
@@ -85,7 +91,7 @@ defmodule ShotElixir.Characters.Character do
       :description,
       :skills,
       :status,
-      :image_url,
+      :image_data,
       :task,
       :summary,
       :wealth,
@@ -97,11 +103,28 @@ defmodule ShotElixir.Characters.Character do
       :faction_id,
       :juncture_id
     ])
+    |> cast_attachments(attrs, [:image])
     |> validate_required([:name, :campaign_id])
     |> validate_number(:impairments, greater_than_or_equal_to: 0)
     |> validate_character_type()
     |> unique_constraint([:name, :campaign_id])
     |> ensure_default_values()
+  end
+
+  @doc """
+  Returns the image URL for a character, using ImageKit if configured.
+  """
+  def image_url(%__MODULE__{} = character) do
+    cond do
+      character.image != nil ->
+        ImageUploader.url({character.image, character})
+
+      map_size(character.image_data) > 0 ->
+        ImagekitService.generate_url_from_metadata(character.image_data)
+
+      true ->
+        nil
+    end
   end
 
   defp validate_character_type(changeset) do
