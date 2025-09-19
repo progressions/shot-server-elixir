@@ -103,12 +103,33 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
-         :ok <- authorize_vehicle_edit(vehicle, current_user),
-         {:ok, updated_vehicle} <-
-           Vehicles.update_vehicle(vehicle, parse_json_params(vehicle_params)) do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-      |> render("show.json", vehicle: updated_vehicle)
+         :ok <- authorize_vehicle_edit(vehicle, current_user) do
+
+      # Handle image upload if present
+      updated_vehicle =
+        case Map.get(vehicle_params, "image") do
+          %Plug.Upload{} = upload ->
+            case Vehicles.update_vehicle(vehicle, %{"image" => upload}) do
+              {:ok, v} -> v
+              _ -> vehicle
+            end
+          _ ->
+            vehicle
+        end
+
+      # Continue with normal update
+      case Vehicles.update_vehicle(updated_vehicle, parse_json_params(vehicle_params)) do
+        {:ok, final_vehicle} ->
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+          |> render("show.json", vehicle: final_vehicle)
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+          |> render("error.json", changeset: changeset)
+      end
     else
       nil ->
         conn

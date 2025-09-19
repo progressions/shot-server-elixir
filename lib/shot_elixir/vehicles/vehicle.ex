@@ -1,6 +1,10 @@
 defmodule ShotElixir.Vehicles.Vehicle do
   use Ecto.Schema
   import Ecto.Changeset
+  use Arc.Ecto.Schema
+
+  alias ShotElixir.Uploaders.ImageUploader
+  alias ShotElixir.Services.ImagekitService
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -11,7 +15,9 @@ defmodule ShotElixir.Vehicles.Vehicle do
     field :color, :string
     field :impairments, :integer, default: 0
     field :active, :boolean, default: true
-    field :image_url, :string
+    field :image, ImageUploader.Type
+    field :image_url, :string, virtual: true
+    field :image_data, :map, default: %{}
     field :task, :boolean, default: false
     field :notion_page_id, :binary_id
     field :last_synced_to_notion_at, :utc_datetime
@@ -34,7 +40,7 @@ defmodule ShotElixir.Vehicles.Vehicle do
       :color,
       :impairments,
       :active,
-      :image_url,
+      :image_data,
       :task,
       :notion_page_id,
       :last_synced_to_notion_at,
@@ -45,6 +51,23 @@ defmodule ShotElixir.Vehicles.Vehicle do
       :faction_id,
       :juncture_id
     ])
+    |> cast_attachments(attrs, [:image])
     |> validate_required([:name, :action_values, :campaign_id])
+  end
+
+  @doc """
+  Returns the image URL for a vehicle, using ImageKit if configured.
+  """
+  def image_url(%__MODULE__{} = vehicle) do
+    cond do
+      vehicle.image != nil ->
+        ImageUploader.url({vehicle.image, vehicle})
+
+      map_size(vehicle.image_data) > 0 ->
+        ImagekitService.generate_url_from_metadata(vehicle.image_data)
+
+      true ->
+        nil
+    end
   end
 end
