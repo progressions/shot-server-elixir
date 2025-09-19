@@ -7,7 +7,6 @@ defmodule ShotElixirWeb.CampaignChannel do
   use ShotElixirWeb, :channel
 
   alias ShotElixir.Campaigns
-  alias ShotElixir.Guardian
 
   @impl true
   def join("campaign:" <> campaign_id, _payload, socket) do

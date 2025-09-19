@@ -3,7 +3,6 @@ defmodule ShotElixir.Sites.Site do
   import Ecto.Changeset
   use Arc.Ecto.Schema
 
-  alias ShotElixir.Services.ImagekitService
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id

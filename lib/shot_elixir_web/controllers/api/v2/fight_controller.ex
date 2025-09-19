@@ -51,7 +51,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       |> put_status(:unprocessable_entity)
       |> json(%{error: "No active campaign selected"})
     else
-      campaign = ShotElixir.Campaigns.get_campaign(campaign_id)
+      campaign = Campaigns.get_campaign(campaign_id)
 
       # Only gamemaster can create fights
       unless campaign.user_id == current_user.id || current_user.gamemaster do
@@ -227,7 +227,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   # Authorization helpers
   defp authorize_fight_access(fight, user) do
     campaign_id = fight.campaign_id
-    campaigns = ShotElixir.Campaigns.get_user_campaigns(user.id)
+    campaigns = Campaigns.get_user_campaigns(user.id)
 
     if Enum.any?(campaigns, fn c -> c.id == campaign_id end) do
       :ok
@@ -237,14 +237,14 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   end
 
   defp authorize_fight_edit(fight, user) do
-    campaign = ShotElixir.Campaigns.get_campaign(fight.campaign_id)
+    campaign = Campaigns.get_campaign(fight.campaign_id)
 
     # For cross-campaign security, return :not_found for non-members, :forbidden for members
     cond do
       campaign.user_id == user.id -> :ok
       user.admin -> :ok
-      user.gamemaster && ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> :ok
-      ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> {:error, :forbidden}
+      user.gamemaster && Campaigns.is_member?(campaign.id, user.id) -> :ok
+      Campaigns.is_member?(campaign.id, user.id) -> {:error, :forbidden}
       true -> {:error, :not_found}
     end
   end

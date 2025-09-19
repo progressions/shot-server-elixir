@@ -127,20 +127,6 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     end
   end
 
-  # PATCH /api/v2/users/profile
-  def update_profile(conn, %{"user" => user_params}) do
-    user = Guardian.Plug.current_resource(conn)
-
-    case Accounts.update_user(user, user_params) do
-      {:ok, updated_user} ->
-        render(conn, :show, user: updated_user)
-
-      {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> render(:error, changeset: changeset)
-    end
-  end
 
   # POST /api/v2/users - Public registration endpoint
   def create(conn, user_params) do

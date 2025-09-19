@@ -250,15 +250,17 @@ defmodule ShotElixir.Fights do
   Advance the shot counter for a fight.
   """
   def advance_shot_counter(%Fight{} = fight) do
-    new_counter = if fight.shot_counter > 0, do: fight.shot_counter - 1, else: 18
-    update_fight(fight, %{shot_counter: new_counter})
+    # Using sequence field as the shot counter
+    new_counter = if fight.sequence > 0, do: fight.sequence - 1, else: 18
+    update_fight(fight, %{sequence: new_counter})
   end
 
   @doc """
   Reset the shot counter to 18.
   """
   def reset_shot_counter(%Fight{} = fight) do
-    update_fight(fight, %{shot_counter: 18})
+    # Using sequence field as the shot counter
+    update_fight(fight, %{sequence: 18})
   end
 
   def delete_fight(%Fight{} = fight) do

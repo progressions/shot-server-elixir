@@ -7,7 +7,7 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Repo
   alias ShotElixir.Characters.Character
 
-  @character_types ["PC", "Ally", "Mook", "Featured Foe", "Boss", "Uber-Boss"]
+  # Character types are defined in the database enum
 
   def list_characters(campaign_id) do
     query =

@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.SchticksJSON do
-  alias ShotElixir.Schticks.Schtick
 
   def index(%{schticks: data}) when is_map(data) do
     # Handle paginated response with metadata

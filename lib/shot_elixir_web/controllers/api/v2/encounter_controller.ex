@@ -3,7 +3,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
   require Logger
   alias ShotElixir.Fights
-  alias ShotElixir.Fights.Shot
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Repo
@@ -85,7 +84,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
                   # Process the action
                   case Fights.act_shot(shot, shot_cost) do
-                    {:ok, updated_shot} ->
+                    {:ok, _updated_shot} ->
                       # TODO: Create fight event for the movement
                       # fight.fight_events.create!(...)
 

@@ -4,11 +4,12 @@ defmodule ShotElixir.Uploaders.ImageUploader do
   Validates file types and delegates storage to ImageKit service.
   """
 
-  use Arc.Definition
+  # Not using Arc.Definition as we're implementing custom storage with ImageKit
 
   alias ShotElixir.Services.ImagekitService
 
-  @versions [:original, :thumb, :medium]
+  # Versions for image transformations
+  # @versions [:original, :thumb, :medium]
   @extension_whitelist ~w(.jpg .jpeg .gif .png .webp .svg)
   @max_file_size 10_485_760 # 10MB in bytes
 
@@ -85,16 +86,13 @@ defmodule ShotElixir.Uploaders.ImageUploader do
   Generate URL for the stored file.
   This will be called by Arc when accessing the file.
   """
-  # Define the header with default value
   def url(file, version \\ :original)
 
-  # Handle tuple format from Arc
   def url({file_name, _scope}, version) do
     transformations = transformations_for_version(version)
     ImagekitService.generate_url(file_name, transformations)
   end
 
-  # Handle string format
   def url(file_name, version) when is_binary(file_name) do
     transformations = transformations_for_version(version)
     ImagekitService.generate_url(file_name, transformations)

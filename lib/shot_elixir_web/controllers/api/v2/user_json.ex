@@ -1,5 +1,4 @@
 defmodule ShotElixirWeb.Api.V2.UserJSON do
-  alias ShotElixir.Accounts.User
 
   def index(%{data: data}) when is_map(data) do
     # Handle paginated response with metadata

@@ -80,7 +80,7 @@ defmodule ShotElixirWeb.FightChannel do
             })
             {:reply, :ok, socket}
 
-          {:error, changeset} ->
+          {:error, _changeset} ->
             {:reply, {:error, %{reason: "Update failed"}}, socket}
         end
     end
@@ -106,7 +106,7 @@ defmodule ShotElixirWeb.FightChannel do
     case Fights.advance_shot_counter(fight) do
       {:ok, updated_fight} ->
         broadcast!(socket, "shot_counter_changed", %{
-          shot_counter: updated_fight.shot_counter,
+          shot_counter: updated_fight.sequence,
           sequence: updated_fight.sequence
         })
         {:reply, :ok, assign(socket, :fight, updated_fight)}
@@ -123,7 +123,7 @@ defmodule ShotElixirWeb.FightChannel do
     case Fights.reset_shot_counter(fight) do
       {:ok, updated_fight} ->
         broadcast!(socket, "shot_counter_changed", %{
-          shot_counter: updated_fight.shot_counter,
+          shot_counter: updated_fight.sequence,
           sequence: updated_fight.sequence
         })
         {:reply, :ok, assign(socket, :fight, updated_fight)}
