@@ -1,5 +1,7 @@
 defmodule ShotElixirWeb.Api.V2.SiteView do
-  def render("index.json", %{data: data}) do
+  alias ShotElixir.JsonSanitizer
+
+  def render("index.json", %{sites: data}) do
     site_serializer =
       if data.is_autocomplete, do: &render_site_autocomplete/1, else: &render_site_index/1
 
@@ -9,12 +11,12 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       meta: data.meta,
       is_autocomplete: data.is_autocomplete
     }
+    |> JsonSanitizer.sanitize()
   end
 
   def render("show.json", %{site: site}) do
-    %{
-      site: render_site_detail(site)
-    }
+    %{site: render_site_detail(site)}
+    |> JsonSanitizer.sanitize()
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -30,16 +32,14 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       juncture_id: site.juncture_id,
       created_at: site.created_at,
       updated_at: site.updated_at,
-      active: site.active,
-      entity_class: "Site"
+      active: site.active
     }
   end
 
   def render_site_autocomplete(site) do
     %{
       id: site.id,
-      name: site.name,
-      entity_class: "Site"
+      name: site.name
     }
   end
 
@@ -53,8 +53,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       created_at: site.created_at,
       updated_at: site.updated_at,
       active: site.active,
-      campaign_id: site.campaign_id,
-      entity_class: "Site"
+      campaign_id: site.campaign_id
     }
 
     # Add associations if loaded

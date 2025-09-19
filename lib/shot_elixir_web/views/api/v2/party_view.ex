@@ -1,5 +1,7 @@
 defmodule ShotElixirWeb.Api.V2.PartyView do
-  def render("index.json", %{data: data}) do
+  alias ShotElixir.JsonSanitizer
+
+  def render("index.json", %{parties: data}) do
     party_serializer =
       if data.is_autocomplete, do: &render_party_autocomplete/1, else: &render_party_index/1
 
@@ -9,12 +11,12 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       meta: data.meta,
       is_autocomplete: data.is_autocomplete
     }
+    |> JsonSanitizer.sanitize()
   end
 
   def render("show.json", %{party: party}) do
-    %{
-      party: render_party_detail(party)
-    }
+    %{party: render_party_detail(party)}
+    |> JsonSanitizer.sanitize()
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -30,16 +32,14 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       juncture_id: party.juncture_id,
       created_at: party.created_at,
       updated_at: party.updated_at,
-      active: party.active,
-      entity_class: "Party"
+      active: party.active
     }
   end
 
   def render_party_autocomplete(party) do
     %{
       id: party.id,
-      name: party.name,
-      entity_class: "Party"
+      name: party.name
     }
   end
 
@@ -53,8 +53,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       created_at: party.created_at,
       updated_at: party.updated_at,
       active: party.active,
-      campaign_id: party.campaign_id,
-      entity_class: "Party"
+      campaign_id: party.campaign_id
     }
 
     # Add associations if loaded

@@ -209,7 +209,12 @@ defmodule ShotElixir.Parties do
         distinct: [f.id, f.name],
         order_by: [asc: fragment("LOWER(?)", f.name)]
 
-    factions = Repo.all(factions_query)
+    factions =
+      factions_query
+      |> Repo.all()
+      |> Enum.map(fn entry ->
+        Map.update(entry, :id, nil, fn id -> normalize_uuid(id) end)
+      end)
 
     # Apply pagination
     parties =
@@ -230,6 +235,7 @@ defmodule ShotElixir.Parties do
       },
       is_autocomplete: params["autocomplete"] == "true" || params["autocomplete"] == true
     }
+    |> ShotElixir.JsonSanitizer.sanitize()
   end
 
   defp parse_ids(ids_param) when is_binary(ids_param) do
@@ -237,9 +243,10 @@ defmodule ShotElixir.Parties do
     |> String.split(",")
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
+    |> Enum.map(&normalize_uuid/1)
   end
 
-  defp parse_ids(ids_param) when is_list(ids_param), do: ids_param
+  defp parse_ids(ids_param) when is_list(ids_param), do: Enum.map(ids_param, &normalize_uuid/1)
   defp parse_ids(_), do: []
 
   defp apply_visibility_filter(query, params) do
@@ -370,4 +377,15 @@ defmodule ShotElixir.Parties do
 
     Repo.all(query)
   end
+
+  defp normalize_uuid(nil), do: nil
+
+  defp normalize_uuid(id) when is_binary(id) and byte_size(id) == 16 do
+    case Ecto.UUID.load(id) do
+      {:ok, uuid} -> uuid
+      :error -> nil
+    end
+  end
+
+  defp normalize_uuid(id), do: id
 end

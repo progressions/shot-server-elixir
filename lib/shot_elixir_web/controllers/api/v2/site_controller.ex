@@ -24,7 +24,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
             result =
               Sites.list_campaign_sites(current_user.current_campaign_id, params, current_user)
 
-            render(conn, :index, sites: result)
+            render(conn, :index, sites: ShotElixir.JsonSanitizer.sanitize(result))
           else
             conn
             |> put_status(:forbidden)

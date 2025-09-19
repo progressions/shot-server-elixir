@@ -76,6 +76,27 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       assert %{"parties" => []} = json_response(conn, 200)
     end
 
+    test "includes string ids for parties and factions", %{
+      conn: conn,
+      campaign: campaign,
+      faction: faction,
+      user: user
+    } do
+      {:ok, _party} =
+        Parties.create_party(%{
+          name: "Encoded Party",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      conn = get(conn, ~p"/api/v2/parties", %{user_id: user.id})
+      payload = json_response(conn, 200)
+
+      assert Jason.encode!(payload)
+      assert Enum.all?(payload["parties"], &is_binary(&1["id"]))
+      assert Enum.all?(payload["factions"], &is_binary(&1["id"]))
+    end
+
     test "returns error when no campaign selected", %{conn: conn, user: user} do
       {:ok, user_without_campaign} = Accounts.update_user(user, %{current_campaign_id: nil})
 

@@ -11,6 +11,10 @@ config :shot_elixir,
   ecto_repos: [ShotElixir.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
+config :shot_elixir, ShotElixir.Repo,
+  migration_primary_key: [type: :binary_id],
+  migration_foreign_key: [type: :binary_id]
+
 # Configures the endpoint
 config :shot_elixir, ShotElixirWeb.Endpoint,
   url: [host: "localhost"],

@@ -28,7 +28,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                 current_user
               )
 
-            render(conn, :index, parties: result)
+            render(conn, :index, parties: ShotElixir.JsonSanitizer.sanitize(result))
           else
             conn
             |> put_status(:forbidden)

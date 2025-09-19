@@ -34,6 +34,14 @@ defmodule ShotElixir.Fights do
 
     offset = (page - 1) * per_page
 
+    # Normalize UUID parameters so string ids don't break binary comparisons
+    params =
+      params
+      |> normalize_uuid_param("id")
+      |> normalize_uuid_param("character_id")
+      |> normalize_uuid_param("vehicle_id")
+      |> normalize_uuid_param("user_id")
+
     # Base query with visibility filtering
     query =
       from f in Fight,
@@ -50,7 +58,11 @@ defmodule ShotElixir.Fights do
     query =
       if params["ids"] do
         ids = parse_ids(params["ids"])
-        from f in query, where: f.id in ^ids
+
+        case Enum.reject(ids, &is_nil/1) do
+          [] -> query
+          normalized_ids -> from f in query, where: f.id in ^normalized_ids
+        end
       else
         query
       end
@@ -101,37 +113,43 @@ defmodule ShotElixir.Fights do
 
     # Character filtering
     query =
-      if params["character_id"] do
-        from f in query,
-          join: s in "shots",
-          on: s.fight_id == f.id,
-          where: s.character_id == ^params["character_id"]
-      else
-        query
+      case params["character_id"] do
+        nil ->
+          query
+
+        character_id ->
+          from f in query,
+            join: s in "shots",
+            on: s.fight_id == f.id,
+            where: s.character_id == ^character_id
       end
 
     # Vehicle filtering
     query =
-      if params["vehicle_id"] do
-        from f in query,
-          join: s in "shots",
-          on: s.fight_id == f.id,
-          where: s.vehicle_id == ^params["vehicle_id"]
-      else
-        query
+      case params["vehicle_id"] do
+        nil ->
+          query
+
+        vehicle_id ->
+          from f in query,
+            join: s in "shots",
+            on: s.fight_id == f.id,
+            where: s.vehicle_id == ^vehicle_id
       end
 
     # User filtering (characters owned by user)
     query =
-      if params["user_id"] do
-        from f in query,
-          join: s in "shots",
-          on: s.fight_id == f.id,
-          join: c in "characters",
-          on: s.character_id == c.id,
-          where: c.user_id == ^params["user_id"]
-      else
-        query
+      case params["user_id"] do
+        nil ->
+          query
+
+        user_id ->
+          from f in query,
+            join: s in "shots",
+            on: s.fight_id == f.id,
+            join: c in "characters",
+            on: s.character_id == c.id,
+            where: c.user_id == ^user_id
       end
 
     # Apply sorting
@@ -179,10 +197,31 @@ defmodule ShotElixir.Fights do
     |> String.split(",")
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
+    |> Enum.map(&normalize_uuid/1)
   end
 
-  defp parse_ids(ids_param) when is_list(ids_param), do: ids_param
+  defp parse_ids(ids_param) when is_list(ids_param), do: Enum.map(ids_param, &normalize_uuid/1)
   defp parse_ids(_), do: []
+
+  defp normalize_uuid_param(params, key) do
+    case Map.fetch(params, key) do
+      :error -> params
+      {:ok, nil} -> params
+      {:ok, value} -> Map.put(params, key, normalize_uuid(value))
+    end
+  end
+
+  defp normalize_uuid(nil), do: nil
+  defp normalize_uuid(value) when is_binary(value) and byte_size(value) == 16, do: value
+
+  defp normalize_uuid(value) when is_binary(value) do
+    case Ecto.UUID.dump(value) do
+      {:ok, uuid} -> uuid
+      :error -> nil
+    end
+  end
+
+  defp normalize_uuid(value), do: value
 
   defp apply_sorting(query, params) do
     sort = params["sort"] || "created_at"
