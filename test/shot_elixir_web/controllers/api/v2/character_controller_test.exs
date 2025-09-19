@@ -209,11 +209,15 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       assert response["character"]["user_id"] == gm.id
     end
 
-    # TODO: Fix WebSocket broadcast tests after channels are properly configured
-    @tag :skip
     test "broadcasts character creation via WebSocket", %{conn: conn, gamemaster: gm, campaign: campaign} do
-      # This test requires proper channel setup
-      assert true
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/characters", character: @create_attrs)
+      response = json_response(conn, 201)
+
+      # Verify character was created
+      assert response["character"]["id"]
+      assert response["character"]["name"] == "Test Character"
+      # TODO: Add proper WebSocket testing once Phoenix Channel test infrastructure is complete
     end
 
     test "renders errors when data is invalid", %{conn: conn, gamemaster: gm} do
@@ -264,16 +268,19 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       assert response["character"]["active"] == false
     end
 
-    # TODO: Fix WebSocket broadcast tests after channels are properly configured
-    @tag :skip
     test "broadcasts character update via WebSocket", %{
       conn: conn,
       gamemaster: gm,
       character: character,
       campaign: campaign
     } do
-      # This test requires proper channel setup
-      assert true
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/characters/#{character.id}", character: @update_attrs)
+      response = json_response(conn, 200)
+
+      # Verify update was successful
+      assert response["character"]["name"] == "Updated Character"
+      # TODO: Add proper WebSocket testing once Phoenix Channel test infrastructure is complete
     end
 
     test "gamemaster can update any character", %{
@@ -339,16 +346,20 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       assert deleted_character.active == false
     end
 
-    # TODO: Fix WebSocket broadcast tests after channels are properly configured
-    @tag :skip
     test "broadcasts character deletion via WebSocket", %{
       conn: conn,
       gamemaster: gm,
       character: character,
       campaign: campaign
     } do
-      # This test requires proper channel setup
-      assert true
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/characters/#{character.id}")
+      assert response(conn, 204)
+
+      # Verify soft deletion occurred
+      deleted_char = Characters.get_character(character.id)
+      assert deleted_char.active == false
+      # TODO: Add proper WebSocket testing once Phoenix Channel test infrastructure is complete
     end
 
     test "returns forbidden when user is not owner", %{
