@@ -7,6 +7,26 @@ defmodule ShotElixir.Guardian do
     {:ok, to_string(user.id)}
   end
 
+  # Handle Rails JWT format with nested user data
+  def resource_from_claims(%{"jti" => _jti, "user" => user_data} = claims) when is_map(user_data) do
+    IO.inspect(claims, label: "Rails JWT claims")
+    # Rails JWT contains user email in nested user map
+    email = user_data["email"] || user_data[:email]
+    IO.inspect(email, label: "Looking for email")
+
+    case Accounts.get_user_by_email(email) do
+      nil ->
+        IO.puts("User not found for email: #{email}")
+        {:error, :user_not_found}
+
+      user ->
+        IO.inspect(user.email, label: "Found user")
+        # For Rails compatibility, we trust the JTI from the token
+        {:ok, user}
+    end
+  end
+
+  # Handle Elixir-generated tokens with sub field
   def resource_from_claims(%{"sub" => id, "jti" => jti}) do
     case Accounts.get_user(id) do
       nil ->

@@ -5,6 +5,9 @@ defmodule ShotElixirWeb.AuthErrorHandler do
 
   @impl Guardian.Plug.ErrorHandler
   def auth_error(conn, {type, reason}, _opts) do
+    # Log the error for debugging
+    IO.inspect({type, reason}, label: "Auth error")
+
     message =
       case {type, reason} do
         {:invalid_token, _} -> "Invalid token"

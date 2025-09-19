@@ -30,10 +30,10 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-# Guardian configuration
+# Guardian configuration - must match Rails Devise JWT secret for compatibility
 config :shot_elixir, ShotElixir.Guardian,
   issuer: "shot_server",
-  secret_key: "your_secret_key_here"
+  secret_key: "d18f1ac82f1db45a11fea843b4b75941433f1a3eded1e7b77f375ced770ef5c7611bd20a3a65706b1913f755024791804071dff7a32a0131e67acbc3fe1746a5"
 
 # ImageKit configuration
 config :shot_elixir, :imagekit,

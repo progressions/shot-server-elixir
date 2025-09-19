@@ -16,6 +16,11 @@ defmodule ShotElixirWeb.Endpoint do
     websocket: true,
     longpoll: false
 
+  # ActionCable-compatible endpoint for Rails frontend
+  socket "/cable", ShotElixirWeb.UserSocket,
+    websocket: true,
+    longpoll: false
+
   # socket "/live", Phoenix.LiveView.Socket,
   #   websocket: [connect_info: [session: @session_options]],
   #   longpoll: [connect_info: [session: @session_options]]
@@ -48,7 +53,8 @@ defmodule ShotElixirWeb.Endpoint do
       "Content-Type",
       "Origin",
       "X-Requested-With"
-    ]
+    ],
+    expose: ["Authorization"]
 
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]

@@ -8,11 +8,13 @@ defmodule ShotElixirWeb.Users.SessionsController do
   def create(conn, %{"user" => %{"email" => email, "password" => password}}) do
     case Accounts.authenticate_user(email, password) do
       {:ok, user} ->
-        # Generate JWT with claims matching Rails format
+        # Generate JWT with claims matching Rails format EXACTLY
         jti = claims_jti(user)
         image_url = get_image_url(user)
 
-        {:ok, token, _claims} = Guardian.encode_and_sign(user, %{
+        # Match Rails JWT structure exactly
+        now = System.system_time(:second)
+        jwt_payload = %{
           "jti" => jti,
           "user" => %{
             "email" => user.email,
@@ -21,14 +23,23 @@ defmodule ShotElixirWeb.Users.SessionsController do
             "last_name" => user.last_name,
             "gamemaster" => user.gamemaster,
             "current_campaign" => user.current_campaign_id,
-            "created_at" => DateTime.to_iso8601(user.created_at),
-            "updated_at" => DateTime.to_iso8601(user.updated_at),
+            "created_at" => format_datetime_rails(user.created_at),
+            "updated_at" => format_datetime_rails(user.updated_at),
             "image_url" => image_url
-          }
-        })
+          },
+          "sub" => user.id,
+          "scp" => "user",
+          "aud" => nil,
+          "iat" => now,
+          "exp" => now + 7 * 24 * 60 * 60  # 7 days expiry like Rails
+        }
+
+        # Generate token using Guardian but with Rails-compatible claims
+        {:ok, token, _claims} = Guardian.encode_and_sign(user, jwt_payload)
 
         conn
         |> put_resp_header("authorization", "Bearer #{token}")
+        |> put_resp_header("access-control-expose-headers", "Authorization")
         |> put_status(:ok)
         |> json(%{
           code: 200,
@@ -82,20 +93,6 @@ defmodule ShotElixirWeb.Users.SessionsController do
     end
   end
 
-  defp render_user(user) do
-    %{
-      id: user.id,
-      email: user.email,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      name: user.name,
-      admin: user.admin,
-      gamemaster: user.gamemaster,
-      current_campaign_id: user.current_campaign_id,
-      created_at: user.created_at,
-      updated_at: user.updated_at
-    }
-  end
 
   defp render_user_data(user, jti) do
     %{
@@ -132,5 +129,13 @@ defmodule ShotElixirWeb.Users.SessionsController do
       _ ->
         Map.get(user, :image_url)
     end
+  end
+
+  defp format_datetime_rails(datetime) do
+    # Format datetime to match Rails format: "2022-12-30 19:10:13 UTC"
+    datetime
+    |> DateTime.to_string()
+    |> String.replace("T", " ")
+    |> String.replace("Z", " UTC")
   end
 end
