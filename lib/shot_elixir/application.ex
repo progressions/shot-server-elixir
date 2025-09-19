@@ -12,8 +12,12 @@ defmodule ShotElixir.Application do
       ShotElixir.Repo,
       {DNSCluster, query: Application.get_env(:shot_elixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ShotElixir.PubSub},
+      # Phoenix Presence for tracking users in channels
+      ShotElixirWeb.Presence,
       # Cachex for image URL caching
       {Cachex, name: :image_cache},
+      # Redis connection for presence tracking
+      {Redix, name: :redix, host: "localhost", port: 6379},
       # Start a worker by calling: ShotElixir.Worker.start_link(arg)
       # {ShotElixir.Worker, arg},
       # Start to serve requests, typically the last entry

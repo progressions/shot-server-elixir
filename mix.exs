@@ -65,7 +65,10 @@ defmodule ShotElixir.MixProject do
       {:cachex, "~> 3.6"},
 
       # Image processing (optional)
-      {:image, "~> 0.54"}
+      {:image, "~> 0.54"},
+
+      # Redis for presence tracking
+      {:redix, "~> 1.5"}
     ]
   end
 

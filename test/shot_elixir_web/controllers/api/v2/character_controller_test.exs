@@ -209,6 +209,26 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       assert response["character"]["user_id"] == gm.id
     end
 
+    test "broadcasts character creation via WebSocket", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      # Subscribe to campaign channel to receive broadcasts
+      {:ok, token, _claims} = Guardian.encode_and_sign(gm)
+      {:ok, socket} = Phoenix.ChannelTest.connect(ShotElixirWeb.UserSocket, %{"token" => token})
+      {:ok, _reply, _socket} = Phoenix.ChannelTest.subscribe_and_join(socket, "campaign:#{campaign.id}", %{})
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/characters", character: @create_attrs)
+      response = json_response(conn, 201)
+
+      # Assert broadcast was sent
+      assert_push "character_created", %{
+        character_id: character_id,
+        action: "created",
+        timestamp: _
+      }
+
+      assert character_id == response["character"]["id"]
+    end
+
     test "renders errors when data is invalid", %{conn: conn, gamemaster: gm} do
       conn = authenticate(conn, gm)
       conn = post(conn, ~p"/api/v2/characters", character: @invalid_attrs)
@@ -255,6 +275,31 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       assert response["character"]["id"] == character.id
       assert response["character"]["name"] == "Updated Character"
       assert response["character"]["active"] == false
+    end
+
+    test "broadcasts character update via WebSocket", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character,
+      campaign: campaign
+    } do
+      # Subscribe to campaign channel to receive broadcasts
+      {:ok, token, _claims} = Guardian.encode_and_sign(gm)
+      {:ok, socket} = Phoenix.ChannelTest.connect(ShotElixirWeb.UserSocket, %{"token" => token})
+      {:ok, _reply, _socket} = Phoenix.ChannelTest.subscribe_and_join(socket, "campaign:#{campaign.id}", %{})
+
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/characters/#{character.id}", character: @update_attrs)
+      json_response(conn, 200)
+
+      # Assert broadcast was sent
+      assert_push "character_updated", %{
+        character_id: character_id,
+        action: "updated",
+        timestamp: _
+      }
+
+      assert character_id == character.id
     end
 
     test "gamemaster can update any character", %{
@@ -318,6 +363,31 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       # Verify character is soft deleted
       deleted_character = Characters.get_character(character.id)
       assert deleted_character.active == false
+    end
+
+    test "broadcasts character deletion via WebSocket", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character,
+      campaign: campaign
+    } do
+      # Subscribe to campaign channel to receive broadcasts
+      {:ok, token, _claims} = Guardian.encode_and_sign(gm)
+      {:ok, socket} = Phoenix.ChannelTest.connect(ShotElixirWeb.UserSocket, %{"token" => token})
+      {:ok, _reply, _socket} = Phoenix.ChannelTest.subscribe_and_join(socket, "campaign:#{campaign.id}", %{})
+
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/characters/#{character.id}")
+      assert response(conn, 204)
+
+      # Assert broadcast was sent
+      assert_push "character_deleted", %{
+        character_id: character_id,
+        action: "deleted",
+        timestamp: _
+      }
+
+      assert character_id == character.id
     end
 
     test "returns forbidden when user is not owner", %{

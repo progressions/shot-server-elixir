@@ -11,6 +11,11 @@ defmodule ShotElixirWeb.Endpoint do
     same_site: "Lax"
   ]
 
+  # WebSocket support for real-time channels
+  socket "/socket", ShotElixirWeb.UserSocket,
+    websocket: true,
+    longpoll: false
+
   # socket "/live", Phoenix.LiveView.Socket,
   #   websocket: [connect_info: [session: @session_options]],
   #   longpoll: [connect_info: [session: @session_options]]

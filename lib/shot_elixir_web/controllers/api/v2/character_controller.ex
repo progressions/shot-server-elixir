@@ -4,6 +4,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
   alias ShotElixir.Guardian.Plug, as: GuardianPlug
+  alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -56,6 +57,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       case Characters.create_character(params) do
         {:ok, character} ->
+          # Broadcast the creation
+          CampaignChannel.broadcast_character_change(campaign_id, character.id, "created")
+
           conn
           |> put_status(:created)
           |> put_view(ShotElixirWeb.Api.V2.CharacterView)
@@ -91,6 +95,15 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       # Continue with normal update
       case Characters.update_character(updated_character, character_params) do
         {:ok, final_character} ->
+          # Broadcast the update
+          if final_character.campaign_id do
+            CampaignChannel.broadcast_character_change(
+              final_character.campaign_id,
+              final_character.id,
+              "updated"
+            )
+          end
+
           conn
           |> put_view(ShotElixirWeb.Api.V2.CharacterView)
           |> render("show.json", character: final_character)
@@ -119,6 +132,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user),
          {:ok, _} <- Characters.delete_character(character) do
+      # Broadcast the deletion
+      if character.campaign_id do
+        CampaignChannel.broadcast_character_change(character.campaign_id, character.id, "deleted")
+      end
+
       send_resp(conn, :no_content, "")
     else
       nil -> {:error, :not_found}
