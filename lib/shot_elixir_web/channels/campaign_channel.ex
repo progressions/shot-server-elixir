@@ -46,7 +46,7 @@ defmodule ShotElixirWeb.CampaignChannel do
 
   # Handle character updates
   @impl true
-  def handle_in("character_update", %{"character_id" => character_id} = payload, socket) do
+  def handle_in("character_update", %{"character_id" => character_id}, socket) do
     broadcast!(socket, "character_update", %{
       character_id: character_id,
       updated_by: socket.assigns.user_id,
@@ -57,7 +57,7 @@ defmodule ShotElixirWeb.CampaignChannel do
 
   # Handle fight updates
   @impl true
-  def handle_in("fight_update", %{"fight_id" => fight_id} = payload, socket) do
+  def handle_in("fight_update", %{"fight_id" => fight_id}, socket) do
     broadcast!(socket, "fight_update", %{
       fight_id: fight_id,
       updated_by: socket.assigns.user_id,

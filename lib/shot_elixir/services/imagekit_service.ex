@@ -93,7 +93,7 @@ defmodule ShotElixir.Services.ImagekitService do
     generate_url(name)
   end
 
-  def generate_url_from_metadata(%{"fileId" => file_id, "name" => name}) do
+  def generate_url_from_metadata(%{"fileId" => _file_id, "name" => name}) do
     generate_url(name)
   end
 
@@ -189,11 +189,12 @@ defmodule ShotElixir.Services.ImagekitService do
       raise "ImageKit private key not configured"
   end
 
-  defp public_key do
-    config()[:public_key] ||
-      System.get_env("IMAGEKIT_PUBLIC_KEY") ||
-      raise "ImageKit public key not configured"
-  end
+  # Currently unused - kept for potential future use
+  # defp public_key do
+  #   config()[:public_key] ||
+  #     System.get_env("IMAGEKIT_PUBLIC_KEY") ||
+  #     raise "ImageKit public key not configured"
+  # end
 
   defp url_endpoint do
     config()[:url_endpoint] ||

@@ -11,7 +11,7 @@ defmodule ShotElixir.Accounts do
     Repo.all(User)
   end
 
-  def list_campaign_users(params \\ %{}, current_user \\ nil) do
+  def list_campaign_users(params \\ %{}, _current_user \\ nil) do
     # Get pagination parameters - handle both string and integer params
     per_page =
       case params["per_page"] do

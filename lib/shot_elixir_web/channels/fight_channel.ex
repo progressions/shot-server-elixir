@@ -45,7 +45,7 @@ defmodule ShotElixirWeb.FightChannel do
   end
 
   @impl true
-  def handle_info({:after_join, fight_id}, socket) do
+  def handle_info({:after_join, _fight_id}, socket) do
     # Broadcast updated user list after join
     broadcast_user_list(socket)
     {:noreply, socket}

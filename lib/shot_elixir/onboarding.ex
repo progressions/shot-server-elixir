@@ -5,7 +5,6 @@ defmodule ShotElixir.Onboarding do
 
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
-  alias ShotElixir.Accounts.User
 
   def get_user_onboarding_progress(user_id) do
     __MODULE__.Progress
@@ -26,7 +25,6 @@ defmodule ShotElixir.Onboarding do
 
   def create_progress(user) do
     # TODO: Fix struct reference issue
-    attrs = %{"user_id" => user.id}
     {:ok, %{id: Ecto.UUID.generate(), user_id: user.id}}
   end
 

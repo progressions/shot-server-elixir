@@ -97,14 +97,13 @@ defmodule ShotElixir.Invitations do
   end
 
   # Rate limiting functions
-  def check_invitation_rate_limit(user_id) do
-    key = "invitation_rate_limit:#{user_id}"
+  def check_invitation_rate_limit(_user_id) do
     # TODO: Implement with Redis or ETS cache
     # For now, always allow
     :ok
   end
 
-  def check_registration_rate_limit(ip_address, email) do
+  def check_registration_rate_limit(_ip_address, _email) do
     # TODO: Implement with Redis or ETS cache
     # For now, always allow
     :ok

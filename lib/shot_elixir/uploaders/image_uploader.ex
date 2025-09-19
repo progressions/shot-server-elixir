@@ -73,7 +73,7 @@ defmodule ShotElixir.Uploaders.ImageUploader do
   @doc """
   Delete file from ImageKit when record is deleted.
   """
-  def delete({file_name, _scope}) do
+  def delete({_file_name, _scope}) do
     # Extract file_id if stored in metadata
     # For now, we'll skip deletion as ImageKit doesn't provide easy lookup by name
     :ok

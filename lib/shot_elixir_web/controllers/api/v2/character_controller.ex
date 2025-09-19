@@ -3,13 +3,13 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
-  alias ShotElixir.Guardian.Plug, as: GuardianPlug
+  alias ShotElixir.Guardian
   alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
   def index(conn, params) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     # Get current campaign from user or params
     campaign_id = current_user.current_campaign_id || params["campaign_id"]
@@ -28,7 +28,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def show(conn, %{"id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user) do
@@ -42,7 +42,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def create(conn, %{"character" => character_params}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
     campaign_id = current_user.current_campaign_id || character_params["campaign_id"]
 
     unless campaign_id do
@@ -75,7 +75,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def update(conn, %{"id" => id, "character" => character_params}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user) do
@@ -127,7 +127,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def delete(conn, %{"id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user),
@@ -146,7 +146,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
   # Custom endpoints
   def duplicate(conn, %{"character_id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user),
@@ -162,7 +162,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def sync(conn, %{"id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user) do
@@ -177,7 +177,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def pdf(conn, %{"id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user) do
@@ -192,7 +192,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def import(conn, _params) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
     campaign_id = current_user.current_campaign_id
 
     unless campaign_id do
@@ -208,7 +208,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   def autocomplete(conn, params) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
     campaign_id = current_user.current_campaign_id || params["campaign_id"]
 
     unless campaign_id do
