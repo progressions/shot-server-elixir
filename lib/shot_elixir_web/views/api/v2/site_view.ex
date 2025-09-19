@@ -16,6 +16,10 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     render_site_detail(site)
   end
 
+  def render("error.json", %{changeset: changeset}) do
+    %{errors: translate_errors(changeset)}
+  end
+
   def render_site_index(site) do
     %{
       id: site.id,
@@ -54,10 +58,6 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     |> add_if_loaded(:faction, site.faction)
     |> add_if_loaded(:juncture, site.juncture)
     |> add_if_loaded(:attunements, site.attunements)
-  end
-
-  def render("error.json", %{changeset: changeset}) do
-    %{errors: translate_errors(changeset)}
   end
 
   defp add_if_loaded(base, key, association) do

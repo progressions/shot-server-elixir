@@ -3,9 +3,10 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
   require Logger
   alias ShotElixir.Fights
-  alias ShotElixir.Shots
+  alias ShotElixir.Fights.Shot
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Repo
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -67,7 +68,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
               Fights.update_fight(fight, %{"action_id" => params["action_id"]})
             end
 
-            case Shots.get_shot(params["shot_id"]) do
+            case Fights.get_shot(params["shot_id"]) do
               nil ->
                 conn
                 |> put_status(:not_found)
@@ -83,7 +84,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   Fights.touch_fight(fight)
 
                   # Process the action
-                  case Shots.act_shot(shot, shot_cost) do
+                  case Fights.act_shot(shot, shot_cost) do
                     {:ok, updated_shot} ->
                       # TODO: Create fight event for the movement
                       # fight.fight_events.create!(...)
@@ -140,13 +141,13 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
               # Process shots in transaction
               Repo.transaction(fn ->
                 Enum.each(shots_data, fn shot_data ->
-                  case Shots.get_shot(shot_data["id"]) do
+                  case Fights.get_shot(shot_data["id"]) do
                     nil ->
                       Repo.rollback("Shot #{shot_data["id"]} not found")
 
                     shot ->
                       if shot.fight_id == fight.id do
-                        case Shots.update_shot(shot, %{"shot" => shot_data["shot"]}) do
+                        case Fights.update_shot(shot, %{"shot" => shot_data["shot"]}) do
                           {:ok, updated_shot} ->
                             entity_name = (updated_shot.character && updated_shot.character.name) ||
                                          (updated_shot.vehicle && updated_shot.vehicle.name) ||

@@ -3,7 +3,6 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
   alias ShotElixir.Factions
   alias ShotElixir.Campaigns
-  alias ShotElixir.Guardian
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -22,7 +21,7 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
             result = Factions.list_campaign_factions(current_user.current_campaign_id, params, current_user)
-            render(conn, :index, data: result)
+            render(conn, :index, factions: result)
           else
             conn
             |> put_status(:forbidden)

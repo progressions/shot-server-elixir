@@ -46,6 +46,13 @@ defmodule ShotElixir.Services.ImagekitServiceTest do
 
   describe "delete_file/1" do
     test "handles string file_id" do
+      # Set minimal config to avoid runtime error
+      Application.put_env(:shot_elixir, :imagekit, [
+        private_key: "test_private_key",
+        public_key: "test_public_key",
+        url_endpoint: "https://ik.imagekit.io/test"
+      ])
+
       assert {:error, _} = ImagekitService.delete_file("test-file-id")
     end
   end

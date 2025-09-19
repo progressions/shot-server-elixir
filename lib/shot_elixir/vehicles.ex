@@ -267,11 +267,14 @@ defmodule ShotElixir.Vehicles do
         where: v.campaign_id == ^campaign_id and not is_nil(v.faction_id),
         join: f in "factions",
         on: f.id == v.faction_id,
-        select: %{id: f.id, name: f.name},
+        select: %{id: f.id, name: f.name, lower_name: fragment("LOWER(?)", f.name)},
         distinct: true,
         order_by: fragment("LOWER(?)", f.name)
 
-    factions = Repo.all(factions_query)
+    factions =
+      factions_query
+      |> Repo.all()
+      |> Enum.map(fn faction -> %{id: faction.id, name: faction.name} end)
 
     # Get archetypes and types
     vehicles_for_meta =

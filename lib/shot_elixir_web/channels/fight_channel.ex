@@ -34,10 +34,8 @@ defmodule ShotElixirWeb.FightChannel do
 
         Logger.info("User #{user.id} joined fight:#{fight_id}")
 
-        # Send current presence state
-        push(socket, "presence_state", Presence.list(socket))
-
-        {:ok, socket}
+        # Don't push during join, return the initial state
+        {:ok, %{status: "ok", fight_id: fight_id}, socket}
 
       {:error, reason} ->
         {:error, %{reason: reason}}
@@ -46,6 +44,8 @@ defmodule ShotElixirWeb.FightChannel do
 
   @impl true
   def handle_info({:after_join, _fight_id}, socket) do
+    # Send presence state after join
+    push(socket, "presence_state", Presence.list(socket))
     # Broadcast updated user list after join
     broadcast_user_list(socket)
     {:noreply, socket}
@@ -67,16 +67,22 @@ defmodule ShotElixirWeb.FightChannel do
   # Shot updates
   @impl true
   def handle_in("shot_update", %{"shot_id" => shot_id, "updates" => updates}, socket) do
-    case Fights.update_shot(shot_id, updates) do
-      {:ok, shot} ->
-        broadcast!(socket, "shot_updated", %{
-          shot: serialize_shot(shot),
-          updated_by: socket.assigns.user_id
-        })
-        {:reply, :ok, socket}
+    case Fights.get_shot(shot_id) do
+      nil ->
+        {:reply, {:error, %{reason: "Shot not found"}}, socket}
 
-      {:error, reason} ->
-        {:reply, {:error, %{reason: reason}}, socket}
+      shot ->
+        case Fights.update_shot(shot, updates) do
+          {:ok, updated_shot} ->
+            broadcast!(socket, "shot_updated", %{
+              "shot" => serialize_shot(updated_shot),
+              "updated_by" => socket.assigns.user_id
+            })
+            {:reply, :ok, socket}
+
+          {:error, changeset} ->
+            {:reply, {:error, %{reason: "Update failed"}}, socket}
+        end
     end
   end
 
@@ -84,12 +90,12 @@ defmodule ShotElixirWeb.FightChannel do
   @impl true
   def handle_in("character_act", %{"character_id" => character_id, "action" => action}, socket) do
     broadcast!(socket, "character_acted", %{
-      character_id: character_id,
-      action: action,
-      acted_by: socket.assigns.user_id,
-      timestamp: DateTime.utc_now()
+      "character_id" => character_id,
+      "action" => action,
+      "acted_by" => socket.assigns.user_id,
+      "timestamp" => DateTime.utc_now()
     })
-    {:noreply, socket}
+    {:reply, :ok, socket}
   end
 
   # Shot counter management
@@ -128,6 +134,16 @@ defmodule ShotElixirWeb.FightChannel do
   end
 
   @impl true
+  def handle_in("sync_request", _payload, socket) do
+    fight = socket.assigns.fight
+
+    {:reply, {:ok, %{
+      "fight_id" => fight.id,
+      "timestamp" => DateTime.utc_now()
+    }}, socket}
+  end
+
+  @impl true
   def handle_in("ping", _payload, socket) do
     {:reply, {:ok, %{pong: :pong}}, socket}
   end
@@ -135,27 +151,38 @@ defmodule ShotElixirWeb.FightChannel do
   # Private functions
 
   defp authorize_fight_access(fight_id, user) do
-    case Fights.get_fight(fight_id) do
-      nil ->
-        {:error, "Fight not found"}
-
-      fight ->
-        case Campaigns.get_campaign(fight.campaign_id) do
+    # Validate UUID format first
+    case Ecto.UUID.cast(fight_id) do
+      {:ok, _uuid} ->
+        case Fights.get_fight(fight_id) do
           nil ->
-            {:error, "Campaign not found"}
+            {:error, "unauthorized"}
 
-          campaign ->
-            cond do
-              campaign.user_id == user.id ->
-                {:ok, fight}
+          fight ->
+            case Campaigns.get_campaign(fight.campaign_id) do
+              nil ->
+                {:error, "unauthorized"}
 
-              Campaigns.is_campaign_member?(campaign.id, user.id) ->
-                {:ok, fight}
+              campaign ->
+                cond do
+                  campaign.user_id == user.id ->
+                    {:ok, fight}
 
-              true ->
-                {:error, "Not authorized"}
+                  user.gamemaster || user.admin ->
+                    {:ok, fight}
+
+                  Campaigns.is_campaign_member?(campaign.id, user.id) ->
+                    {:ok, fight}
+
+                  true ->
+                    {:error, "unauthorized"}
+                end
             end
         end
+
+      :error ->
+        # Invalid UUID format
+        {:error, "unauthorized"}
     end
   end
 
@@ -184,11 +211,11 @@ defmodule ShotElixirWeb.FightChannel do
 
   defp serialize_shot(shot) do
     %{
-      id: shot.id,
-      shot_number: shot.shot,
-      acted: shot.acted,
-      character_id: shot.character_id,
-      vehicle_id: shot.vehicle_id
+      "id" => shot.id,
+      "shot_number" => shot.shot,
+      "acted" => Map.get(shot, :acted, false),
+      "character_id" => shot.character_id,
+      "vehicle_id" => shot.vehicle_id
     }
   end
 
@@ -198,10 +225,12 @@ defmodule ShotElixirWeb.FightChannel do
   Broadcasts a fight update to all connected clients.
   """
   def broadcast_fight_update(fight_id, event, payload) do
+    payload_with_timestamp = Map.put(payload, :timestamp, DateTime.utc_now())
+
     ShotElixirWeb.Endpoint.broadcast!(
       "fight:#{fight_id}",
       event,
-      payload
+      payload_with_timestamp
     )
   end
 

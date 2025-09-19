@@ -4,7 +4,6 @@ defmodule ShotElixirWeb.Api.V2.UserController do
   alias ShotElixir.Accounts
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
-  alias ShotElixirWeb.ErrorJSON
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -39,7 +38,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
       :forbidden ->
         conn
         |> put_status(:forbidden)
-        |> json(%{error: "Admin access required"})
+        |> json(%{error: "Forbidden"})
 
       _ ->
         result = Accounts.list_campaign_users(params, current_user)
@@ -143,58 +142,49 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     end
   end
 
-  # POST /api/v2/users
+  # POST /api/v2/users - Public registration endpoint
   def create(conn, user_params) do
-    current_user = Guardian.Plug.current_resource(conn)
+    # Handle JSON string parsing like Rails
+    parsed_params =
+      case user_params do
+        %{"user" => user_data} when is_binary(user_data) ->
+          case Jason.decode(user_data) do
+            {:ok, decoded} ->
+              decoded
 
-    # Only admin can create users
-    unless current_user.admin do
+            {:error, _} ->
+              conn
+              |> put_status(:bad_request)
+              |> json(%{error: "Invalid user data format"})
+              |> halt()
+          end
+
+        %{"user" => user_data} when is_map(user_data) ->
+          user_data
+
+        _ ->
+          conn
+          |> put_status(:bad_request)
+          |> json(%{error: "User parameters required"})
+          |> halt()
+      end
+
+    if conn.halted do
       conn
-      |> put_status(:forbidden)
-      |> json(%{error: "Admin access required"})
     else
-      # Handle JSON string parsing like Rails
-      parsed_params =
-        case user_params do
-          %{"user" => user_data} when is_binary(user_data) ->
-            case Jason.decode(user_data) do
-              {:ok, decoded} ->
-                decoded
+      case Accounts.create_user(parsed_params) do
+        {:ok, user} ->
+          {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
-              {:error, _} ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "Invalid user data format"})
-                |> halt()
-            end
+          conn
+          |> put_status(:created)
+          |> put_resp_header("authorization", "Bearer #{token}")
+          |> render(:show, user: user, token: token)
 
-          %{"user" => user_data} when is_map(user_data) ->
-            user_data
-
-          _ ->
-            conn
-            |> put_status(:bad_request)
-            |> json(%{error: "User parameters required"})
-            |> halt()
-        end
-
-      if conn.halted do
-        conn
-      else
-        case Accounts.create_user(parsed_params) do
-          {:ok, user} ->
-            {:ok, token, _claims} = Guardian.encode_and_sign(user)
-
-            conn
-            |> put_status(:created)
-            |> put_resp_header("authorization", "Bearer #{token}")
-            |> render(:show, user: user)
-
-          {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> render(:error, changeset: changeset)
-        end
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> render(:error, changeset: changeset)
       end
     end
   end
@@ -313,7 +303,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
         else
           conn
           |> put_status(:forbidden)
-          |> json(%{error: "You can only edit your own attributes or must be an admin"})
+          |> json(%{error: "Forbidden"})
         end
     end
   end
@@ -370,11 +360,11 @@ defmodule ShotElixirWeb.Api.V2.UserController do
   def delete(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    # Only admin can delete users
-    unless current_user.admin do
+    # Admin can delete any user, users can delete themselves
+    unless current_user.admin || current_user.id == id do
       conn
       |> put_status(:forbidden)
-      |> json(%{error: "Admin access required"})
+      |> json(%{error: "Forbidden"})
     else
       case Accounts.get_user(id) do
         nil ->

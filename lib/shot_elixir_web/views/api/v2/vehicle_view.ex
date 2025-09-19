@@ -71,6 +71,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
       id: vehicle.id,
       name: vehicle.name,
       description: vehicle.description,
+      color: vehicle.color,
+      impairments: vehicle.impairments,
       campaign_id: vehicle.campaign_id,
       user_id: vehicle.user_id,
       faction_id: vehicle.faction_id,

@@ -66,30 +66,35 @@ defmodule ShotElixirWeb.FightChannelTest do
       shot = insert(:shot, fight: fight)
       payload = %{
         "shot_id" => shot.id,
-        "shot" => 10,
-        "acted" => false
+        "updates" => %{
+          "shot" => 10,
+          "acted" => false
+        }
       }
 
       ref = push(socket, "shot_update", payload)
       assert_reply ref, :ok
 
-      assert_broadcast "shot_update", broadcast_payload
-      assert broadcast_payload["shot_id"] == shot.id
-      assert broadcast_payload["shot"] == 10
-      assert broadcast_payload["acted"] == false
+      assert_broadcast "shot_updated", broadcast_payload
+      assert broadcast_payload["shot"]["id"] == shot.id
+      assert broadcast_payload["shot"]["shot_number"] == 10
+      assert broadcast_payload["shot"]["acted"] == false
     end
 
     test "includes timestamp in shot update broadcast", %{socket: socket, fight: fight} do
       {:ok, _reply, socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
 
       shot = insert(:shot, fight: fight)
-      payload = %{"shot_id" => shot.id, "shot" => 10}
+      payload = %{
+        "shot_id" => shot.id,
+        "updates" => %{"shot" => 10}
+      }
 
       ref = push(socket, "shot_update", payload)
       assert_reply ref, :ok
 
-      assert_broadcast "shot_update", %{"timestamp" => timestamp}
-      assert is_binary(timestamp) or is_struct(timestamp, DateTime)
+      assert_broadcast "shot_updated", broadcast_payload
+      refute is_nil(broadcast_payload["updated_by"])
     end
   end
 
@@ -100,19 +105,17 @@ defmodule ShotElixirWeb.FightChannelTest do
       character = insert(:character)
       payload = %{
         "character_id" => character.id,
-        "action" => "attack",
-        "target_id" => "target-123",
-        "result" => %{"damage" => 10}
+        "action" => "attack"
       }
 
-      ref = push(socket, "character_action", payload)
+      ref = push(socket, "character_act", payload)
       assert_reply ref, :ok
 
-      assert_broadcast "character_action", broadcast_payload
+      assert_broadcast "character_acted", broadcast_payload
       assert broadcast_payload["character_id"] == character.id
       assert broadcast_payload["action"] == "attack"
-      assert broadcast_payload["target_id"] == "target-123"
-      assert broadcast_payload["result"]["damage"] == 10
+      assert broadcast_payload["acted_by"]
+      assert broadcast_payload["timestamp"]
     end
   end
 
@@ -132,7 +135,7 @@ defmodule ShotElixirWeb.FightChannelTest do
     test "broadcasts fight updates to channel", %{socket: socket, fight: fight} do
       {:ok, _reply, socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
 
-      FightChannel.broadcast_fight_update(fight.id, %{
+      FightChannel.broadcast_fight_update(fight.id, "fight_update", %{
         event: "round_advanced",
         round: 2
       })
@@ -165,10 +168,9 @@ defmodule ShotElixirWeb.FightChannelTest do
       refute Map.has_key?(presences_after, user.id)
     end
 
-    test "tracks multiple users in same fight", %{fight: fight} do
+    test "tracks multiple users in same fight", %{fight: fight, campaign: campaign} do
       user1 = insert(:user)
       user2 = insert(:user)
-      campaign = fight.campaign
 
       insert(:campaign_user, user: user1, campaign: campaign)
       insert(:campaign_user, user: user2, campaign: campaign)

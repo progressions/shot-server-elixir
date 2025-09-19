@@ -26,6 +26,16 @@ defmodule ShotElixir.Campaigns do
     Repo.all(query)
   end
 
+  @doc """
+  Check if a user is a member of a campaign.
+  """
+  def is_campaign_member?(campaign_id, user_id) do
+    from(cm in CampaignMembership,
+      where: cm.campaign_id == ^campaign_id and cm.user_id == ^user_id
+    )
+    |> Repo.exists?()
+  end
+
   def list_user_campaigns(user_id, params \\ %{}, _current_user \\ nil) do
     # Get pagination parameters - handle both string and integer params
     per_page =

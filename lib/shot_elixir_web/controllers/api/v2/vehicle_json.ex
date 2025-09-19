@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.VehicleJSON do
-  alias ShotElixir.Vehicles.Vehicle
+  # alias ShotElixir.Vehicles.Vehicle
 
   def index(%{vehicles: vehicles}) do
     %{vehicles: Enum.map(vehicles, &vehicle_json/1)}

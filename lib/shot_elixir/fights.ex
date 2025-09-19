@@ -246,6 +246,21 @@ defmodule ShotElixir.Fights do
     |> Repo.update()
   end
 
+  @doc """
+  Advance the shot counter for a fight.
+  """
+  def advance_shot_counter(%Fight{} = fight) do
+    new_counter = if fight.shot_counter > 0, do: fight.shot_counter - 1, else: 18
+    update_fight(fight, %{shot_counter: new_counter})
+  end
+
+  @doc """
+  Reset the shot counter to 18.
+  """
+  def reset_shot_counter(%Fight{} = fight) do
+    update_fight(fight, %{shot_counter: 18})
+  end
+
   def delete_fight(%Fight{} = fight) do
     fight
     |> Ecto.Changeset.change(active: false)
@@ -291,6 +306,14 @@ defmodule ShotElixir.Fights do
   end
 
   def get_shot(id), do: Repo.get(Shot, id)
+
+  @doc """
+  Acts a shot, moving it down the initiative track.
+  """
+  def act_shot(%Shot{} = shot, shot_cost) do
+    new_shot = max(shot.shot - shot_cost, 0)
+    update_shot(shot, %{shot: new_shot, acted: true})
+  end
 
   def get_shot_with_drivers(id) do
     Shot

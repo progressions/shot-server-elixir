@@ -22,7 +22,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
             result = Junctures.list_campaign_junctures(current_user.current_campaign_id, params, current_user)
-            render(conn, :index, data: result)
+            render(conn, :index, junctures: result)
           else
             conn
             |> put_status(:forbidden)

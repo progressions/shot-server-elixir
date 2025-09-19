@@ -22,7 +22,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
             result = Sites.list_campaign_sites(current_user.current_campaign_id, params, current_user)
-            render(conn, :index, data: result)
+            render(conn, :index, sites: result)
           else
             conn
             |> put_status(:forbidden)

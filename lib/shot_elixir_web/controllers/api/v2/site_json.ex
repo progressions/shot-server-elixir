@@ -1,5 +1,16 @@
 defmodule ShotElixirWeb.Api.V2.SiteJSON do
-  def index(%{sites: sites}) do
+  def index(%{sites: data}) when is_map(data) do
+    # Handle paginated response with metadata
+    %{
+      sites: Enum.map(data.sites, &site_json/1),
+      factions: data[:factions] || [],
+      meta: data[:meta] || %{},
+      is_autocomplete: data[:is_autocomplete] || false
+    }
+  end
+
+  def index(%{sites: sites}) when is_list(sites) do
+    # Handle simple list response
     %{sites: Enum.map(sites, &site_json/1)}
   end
 
@@ -18,35 +29,37 @@ defmodule ShotElixirWeb.Api.V2.SiteJSON do
     }
   end
 
-  defp site_json(site) do
+  defp site_json(site) when is_map(site) do
     %{
-      id: site.id,
-      name: site.name,
-      description: site.description,
-      active: site.active,
-      campaign_id: site.campaign_id,
-      faction_id: site.faction_id,
-      juncture_id: site.juncture_id,
+      id: Map.get(site, :id),
+      name: Map.get(site, :name),
+      description: Map.get(site, :description),
+      active: Map.get(site, :active, true),
+      campaign_id: Map.get(site, :campaign_id),
+      faction_id: Map.get(site, :faction_id),
+      juncture_id: Map.get(site, :juncture_id),
       faction:
-        if Ecto.assoc_loaded?(site.faction) && site.faction do
-          %{
-            id: site.faction.id,
-            name: site.faction.name
+        case Map.get(site, :faction) do
+          %Ecto.Association.NotLoaded{} -> nil
+          nil -> nil
+          faction when is_map(faction) -> %{
+            id: Map.get(faction, :id),
+            name: Map.get(faction, :name)
           }
-        else
-          nil
+          _ -> nil
         end,
       juncture:
-        if Ecto.assoc_loaded?(site.juncture) && site.juncture do
-          %{
-            id: site.juncture.id,
-            name: site.juncture.name
+        case Map.get(site, :juncture) do
+          %Ecto.Association.NotLoaded{} -> nil
+          nil -> nil
+          juncture when is_map(juncture) -> %{
+            id: Map.get(juncture, :id),
+            name: Map.get(juncture, :name)
           }
-        else
-          nil
+          _ -> nil
         end,
-      created_at: site.created_at,
-      updated_at: site.updated_at
+      created_at: Map.get(site, :created_at),
+      updated_at: Map.get(site, :updated_at)
     }
   end
 

@@ -15,11 +15,9 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
       alias ShotElixir.Services.ImagekitService
       alias ShotElixir.Repo
 
-      # Add Arc.Ecto attachment field
-      # This creates :image field and :image_url virtual field
-      field :image, ImageUploader.Type
+      # Add image_url virtual field for API compatibility
+      # Note: actual image storage is handled by Rails app
       field :image_url, :string, virtual: true
-      field :image_data, :map, default: %{}
 
       @doc """
       Uploads an image for this record using ImageKit.
@@ -49,19 +47,12 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
       """
       def image_url(%__MODULE__{} = record) do
         cond do
-          # First check virtual field (already loaded)
+          # Check virtual field (already loaded)
           record.image_url != nil ->
             record.image_url
 
-          # Then check Arc attachment
-          record.image != nil ->
-            ImageUploader.url({record.image, record})
-
-          # Finally check legacy image_data for Rails compatibility
-          map_size(record.image_data) > 0 ->
-            ImagekitService.generate_url_from_metadata(record.image_data)
-
           true ->
+            # Image handling done by Rails app
             nil
         end
       end
@@ -106,19 +97,9 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
         end
       end
 
-      defp generate_image_url(%__MODULE__{} = record) do
-        cond do
-          # Arc attachment
-          record.image != nil ->
-            ImageUploader.url({record.image, record})
-
-          # Legacy image_data (Rails compatibility)
-          map_size(record.image_data) > 0 ->
-            ImagekitService.generate_url_from_metadata(record.image_data)
-
-          true ->
-            nil
-        end
+      defp generate_image_url(%__MODULE__{} = _record) do
+        # Image handling done by Rails app
+        nil
       end
 
       defp image_cache_key(%__MODULE__{} = record) do
@@ -131,30 +112,15 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
         nil
       end
 
-      defp store_image_metadata(%__MODULE__{} = record, metadata) do
-        changeset =
-          record
-          |> Ecto.Changeset.change()
-          |> Ecto.Changeset.put_change(:image_data, metadata)
-
-        Repo.update(changeset)
+      defp store_image_metadata(%__MODULE__{} = record, _metadata) do
+        # Image storage handled by Rails app
+        {:ok, record}
       end
 
       # Override Arc's default delete behavior
       def delete_image(%__MODULE__{} = record) do
-        if record.image do
-          ImageUploader.delete({record.image, record})
-
-          changeset =
-            record
-            |> Ecto.Changeset.change()
-            |> Ecto.Changeset.put_change(:image, nil)
-            |> Ecto.Changeset.put_change(:image_data, %{})
-
-          Repo.update(changeset)
-        else
-          {:ok, record}
-        end
+        # Image deletion handled by Rails app
+        {:ok, record}
       end
 
       # Make functions overridable

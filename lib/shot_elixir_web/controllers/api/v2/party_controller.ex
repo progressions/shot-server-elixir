@@ -22,7 +22,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
             result = Parties.list_campaign_parties(current_user.current_campaign_id, params, current_user)
-            render(conn, :index, data: result)
+            render(conn, :index, parties: result)
           else
             conn
             |> put_status(:forbidden)
@@ -350,7 +350,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   # DELETE /api/v2/parties/:id/members/:membership_id
   def remove_member(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
-    party_id = params["id"]
+    party_id = params["party_id"]
     membership_id = params["membership_id"]
 
     case Parties.get_party(party_id) do

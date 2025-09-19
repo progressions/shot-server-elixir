@@ -1,5 +1,14 @@
 defmodule ShotElixirWeb.Api.V2.FactionJSON do
-  def index(%{factions: factions}) do
+  def index(%{factions: data}) when is_map(data) do
+    # Handle paginated response with metadata
+    %{
+      factions: Enum.map(data.factions, &faction_json/1),
+      meta: data[:meta] || %{}
+    }
+  end
+
+  def index(%{factions: factions}) when is_list(factions) do
+    # Handle simple list response
     %{factions: Enum.map(factions, &faction_json/1)}
   end
 
@@ -18,15 +27,15 @@ defmodule ShotElixirWeb.Api.V2.FactionJSON do
     }
   end
 
-  defp faction_json(faction) do
+  defp faction_json(faction) when is_map(faction) do
     %{
-      id: faction.id,
-      name: faction.name,
-      description: faction.description,
-      active: faction.active,
-      campaign_id: faction.campaign_id,
-      created_at: faction.created_at,
-      updated_at: faction.updated_at
+      id: Map.get(faction, :id),
+      name: Map.get(faction, :name),
+      description: Map.get(faction, :description),
+      active: Map.get(faction, :active, true),
+      campaign_id: Map.get(faction, :campaign_id),
+      created_at: Map.get(faction, :created_at),
+      updated_at: Map.get(faction, :updated_at)
     }
   end
 end

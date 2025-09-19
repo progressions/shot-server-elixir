@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.WeaponJSON do
-  alias ShotElixir.Weapons.Weapon
+  # alias ShotElixir.Weapons.Weapon
 
   def index(%{weapons: weapons}) do
     %{weapons: Enum.map(weapons, &weapon_json/1)}

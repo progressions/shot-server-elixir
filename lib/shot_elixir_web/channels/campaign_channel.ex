@@ -17,7 +17,7 @@ defmodule ShotElixirWeb.CampaignChannel do
       :ok ->
         socket = assign(socket, :campaign_id, campaign_id)
         send(self(), :after_join)
-        {:ok, socket}
+        {:ok, %{status: "ok"}, socket}
 
       {:error, reason} ->
         {:error, %{reason: reason}}
@@ -69,23 +69,35 @@ defmodule ShotElixirWeb.CampaignChannel do
   # Private functions
 
   defp authorize_campaign_access(campaign_id, user) do
-    case Campaigns.get_campaign(campaign_id) do
-      nil ->
-        {:error, "Campaign not found"}
+    # Validate UUID format first
+    case Ecto.UUID.cast(campaign_id) do
+      {:ok, _uuid} ->
+        case Campaigns.get_campaign(campaign_id) do
+          nil ->
+            {:error, "unauthorized"}
 
-      campaign ->
-        cond do
-          # Gamemaster has access to all campaigns they own
-          campaign.user_id == user.id ->
-            :ok
+          campaign ->
+            cond do
+              # Campaign owner has access
+              campaign.user_id == user.id ->
+                :ok
 
-          # Players have access to campaigns they're members of
-          Campaigns.is_campaign_member?(campaign_id, user.id) ->
-            :ok
+              # Gamemasters and admins have access to all campaigns
+              user.gamemaster || user.admin ->
+                :ok
 
-          true ->
-            {:error, "Not authorized"}
+              # Players have access to campaigns they're members of
+              Campaigns.is_campaign_member?(campaign_id, user.id) ->
+                :ok
+
+              true ->
+                {:error, "unauthorized"}
+            end
         end
+
+      :error ->
+        # Invalid UUID format
+        {:error, "unauthorized"}
     end
   end
 
@@ -104,10 +116,12 @@ defmodule ShotElixirWeb.CampaignChannel do
   Broadcasts a campaign update to all connected clients.
   """
   def broadcast_update(campaign_id, event, payload) do
+    payload_with_timestamp = Map.put(payload, :timestamp, DateTime.utc_now())
+
     ShotElixirWeb.Endpoint.broadcast!(
       "campaign:#{campaign_id}",
       event,
-      payload
+      payload_with_timestamp
     )
   end
 

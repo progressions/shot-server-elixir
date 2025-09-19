@@ -68,32 +68,39 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
     else
       campaign = Campaigns.get_campaign(campaign_id)
 
-      # Only gamemaster can create vehicles
-      unless campaign.user_id == current_user.id || current_user.gamemaster do
-        conn
-        |> put_status(:forbidden)
-        |> json(%{error: "Only gamemaster can create vehicles"})
-      else
-        # Handle JSON string parameters (Rails compatibility)
-        parsed_params = parse_json_params(vehicle_params)
+      cond do
+        !campaign ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Campaign not found"})
 
-        params =
-          parsed_params
-          |> Map.put("campaign_id", campaign_id)
+        campaign.user_id != current_user.id && !current_user.gamemaster && !Campaigns.is_member?(campaign.id, current_user.id) ->
+          conn
+          |> put_status(:forbidden)
+          |> json(%{error: "Only gamemaster can create vehicles"})
 
-        case Vehicles.create_vehicle(params) do
-          {:ok, vehicle} ->
-            conn
-            |> put_status(:created)
-            |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-            |> render("show.json", vehicle: vehicle)
+        true ->
+          # Handle JSON string parameters (Rails compatibility)
+          parsed_params = parse_json_params(vehicle_params)
 
-          {:error, %Ecto.Changeset{} = changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-            |> render("error.json", changeset: changeset)
-        end
+          params =
+            parsed_params
+            |> Map.put("campaign_id", campaign_id)
+            |> Map.put("user_id", current_user.id)
+
+          case Vehicles.create_vehicle(params) do
+            {:ok, vehicle} ->
+              conn
+              |> put_status(:created)
+              |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+              |> render("show.json", vehicle: vehicle)
+
+            {:error, %Ecto.Changeset{} = changeset} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+              |> render("error.json", changeset: changeset)
+          end
       end
     end
   end
@@ -187,9 +194,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
   def archetypes(conn, _params) do
     archetypes = Vehicles.list_vehicle_archetypes()
 
-    conn
-    |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-    |> render("archetypes.json", archetypes: archetypes)
+    json(conn, %{archetypes: archetypes})
   end
 
   # DELETE /api/v2/vehicles/:id/remove_image

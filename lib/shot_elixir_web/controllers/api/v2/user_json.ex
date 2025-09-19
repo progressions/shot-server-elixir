@@ -1,7 +1,17 @@
 defmodule ShotElixirWeb.Api.V2.UserJSON do
   alias ShotElixir.Accounts.User
 
-  def index(%{users: users}) do
+  def index(%{data: data}) when is_map(data) do
+    # Handle paginated response with metadata
+    %{
+      users: Enum.map(data.users, &user_json/1),
+      meta: data[:meta] || %{},
+      is_autocomplete: data[:is_autocomplete] || false
+    }
+  end
+
+  def index(%{users: users}) when is_list(users) do
+    # Handle simple list response
     %{users: Enum.map(users, &user_json/1)}
   end
 

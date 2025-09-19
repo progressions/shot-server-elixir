@@ -107,6 +107,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       active: character.active,
       created_at: character.created_at,
       updated_at: character.updated_at,
+      campaign_id: character.campaign_id,
       action_values: character.action_values,
       faction_id: character.faction_id,
       description: character.description,
@@ -118,10 +119,12 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       wealth: character.wealth,
       juncture_id: character.juncture_id,
       schtick_ids: get_association_ids(character, :schticks),
+      schticks: render_schticks_if_loaded(character),
       party_ids: get_association_ids(character, :parties),
       site_ids: get_association_ids(character, :sites),
       advancement_ids: get_association_ids(character, :advancements),
       weapon_ids: get_association_ids(character, :weapons),
+      weapons: render_weapons_if_loaded(character),
       entity_class: "Character",
       user_id: character.user_id,
       is_template: character.is_template,
@@ -189,6 +192,22 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
       positions -> Enum.map(positions, &render_image_position/1)
+    end
+  end
+
+  defp render_schticks_if_loaded(character) do
+    case Map.get(character, :schticks) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      schticks -> Enum.map(schticks, &render_schtick_lite/1)
+    end
+  end
+
+  defp render_weapons_if_loaded(character) do
+    case Map.get(character, :weapons) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      weapons -> Enum.map(weapons, &render_weapon_lite/1)
     end
   end
 
@@ -260,6 +279,22 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       x_position: position.x_position,
       y_position: position.y_position,
       style_overrides: position.style_overrides
+    }
+  end
+
+  defp render_schtick_lite(schtick) do
+    %{
+      id: schtick.id,
+      name: schtick.name,
+      category: schtick.category
+    }
+  end
+
+  defp render_weapon_lite(weapon) do
+    %{
+      id: weapon.id,
+      name: weapon.name,
+      damage: weapon.damage
     }
   end
 

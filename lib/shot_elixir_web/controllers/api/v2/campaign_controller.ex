@@ -3,12 +3,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
 
   alias ShotElixir.Campaigns
   alias ShotElixir.Campaigns.Campaign
-  alias ShotElixir.Guardian.Plug, as: GuardianPlug
+  alias ShotElixir.Guardian
 
   action_fallback ShotElixirWeb.FallbackController
 
   def index(conn, params) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
     campaigns = Campaigns.list_user_campaigns(current_user.id, params, current_user)
 
     conn
@@ -17,7 +17,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def show(conn, %{"id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     campaign =
       if id == "current" do
@@ -40,7 +40,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def create(conn, %{"campaign" => campaign_params}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with :ok <- authorize_gamemaster_or_admin(current_user) do
       # Handle JSON string parameters for Rails compatibility
@@ -70,7 +70,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def update(conn, %{"id" => id, "campaign" => campaign_params}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with :ok <- authorize_gamemaster_or_admin(current_user),
          %Campaign{} = campaign <- Campaigns.get_campaign(id),
@@ -105,7 +105,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def delete(conn, %{"id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with :ok <- authorize_gamemaster_or_admin(current_user),
          %Campaign{} = campaign <- Campaigns.get_campaign(id),
@@ -136,7 +136,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def current(conn, _params) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     case current_user.current_campaign_id do
       nil ->
@@ -158,7 +158,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   # Custom endpoints
   def set(conn, params) do
     id = params["campaign_id"] || params["id"]
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
          :ok <- authorize_campaign_access(campaign, current_user),
@@ -178,7 +178,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def current_fight(conn, %{"campaign_id" => id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
          :ok <- authorize_campaign_access(campaign, current_user) do
@@ -204,7 +204,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
 
   # Membership management
   def add_member(conn, %{"campaign_id" => id, "user_id" => user_id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
          :ok <- authorize_campaign_owner(campaign, current_user),
@@ -230,7 +230,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   end
 
   def remove_member(conn, %{"campaign_id" => id, "user_id" => user_id}) do
-    current_user = GuardianPlug.current_resource(conn)
+    current_user = Guardian.Plug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
          :ok <- authorize_campaign_owner(campaign, current_user),

@@ -93,10 +93,6 @@ defmodule ShotElixir.Services.ImagekitService do
     generate_url(name)
   end
 
-  def generate_url_from_metadata(%{"fileId" => _file_id, "name" => name}) do
-    generate_url(name)
-  end
-
   def generate_url_from_metadata(_), do: nil
 
   # Private functions

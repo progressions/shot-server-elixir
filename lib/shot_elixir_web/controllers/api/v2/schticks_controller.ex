@@ -19,7 +19,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
 
       campaign ->
         result = Schticks.list_campaign_schticks(campaign.id, params, current_user)
-        render(conn, :index, data: result)
+        render(conn, :index, schticks: result)
     end
   end
 

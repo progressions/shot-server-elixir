@@ -80,6 +80,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       id: campaign.id,
       name: campaign.name,
       description: campaign.description,
+      user_id: campaign.user_id,
       gamemaster_id: campaign.user_id,
       gamemaster: render_gamemaster_if_loaded(campaign),
       created_at: campaign.created_at,
