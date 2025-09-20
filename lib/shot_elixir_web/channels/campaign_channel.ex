@@ -2,9 +2,11 @@ defmodule ShotElixirWeb.CampaignChannel do
   @moduledoc """
   Channel for real-time campaign updates.
   Broadcasts changes to characters, fights, and other campaign resources.
+  Rails ActionCable compatible.
   """
 
   use ShotElixirWeb, :channel
+  require Logger
 
   alias ShotElixir.Campaigns
 
@@ -14,8 +16,13 @@ defmodule ShotElixirWeb.CampaignChannel do
 
     case authorize_campaign_access(campaign_id, user) do
       :ok ->
+        # Subscribe to PubSub for this campaign to receive broadcasts
+        Phoenix.PubSub.subscribe(ShotElixir.PubSub, "campaign:#{campaign_id}")
+
         socket = assign(socket, :campaign_id, campaign_id)
         send(self(), :after_join)
+
+        Logger.info("User #{user.id} joined campaign:#{campaign_id}")
         {:ok, %{status: "ok"}, socket}
 
       {:error, reason} ->
@@ -30,6 +37,15 @@ defmodule ShotElixirWeb.CampaignChannel do
       user_name: get_user_name(socket.assigns.user)
     })
 
+    {:noreply, socket}
+  end
+
+  # Handle Rails-compatible broadcast messages from PubSub
+  @impl true
+  def handle_info({:rails_message, payload}, socket) do
+    # Push to client with generic "message" event (Rails ActionCable format)
+    # The client expects messages without specific event names
+    push(socket, "message", payload)
     {:noreply, socket}
   end
 

@@ -6,6 +6,8 @@ defmodule ShotElixir.Characters do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Characters.Character
+  alias Ecto.Multi
+  use ShotElixir.Models.Broadcastable
 
   # Character types are defined in the database enum
 
@@ -268,21 +270,45 @@ defmodule ShotElixir.Characters do
   def get_character(id), do: Repo.get(Character, id)
 
   def create_character(attrs \\ %{}) do
-    %Character{}
-    |> Character.changeset(attrs)
-    |> Repo.insert()
+    Multi.new()
+    |> Multi.insert(:character, Character.changeset(%Character{}, attrs))
+    |> Multi.run(:broadcast, fn _repo, %{character: character} ->
+      broadcast_change(character, :insert)
+      {:ok, character}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{character: character}} -> {:ok, character}
+      {:error, :character, changeset, _} -> {:error, changeset}
+    end
   end
 
   def update_character(%Character{} = character, attrs) do
-    character
-    |> Character.changeset(attrs)
-    |> Repo.update()
+    Multi.new()
+    |> Multi.update(:character, Character.changeset(character, attrs))
+    |> Multi.run(:broadcast, fn _repo, %{character: character} ->
+      broadcast_change(character, :update)
+      {:ok, character}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{character: character}} -> {:ok, character}
+      {:error, :character, changeset, _} -> {:error, changeset}
+    end
   end
 
   def delete_character(%Character{} = character) do
-    character
-    |> Ecto.Changeset.change(active: false)
-    |> Repo.update()
+    Multi.new()
+    |> Multi.update(:character, Ecto.Changeset.change(character, active: false))
+    |> Multi.run(:broadcast, fn _repo, %{character: character} ->
+      broadcast_change(character, :delete)
+      {:ok, character}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{character: character}} -> {:ok, character}
+      {:error, :character, changeset, _} -> {:error, changeset}
+    end
   end
 
   def duplicate_character(%Character{} = character, user) do
