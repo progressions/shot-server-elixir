@@ -29,7 +29,24 @@ defmodule ShotElixir.Models.Broadcastable do
         ShotElixir.BroadcastManager.broadcast_entity_change(entity, action)
       end
 
-      defoverridable broadcast_after_commit: 2, broadcast_change: 2
+      @doc """
+      Helper to broadcast successful repo operations while preserving the tuple interface.
+
+      Optionally accepts a transform function that can preload or mutate the entity prior
+      to broadcasting and returning it.
+      """
+      def broadcast_result(result, action, transform \\ & &1)
+
+      def broadcast_result({:ok, entity}, action, transform)
+          when action in [:insert, :update, :delete] and is_function(transform, 1) do
+        entity = transform.(entity)
+        broadcast_change(entity, action)
+        {:ok, entity}
+      end
+
+      def broadcast_result(result, _action, _transform), do: result
+
+      defoverridable broadcast_after_commit: 2, broadcast_change: 2, broadcast_result: 3
     end
   end
 

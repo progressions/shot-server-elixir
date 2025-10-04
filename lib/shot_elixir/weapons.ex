@@ -7,6 +7,7 @@ defmodule ShotElixir.Weapons do
   alias Ecto.Changeset
   alias ShotElixir.Repo
   alias ShotElixir.Weapons.Weapon
+  use ShotElixir.Models.Broadcastable
 
   def list_weapons(campaign_id, filters \\ %{}) do
     per_page = max(parse_int(filters["per_page"], 15), 1)
@@ -82,18 +83,21 @@ defmodule ShotElixir.Weapons do
     %Weapon{}
     |> Weapon.changeset(attrs)
     |> Repo.insert()
+    |> broadcast_result(:insert)
   end
 
   def update_weapon(%Weapon{} = weapon, attrs) do
     weapon
     |> Weapon.changeset(attrs)
     |> Repo.update()
+    |> broadcast_result(:update)
   end
 
   def delete_weapon(%Weapon{} = weapon) do
     weapon
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> broadcast_result(:delete)
   end
 
   def weapon_categories do
@@ -140,6 +144,7 @@ defmodule ShotElixir.Weapons do
     weapon
     |> Changeset.change(image_url: nil)
     |> Repo.update()
+    |> broadcast_result(:update)
   end
 
   defp maybe_filter_by_search(values, nil), do: values

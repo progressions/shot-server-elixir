@@ -6,6 +6,7 @@ defmodule ShotElixir.Factions do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Factions.Faction
+  use ShotElixir.Models.Broadcastable
 
   def list_factions(campaign_id) do
     query =
@@ -244,17 +245,20 @@ defmodule ShotElixir.Factions do
     %Faction{}
     |> Faction.changeset(attrs)
     |> Repo.insert()
+    |> broadcast_result(:insert)
   end
 
   def update_faction(%Faction{} = faction, attrs) do
     faction
     |> Faction.changeset(attrs)
     |> Repo.update()
+    |> broadcast_result(:update)
   end
 
   def delete_faction(%Faction{} = faction) do
     faction
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> broadcast_result(:delete)
   end
 end

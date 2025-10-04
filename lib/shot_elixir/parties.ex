@@ -6,6 +6,7 @@ defmodule ShotElixir.Parties do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Parties.{Party, Membership}
+  use ShotElixir.Models.Broadcastable
 
   def list_parties(campaign_id) do
     query =
@@ -303,7 +304,9 @@ defmodule ShotElixir.Parties do
     |> Repo.insert()
     |> case do
       {:ok, party} ->
-        {:ok, Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]])}
+        party = Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]])
+        broadcast_change(party, :insert)
+        {:ok, party}
 
       error ->
         error
@@ -316,10 +319,13 @@ defmodule ShotElixir.Parties do
     |> Repo.update()
     |> case do
       {:ok, party} ->
-        {:ok,
-         Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]],
-           force: true
-         )}
+        party =
+          Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]],
+            force: true
+          )
+
+        broadcast_change(party, :update)
+        {:ok, party}
 
       error ->
         error
@@ -330,6 +336,14 @@ defmodule ShotElixir.Parties do
     party
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> case do
+      {:ok, party} = result ->
+        broadcast_change(party, :delete)
+        result
+
+      error ->
+        error
+    end
   end
 
   def add_member(party_id, member_attrs) do
@@ -339,8 +353,12 @@ defmodule ShotElixir.Parties do
     |> Membership.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, membership} -> {:ok, Repo.preload(membership, [:party, :character, :vehicle])}
-      error -> error
+      {:ok, membership} ->
+        broadcast_party_update(party_id)
+        {:ok, Repo.preload(membership, [:party, :character, :vehicle])}
+
+      error ->
+        error
     end
   end
 
@@ -348,7 +366,16 @@ defmodule ShotElixir.Parties do
     membership = Repo.get(Membership, membership_id)
 
     if membership do
-      Repo.delete(membership)
+      membership
+      |> Repo.delete()
+      |> case do
+        {:ok, membership} = result ->
+          broadcast_party_update(membership.party_id)
+          result
+
+        error ->
+          error
+      end
     else
       {:error, :not_found}
     end
@@ -388,4 +415,13 @@ defmodule ShotElixir.Parties do
   end
 
   defp normalize_uuid(id), do: id
+
+  defp broadcast_party_update(nil), do: :ok
+
+  defp broadcast_party_update(party_id) do
+    case get_party(party_id) do
+      nil -> :ok
+      party -> broadcast_change(party, :update)
+    end
+  end
 end

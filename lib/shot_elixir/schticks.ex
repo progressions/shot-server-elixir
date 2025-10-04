@@ -6,6 +6,7 @@ defmodule ShotElixir.Schticks do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Schticks.Schtick
+  use ShotElixir.Models.Broadcastable
 
   def list_campaign_schticks(campaign_id, params \\ %{}, _current_user \\ nil) do
     # Get pagination parameters - handle both string and integer params
@@ -334,7 +335,11 @@ defmodule ShotElixir.Schticks do
     |> Schtick.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, schtick} -> {:ok, Repo.preload(schtick, :prerequisite)}
+      {:ok, schtick} ->
+        schtick = Repo.preload(schtick, :prerequisite)
+        broadcast_change(schtick, :insert)
+        {:ok, schtick}
+
       error -> error
     end
   end
@@ -344,7 +349,11 @@ defmodule ShotElixir.Schticks do
     |> Schtick.changeset(attrs)
     |> Repo.update()
     |> case do
-      {:ok, schtick} -> {:ok, Repo.preload(schtick, :prerequisite)}
+      {:ok, schtick} ->
+        schtick = Repo.preload(schtick, :prerequisite, force: true)
+        broadcast_change(schtick, :update)
+        {:ok, schtick}
+
       error -> error
     end
   end
@@ -358,12 +367,22 @@ defmodule ShotElixir.Schticks do
       )
       |> Repo.one()
 
-    if dependent_count > 0 do
-      {:error, :has_dependents}
-    else
-      schtick
-      |> Ecto.Changeset.change(active: false)
-      |> Repo.update()
+    cond do
+      dependent_count > 0 ->
+        {:error, :has_dependents}
+
+      true ->
+        schtick
+        |> Ecto.Changeset.change(active: false)
+        |> Repo.update()
+        |> case do
+          {:ok, schtick} = result ->
+            broadcast_change(schtick, :delete)
+            result
+
+          error ->
+            error
+        end
     end
   end
 

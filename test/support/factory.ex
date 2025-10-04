@@ -3,7 +3,7 @@ defmodule ShotElixir.Factory do
   Factory functions for creating test data.
   """
 
-  alias ShotElixir.{Repo, Accounts, Campaigns, Characters, Fights}
+  alias ShotElixir.{Accounts, Campaigns, Characters, Fights}
 
   def insert(type, attrs \\ %{})
 

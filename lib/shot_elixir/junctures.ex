@@ -6,6 +6,7 @@ defmodule ShotElixir.Junctures do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Junctures.Juncture
+  use ShotElixir.Models.Broadcastable
 
   def list_junctures(campaign_id) do
     query =
@@ -274,7 +275,11 @@ defmodule ShotElixir.Junctures do
     |> Juncture.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, juncture} -> {:ok, Repo.preload(juncture, :faction)}
+      {:ok, juncture} ->
+        juncture = Repo.preload(juncture, :faction)
+        broadcast_change(juncture, :insert)
+        {:ok, juncture}
+
       error -> error
     end
   end
@@ -284,7 +289,11 @@ defmodule ShotElixir.Junctures do
     |> Juncture.changeset(attrs)
     |> Repo.update()
     |> case do
-      {:ok, juncture} -> {:ok, Repo.preload(juncture, :faction)}
+      {:ok, juncture} ->
+        juncture = Repo.preload(juncture, :faction, force: true)
+        broadcast_change(juncture, :update)
+        {:ok, juncture}
+
       error -> error
     end
   end
@@ -293,5 +302,6 @@ defmodule ShotElixir.Junctures do
     juncture
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> broadcast_result(:delete)
   end
 end

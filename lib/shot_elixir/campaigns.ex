@@ -7,6 +7,7 @@ defmodule ShotElixir.Campaigns do
   alias ShotElixir.Repo
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Campaigns.CampaignMembership
+  use ShotElixir.Models.Broadcastable
 
   def list_campaigns do
     Repo.all(Campaign)
@@ -233,24 +234,35 @@ defmodule ShotElixir.Campaigns do
     %Campaign{}
     |> Campaign.changeset(attrs)
     |> Repo.insert()
+    |> broadcast_result(:insert)
   end
 
   def update_campaign(%Campaign{} = campaign, attrs) do
     campaign
     |> Campaign.changeset(attrs)
     |> Repo.update()
+    |> broadcast_result(:update)
   end
 
   def delete_campaign(%Campaign{} = campaign) do
     campaign
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> broadcast_result(:delete)
   end
 
   def add_member(campaign, user) do
     %CampaignMembership{}
     |> CampaignMembership.changeset(%{campaign_id: campaign.id, user_id: user.id})
     |> Repo.insert()
+    |> case do
+      {:ok, _membership} = result ->
+        broadcast_change(campaign, :update)
+        result
+
+      error ->
+        error
+    end
   end
 
   def remove_member(campaign, user) do
@@ -258,7 +270,17 @@ defmodule ShotElixir.Campaigns do
       from cm in CampaignMembership,
         where: cm.campaign_id == ^campaign.id and cm.user_id == ^user.id
 
-    Repo.delete_all(query)
+    case Repo.delete_all(query) do
+      {count, _} ->
+        if count > 0 do
+          broadcast_change(campaign, :update)
+        end
+
+        {count, nil}
+
+      other ->
+        other
+    end
   end
 
   def is_member?(campaign_id, user_id) do

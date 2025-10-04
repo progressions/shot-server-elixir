@@ -38,11 +38,23 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   def render("current.json", %{campaign: campaign}) do
-    render_campaign_detail(campaign)
+    %{
+      campaign: render_campaign_detail(campaign)
+    }
+  end
+
+  def render("set_current.json", %{campaign: campaign, user: user}) do
+    %{
+      campaign: render_campaign_detail(campaign),
+      user: render_user_full(user)
+    }
   end
 
   def render("set_current.json", %{campaign: campaign}) do
-      render_campaign_detail(campaign)
+    %{
+      campaign: render_campaign_detail(campaign),
+      user: nil
+    }
   end
 
   def render("current_fight.json", %{campaign: campaign, fight: fight}) do
@@ -141,11 +153,13 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   defp render_character_summary(character) do
+    action_values = Map.get(character, :action_values) || %{}
+
     %{
       id: character.id,
       name: character.name,
-      archetype: character.archetype,
-      character_type: character.character_type
+      archetype: Map.get(action_values, "Archetype"),
+      character_type: Map.get(action_values, "Type")
     }
   end
 
@@ -208,6 +222,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       admin: user.admin,
       entity_class: "User",
       active: user.active,
+      current_campaign_id: Map.get(user, :current_campaign_id),
       created_at: user.created_at,
       updated_at: user.updated_at
     }

@@ -15,6 +15,8 @@ defmodule ShotElixirWeb.Router do
   scope "/", ShotElixirWeb do
     pipe_through :api
     get "/health", HealthController, :show
+    # Allow simple HTTP probes of the ActionCable-compatible endpoint
+    get "/cable", CableController, :show
   end
 
   # Authentication endpoints (Devise compatible)

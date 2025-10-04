@@ -173,11 +173,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       true ->
         with %Campaign{} = campaign <- Campaigns.get_campaign(id),
              :ok <- authorize_campaign_access(campaign, current_user),
-             {:ok, _updated_user} <-
+             {:ok, updated_user} <-
                ShotElixir.Accounts.set_current_campaign(current_user, campaign.id) do
           conn
           |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-          |> render("set_current.json", campaign: campaign)
+          |> render("set_current.json", campaign: campaign, user: updated_user)
         else
           nil -> {:error, :not_found}
           {:error, reason} -> {:error, reason}

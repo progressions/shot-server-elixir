@@ -6,6 +6,7 @@ defmodule ShotElixir.Fights do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Fights.{Fight, Shot}
+  use ShotElixir.Models.Broadcastable
 
   def list_fights(campaign_id) do
     query =
@@ -292,12 +293,14 @@ defmodule ShotElixir.Fights do
     %Fight{}
     |> Fight.changeset(attrs)
     |> Repo.insert()
+    |> broadcast_result(:insert, &Repo.preload(&1, fight_broadcast_preloads()))
   end
 
   def update_fight(%Fight{} = fight, attrs) do
     fight
     |> Fight.changeset(attrs)
     |> Repo.update()
+    |> broadcast_result(:update, &Repo.preload(&1, fight_broadcast_preloads()))
   end
 
   @doc """
@@ -321,6 +324,7 @@ defmodule ShotElixir.Fights do
     fight
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> broadcast_result(:delete, &Repo.preload(&1, fight_broadcast_preloads()))
   end
 
   def end_fight(%Fight{} = fight) do
@@ -330,12 +334,14 @@ defmodule ShotElixir.Fights do
       ended_at: DateTime.utc_now() |> DateTime.truncate(:second)
     )
     |> Repo.update()
+    |> broadcast_result(:update, &Repo.preload(&1, fight_broadcast_preloads()))
   end
 
   def touch_fight(%Fight{} = fight) do
     fight
     |> Ecto.Changeset.change(updated_at: DateTime.utc_now() |> DateTime.truncate(:second))
     |> Repo.update()
+    |> broadcast_result(:update, &Repo.preload(&1, fight_broadcast_preloads()))
   end
 
   # Shot management
@@ -343,22 +349,55 @@ defmodule ShotElixir.Fights do
     %Shot{}
     |> Shot.changeset(attrs)
     |> Repo.insert()
+    |> case do
+      {:ok, shot} = result ->
+        broadcast_fight_update(shot.fight_id)
+        result
+
+      error ->
+        error
+    end
   end
 
   def update_shot(%Shot{} = shot, attrs) do
     shot
     |> Shot.changeset(attrs)
     |> Repo.update()
+    |> case do
+      {:ok, shot} = result ->
+        broadcast_fight_update(shot.fight_id)
+        result
+
+      error ->
+        error
+    end
   end
 
   def delete_shot(%Shot{} = shot) do
-    Repo.delete(shot)
+    shot
+    |> Repo.delete()
+    |> case do
+      {:ok, shot} = result ->
+        broadcast_fight_update(shot.fight_id)
+        result
+
+      error ->
+        error
+    end
   end
 
   def act_on_shot(%Shot{} = shot) do
     shot
     |> Ecto.Changeset.change(acted: true)
     |> Repo.update()
+    |> case do
+      {:ok, shot} = result ->
+        broadcast_fight_update(shot.fight_id)
+        result
+
+      error ->
+        error
+    end
   end
 
   def get_shot(id), do: Repo.get(Shot, id)
@@ -382,13 +421,31 @@ defmodule ShotElixir.Fights do
     %ShotElixir.Fights.ShotDriver{}
     |> ShotElixir.Fights.ShotDriver.changeset(attrs)
     |> Repo.insert()
+    |> case do
+      {:ok, shot_driver} = result ->
+        shot_driver.shot_id
+        |> fight_id_from_shot()
+        |> broadcast_fight_update()
+        result
+
+      error ->
+        error
+    end
   end
 
   def remove_shot_drivers(shot_id) do
+    fight_id = fight_id_from_shot(shot_id)
+
     from(sd in ShotElixir.Fights.ShotDriver, where: sd.shot_id == ^shot_id)
     |> Repo.delete_all()
+    |> case do
+      {count, _} ->
+        if fight_id && count > 0, do: broadcast_fight_update(fight_id)
+        {count, nil}
 
-    :ok
+      other ->
+        other
+    end
   end
 
   # Driver assignment functions for Rails compatibility
@@ -398,13 +455,58 @@ defmodule ShotElixir.Fights do
       update: [set: [driving_id: nil]]
     )
     |> Repo.update_all([])
+    |> case do
+      {count, _} ->
+        if count > 0, do: broadcast_fight_update(fight_id)
+        {count, nil}
 
-    :ok
+      other ->
+        other
+    end
   end
 
   def assign_driver(driver_shot, vehicle_shot_id) do
     driver_shot
     |> Ecto.Changeset.change(driving_id: vehicle_shot_id)
     |> Repo.update()
+    |> case do
+      {:ok, shot} = result ->
+        broadcast_fight_update(shot.fight_id)
+        result
+
+      error ->
+        error
+    end
+  end
+
+  defp fight_broadcast_preloads do
+    [
+      :image_positions,
+      shots: [:character, :vehicle]
+    ]
+  end
+
+  defp broadcast_fight_update(nil), do: :ok
+
+  defp broadcast_fight_update(fight_id) do
+    case get_fight(fight_id) do
+      nil -> :ok
+      fight ->
+        fight
+        |> Repo.preload(fight_broadcast_preloads())
+        |> broadcast_change(:update)
+        :ok
+    end
+  end
+
+  defp fight_id_from_shot(nil), do: nil
+
+  defp fight_id_from_shot(shot_id) do
+    shot_id
+    |> get_shot()
+    |> case do
+      nil -> nil
+      shot -> shot.fight_id
+    end
   end
 end

@@ -6,6 +6,7 @@ defmodule ShotElixir.Vehicles do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Vehicles.Vehicle
+  use ShotElixir.Models.Broadcastable
 
   def list_vehicles(campaign_id) do
     query =
@@ -376,18 +377,21 @@ defmodule ShotElixir.Vehicles do
     %Vehicle{}
     |> Vehicle.changeset(attrs)
     |> Repo.insert()
+    |> broadcast_result(:insert, &Repo.preload(&1, [:user, :faction]))
   end
 
   def update_vehicle(%Vehicle{} = vehicle, attrs) do
     vehicle
     |> Vehicle.changeset(attrs)
     |> Repo.update()
+    |> broadcast_result(:update, &Repo.preload(&1, [:user, :faction]))
   end
 
   def delete_vehicle(%Vehicle{} = vehicle) do
     vehicle
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> broadcast_result(:delete)
   end
 
   def update_chase_state(%Vehicle{} = vehicle, chase_params) do
@@ -399,6 +403,7 @@ defmodule ShotElixir.Vehicles do
       vehicle
       |> Ecto.Changeset.change(action_values: updated_values)
       |> Repo.update()
+      |> broadcast_result(:update, &Repo.preload(&1, [:user, :faction]))
     end
   end
 

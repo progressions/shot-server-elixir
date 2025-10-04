@@ -6,6 +6,7 @@ defmodule ShotElixir.Sites do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Sites.{Site, Attunement}
+  use ShotElixir.Models.Broadcastable
 
   def list_sites(campaign_id) do
     query =
@@ -280,7 +281,11 @@ defmodule ShotElixir.Sites do
     |> Site.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, site} -> {:ok, Repo.preload(site, [:faction, :juncture])}
+      {:ok, site} ->
+        site = Repo.preload(site, [:faction, :juncture])
+        broadcast_change(site, :insert)
+        {:ok, site}
+
       error -> error
     end
   end
@@ -290,7 +295,11 @@ defmodule ShotElixir.Sites do
     |> Site.changeset(attrs)
     |> Repo.update()
     |> case do
-      {:ok, site} -> {:ok, Repo.preload(site, [:faction, :juncture], force: true)}
+      {:ok, site} ->
+        site = Repo.preload(site, [:faction, :juncture], force: true)
+        broadcast_change(site, :update)
+        {:ok, site}
+
       error -> error
     end
   end
@@ -299,6 +308,7 @@ defmodule ShotElixir.Sites do
     site
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
+    |> broadcast_result(:delete)
   end
 
   def create_attunement(attrs \\ %{}) do
@@ -306,13 +316,26 @@ defmodule ShotElixir.Sites do
     |> Attunement.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, attunement} -> {:ok, Repo.preload(attunement, [:character, :site])}
+      {:ok, attunement} ->
+        attunement = Repo.preload(attunement, [:character, :site])
+        broadcast_site_update(attunement.site_id)
+        {:ok, attunement}
+
       error -> error
     end
   end
 
   def delete_attunement(%Attunement{} = attunement) do
-    Repo.delete(attunement)
+    attunement
+    |> Repo.delete()
+    |> case do
+      {:ok, attunement} = result ->
+        broadcast_site_update(attunement.site_id)
+        result
+
+      error ->
+        error
+    end
   end
 
   def get_attunement_by_character_and_site(character_id, site_id) do
@@ -340,4 +363,16 @@ defmodule ShotElixir.Sites do
   end
 
   defp normalize_uuid(id), do: id
+
+  defp broadcast_site_update(nil), do: :ok
+
+  defp broadcast_site_update(site_id) do
+    case get_site(site_id) do
+      nil -> :ok
+      site ->
+        site
+        |> Repo.preload([:faction, :juncture], force: true)
+        |> broadcast_change(:update)
+    end
+  end
 end

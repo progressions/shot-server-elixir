@@ -96,7 +96,10 @@ defmodule ShotElixir.BroadcastManager do
       entity_with_associations = preload_associations(entity, entity_type)
 
       # Serialize entity using appropriate view
-      serialized = serialize_entity(entity_with_associations, entity_type)
+      serialized =
+        entity_with_associations
+        |> serialize_entity(entity_type)
+        |> stringify_keys()
 
       # Broadcast entity update (Rails format)
       Phoenix.PubSub.broadcast!(
@@ -193,7 +196,8 @@ defmodule ShotElixir.BroadcastManager do
       concealment: weapon.concealment,
       reload_value: weapon.reload_value,
       category: weapon.category,
-      juncture_id: weapon.juncture_id,
+      juncture_id: Map.get(weapon, :juncture_id),
+      juncture: Map.get(weapon, :juncture),
       campaign_id: weapon.campaign_id,
       entity_class: "Weapon",
       created_at: weapon.created_at,
@@ -257,7 +261,7 @@ defmodule ShotElixir.BroadcastManager do
 
   defp serialize_entity(entity, entity_type) do
     # Fallback for unknown entity types
-    Logger.warn("Unknown entity type for serialization: #{entity_type}")
+    Logger.warning("Unknown entity type for serialization: #{entity_type}")
     %{
       id: entity.id,
       entity_class: String.capitalize(entity_type)
@@ -283,4 +287,30 @@ defmodule ShotElixir.BroadcastManager do
       %{entity_type: entity_type, action: action}
     )
   end
+
+  defp stringify_keys(%DateTime{} = datetime), do: DateTime.to_iso8601(datetime)
+  defp stringify_keys(%NaiveDateTime{} = datetime), do: NaiveDateTime.to_iso8601(datetime)
+  defp stringify_keys(%Time{} = time), do: Time.to_iso8601(time)
+
+  defp stringify_keys(%_{} = struct) do
+    struct
+    |> Map.from_struct()
+    |> stringify_keys()
+  end
+
+  defp stringify_keys(value) when is_map(value) do
+    Enum.reduce(value, %{}, fn {key, val}, acc ->
+      Map.put(acc, stringify_key(key), stringify_keys(val))
+    end)
+  end
+
+  defp stringify_keys(value) when is_list(value) do
+    Enum.map(value, &stringify_keys/1)
+  end
+
+  defp stringify_keys(value), do: value
+
+  defp stringify_key(key) when is_atom(key), do: Atom.to_string(key)
+  defp stringify_key(key) when is_binary(key), do: key
+  defp stringify_key(key), do: to_string(key)
 end

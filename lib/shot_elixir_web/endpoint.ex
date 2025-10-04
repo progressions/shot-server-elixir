@@ -11,14 +11,21 @@ defmodule ShotElixirWeb.Endpoint do
     same_site: "Lax"
   ]
 
+  @websocket_options [
+    compress: false,
+    subprotocols: ["actioncable-v1-json", "phoenix"],
+    connect_info: [:peer_data, :x_headers, :uri, :user_agent],
+    timeout: 45_000
+  ]
+
   # WebSocket support for real-time channels
   socket "/socket", ShotElixirWeb.UserSocket,
-    websocket: true,
+    websocket: @websocket_options,
     longpoll: false
 
   # ActionCable-compatible endpoint for Rails frontend
   socket "/cable", ShotElixirWeb.UserSocket,
-    websocket: true,
+    websocket: @websocket_options,
     longpoll: false
 
   # socket "/live", Phoenix.LiveView.Socket,
