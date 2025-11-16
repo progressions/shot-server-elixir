@@ -134,6 +134,12 @@ defmodule ShotElixir.Characters do
           |> select([s], s.character_id)
           |> Repo.all()
           |> Enum.reject(&is_nil/1)
+          |> Enum.map(fn id ->
+            case Ecto.UUID.dump(id) do
+              {:ok, binary_id} -> binary_id
+              :error -> id
+            end
+          end)
           |> Enum.uniq()
 
         query =
