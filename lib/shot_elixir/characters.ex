@@ -6,6 +6,7 @@ defmodule ShotElixir.Characters do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Characters.Character
+  alias ShotElixir.Fights.Shot
   alias Ecto.Multi
   use ShotElixir.Models.Broadcastable
 
@@ -324,3 +325,14 @@ defmodule ShotElixir.Characters do
     create_character(attrs)
   end
 end
+
+query =
+  if params["fight_id"] do
+    from c in query,
+      join: s in Shot,
+      on: s.character_id == c.id,
+      where: s.fight_id == ^params["fight_id"],
+      distinct: true
+  else
+    query
+  end
