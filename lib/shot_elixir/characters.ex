@@ -132,7 +132,7 @@ defmodule ShotElixir.Characters do
           join: s in Shot,
           on: s.character_id == c.id,
           where: s.fight_id == ^params["fight_id"],
-          distinct: true
+          distinct: [asc: c.id]
       else
         query
       end
