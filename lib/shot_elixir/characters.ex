@@ -7,6 +7,8 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Repo
   alias ShotElixir.Characters.Character
   alias ShotElixir.Fights.Shot
+  alias ShotElixir.Parties.Membership
+  alias ShotElixir.Sites.Attunement
   alias Ecto.Multi
   use ShotElixir.Models.Broadcastable
 
@@ -38,121 +40,28 @@ defmodule ShotElixir.Characters do
 
     offset = (page - 1) * per_page
 
+    # Base query always filters by campaign_id and active status
     query =
-      if fight_id = params["fight_id"] do
-        # If fight_id is present, create a simple query that ignores campaign_id and other filters.
-        character_ids_in_fight =
-          from s in Shot,
-            where: s.fight_id == ^fight_id,
-            select: s.character_id,
-            distinct: true
+      from c in Character,
+        where: c.campaign_id == ^campaign_id and c.active == true
 
-        from(
-          c in Character,
-          where: c.id in subquery(character_ids_in_fight)
-        )
+    # Apply ids filter if present
+    query =
+      if params["ids"] do
+        ids = parse_ids(params["ids"])
+        from c in query, where: c.id in ^ids
       else
-        # Original logic when no fight_id is present
-        query =
-          from c in Character,
-            where: c.campaign_id == ^campaign_id and c.active == true
+        query
+      end
 
-        # Apply template filtering (admin-only feature)
-        query = apply_template_filter(query, params, current_user)
-
-        # Apply basic filters
-        query =
-          if params["id"] do
-            from c in query, where: c.id == ^params["id"]
-          else
-            query
-          end
-
-        query =
-          if params["ids"] do
-            ids = parse_ids(params["ids"])
-            from c in query, where: c.id in ^ids
-          else
-            query
-          end
-
-        query =
-          if params["search"] do
-            from c in query, where: ilike(c.name, ^"%#{params["search"]}%")
-          else
-            query
-          end
-
-        query =
-          if params["character_type"] do
-            from c in query,
-              where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
-          else
-            query
-          end
-
-        query =
-          if params["archetype"] do
-            archetype_value =
-              if params["archetype"] == "__NONE__", do: "", else: params["archetype"]
-
-            from c in query,
-              where: fragment("?->>'Archetype' = ?", c.action_values, ^archetype_value)
-          else
-            query
-          end
-
-        # Relationship filters
-        query =
-          if params["faction_id"] do
-            if params["faction_id"] == "__NONE__" do
-              from c in query, where: is_nil(c.faction_id)
-            else
-              from c in query, where: c.faction_id == ^params["faction_id"]
-            end
-          else
-            query
-          end
-
-        query =
-          if params["juncture_id"] do
-            if params["juncture_id"] == "__NONE__" do
-              from c in query, where: is_nil(c.juncture_id)
-            else
-              from c in query, where: c.juncture_id == ^params["juncture_id"]
-            end
-          else
-            query
-          end
-
-        query =
-          if params["user_id"] do
-            from c in query, where: c.user_id == ^params["user_id"]
-          else
-            query
-          end
-
-        # Association-based filters
-        query =
-          if params["party_id"] do
-            from c in query,
-              join: m in "memberships",
-              on: m.character_id == c.id,
-              where: m.party_id == ^params["party_id"]
-          else
-            query
-          end
-
-        query =
-          if params["site_id"] do
-            from c in query,
-              join: a in "attunements",
-              on: a.character_id == c.id,
-              where: a.site_id == ^params["site_id"]
-          else
-            query
-          end
-
+    # Apply fight_id filter if present
+    query =
+      if params["fight_id"] do
+        from c in query,
+          join: s in Shot,
+          on: s.character_id == c.id,
+          where: s.fight_id == ^params["fight_id"]
+      else
         query
       end
 

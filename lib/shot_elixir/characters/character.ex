@@ -43,7 +43,7 @@ defmodule ShotElixir.Characters.Character do
     field :action_values, :map, default: @default_action_values
     field :description, :map, default: %{}
     field :skills, :map, default: %{}
-    field :status, {:array, :map}, default: []
+    field :status, {:array, :string}, default: []
 
     # Additional fields (image_url is provided virtually via external services)
     field :image_url, :string, virtual: true
