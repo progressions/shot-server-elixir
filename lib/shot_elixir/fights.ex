@@ -305,10 +305,100 @@ defmodule ShotElixir.Fights do
   end
 
   def update_fight(%Fight{} = fight, attrs) do
-    fight
-    |> Fight.changeset(attrs)
-    |> Repo.update()
-    |> broadcast_result(:update, &Repo.preload(&1, fight_broadcast_preloads()))
+    # Extract character_ids and vehicle_ids from attrs
+    character_ids = attrs["character_ids"] || attrs[:character_ids]
+    vehicle_ids = attrs["vehicle_ids"] || attrs[:vehicle_ids]
+
+    # Remove them from attrs so they don't go through changeset
+    attrs = attrs
+      |> Map.delete("character_ids")
+      |> Map.delete(:character_ids)
+      |> Map.delete("vehicle_ids")
+      |> Map.delete(:vehicle_ids)
+
+    # Start a transaction to update fight and manage shots
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:fight, Fight.changeset(fight, attrs))
+    |> Ecto.Multi.run(:character_shots, fn _repo, %{fight: updated_fight} ->
+      if character_ids do
+        sync_character_shots(updated_fight, character_ids)
+      else
+        {:ok, []}
+      end
+    end)
+    |> Ecto.Multi.run(:vehicle_shots, fn _repo, %{fight: updated_fight} ->
+      if vehicle_ids do
+        sync_vehicle_shots(updated_fight, vehicle_ids)
+      else
+        {:ok, []}
+      end
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{fight: updated_fight}} ->
+        result = Repo.preload(updated_fight, fight_broadcast_preloads(), force: true)
+        broadcast_change(result, :update)
+        {:ok, result}
+
+      {:error, _step, changeset, _changes} ->
+        {:error, changeset}
+    end
+  end
+
+  defp sync_character_shots(fight, character_ids) do
+    # Get current character IDs in the fight
+    existing_shots = Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.character_id))
+    existing_character_ids = Enum.map(existing_shots, & &1.character_id)
+
+    # Normalize incoming IDs
+    new_character_ids = Enum.map(character_ids || [], &normalize_uuid/1) |> Enum.reject(&is_nil/1)
+
+    # Find IDs to add and remove
+    ids_to_add = new_character_ids -- existing_character_ids
+    ids_to_remove = existing_character_ids -- new_character_ids
+
+    # Add new shots for new characters
+    Enum.each(ids_to_add, fn char_id ->
+      %Shot{}
+      |> Shot.changeset(%{fight_id: fight.id, character_id: char_id, shot: nil})
+      |> Repo.insert!()
+    end)
+
+    # Remove shots for characters no longer in the fight
+    if ids_to_remove != [] do
+      from(s in Shot, where: s.fight_id == ^fight.id and s.character_id in ^ids_to_remove)
+      |> Repo.delete_all()
+    end
+
+    {:ok, []}
+  end
+
+  defp sync_vehicle_shots(fight, vehicle_ids) do
+    # Get current vehicle IDs in the fight
+    existing_shots = Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.vehicle_id))
+    existing_vehicle_ids = Enum.map(existing_shots, & &1.vehicle_id)
+
+    # Normalize incoming IDs
+    new_vehicle_ids = Enum.map(vehicle_ids || [], &normalize_uuid/1) |> Enum.reject(&is_nil/1)
+
+    # Find IDs to add and remove
+    ids_to_add = new_vehicle_ids -- existing_vehicle_ids
+    ids_to_remove = existing_vehicle_ids -- new_vehicle_ids
+
+    # Add new shots for new vehicles
+    Enum.each(ids_to_add, fn vehicle_id ->
+      %Shot{}
+      |> Shot.changeset(%{fight_id: fight.id, vehicle_id: vehicle_id, shot: nil})
+      |> Repo.insert!()
+    end)
+
+    # Remove shots for vehicles no longer in the fight
+    if ids_to_remove != [] do
+      from(s in Shot, where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove)
+      |> Repo.delete_all()
+    end
+
+    {:ok, []}
   end
 
   @doc """

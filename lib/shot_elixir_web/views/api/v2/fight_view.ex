@@ -104,9 +104,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       id: shot.id,
       shot: shot.shot,
       character_id: shot.character_id,
-      vehicle_id: shot.vehicle_id,
-      acted: shot.acted,
-      sequence: shot.sequence
+      vehicle_id: shot.vehicle_id
     }
   end
 
