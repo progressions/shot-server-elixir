@@ -128,10 +128,18 @@ defmodule ShotElixir.Characters do
 
     query =
       if params["fight_id"] do
-        from c in query,
-          join: s in Shot,
-          on: s.character_id == c.id,
-          where: s.fight_id == ^params["fight_id"]
+        character_ids =
+          Shot
+          |> where([s], s.fight_id == ^params["fight_id"])
+          |> select([s], s.character_id)
+          |> Repo.all()
+          |> Enum.reject(&is_nil/1)
+
+        if Enum.empty?(character_ids) do
+          from c in query, where: false
+        else
+          from c in query, where: c.id in ^character_ids
+        end
       else
         query
       end
