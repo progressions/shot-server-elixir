@@ -101,6 +101,9 @@ defmodule ShotElixir.Characters do
         query
       end
 
+    # Apply template filtering - defaults to excluding templates
+    query = apply_template_filter(query, params, current_user)
+
     # Apply sorting
     query = apply_sorting(query, params)
 
