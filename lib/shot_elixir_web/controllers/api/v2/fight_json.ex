@@ -32,7 +32,8 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       session: fight.session,
       campaign_id: fight.campaign_id,
       created_at: fight.created_at,
-      updated_at: fight.updated_at
+      updated_at: fight.updated_at,
+      entity_class: "Fight"
     }
   end
 
@@ -76,11 +77,13 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
   defp character_summary(%Ecto.Association.NotLoaded{}), do: nil
 
   defp character_summary(character) do
+    action_values = Map.get(character, :action_values) || %{}
+
     %{
       id: character.id,
       name: character.name,
-      character_type: character.character_type,
-      archetype: character.archetype,
+      character_type: Map.get(action_values, "Type"),
+      archetype: Map.get(action_values, "Archetype"),
       image_url: character.image_url
     }
   end

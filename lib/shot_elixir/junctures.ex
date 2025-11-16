@@ -280,7 +280,8 @@ defmodule ShotElixir.Junctures do
         broadcast_change(juncture, :insert)
         {:ok, juncture}
 
-      error -> error
+      error ->
+        error
     end
   end
 
@@ -294,7 +295,8 @@ defmodule ShotElixir.Junctures do
         broadcast_change(juncture, :update)
         {:ok, juncture}
 
-      error -> error
+      error ->
+        error
     end
   end
 

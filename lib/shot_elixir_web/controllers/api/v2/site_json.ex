@@ -73,7 +73,8 @@ defmodule ShotElixirWeb.Api.V2.SiteJSON do
             nil
         end,
       created_at: Map.get(site, :created_at),
-      updated_at: Map.get(site, :updated_at)
+      updated_at: Map.get(site, :updated_at),
+      entity_class: "Site"
     }
   end
 
@@ -86,11 +87,13 @@ defmodule ShotElixirWeb.Api.V2.SiteJSON do
           %{
             id: attunement.id,
             character_id: attunement.character_id,
+            entity_class: "Attunement",
             character:
               if Ecto.assoc_loaded?(attunement.character) && attunement.character do
                 %{
                   id: attunement.character.id,
-                  name: attunement.character.name
+                  name: attunement.character.name,
+                  entity_class: "Character"
                 }
               else
                 nil

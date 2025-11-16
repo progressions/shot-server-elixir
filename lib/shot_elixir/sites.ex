@@ -286,7 +286,8 @@ defmodule ShotElixir.Sites do
         broadcast_change(site, :insert)
         {:ok, site}
 
-      error -> error
+      error ->
+        error
     end
   end
 
@@ -300,7 +301,8 @@ defmodule ShotElixir.Sites do
         broadcast_change(site, :update)
         {:ok, site}
 
-      error -> error
+      error ->
+        error
     end
   end
 
@@ -321,7 +323,8 @@ defmodule ShotElixir.Sites do
         broadcast_site_update(attunement.site_id)
         {:ok, attunement}
 
-      error -> error
+      error ->
+        error
     end
   end
 
@@ -368,7 +371,9 @@ defmodule ShotElixir.Sites do
 
   defp broadcast_site_update(site_id) do
     case get_site(site_id) do
-      nil -> :ok
+      nil ->
+        :ok
+
       site ->
         site
         |> Repo.preload([:faction, :juncture], force: true)

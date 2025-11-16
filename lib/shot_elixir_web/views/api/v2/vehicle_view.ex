@@ -1,4 +1,6 @@
 defmodule ShotElixirWeb.Api.V2.VehicleView do
+  alias ShotElixir.JsonSanitizer
+
   def render("index.json", %{vehicles: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
@@ -20,6 +22,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
           types: types,
           meta: meta
         }
+        |> JsonSanitizer.sanitize()
 
       %{vehicles: vehicles, factions: factions, archetypes: archetypes, types: types, meta: meta} ->
         %{
@@ -29,6 +32,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
           types: types,
           meta: meta
         }
+        |> JsonSanitizer.sanitize()
 
       vehicles when is_list(vehicles) ->
         # Legacy format for backward compatibility
@@ -44,6 +48,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
             total_pages: 1
           }
         }
+        |> JsonSanitizer.sanitize()
     end
   end
 
@@ -51,6 +56,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     %{
       vehicle: render_vehicle_detail(vehicle)
     }
+    |> JsonSanitizer.sanitize()
   end
 
   def render("archetypes.json", %{archetypes: archetypes}) do

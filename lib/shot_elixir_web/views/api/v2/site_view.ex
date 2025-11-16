@@ -32,14 +32,16 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       juncture_id: site.juncture_id,
       created_at: site.created_at,
       updated_at: site.updated_at,
-      active: site.active
+      active: site.active,
+      entity_class: "Site"
     }
   end
 
   def render_site_autocomplete(site) do
     %{
       id: site.id,
-      name: site.name
+      name: site.name,
+      entity_class: "Site"
     }
   end
 
@@ -53,7 +55,8 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       created_at: site.created_at,
       updated_at: site.updated_at,
       active: site.active,
-      campaign_id: site.campaign_id
+      campaign_id: site.campaign_id,
+      entity_class: "Site"
     }
 
     # Add associations if loaded
@@ -103,7 +106,8 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
         Map.put(base, :character, %{
           id: attunement.character.id,
           name: attunement.character.name,
-          archetype: attunement.character.archetype
+          archetype: attunement.character.archetype,
+          entity_class: "Character"
         })
       else
         base

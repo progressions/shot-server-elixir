@@ -340,7 +340,8 @@ defmodule ShotElixir.Schticks do
         broadcast_change(schtick, :insert)
         {:ok, schtick}
 
-      error -> error
+      error ->
+        error
     end
   end
 
@@ -354,7 +355,8 @@ defmodule ShotElixir.Schticks do
         broadcast_change(schtick, :update)
         {:ok, schtick}
 
-      error -> error
+      error ->
+        error
     end
   end
 

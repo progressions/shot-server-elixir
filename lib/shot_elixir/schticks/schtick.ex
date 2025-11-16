@@ -11,7 +11,7 @@ defmodule ShotElixir.Schticks.Schtick do
     field :category, :string
     field :path, :string
     field :color, :string
-    field :image_url, :string
+    field :image_url, :string, virtual: true
     field :bonus, :boolean, default: false
     field :archetypes, :map
     field :active, :boolean, default: true
@@ -33,7 +33,6 @@ defmodule ShotElixir.Schticks.Schtick do
       :category,
       :path,
       :color,
-      :image_url,
       :bonus,
       :archetypes,
       :active,

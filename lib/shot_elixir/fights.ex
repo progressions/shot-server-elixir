@@ -90,26 +90,28 @@ defmodule ShotElixir.Fights do
 
     # Season filtering
     query =
-      if params["season"] do
-        if params["season"] == "__NONE__" do
+      case blank_to_nil(params["season"]) do
+        nil ->
+          query
+
+        "__NONE__" ->
           from f in query, where: is_nil(f.season)
-        else
-          from f in query, where: f.season == ^params["season"]
-        end
-      else
-        query
+
+        season ->
+          from f in query, where: f.season == ^season
       end
 
     # Session filtering
     query =
-      if params["session"] do
-        if params["session"] == "__NONE__" do
+      case blank_to_nil(params["session"]) do
+        nil ->
+          query
+
+        "__NONE__" ->
           from f in query, where: is_nil(f.session)
-        else
-          from f in query, where: f.session == ^params["session"]
-        end
-      else
-        query
+
+        session ->
+          from f in query, where: f.session == ^session
       end
 
     # Character filtering
@@ -163,7 +165,8 @@ defmodule ShotElixir.Fights do
         # For distinct queries with joins, we need a special count approach
         # The query already has distinct: true from the joins above
         query
-        |> exclude(:order_by)  # Remove any ordering for the count
+        # Remove any ordering for the count
+        |> exclude(:order_by)
         |> select([f], f.id)
         |> Repo.all()
         |> length()
@@ -238,6 +241,9 @@ defmodule ShotElixir.Fights do
   end
 
   defp normalize_uuid(value), do: value
+
+  defp blank_to_nil(value) when value in [nil, ""], do: nil
+  defp blank_to_nil(value), do: value
 
   defp apply_sorting(query, params) do
     sort = params["sort"] || "created_at"
@@ -426,6 +432,7 @@ defmodule ShotElixir.Fights do
         shot_driver.shot_id
         |> fight_id_from_shot()
         |> broadcast_fight_update()
+
         result
 
       error ->
@@ -490,11 +497,14 @@ defmodule ShotElixir.Fights do
 
   defp broadcast_fight_update(fight_id) do
     case get_fight(fight_id) do
-      nil -> :ok
+      nil ->
+        :ok
+
       fight ->
         fight
         |> Repo.preload(fight_broadcast_preloads())
         |> broadcast_change(:update)
+
         :ok
     end
   end

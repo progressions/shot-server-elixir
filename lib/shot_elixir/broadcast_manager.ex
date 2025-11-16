@@ -17,11 +17,9 @@ defmodule ShotElixir.BroadcastManager do
     UserView
   }
 
-  defstruct [
-    broadcast_count: 0,
-    last_broadcast: nil,
-    error_count: 0
-  ]
+  defstruct broadcast_count: 0,
+            last_broadcast: nil,
+            error_count: 0
 
   # Client API
 
@@ -63,9 +61,10 @@ defmodule ShotElixir.BroadcastManager do
       end
     end)
 
-    new_state = %{state |
-      broadcast_count: state.broadcast_count + 1,
-      last_broadcast: DateTime.utc_now()
+    new_state = %{
+      state
+      | broadcast_count: state.broadcast_count + 1,
+        last_broadcast: DateTime.utc_now()
     }
 
     {:noreply, new_state}
@@ -79,6 +78,7 @@ defmodule ShotElixir.BroadcastManager do
       last_broadcast: state.last_broadcast,
       error_count: state.error_count
     }
+
     {:reply, health, state}
   end
 
@@ -115,7 +115,10 @@ defmodule ShotElixir.BroadcastManager do
         {:rails_message, %{"#{entity_type}s" => "reload"}}
       )
 
-      Logger.info("Broadcasted #{action} for #{entity_type} #{entity.id} to campaign:#{campaign_id}")
+      Logger.info(
+        "Broadcasted #{action} for #{entity_type} #{entity.id} to campaign:#{campaign_id}"
+      )
+
       emit_telemetry(entity_type, action)
     else
       Logger.warning("Cannot broadcast #{entity_type} without campaign_id")
@@ -149,7 +152,8 @@ defmodule ShotElixir.BroadcastManager do
   defp get_campaign_id(entity) do
     case get_entity_type(entity) do
       "campaign" -> Map.get(entity, :id)
-      "user" -> nil  # Users don't have campaign_id
+      # Users don't have campaign_id
+      "user" -> nil
       _ -> Map.get(entity, :campaign_id)
     end
   end
@@ -171,24 +175,28 @@ defmodule ShotElixir.BroadcastManager do
   defp serialize_entity(entity, "character") do
     # Ensure we have the minimal structure for the view
     character = ensure_associations(entity, [:user, :faction, :juncture, :image_positions])
+
     CharacterView.render("show.json", %{character: character})
     |> Map.get(:character)
   end
 
   defp serialize_entity(entity, "vehicle") do
     vehicle = ensure_associations(entity, [:user, :campaign, :image_positions])
+
     VehicleView.render("show.json", %{vehicle: vehicle})
     |> Map.get(:vehicle)
   end
 
   defp serialize_entity(entity, "fight") do
     fight = ensure_associations(entity, [:campaign, :shots])
+
     FightView.render("show.json", %{fight: fight})
     |> Map.get(:fight)
   end
 
   defp serialize_entity(entity, "weapon") do
     weapon = ensure_associations(entity, [:campaign, :juncture])
+
     %{
       id: weapon.id,
       name: weapon.name,
@@ -220,30 +228,35 @@ defmodule ShotElixir.BroadcastManager do
 
   defp serialize_entity(entity, "site") do
     site = ensure_associations(entity, [:campaign])
+
     SiteView.render("show.json", %{site: site})
     |> Map.get(:site)
   end
 
   defp serialize_entity(entity, "party") do
     party = ensure_associations(entity, [:campaign])
+
     PartyView.render("show.json", %{party: party})
     |> Map.get(:party)
   end
 
   defp serialize_entity(entity, "faction") do
     faction = ensure_associations(entity, [:campaign])
+
     FactionView.render("show.json", %{faction: faction})
     |> Map.get(:faction)
   end
 
   defp serialize_entity(entity, "juncture") do
     juncture = ensure_associations(entity, [:campaign])
+
     JunctureView.render("show.json", %{juncture: juncture})
     |> Map.get(:juncture)
   end
 
   defp serialize_entity(entity, "user") do
     user = ensure_associations(entity, [])
+
     UserView.render("show.json", %{user: user})
     |> Map.get(:user)
   end
@@ -262,6 +275,7 @@ defmodule ShotElixir.BroadcastManager do
   defp serialize_entity(entity, entity_type) do
     # Fallback for unknown entity types
     Logger.warning("Unknown entity type for serialization: #{entity_type}")
+
     %{
       id: entity.id,
       entity_class: String.capitalize(entity_type)
@@ -274,6 +288,7 @@ defmodule ShotElixir.BroadcastManager do
       case Map.get(acc, assoc) do
         %Ecto.Association.NotLoaded{} ->
           Map.put(acc, assoc, nil)
+
         _ ->
           acc
       end

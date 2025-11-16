@@ -41,7 +41,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponJSON do
       active: weapon.active,
       campaign_id: weapon.campaign_id,
       created_at: weapon.created_at,
-      updated_at: weapon.updated_at
+      updated_at: weapon.updated_at,
+      entity_class: "Weapon"
     }
   end
 end

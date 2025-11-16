@@ -305,7 +305,6 @@ CREATE TABLE public.characters (
     description jsonb,
     skills jsonb,
     faction_id uuid,
-    image_url character varying,
     task boolean,
     notion_page_id uuid,
     last_synced_to_notion_at timestamp(6) without time zone,
@@ -535,7 +534,6 @@ CREATE TABLE public.schticks (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     color character varying,
-    image_url character varying,
     bonus boolean,
     archetypes jsonb,
     name character varying,
@@ -632,7 +630,6 @@ CREATE TABLE public.vehicles (
     campaign_id uuid,
     active boolean DEFAULT true NOT NULL,
     faction_id uuid,
-    image_url character varying,
     task boolean,
     notion_page_id uuid,
     last_synced_to_notion_at timestamp(6) without time zone,
@@ -660,7 +657,6 @@ CREATE TABLE public.weapons (
     mook_bonus integer DEFAULT 0 NOT NULL,
     category character varying,
     kachunk boolean,
-    image_url character varying,
     active boolean DEFAULT true NOT NULL
 );
 

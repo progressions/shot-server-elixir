@@ -15,7 +15,7 @@ defmodule ShotElixir.Weapons.Weapon do
     field :mook_bonus, :integer, default: 0
     field :category, :string
     field :kachunk, :boolean, default: false
-    field :image_url, :string
+    field :image_url, :string, virtual: true
     field :active, :boolean, default: true
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
@@ -35,7 +35,6 @@ defmodule ShotElixir.Weapons.Weapon do
       :mook_bonus,
       :category,
       :kachunk,
-      :image_url,
       :active,
       :campaign_id
     ])

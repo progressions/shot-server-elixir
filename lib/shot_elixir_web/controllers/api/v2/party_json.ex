@@ -72,7 +72,8 @@ defmodule ShotElixirWeb.Api.V2.PartyJSON do
             nil
         end,
       created_at: Map.get(party, :created_at),
-      updated_at: Map.get(party, :updated_at)
+      updated_at: Map.get(party, :updated_at),
+      entity_class: "Party"
     }
   end
 
@@ -89,7 +90,8 @@ defmodule ShotElixirWeb.Api.V2.PartyJSON do
                 id: membership.character.id,
                 name: membership.character.name,
                 category: "character",
-                membership_id: membership.id
+                membership_id: membership.id,
+                entity_class: "Character"
               }
 
               {[character | chars], vehs}
@@ -99,7 +101,8 @@ defmodule ShotElixirWeb.Api.V2.PartyJSON do
                 id: membership.vehicle.id,
                 name: membership.vehicle.name,
                 category: "vehicle",
-                membership_id: membership.id
+                membership_id: membership.id,
+                entity_class: "Vehicle"
               }
 
               {chars, [vehicle | vehs]}
