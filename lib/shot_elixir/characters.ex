@@ -151,7 +151,7 @@ defmodule ShotElixir.Characters do
     query = apply_sorting(query, params)
 
     # Get total count for pagination
-    total_count = Repo.aggregate(query, :count, :id)
+    total_count = query |> select([c], c.id) |> distinct(true) |> Repo.aggregate(:count, :id)
 
     # Apply pagination
     characters =
