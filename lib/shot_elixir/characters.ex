@@ -135,8 +135,8 @@ defmodule ShotElixir.Characters do
           |> Repo.all()
           |> Enum.reject(&is_nil/1)
           |> Enum.map(fn id ->
-            case Ecto.UUID.dump(id) do
-              {:ok, binary_id} -> binary_id
+            case Ecto.UUID.cast(id) do
+              {:ok, uuid} -> uuid
               :error -> id
             end
           end)
