@@ -346,9 +346,17 @@ defmodule ShotElixir.Fights do
   end
 
   defp sync_character_shots(fight, character_ids) do
-    # Get current character IDs in the fight - Ecto loads them as binary
+    # Get current character IDs in the fight
     existing_shots = Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.character_id))
-    existing_character_ids = Enum.map(existing_shots, & &1.character_id)
+    # Convert existing character IDs to binary format for comparison
+    existing_character_ids =
+      Enum.map(existing_shots, fn shot ->
+        case Ecto.UUID.dump(shot.character_id) do
+          {:ok, binary} -> binary
+          :error -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
 
     # Convert incoming string UUIDs to binary for comparison
     # character_ids come in as strings like "09a75d40-db41-41a3-af77-cf1c76de7e32"
@@ -361,9 +369,17 @@ defmodule ShotElixir.Fights do
       end)
       |> Enum.reject(&is_nil/1)
 
+    # Debug logging
+    IO.puts("=== Character Sync Debug ===")
+    IO.inspect(existing_character_ids, label: "Existing (binary)")
+    IO.inspect(new_character_ids_binary, label: "New (binary)")
+
     # Find IDs to add and remove (comparing binary formats)
     ids_to_add = new_character_ids_binary -- existing_character_ids
     ids_to_remove = existing_character_ids -- new_character_ids_binary
+
+    IO.inspect(ids_to_add, label: "To Add")
+    IO.inspect(ids_to_remove, label: "To Remove")
 
     # Add new shots for new characters
     Enum.each(ids_to_add, fn char_id_binary ->
@@ -376,7 +392,13 @@ defmodule ShotElixir.Fights do
 
     # Remove shots for characters no longer in the fight
     if ids_to_remove != [] do
-      from(s in Shot, where: s.fight_id == ^fight.id and s.character_id in ^ids_to_remove)
+      # Convert binary UUIDs back to strings for the query
+      ids_to_remove_strings = Enum.map(ids_to_remove, fn binary ->
+        {:ok, string} = Ecto.UUID.cast(binary)
+        string
+      end)
+
+      from(s in Shot, where: s.fight_id == ^fight.id and s.character_id in ^ids_to_remove_strings)
       |> Repo.delete_all()
     end
 
@@ -384,9 +406,17 @@ defmodule ShotElixir.Fights do
   end
 
   defp sync_vehicle_shots(fight, vehicle_ids) do
-    # Get current vehicle IDs in the fight - Ecto loads them as binary
+    # Get current vehicle IDs in the fight
     existing_shots = Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.vehicle_id))
-    existing_vehicle_ids = Enum.map(existing_shots, & &1.vehicle_id)
+    # Convert existing vehicle IDs to binary format for comparison
+    existing_vehicle_ids =
+      Enum.map(existing_shots, fn shot ->
+        case Ecto.UUID.dump(shot.vehicle_id) do
+          {:ok, binary} -> binary
+          :error -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
 
     # Convert incoming string UUIDs to binary for comparison
     new_vehicle_ids_binary =
@@ -413,7 +443,13 @@ defmodule ShotElixir.Fights do
 
     # Remove shots for vehicles no longer in the fight
     if ids_to_remove != [] do
-      from(s in Shot, where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove)
+      # Convert binary UUIDs back to strings for the query
+      ids_to_remove_strings = Enum.map(ids_to_remove, fn binary ->
+        {:ok, string} = Ecto.UUID.cast(binary)
+        string
+      end)
+
+      from(s in Shot, where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove_strings)
       |> Repo.delete_all()
     end
 
