@@ -40,8 +40,12 @@ defmodule ShotElixir.Characters do
 
     # Base query with visibility filtering
     query =
-      from c in Character,
-        where: c.campaign_id == ^campaign_id and c.active == true
+      if params["fight_id"] do
+        from c in Character, where: c.active == true
+      else
+        from c in Character,
+          where: c.campaign_id == ^campaign_id and c.active == true
+      end
 
     # Apply template filtering (admin-only feature)
     query = apply_template_filter(query, params, current_user)
@@ -128,18 +132,10 @@ defmodule ShotElixir.Characters do
 
     query =
       if params["fight_id"] do
-        character_ids =
-          Shot
-          |> where([s], s.fight_id == ^params["fight_id"])
-          |> select([s], s.character_id)
-          |> Repo.all()
-          |> Enum.reject(&is_nil/1)
-
-        if Enum.empty?(character_ids) do
-          from c in query, where: false
-        else
-          from c in query, where: c.id in ^character_ids
-        end
+        from c in query,
+          join: s in Shot,
+          on: s.character_id == c.id,
+          where: s.fight_id == ^params["fight_id"]
       else
         query
       end

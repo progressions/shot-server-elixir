@@ -1,4 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.CharacterController do
+  require Logger
   use ShotElixirWeb, :controller
 
   alias ShotElixir.Characters
@@ -19,6 +20,16 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> json(%{error: "No current campaign set"})
     else
       characters = Characters.list_campaign_characters(campaign_id, params, current_user)
+
+      Logger.debug(fn ->
+        %{
+          message: "Characters#index",
+          params: params,
+          campaign_id: campaign_id,
+          returned: length(characters.characters)
+        }
+        |> Jason.encode!()
+      end)
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
