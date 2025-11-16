@@ -21,6 +21,7 @@ defmodule ShotElixir.Parties.Membership do
     |> foreign_key_constraint(:party_id)
     |> foreign_key_constraint(:character_id)
     |> foreign_key_constraint(:vehicle_id)
+
     # Note: Unique constraints were removed in Rails migration 20250928172151
     # The database now allows duplicate memberships
   end

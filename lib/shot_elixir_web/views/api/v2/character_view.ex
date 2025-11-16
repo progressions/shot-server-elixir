@@ -2,7 +2,12 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
   def render("index.json", %{characters: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
-      %{characters: characters, archetypes: archetypes, meta: meta, is_autocomplete: is_autocomplete} ->
+      %{
+        characters: characters,
+        archetypes: archetypes,
+        meta: meta,
+        is_autocomplete: is_autocomplete
+      } ->
         character_serializer =
           if is_autocomplete,
             do: &render_character_autocomplete/1,

@@ -95,6 +95,7 @@ defmodule ShotElixir.Characters do
     query =
       if params["archetype"] && params["archetype"] != "" do
         archetype_value = if params["archetype"] == "__NONE__", do: "", else: params["archetype"]
+
         from c in query,
           where: fragment("?->>'Archetype' = ?", c.action_values, ^archetype_value)
       else
