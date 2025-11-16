@@ -75,6 +75,19 @@ defmodule ShotElixir.Characters do
         query
       end
 
+    # Apply faction_id filter if present
+    # Special case: "__NONE__" means faction_id IS NULL
+    query =
+      if params["faction_id"] do
+        if params["faction_id"] == "__NONE__" do
+          from c in query, where: is_nil(c.faction_id)
+        else
+          from c in query, where: c.faction_id == ^params["faction_id"]
+        end
+      else
+        query
+      end
+
     # Apply sorting
     query = apply_sorting(query, params)
 
