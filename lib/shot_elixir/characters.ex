@@ -101,10 +101,6 @@ defmodule ShotElixir.Characters do
         query
       end
 
-    # Apply template filtering with security enforcement
-    # Defaults to excluding templates (is_template = false or nil)
-    query = apply_template_filter(query, params, current_user)
-
     # Apply sorting
     query = apply_sorting(query, params)
 
@@ -146,23 +142,17 @@ defmodule ShotElixir.Characters do
   end
 
   defp apply_template_filter(query, params, current_user) do
-    # Template filtering - only admin users and gamemasters can access templates
-    # Regular players should never see templates
-    can_access_templates = current_user && (current_user.admin || current_user.gamemaster)
+    # Template filtering - only admins can access templates
+    # Non-admin users (gamemasters and players) should never see templates
+    is_admin = current_user && current_user.admin
 
-    # Support both new template_filter parameter and legacy is_template parameter
-    template_filter = cond do
-      params["template_filter"] -> params["template_filter"]
-      params["is_template"] == "true" -> "templates"
-      params["is_template"] -> "non-templates"
-      true -> nil
-    end
+    template_filter = params["template_filter"] || params["is_template"]
 
-    if !can_access_templates do
-      # Non-gamemaster users always get non-templates only
+    if !is_admin do
+      # Non-admin users always get non-templates only
       from c in query, where: c.is_template in [false, nil]
     else
-      # Admin users and gamemasters can use template filtering
+      # Admin users can use template filtering
       case template_filter do
         "templates" ->
           from c in query, where: c.is_template == true
@@ -173,14 +163,10 @@ defmodule ShotElixir.Characters do
         "true" ->
           from c in query, where: c.is_template == true
 
-        "non-templates" ->
-          from c in query, where: c.is_template in [false, nil]
-
         "false" ->
           from c in query, where: c.is_template in [false, nil]
 
         nil ->
-          # Default to non-templates
           from c in query, where: c.is_template in [false, nil]
 
         "" ->
