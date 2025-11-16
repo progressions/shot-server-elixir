@@ -65,6 +65,16 @@ defmodule ShotElixir.Characters do
         query
       end
 
+    # Apply character_type filter if present
+    # character_type is stored in action_values["Type"]
+    query =
+      if params["character_type"] do
+        from c in query,
+          where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
+      else
+        query
+      end
+
     # Apply sorting
     query = apply_sorting(query, params)
 
