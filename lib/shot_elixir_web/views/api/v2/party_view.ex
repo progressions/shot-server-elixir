@@ -108,7 +108,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
           Map.put(base, :character, %{
             id: membership.character.id,
             name: membership.character.name,
-            archetype: membership.character.archetype,
+            archetype: get_in(membership.character.action_values, ["Archetype"]),
             entity_class: "Character"
           })
         else
@@ -119,7 +119,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
         Map.put(base, :vehicle, %{
           id: membership.vehicle.id,
           name: membership.vehicle.name,
-          vehicle_type: membership.vehicle.vehicle_type,
+          vehicle_type: get_in(membership.vehicle.action_values, ["Type"]),
           entity_class: "Vehicle"
         })
       else

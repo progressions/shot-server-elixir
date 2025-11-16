@@ -316,14 +316,17 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       assert %{"error" => "Party not found"} = json_response(conn, 404)
     end
 
-    test "returns error for duplicate membership", %{
+    test "allows duplicate membership (constraint removed in Rails migration 20250928172151)", %{
       conn: conn,
       party: party,
       character: character
     } do
+      # First membership
       {:ok, _} = Parties.add_member(party.id, %{"character_id" => character.id})
+
+      # Second membership - now allowed after unique constraint removal
       conn = post(conn, ~p"/api/v2/parties/#{party.id}/members", character_id: character.id)
-      assert %{"errors" => _} = json_response(conn, 422)
+      assert %{"party" => _} = json_response(conn, 200)
     end
 
     test "returns error when neither character_id nor vehicle_id provided", %{

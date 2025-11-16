@@ -101,6 +101,15 @@ defmodule ShotElixir.Characters do
         query
       end
 
+    # Apply search filter if present
+    query =
+      if params["search"] && params["search"] != "" do
+        search_term = "%#{params["search"]}%"
+        from c in query, where: ilike(c.name, ^search_term)
+      else
+        query
+      end
+
     # Apply template filtering - defaults to excluding templates
     # Skip template filter if specific IDs are requested
     query =

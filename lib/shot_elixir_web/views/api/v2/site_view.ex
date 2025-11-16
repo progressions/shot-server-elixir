@@ -106,7 +106,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
         Map.put(base, :character, %{
           id: attunement.character.id,
           name: attunement.character.name,
-          archetype: attunement.character.archetype,
+          archetype: get_in(attunement.character.action_values, ["Archetype"]),
           entity_class: "Character"
         })
       else

@@ -129,24 +129,27 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
     test "filters by search term", %{conn: conn, gamemaster: gm, campaign: campaign} do
       {:ok, _} =
         Characters.create_character(%{
-          name: "Maverick Cop",
+          name: "Maverick Cop XYZ123",
           campaign_id: campaign.id,
-          user_id: gm.id
+          user_id: gm.id,
+          is_template: false
         })
 
       {:ok, _} =
         Characters.create_character(%{
           name: "Ex-Special Forces",
           campaign_id: campaign.id,
-          user_id: gm.id
+          user_id: gm.id,
+          is_template: false
         })
 
       conn = authenticate(conn, gm)
-      conn = get(conn, ~p"/api/v2/characters", search: "Maverick")
+      # Explicitly exclude templates to ensure test isolation
+      conn = get(conn, ~p"/api/v2/characters", search: "XYZ123", template_filter: "false")
       response = json_response(conn, 200)
 
       assert length(response["characters"]) == 1
-      assert List.first(response["characters"])["name"] == "Maverick Cop"
+      assert List.first(response["characters"])["name"] == "Maverick Cop XYZ123"
     end
   end
 
