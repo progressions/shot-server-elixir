@@ -126,30 +126,17 @@ defmodule ShotElixir.Characters do
         query
       end
 
-    {query, fight_character_ids} =
+    {query, fight_character_count} =
       if fight_id = params["fight_id"] do
-        character_ids =
+        shot_query =
           Shot
           |> where([s], s.fight_id == ^fight_id)
           |> select([s], s.character_id)
-          |> Repo.all()
-          |> Enum.reject(&is_nil/1)
-          |> Enum.map(fn id ->
-            case Ecto.UUID.cast(id) do
-              {:ok, uuid} -> uuid
-              :error -> id
-            end
-          end)
-          |> Enum.uniq()
 
-        query =
-          if Enum.empty?(character_ids) do
-            from c in query, where: false
-          else
-            from c in query, where: c.id in ^character_ids
-          end
+        query = from c in query, where: c.id in subquery(shot_query)
 
-        {query, character_ids}
+        count = Repo.aggregate(shot_query, :count, :character_id)
+        {query, count}
       else
         {query, nil}
       end
@@ -169,8 +156,8 @@ defmodule ShotElixir.Characters do
 
     # Get total count for pagination
     total_count =
-      if fight_character_ids do
-        length(fight_character_ids)
+      if fight_character_count do
+        fight_character_count
       else
         query
         |> exclude(:order_by)
