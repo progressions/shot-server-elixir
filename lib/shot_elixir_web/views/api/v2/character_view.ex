@@ -2,7 +2,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
   def render("index.json", %{characters: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
-      %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
+      %{characters: characters, archetypes: archetypes, meta: meta, is_autocomplete: is_autocomplete} ->
         character_serializer =
           if is_autocomplete,
             do: &render_character_autocomplete/1,
@@ -12,7 +12,28 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
           characters: Enum.map(characters, character_serializer),
           # TODO: Include factions from query
           factions: [],
-          # TODO: Include archetypes from query
+          archetypes: archetypes,
+          meta: meta
+        }
+
+      %{characters: characters, archetypes: archetypes, meta: meta} ->
+        %{
+          characters: Enum.map(characters, &render_character_index/1),
+          # TODO: Include factions from query
+          factions: [],
+          archetypes: archetypes,
+          meta: meta
+        }
+
+      %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
+        character_serializer =
+          if is_autocomplete,
+            do: &render_character_autocomplete/1,
+            else: &render_character_index/1
+
+        %{
+          characters: Enum.map(characters, character_serializer),
+          factions: [],
           archetypes: [],
           meta: meta
         }
@@ -20,9 +41,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       %{characters: characters, meta: meta} ->
         %{
           characters: Enum.map(characters, &render_character_index/1),
-          # TODO: Include factions from query
           factions: [],
-          # TODO: Include archetypes from query
           archetypes: [],
           meta: meta
         }

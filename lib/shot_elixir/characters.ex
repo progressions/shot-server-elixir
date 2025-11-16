@@ -89,6 +89,18 @@ defmodule ShotElixir.Characters do
         query
       end
 
+    # Apply archetype filter if present
+    # archetype is stored in action_values["Archetype"]
+    # Special case: "__NONE__" means empty string archetype
+    query =
+      if params["archetype"] && params["archetype"] != "" do
+        archetype_value = if params["archetype"] == "__NONE__", do: "", else: params["archetype"]
+        from c in query,
+          where: fragment("?->>'Archetype' = ?", c.action_values, ^archetype_value)
+      else
+        query
+      end
+
     # Apply sorting
     query = apply_sorting(query, params)
 
@@ -106,9 +118,19 @@ defmodule ShotElixir.Characters do
       |> offset(^offset)
       |> Repo.all()
 
-    # Return characters with pagination metadata
+    # Extract unique archetypes from characters
+    archetypes =
+      characters
+      |> Enum.map(fn c -> get_in(c.action_values, ["Archetype"]) end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    # Return characters with pagination metadata and archetypes
     %{
       characters: characters,
+      archetypes: archetypes,
       meta: %{
         current_page: page,
         per_page: per_page,
