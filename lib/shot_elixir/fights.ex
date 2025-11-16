@@ -350,17 +350,18 @@ defmodule ShotElixir.Fights do
     existing_shots = Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.character_id))
     existing_character_ids = Enum.map(existing_shots, & &1.character_id)
 
-    # Normalize incoming IDs
-    new_character_ids = Enum.map(character_ids || [], &normalize_uuid/1) |> Enum.reject(&is_nil/1)
+    # Normalize incoming IDs for comparison (convert to binary)
+    normalized_new_ids = Enum.map(character_ids || [], &normalize_uuid/1) |> Enum.reject(&is_nil/1)
 
-    # Find IDs to add and remove
-    ids_to_add = new_character_ids -- existing_character_ids
-    ids_to_remove = existing_character_ids -- new_character_ids
+    # Find IDs to add and remove (comparing binary formats)
+    ids_to_add = normalized_new_ids -- existing_character_ids
+    ids_to_remove = existing_character_ids -- normalized_new_ids
 
-    # Add new shots for new characters
-    Enum.each(ids_to_add, fn char_id ->
+    # Add new shots for new characters - convert binary back to string for changeset
+    Enum.each(ids_to_add, fn char_id_binary ->
+      {:ok, char_id_string} = Ecto.UUID.cast(char_id_binary)
       %Shot{}
-      |> Shot.changeset(%{fight_id: fight.id, character_id: char_id, shot: nil})
+      |> Shot.changeset(%{fight_id: fight.id, character_id: char_id_string, shot: nil})
       |> Repo.insert!()
     end)
 
@@ -378,17 +379,18 @@ defmodule ShotElixir.Fights do
     existing_shots = Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.vehicle_id))
     existing_vehicle_ids = Enum.map(existing_shots, & &1.vehicle_id)
 
-    # Normalize incoming IDs
-    new_vehicle_ids = Enum.map(vehicle_ids || [], &normalize_uuid/1) |> Enum.reject(&is_nil/1)
+    # Normalize incoming IDs for comparison (convert to binary)
+    normalized_new_ids = Enum.map(vehicle_ids || [], &normalize_uuid/1) |> Enum.reject(&is_nil/1)
 
-    # Find IDs to add and remove
-    ids_to_add = new_vehicle_ids -- existing_vehicle_ids
-    ids_to_remove = existing_vehicle_ids -- new_vehicle_ids
+    # Find IDs to add and remove (comparing binary formats)
+    ids_to_add = normalized_new_ids -- existing_vehicle_ids
+    ids_to_remove = existing_vehicle_ids -- normalized_new_ids
 
-    # Add new shots for new vehicles
-    Enum.each(ids_to_add, fn vehicle_id ->
+    # Add new shots for new vehicles - convert binary back to string for changeset
+    Enum.each(ids_to_add, fn vehicle_id_binary ->
+      {:ok, vehicle_id_string} = Ecto.UUID.cast(vehicle_id_binary)
       %Shot{}
-      |> Shot.changeset(%{fight_id: fight.id, vehicle_id: vehicle_id, shot: nil})
+      |> Shot.changeset(%{fight_id: fight.id, vehicle_id: vehicle_id_string, shot: nil})
       |> Repo.insert!()
     end)
 
