@@ -126,19 +126,17 @@ defmodule ShotElixir.Characters do
         query
       end
 
-    {query, fight_character_count} =
+    query =
       if fight_id = params["fight_id"] do
-        shot_query =
-          Shot
-          |> where([s], s.fight_id == ^fight_id)
-          |> select([s], s.character_id)
-
-        query = from c in query, where: c.id in subquery(shot_query)
-
-        count = Repo.aggregate(shot_query, :count, :character_id)
-        {query, count}
+        from(
+          c in query,
+          join: s in Shot,
+          on: c.id == s.character_id,
+          where: s.fight_id == ^fight_id,
+          distinct: true
+        )
       else
-        {query, nil}
+        query
       end
 
     query =
@@ -156,14 +154,10 @@ defmodule ShotElixir.Characters do
 
     # Get total count for pagination
     total_count =
-      if fight_character_count do
-        fight_character_count
-      else
-        query
-        |> exclude(:order_by)
-        |> select([c], count(c.id))
-        |> Repo.one()
-      end
+      query
+      |> exclude(:order_by)
+      |> select([c], count(c.id))
+      |> Repo.one()
 
     # Apply pagination
     characters =
@@ -235,7 +229,7 @@ defmodule ShotElixir.Characters do
 
   defp apply_sorting(query, params) do
     sort = params["sort"] || "created_at"
-    order = if params["order"] == "ASC", do: :asc, else: :desc
+    order = if String.upcase(params["order"] || "") == "ASC", do: :asc, else: :desc
 
     case sort do
       "type" ->
