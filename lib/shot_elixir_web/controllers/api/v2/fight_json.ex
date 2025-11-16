@@ -33,6 +33,11 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       campaign_id: fight.campaign_id,
       created_at: fight.created_at,
       updated_at: fight.updated_at,
+      image_positions: render_image_positions(fight),
+      characters: render_characters(fight),
+      character_ids: get_association_ids(fight, :characters),
+      vehicles: render_vehicles(fight),
+      vehicle_ids: get_association_ids(fight, :vehicles),
       entity_class: "Fight"
     }
   end
@@ -99,5 +104,75 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       image_url: vehicle.image_url,
       impairments: vehicle.impairments
     }
+  end
+
+  defp render_characters(fight) do
+    case Map.get(fight, :characters) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      characters ->
+        characters
+        |> Enum.uniq_by(& &1.id)
+        |> Enum.map(&character_summary/1)
+    end
+  end
+
+  defp render_vehicles(fight) do
+    case Map.get(fight, :vehicles) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      vehicles ->
+        vehicles
+        |> Enum.uniq_by(& &1.id)
+        |> Enum.map(&vehicle_summary/1)
+    end
+  end
+
+  defp render_image_positions(fight) do
+    case Map.get(fight, :image_positions) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      positions ->
+        positions
+        |> Enum.map(fn position ->
+          %{
+            id: position.id,
+            context: position.context,
+            x_position: position.x_position,
+            y_position: position.y_position,
+            style_overrides: position.style_overrides
+          }
+        end)
+    end
+  end
+
+  defp get_association_ids(record, association) do
+    case Map.get(record, association) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      items when is_list(items) ->
+        items
+        |> Enum.uniq_by(& &1.id)
+        |> Enum.map(& &1.id)
+
+      _ ->
+        []
+    end
   end
 end
