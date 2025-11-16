@@ -77,8 +77,9 @@ defmodule ShotElixir.Characters do
 
     # Apply faction_id filter if present
     # Special case: "__NONE__" means faction_id IS NULL
+    # Empty string is treated as no filter
     query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from c in query, where: is_nil(c.faction_id)
         else
