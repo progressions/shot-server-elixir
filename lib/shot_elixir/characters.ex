@@ -41,12 +41,15 @@ defmodule ShotElixir.Characters do
     query =
       if fight_id = params["fight_id"] do
         # If fight_id is present, create a simple query that ignores campaign_id and other filters.
+        character_ids_in_fight =
+          from s in Shot,
+            where: s.fight_id == ^fight_id,
+            select: s.character_id,
+            distinct: true
+
         from(
           c in Character,
-          join: s in Shot,
-          on: c.id == s.character_id,
-          where: s.fight_id == ^fight_id,
-          distinct: true
+          where: c.id in subquery(character_ids_in_fight)
         )
       else
         # Original logic when no fight_id is present
