@@ -40,12 +40,8 @@ defmodule ShotElixir.Characters do
 
     # Base query with visibility filtering
     query =
-      if params["fight_id"] do
-        from c in Character, where: c.active == true
-      else
-        from c in Character,
-          where: c.campaign_id == ^campaign_id and c.active == true
-      end
+      from c in Character,
+        where: c.campaign_id == ^campaign_id and c.active == true
 
     # Apply template filtering (admin-only feature)
     query = apply_template_filter(query, params, current_user)
@@ -130,14 +126,26 @@ defmodule ShotElixir.Characters do
         query
       end
 
-    query =
-      if params["fight_id"] do
-        from c in query,
-          join: s in Shot,
-          on: s.character_id == c.id,
-          where: s.fight_id == ^params["fight_id"]
+    {query, fight_character_ids} =
+      if fight_id = params["fight_id"] do
+        character_ids =
+          Shot
+          |> where([s], s.fight_id == ^fight_id)
+          |> select([s], s.character_id)
+          |> Repo.all()
+          |> Enum.reject(&is_nil/1)
+          |> Enum.uniq()
+
+        query =
+          if Enum.empty?(character_ids) do
+            from c in query, where: false
+          else
+            from c in query, where: c.id in ^character_ids
+          end
+
+        {query, character_ids}
       else
-        query
+        {query, nil}
       end
 
     query =
@@ -155,10 +163,14 @@ defmodule ShotElixir.Characters do
 
     # Get total count for pagination
     total_count =
-      query
-      |> exclude(:order_by)
-      |> select([c], count(c.id))
-      |> Repo.one()
+      if fight_character_ids do
+        length(fight_character_ids)
+      else
+        query
+        |> exclude(:order_by)
+        |> select([c], count(c.id))
+        |> Repo.one()
+      end
 
     # Apply pagination
     characters =
