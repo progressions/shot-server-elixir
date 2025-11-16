@@ -25,6 +25,8 @@ defmodule ShotElixir.Fights.Fight do
 
     has_many :shots, ShotElixir.Fights.Shot
     has_many :character_effects, ShotElixir.Effects.CharacterEffect
+    has_many :characters, through: [:shots, :character]
+    has_many :vehicles, through: [:shots, :vehicle]
 
     has_many :image_positions, ImagePosition,
       foreign_key: :positionable_id,

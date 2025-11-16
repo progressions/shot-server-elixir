@@ -113,17 +113,31 @@ defmodule ShotElixirWeb.Api.V2.FightView do
   # Helper functions for Rails-compatible associations
   defp render_characters_if_loaded(fight) do
     case Map.get(fight, :characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
-      characters -> Enum.map(characters, &render_character_autocomplete/1)
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      characters ->
+        characters
+        |> Enum.uniq_by(& &1.id)
+        |> Enum.map(&render_character_autocomplete/1)
     end
   end
 
   defp render_vehicles_if_loaded(fight) do
     case Map.get(fight, :vehicles) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
-      vehicles -> Enum.map(vehicles, &render_vehicle_lite/1)
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      vehicles ->
+        vehicles
+        |> Enum.uniq_by(& &1.id)
+        |> Enum.map(&render_vehicle_lite/1)
     end
   end
 
@@ -137,10 +151,19 @@ defmodule ShotElixirWeb.Api.V2.FightView do
 
   defp get_association_ids(record, association) do
     case Map.get(record, association) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
-      items when is_list(items) -> Enum.map(items, & &1.id)
-      _ -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      items when is_list(items) ->
+        items
+        |> Enum.uniq_by(& &1.id)
+        |> Enum.map(& &1.id)
+
+      _ ->
+        []
     end
   end
 

@@ -196,6 +196,7 @@ defmodule ShotElixir.Fights do
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
+      |> Repo.preload([:characters, :vehicles])
 
     # Return fights with pagination metadata and seasons
     %{
@@ -293,6 +294,7 @@ defmodule ShotElixir.Fights do
     Fight
     |> Repo.get(id)
     |> Repo.preload(shots: [:character, :vehicle])
+    |> Repo.preload([:characters, :vehicles])
   end
 
   def create_fight(attrs \\ %{}) do
@@ -489,6 +491,8 @@ defmodule ShotElixir.Fights do
   defp fight_broadcast_preloads do
     [
       :image_positions,
+      :characters,
+      :vehicles,
       shots: [:character, :vehicle]
     ]
   end
