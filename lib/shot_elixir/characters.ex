@@ -131,7 +131,8 @@ defmodule ShotElixir.Characters do
         from c in query,
           join: s in Shot,
           on: s.character_id == c.id,
-          where: s.fight_id == ^params["fight_id"]
+          where: s.fight_id == ^params["fight_id"],
+          distinct: true
       else
         query
       end
@@ -153,8 +154,7 @@ defmodule ShotElixir.Characters do
     total_count =
       query
       |> exclude(:order_by)
-      |> select([c], %{id: c.id})
-      |> distinct(true)
+      |> select([c], c.id)
       |> Repo.aggregate(:count, :id)
 
     # Apply pagination
