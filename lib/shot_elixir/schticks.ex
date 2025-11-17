@@ -58,7 +58,7 @@ defmodule ShotElixir.Schticks do
 
     # Category filtering - handle "__NONE__" special case
     query =
-      if params["category"] do
+      if params["category"] && params["category"] != "" do
         if params["category"] == "__NONE__" do
           from s in query, where: is_nil(s.category)
         else
@@ -70,7 +70,7 @@ defmodule ShotElixir.Schticks do
 
     # Path filtering - handle "__NONE__" special case
     query =
-      if params["path"] do
+      if params["path"] && params["path"] != "" do
         if params["path"] == "__NONE__" do
           from s in query, where: is_nil(s.path)
         else
@@ -125,7 +125,7 @@ defmodule ShotElixir.Schticks do
       end
 
     count_query =
-      if params["category"] do
+      if params["category"] && params["category"] != "" do
         if params["category"] == "__NONE__" do
           from s in count_query, where: is_nil(s.category)
         else
@@ -136,7 +136,7 @@ defmodule ShotElixir.Schticks do
       end
 
     count_query =
-      if params["path"] do
+      if params["path"] && params["path"] != "" do
         if params["path"] == "__NONE__" do
           from s in count_query, where: is_nil(s.path)
         else
@@ -244,18 +244,9 @@ defmodule ShotElixir.Schticks do
     from s in query, where: s.path == ^path
   end
 
-  defp apply_visibility_filter(query, params) do
-    case params["visibility"] do
-      "hidden" ->
-        from s in query, where: s.active == false
-
-      "all" ->
-        query
-
-      _ ->
-        # Default to visible (active) only
-        from s in query, where: s.active == true
-    end
+  defp apply_visibility_filter(query, _params) do
+    # Always show only active schticks
+    from s in query, where: s.active == true
   end
 
   defp parse_ids(ids_param) when is_binary(ids_param) do

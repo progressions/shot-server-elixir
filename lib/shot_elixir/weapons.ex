@@ -69,12 +69,14 @@ defmodule ShotElixir.Weapons do
   end
 
   defp filter_by_category(query, nil), do: query
+  defp filter_by_category(query, ""), do: query
 
   defp filter_by_category(query, category) do
     from w in query, where: w.category == ^category
   end
 
   defp filter_by_juncture(query, nil), do: query
+  defp filter_by_juncture(query, ""), do: query
 
   defp filter_by_juncture(query, juncture) do
     from w in query, where: w.juncture == ^juncture

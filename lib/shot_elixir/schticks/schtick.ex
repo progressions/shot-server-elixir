@@ -13,7 +13,7 @@ defmodule ShotElixir.Schticks.Schtick do
     field :color, :string
     field :image_url, :string, virtual: true
     field :bonus, :boolean, default: false
-    field :archetypes, :map
+    field :archetypes, {:array, :string}
     field :active, :boolean, default: true
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
