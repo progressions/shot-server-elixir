@@ -30,6 +30,19 @@ defmodule ShotElixir.Characters.Character do
     "Damage" => 0
   }
 
+  @default_description %{
+    "Nicknames" => "",
+    "Age" => "",
+    "Height" => "",
+    "Weight" => "",
+    "Hair Color" => "",
+    "Eye Color" => "",
+    "Style of Dress" => "",
+    "Appearance" => "",
+    "Background" => "",
+    "Melodramatic Hook" => ""
+  }
+
   @character_types ["PC", "NPC", "Ally", "Mook", "Featured Foe", "Boss", "Uber-Boss"]
 
   schema "characters" do
@@ -130,7 +143,20 @@ defmodule ShotElixir.Characters.Character do
 
   defp ensure_default_values(changeset) do
     changeset
-    |> put_change_if_nil(:action_values, @default_action_values)
+    |> ensure_default_action_values()
+    |> ensure_default_description()
+  end
+
+  defp ensure_default_action_values(changeset) do
+    action_values = get_field(changeset, :action_values) || %{}
+    merged_values = Map.merge(@default_action_values, action_values)
+    put_change(changeset, :action_values, merged_values)
+  end
+
+  defp ensure_default_description(changeset) do
+    description = get_field(changeset, :description) || %{}
+    merged_description = Map.merge(@default_description, description)
+    put_change(changeset, :description, merged_description)
   end
 
   defp put_change_if_nil(changeset, key, value) do
