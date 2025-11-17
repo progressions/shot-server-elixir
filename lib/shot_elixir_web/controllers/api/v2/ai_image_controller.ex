@@ -254,114 +254,106 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   end
 
   defp get_entity("Character", entity_id, campaign_id) do
-    case Characters.get_character(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      character ->
-        if character.campaign_id == campaign_id do
-          {:ok, character}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from c in ShotElixir.Characters.Character,
+        where: c.id == ^entity_id and c.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      character -> {:ok, character}
     end
   end
 
   defp get_entity("Vehicle", entity_id, campaign_id) do
-    case Vehicles.get_vehicle(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      vehicle ->
-        if vehicle.campaign_id == campaign_id do
-          {:ok, vehicle}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from v in ShotElixir.Vehicles.Vehicle,
+        where: v.id == ^entity_id and v.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      vehicle -> {:ok, vehicle}
     end
   end
 
   defp get_entity("Party", entity_id, campaign_id) do
-    case Parties.get_party(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      party ->
-        if party.campaign_id == campaign_id do
-          {:ok, party}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from p in ShotElixir.Parties.Party,
+        where: p.id == ^entity_id and p.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      party -> {:ok, party}
     end
   end
 
   defp get_entity("Faction", entity_id, campaign_id) do
-    case Factions.get_faction(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      faction ->
-        if faction.campaign_id == campaign_id do
-          {:ok, faction}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from f in ShotElixir.Factions.Faction,
+        where: f.id == ^entity_id and f.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      faction -> {:ok, faction}
     end
   end
 
   defp get_entity("Site", entity_id, campaign_id) do
-    case Sites.get_site(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      site ->
-        if site.campaign_id == campaign_id do
-          {:ok, site}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from s in ShotElixir.Sites.Site,
+        where: s.id == ^entity_id and s.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      site -> {:ok, site}
     end
   end
 
   defp get_entity("Weapon", entity_id, campaign_id) do
-    case Weapons.get_weapon(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      weapon ->
-        if weapon.campaign_id == campaign_id do
-          {:ok, weapon}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from w in ShotElixir.Weapons.Weapon,
+        where: w.id == ^entity_id and w.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      weapon -> {:ok, weapon}
     end
   end
 
   defp get_entity("Schtick", entity_id, campaign_id) do
-    case Schticks.get_schtick(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      schtick ->
-        if schtick.campaign_id == campaign_id do
-          {:ok, schtick}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from s in ShotElixir.Schticks.Schtick,
+        where: s.id == ^entity_id and s.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      schtick -> {:ok, schtick}
     end
   end
 
   defp get_entity("Fight", entity_id, campaign_id) do
-    case Fights.get_fight(entity_id) do
-      nil ->
-        {:error, :not_found}
+    import Ecto.Query
 
-      fight ->
-        if fight.campaign_id == campaign_id do
-          {:ok, fight}
-        else
-          {:error, :wrong_campaign}
-        end
+    query =
+      from f in ShotElixir.Fights.Fight,
+        where: f.id == ^entity_id and f.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      fight -> {:ok, fight}
     end
   end
 
