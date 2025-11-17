@@ -61,3 +61,11 @@ config :phoenix, :stacktrace_depth, 20
 
 # Initialize plugs at runtime for faster development compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# ImageKit credentials for development
+config :shot_elixir, :imagekit,
+  private_key: "private_tR/jCUDO7Q6eSDGhC4e/pyyTKIs=",
+  public_key: "public_nyNChhUq1KWjp2I+YYI+lhAzPmk=",
+  id: "nvqgwnjgv",
+  url_endpoint: "https://ik.imagekit.io/nvqgwnjgv",
+  environment: :dev
