@@ -10,6 +10,8 @@ defmodule ShotElixir.Parties.Party do
     field :name, :string
     field :description, :string
     field :active, :boolean, default: true
+    # Note: image storage handled by Rails app, not in this schema
+    field :image_url, :string, virtual: true
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction

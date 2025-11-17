@@ -12,7 +12,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
     if current_user.current_campaign_id do
       weapons = Weapons.list_weapons(current_user.current_campaign_id, params)
-      render(conn, :index, weapons)
+      render(conn, :index, weapons: weapons)
     else
       conn
       |> put_status(:unprocessable_entity)

@@ -21,14 +21,9 @@ defmodule ShotElixir.Parties.Membership do
     |> foreign_key_constraint(:party_id)
     |> foreign_key_constraint(:character_id)
     |> foreign_key_constraint(:vehicle_id)
-    |> unique_constraint([:party_id, :character_id],
-      name: :memberships_party_id_character_id_index,
-      message: "Character already in party"
-    )
-    |> unique_constraint([:party_id, :vehicle_id],
-      name: :memberships_party_id_vehicle_id_index,
-      message: "Vehicle already in party"
-    )
+
+    # Note: Unique constraints were removed in Rails migration 20250928172151
+    # The database now allows duplicate memberships
   end
 
   defp validate_either_character_or_vehicle(changeset) do

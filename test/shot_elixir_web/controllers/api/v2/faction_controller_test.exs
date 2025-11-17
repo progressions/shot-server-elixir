@@ -117,9 +117,8 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
     test "shows faction when found", %{conn: conn, faction: faction} do
       conn = get(conn, ~p"/api/v2/factions/#{faction.id}")
-      response = json_response(conn, 200)
+      returned_faction = json_response(conn, 200)
 
-      assert %{"faction" => returned_faction} = response
       assert returned_faction["id"] == faction.id
       assert returned_faction["name"] == faction.name
       assert returned_faction["description"] == faction.description
@@ -140,9 +139,8 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
   describe "create" do
     test "creates faction with valid data", %{conn: conn} do
       conn = post(conn, ~p"/api/v2/factions", faction: @create_attrs)
-      response = json_response(conn, 201)
+      faction = json_response(conn, 201)
 
-      assert %{"faction" => faction} = response
       assert faction["name"] == @create_attrs.name
       assert faction["description"] == @create_attrs.description
     end
@@ -173,9 +171,8 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
     test "updates faction with valid data", %{conn: conn, faction: faction} do
       conn = patch(conn, ~p"/api/v2/factions/#{faction.id}", faction: @update_attrs)
-      response = json_response(conn, 200)
+      updated_faction = json_response(conn, 200)
 
-      assert %{"faction" => updated_faction} = response
       assert updated_faction["name"] == @update_attrs.name
       assert updated_faction["description"] == @update_attrs.description
     end

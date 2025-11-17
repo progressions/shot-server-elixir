@@ -1,8 +1,26 @@
 defmodule ShotElixirWeb.Api.V2.CharacterView do
+  @default_description %{
+    "Nicknames" => "",
+    "Age" => "",
+    "Height" => "",
+    "Weight" => "",
+    "Hair Color" => "",
+    "Eye Color" => "",
+    "Style of Dress" => "",
+    "Appearance" => "",
+    "Background" => "",
+    "Melodramatic Hook" => ""
+  }
+
   def render("index.json", %{characters: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
-      %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
+      %{
+        characters: characters,
+        archetypes: archetypes,
+        meta: meta,
+        is_autocomplete: is_autocomplete
+      } ->
         character_serializer =
           if is_autocomplete,
             do: &render_character_autocomplete/1,
@@ -12,7 +30,28 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
           characters: Enum.map(characters, character_serializer),
           # TODO: Include factions from query
           factions: [],
-          # TODO: Include archetypes from query
+          archetypes: archetypes,
+          meta: meta
+        }
+
+      %{characters: characters, archetypes: archetypes, meta: meta} ->
+        %{
+          characters: Enum.map(characters, &render_character_index/1),
+          # TODO: Include factions from query
+          factions: [],
+          archetypes: archetypes,
+          meta: meta
+        }
+
+      %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
+        character_serializer =
+          if is_autocomplete,
+            do: &render_character_autocomplete/1,
+            else: &render_character_index/1
+
+        %{
+          characters: Enum.map(characters, character_serializer),
+          factions: [],
           archetypes: [],
           meta: meta
         }
@@ -20,9 +59,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       %{characters: characters, meta: meta} ->
         %{
           characters: Enum.map(characters, &render_character_index/1),
-          # TODO: Include factions from query
           factions: [],
-          # TODO: Include archetypes from query
           archetypes: [],
           meta: meta
         }
@@ -42,9 +79,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
   end
 
   def render("show.json", %{character: character}) do
-    %{
-      character: render_character_full(character)
-    }
+    render_character_full(character)
   end
 
   def render("autocomplete.json", %{characters: characters}) do
@@ -93,7 +128,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       created_at: character.created_at,
       active: character.active,
       entity_class: "Character",
-      description: character.description,
+      description: ensure_description_keys(character.description),
       schtick_ids: get_association_ids(character, :schticks),
       weapon_ids: get_association_ids(character, :weapons),
       skills: character.skills,
@@ -114,7 +149,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       campaign_id: character.campaign_id,
       action_values: character.action_values,
       faction_id: character.faction_id,
-      description: character.description,
+      description: ensure_description_keys(character.description),
       skills: character.skills,
       category: get_in(character.action_values, ["Type"]),
       image_url: get_image_url(character),
@@ -318,4 +353,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     # For now, return nil like Rails when no image is attached
     Map.get(record, :image_url)
   end
+
+  # Ensure description has all required keys with default values
+  defp ensure_description_keys(description) when is_map(description) do
+    Map.merge(@default_description, description)
+  end
+
+  defp ensure_description_keys(_), do: @default_description
 end

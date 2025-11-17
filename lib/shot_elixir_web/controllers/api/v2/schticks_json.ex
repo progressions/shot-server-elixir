@@ -16,7 +16,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksJSON do
   end
 
   def show(%{schtick: schtick}) do
-    %{schtick: schtick_json(schtick)}
+    schtick_json(schtick)
   end
 
   def error(%{changeset: changeset}) do
@@ -65,7 +65,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksJSON do
       prerequisite_id: Map.get(schtick, :prerequisite_id),
       prerequisite: prerequisite,
       created_at: Map.get(schtick, :created_at),
-      updated_at: Map.get(schtick, :updated_at)
+      updated_at: Map.get(schtick, :updated_at),
+      entity_class: "Schtick"
     }
   end
 end

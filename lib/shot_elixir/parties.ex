@@ -6,6 +6,7 @@ defmodule ShotElixir.Parties do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Parties.{Party, Membership}
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_parties(campaign_id) do
@@ -15,7 +16,9 @@ defmodule ShotElixir.Parties do
         order_by: [asc: fragment("lower(?)", p.name)],
         preload: [:faction, :juncture, memberships: [:character, :vehicle]]
 
-    Repo.all(query)
+    query
+    |> Repo.all()
+    |> ImageLoader.load_image_urls("Party")
   end
 
   def list_campaign_parties(campaign_id, params \\ %{}, _current_user \\ nil) do
@@ -36,20 +39,10 @@ defmodule ShotElixir.Parties do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
       from p in Party,
-        where: p.campaign_id == ^campaign_id,
-        select: [
-          :id,
-          :name,
-          :description,
-          :faction_id,
-          :juncture_id,
-          :created_at,
-          :updated_at,
-          :active
-        ]
+        where: p.campaign_id == ^campaign_id
 
     # Apply basic filters
     query =
@@ -77,7 +70,7 @@ defmodule ShotElixir.Parties do
 
     # Faction filtering - handle "__NONE__" special case
     query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from p in query, where: is_nil(p.faction_id)
         else
@@ -89,7 +82,7 @@ defmodule ShotElixir.Parties do
 
     # Juncture filtering - handle "__NONE__" special case
     query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         if params["juncture_id"] == "__NONE__" do
           from p in query, where: is_nil(p.juncture_id)
         else
@@ -155,7 +148,7 @@ defmodule ShotElixir.Parties do
       end
 
     count_query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from p in count_query, where: is_nil(p.faction_id)
         else
@@ -166,7 +159,7 @@ defmodule ShotElixir.Parties do
       end
 
     count_query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         if params["juncture_id"] == "__NONE__" do
           from p in count_query, where: is_nil(p.juncture_id)
         else
@@ -224,9 +217,12 @@ defmodule ShotElixir.Parties do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all parties efficiently
+    parties_with_images = ImageLoader.load_image_urls(parties, "Party")
+
     # Return parties with pagination metadata and factions
     %{
-      parties: parties,
+      parties: parties_with_images,
       factions: factions,
       meta: %{
         current_page: page,
@@ -290,12 +286,14 @@ defmodule ShotElixir.Parties do
     Party
     |> preload([:faction, :juncture, memberships: [:character, :vehicle]])
     |> Repo.get!(id)
+    |> ImageLoader.load_image_url("Party")
   end
 
   def get_party(id) do
     Party
     |> preload([:faction, :juncture, memberships: [:character, :vehicle]])
     |> Repo.get(id)
+    |> ImageLoader.load_image_url("Party")
   end
 
   def create_party(attrs \\ %{}) do

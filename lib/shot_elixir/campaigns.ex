@@ -7,14 +7,24 @@ defmodule ShotElixir.Campaigns do
   alias ShotElixir.Repo
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Campaigns.CampaignMembership
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_campaigns do
     Repo.all(Campaign)
   end
 
-  def get_campaign!(id), do: Repo.get!(Campaign, id) |> Repo.preload(:user)
-  def get_campaign(id), do: Repo.get(Campaign, id) |> Repo.preload(:user)
+  def get_campaign!(id) do
+    Repo.get!(Campaign, id)
+    |> Repo.preload(:user)
+    |> ImageLoader.load_image_url("Campaign")
+  end
+
+  def get_campaign(id) do
+    Repo.get(Campaign, id)
+    |> Repo.preload(:user)
+    |> ImageLoader.load_image_url("Campaign")
+  end
 
   def get_user_campaigns(user_id) do
     query =
@@ -88,7 +98,7 @@ defmodule ShotElixir.Campaigns do
 
     # Association-based filters
     query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from c in query,
           join: ch in "characters",
           on: ch.campaign_id == c.id,
@@ -98,7 +108,7 @@ defmodule ShotElixir.Campaigns do
       end
 
     query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from c in query,
           join: v in "vehicles",
           on: v.campaign_id == c.id,
@@ -145,7 +155,7 @@ defmodule ShotElixir.Campaigns do
       end
 
     count_query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from c in count_query,
           join: ch in "characters",
           on: ch.campaign_id == c.id,
@@ -155,7 +165,7 @@ defmodule ShotElixir.Campaigns do
       end
 
     count_query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from c in count_query,
           join: v in "vehicles",
           on: v.campaign_id == c.id,
@@ -174,9 +184,12 @@ defmodule ShotElixir.Campaigns do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all campaigns efficiently
+    campaigns_with_images = ImageLoader.load_image_urls(campaigns, "Campaign")
+
     # Return campaigns with pagination metadata
     %{
-      campaigns: campaigns,
+      campaigns: campaigns_with_images,
       meta: %{
         current_page: page,
         per_page: per_page,

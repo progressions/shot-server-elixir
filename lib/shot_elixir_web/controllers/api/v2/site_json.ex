@@ -15,7 +15,7 @@ defmodule ShotElixirWeb.Api.V2.SiteJSON do
   end
 
   def show(%{site: site}) do
-    %{site: site_json_with_attunements(site)}
+    site_json_with_attunements(site)
   end
 
   def error(%{changeset: changeset}) do
@@ -74,6 +74,7 @@ defmodule ShotElixirWeb.Api.V2.SiteJSON do
         end,
       created_at: Map.get(site, :created_at),
       updated_at: Map.get(site, :updated_at),
+      image_url: Map.get(site, :image_url),
       entity_class: "Site"
     }
   end

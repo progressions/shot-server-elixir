@@ -85,6 +85,22 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   def update(conn, %{"id" => id, "character" => character_params}) do
     current_user = Guardian.Plug.current_resource(conn)
 
+    # Parse character_params if it's a JSON string (from multipart/form-data)
+    parsed_params =
+      case character_params do
+        params when is_binary(params) ->
+          case Jason.decode(params) do
+            {:ok, decoded} -> decoded
+            {:error, _} -> %{}
+          end
+
+        params when is_map(params) ->
+          params
+
+        _ ->
+          %{}
+      end
+
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user) do
       # Handle image upload if present
@@ -93,7 +109,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       updated_character = character
 
       # Continue with normal update
-      case Characters.update_character(updated_character, character_params) do
+      case Characters.update_character(updated_character, parsed_params) do
         {:ok, final_character} ->
           # Broadcasting now happens automatically in Characters context
           conn

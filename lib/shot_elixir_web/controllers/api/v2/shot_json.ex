@@ -1,6 +1,6 @@
 defmodule ShotElixirWeb.Api.V2.ShotJSON do
   def show(%{shot: shot}) do
-    %{shot: shot_json(shot)}
+    shot_json(shot)
   end
 
   def error(%{changeset: changeset}) do
@@ -24,7 +24,8 @@ defmodule ShotElixirWeb.Api.V2.ShotJSON do
       character_id: shot.character_id,
       vehicle_id: shot.vehicle_id,
       created_at: shot.created_at,
-      updated_at: shot.updated_at
+      updated_at: shot.updated_at,
+      entity_class: "Shot"
     }
   end
 end

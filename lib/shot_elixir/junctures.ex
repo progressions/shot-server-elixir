@@ -6,6 +6,7 @@ defmodule ShotElixir.Junctures do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Junctures.Juncture
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_junctures(campaign_id) do
@@ -36,19 +37,10 @@ defmodule ShotElixir.Junctures do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
       from j in Juncture,
-        where: j.campaign_id == ^campaign_id,
-        select: [
-          :id,
-          :name,
-          :description,
-          :faction_id,
-          :created_at,
-          :updated_at,
-          :active
-        ]
+        where: j.campaign_id == ^campaign_id
 
     # Apply basic filters
     query =
@@ -76,7 +68,7 @@ defmodule ShotElixir.Junctures do
 
     # Faction filtering
     query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from j in query, where: is_nil(j.faction_id)
         else
@@ -91,7 +83,7 @@ defmodule ShotElixir.Junctures do
 
     # Character filtering (junctures containing specific characters)
     query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from j in query,
           join: c in "characters",
           on: c.juncture_id == j.id,
@@ -102,7 +94,7 @@ defmodule ShotElixir.Junctures do
 
     # Vehicle filtering (junctures containing specific vehicles)
     query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from j in query,
           join: v in "vehicles",
           on: v.juncture_id == j.id,
@@ -142,7 +134,7 @@ defmodule ShotElixir.Junctures do
       end
 
     count_query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from j in count_query, where: is_nil(j.faction_id)
         else
@@ -155,7 +147,7 @@ defmodule ShotElixir.Junctures do
     count_query = apply_visibility_filter(count_query, params)
 
     count_query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from j in count_query,
           join: c in "characters",
           on: c.juncture_id == j.id,
@@ -165,7 +157,7 @@ defmodule ShotElixir.Junctures do
       end
 
     count_query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from j in count_query,
           join: v in "vehicles",
           on: v.juncture_id == j.id,
@@ -183,24 +175,30 @@ defmodule ShotElixir.Junctures do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all junctures efficiently
+    junctures_with_images = ImageLoader.load_image_urls(junctures, "Juncture")
+
     # Fetch factions for the junctures
     faction_ids = junctures |> Enum.map(& &1.faction_id) |> Enum.uniq() |> Enum.reject(&is_nil/1)
 
     factions =
       if Enum.any?(faction_ids) do
         from(f in "factions",
-          where: f.id in ^faction_ids,
-          select: %{id: f.id, name: f.name},
+          where: fragment("? = ANY(?)", f.id, type(^faction_ids, {:array, :binary_id})),
+          select: %{id: type(f.id, :binary_id), name: f.name},
           order_by: [asc: fragment("LOWER(?)", f.name)]
         )
         |> Repo.all()
+        |> Enum.map(fn faction ->
+          %{id: Ecto.UUID.cast!(faction.id), name: faction.name}
+        end)
       else
         []
       end
 
     # Return junctures with pagination metadata
     %{
-      junctures: junctures,
+      junctures: junctures_with_images,
       factions: factions,
       meta: %{
         current_page: page,

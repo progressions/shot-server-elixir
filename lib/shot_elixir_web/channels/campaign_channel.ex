@@ -43,9 +43,11 @@ defmodule ShotElixirWeb.CampaignChannel do
   # Handle Rails-compatible broadcast messages from PubSub
   @impl true
   def handle_info({:rails_message, payload}, socket) do
-    # Push to client with generic "message" event (Rails ActionCable format)
-    # The client expects messages without specific event names
-    push(socket, "message", payload)
+    # Push to both ActionCable and Phoenix Channels clients
+    # ActionCable clients expect "message" event (no event name in received callback)
+    # Phoenix clients expect named events like "update"
+    push(socket, "message", payload)  # For ActionCable compatibility
+    push(socket, "update", payload)    # For Phoenix Channels clients
     {:noreply, socket}
   end
 

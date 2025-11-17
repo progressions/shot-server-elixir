@@ -192,7 +192,11 @@ defmodule ShotElixir.Services.ImagekitService do
   #     raise "ImageKit public key not configured"
   # end
 
-  defp url_endpoint do
+  @doc """
+  Returns the configured ImageKit URL endpoint.
+  Public function needed by ActiveStorage module for building image URLs.
+  """
+  def url_endpoint do
     config()[:url_endpoint] ||
       "https://ik.imagekit.io/#{imagekit_id()}/chi-war-#{environment()}"
   end

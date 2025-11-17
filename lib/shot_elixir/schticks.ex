@@ -6,6 +6,7 @@ defmodule ShotElixir.Schticks do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Schticks.Schtick
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_campaign_schticks(campaign_id, params \\ %{}, _current_user \\ nil) do
@@ -26,21 +27,10 @@ defmodule ShotElixir.Schticks do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
       from s in Schtick,
-        where: s.campaign_id == ^campaign_id,
-        select: [
-          :id,
-          :name,
-          :description,
-          :category,
-          :path,
-          :prerequisite_id,
-          :created_at,
-          :updated_at,
-          :active
-        ]
+        where: s.campaign_id == ^campaign_id
 
     # Apply basic filters
     query =
@@ -68,7 +58,7 @@ defmodule ShotElixir.Schticks do
 
     # Category filtering - handle "__NONE__" special case
     query =
-      if params["category"] do
+      if params["category"] && params["category"] != "" do
         if params["category"] == "__NONE__" do
           from s in query, where: is_nil(s.category)
         else
@@ -80,7 +70,7 @@ defmodule ShotElixir.Schticks do
 
     # Path filtering - handle "__NONE__" special case
     query =
-      if params["path"] do
+      if params["path"] && params["path"] != "" do
         if params["path"] == "__NONE__" do
           from s in query, where: is_nil(s.path)
         else
@@ -135,7 +125,7 @@ defmodule ShotElixir.Schticks do
       end
 
     count_query =
-      if params["category"] do
+      if params["category"] && params["category"] != "" do
         if params["category"] == "__NONE__" do
           from s in count_query, where: is_nil(s.category)
         else
@@ -146,7 +136,7 @@ defmodule ShotElixir.Schticks do
       end
 
     count_query =
-      if params["path"] do
+      if params["path"] && params["path"] != "" do
         if params["path"] == "__NONE__" do
           from s in count_query, where: is_nil(s.path)
         else
@@ -204,9 +194,12 @@ defmodule ShotElixir.Schticks do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all schticks efficiently
+    schticks_with_images = ImageLoader.load_image_urls(schticks, "Schtick")
+
     # Return schticks with pagination metadata
     %{
-      schticks: schticks,
+      schticks: schticks_with_images,
       categories: categories,
       paths: paths,
       meta: %{
@@ -251,18 +244,9 @@ defmodule ShotElixir.Schticks do
     from s in query, where: s.path == ^path
   end
 
-  defp apply_visibility_filter(query, params) do
-    case params["visibility"] do
-      "hidden" ->
-        from s in query, where: s.active == false
-
-      "all" ->
-        query
-
-      _ ->
-        # Default to visible (active) only
-        from s in query, where: s.active == true
-    end
+  defp apply_visibility_filter(query, _params) do
+    # Always show only active schticks
+    from s in query, where: s.active == true
   end
 
   defp parse_ids(ids_param) when is_binary(ids_param) do
@@ -322,12 +306,14 @@ defmodule ShotElixir.Schticks do
     Schtick
     |> preload(:prerequisite)
     |> Repo.get!(id)
+    |> ImageLoader.load_image_url("Schtick")
   end
 
   def get_schtick(id) do
     Schtick
     |> preload(:prerequisite)
     |> Repo.get(id)
+    |> ImageLoader.load_image_url("Schtick")
   end
 
   def create_schtick(attrs \\ %{}) do
@@ -516,11 +502,13 @@ defmodule ShotElixir.Schticks do
     query =
       from s in Schtick,
         where: s.campaign_id == ^campaign_id and s.id in ^ids,
-        select: [:id, :name, :description, :category, :path],
         limit: ^per_page,
         offset: ^offset
 
-    schticks = Repo.all(query)
+    schticks =
+      query
+      |> Repo.all()
+      |> Enum.map(&ImageLoader.load_image_url(&1, "Schtick"))
 
     # Get total count for this batch
     total_count =

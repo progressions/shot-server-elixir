@@ -1,10 +1,21 @@
 defmodule ShotElixirWeb.Api.V2.FightJSON do
-  def index(%{fights: fights}) do
+  def index(%{fights: data}) when is_map(data) do
+    # Handle paginated response with metadata
+    fights_list = Map.get(data, :fights) || Map.get(data, "fights") || []
+
+    %{
+      fights: Enum.map(fights_list, &fight_json/1),
+      meta: Map.get(data, :meta) || Map.get(data, "meta") || %{}
+    }
+  end
+
+  def index(%{fights: fights}) when is_list(fights) do
+    # Handle simple list response
     %{fights: Enum.map(fights, &fight_json/1)}
   end
 
   def show(%{fight: fight}) do
-    %{fight: fight_json_with_shots(fight)}
+    fight_json_with_shots(fight)
   end
 
   def error(%{changeset: changeset}) do
@@ -33,6 +44,7 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       campaign_id: fight.campaign_id,
       created_at: fight.created_at,
       updated_at: fight.updated_at,
+      image_url: Map.get(fight, :image_url),
       image_positions: render_image_positions(fight),
       characters: render_characters(fight),
       character_ids: get_association_ids(fight, :characters),
@@ -89,7 +101,8 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       name: character.name,
       character_type: Map.get(action_values, "Type"),
       archetype: Map.get(action_values, "Archetype"),
-      image_url: character.image_url
+      image_url: character.image_url,
+      entity_class: "Character"
     }
   end
 
@@ -102,7 +115,8 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       name: vehicle.name,
       color: vehicle.color,
       image_url: vehicle.image_url,
-      impairments: vehicle.impairments
+      impairments: vehicle.impairments,
+      entity_class: "Vehicle"
     }
   end
 

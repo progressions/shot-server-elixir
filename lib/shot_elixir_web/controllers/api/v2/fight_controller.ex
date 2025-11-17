@@ -23,8 +23,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       fights_data = Fights.list_campaign_fights(campaign_id, params, current_user)
 
       conn
-      |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("index.json", fights: fights_data)
+      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+      |> render(:index, fights: fights_data)
     end
   end
 
@@ -70,14 +70,14 @@ defmodule ShotElixirWeb.Api.V2.FightController do
           {:ok, fight} ->
             conn
             |> put_status(:created)
-            |> put_view(ShotElixirWeb.Api.V2.FightView)
-            |> render("show.json", fight: fight)
+            |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+            |> render(:show, fight: fight)
 
           {:error, %Ecto.Changeset{} = changeset} ->
             conn
             |> put_status(:unprocessable_entity)
-            |> put_view(ShotElixirWeb.Api.V2.FightView)
-            |> render("error.json", changeset: changeset)
+            |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+            |> render(:error, changeset: changeset)
         end
       end
     end
@@ -91,8 +91,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
          :ok <- authorize_fight_edit(fight, current_user),
          {:ok, updated_fight} <- Fights.update_fight(fight, parse_json_params(fight_params)) do
       conn
-      |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("show.json", fight: updated_fight)
+      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+      |> render(:show, fight: updated_fight)
     else
       nil ->
         conn
@@ -112,8 +112,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       {:error, %Ecto.Changeset{} = changeset} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> put_view(ShotElixirWeb.Api.V2.FightView)
-        |> render("error.json", changeset: changeset)
+        |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+        |> render(:error, changeset: changeset)
     end
   end
 
@@ -154,8 +154,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
          :ok <- authorize_fight_edit(fight, current_user),
          {:ok, fight} <- Fights.touch_fight(fight) do
       conn
-      |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("show.json", fight: fight)
+      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+      |> render(:show, fight: fight)
     else
       nil ->
         conn
@@ -185,8 +185,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
          :ok <- authorize_fight_edit(fight, current_user),
          {:ok, fight} <- Fights.end_fight(fight) do
       conn
-      |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("show.json", fight: fight)
+      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+      |> render(:show, fight: fight)
     else
       nil ->
         conn
@@ -216,8 +216,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
          :ok <- authorize_fight_edit(fight, current_user) do
       # TODO: Implement image removal
       conn
-      |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("show.json", fight: fight)
+      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+      |> render(:show, fight: fight)
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}

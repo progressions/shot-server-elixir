@@ -6,6 +6,7 @@ defmodule ShotElixir.Vehicles do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Vehicles.Vehicle
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_vehicles(campaign_id) do
@@ -73,7 +74,7 @@ defmodule ShotElixir.Vehicles do
 
     # Faction filtering
     query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from v in query, where: is_nil(v.faction_id)
         else
@@ -105,7 +106,7 @@ defmodule ShotElixir.Vehicles do
 
     # Vehicle type filtering
     query =
-      if params["vehicle_type"] do
+      if params["vehicle_type"] && params["vehicle_type"] != "" do
         from v in query,
           where: fragment("?->>'Type' = ?", v.action_values, ^params["vehicle_type"])
       else
@@ -114,7 +115,7 @@ defmodule ShotElixir.Vehicles do
 
     # Archetype filtering
     query =
-      if params["archetype"] do
+      if params["archetype"] && params["archetype"] != "" do
         if params["archetype"] == "__NONE__" do
           from v in query,
             where:
@@ -189,7 +190,7 @@ defmodule ShotElixir.Vehicles do
       end
 
     count_query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from v in count_query, where: is_nil(v.faction_id)
         else
@@ -218,7 +219,7 @@ defmodule ShotElixir.Vehicles do
       end
 
     count_query =
-      if params["vehicle_type"] do
+      if params["vehicle_type"] && params["vehicle_type"] != "" do
         from v in count_query,
           where: fragment("?->>'Type' = ?", v.action_values, ^params["vehicle_type"])
       else
@@ -226,7 +227,7 @@ defmodule ShotElixir.Vehicles do
       end
 
     count_query =
-      if params["archetype"] do
+      if params["archetype"] && params["archetype"] != "" do
         if params["archetype"] == "__NONE__" do
           from v in count_query,
             where:
@@ -304,9 +305,12 @@ defmodule ShotElixir.Vehicles do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all vehicles efficiently
+    vehicles_with_images = ImageLoader.load_image_urls(vehicles, "Vehicle")
+
     # Return vehicles with pagination metadata, factions, archetypes, and types
     %{
-      vehicles: vehicles,
+      vehicles: vehicles_with_images,
       factions: factions,
       archetypes: archetypes,
       types: types,
@@ -364,8 +368,15 @@ defmodule ShotElixir.Vehicles do
     end
   end
 
-  def get_vehicle!(id), do: Repo.get!(Vehicle, id)
-  def get_vehicle(id), do: Repo.get(Vehicle, id)
+  def get_vehicle!(id) do
+    Repo.get!(Vehicle, id)
+    |> ImageLoader.load_image_url("Vehicle")
+  end
+
+  def get_vehicle(id) do
+    Repo.get(Vehicle, id)
+    |> ImageLoader.load_image_url("Vehicle")
+  end
 
   def get_vehicle_with_preloads(id) do
     Vehicle

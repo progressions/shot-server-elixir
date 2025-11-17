@@ -21,7 +21,7 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
   end
 
   def show(%{user: user}) do
-    %{user: user_json(user)}
+    user_json(user)
   end
 
   def current(%{user: user}) do
@@ -54,7 +54,8 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
       gamemaster: user.gamemaster,
       current_campaign_id: user.current_campaign_id,
       created_at: user.created_at,
-      updated_at: user.updated_at
+      updated_at: user.updated_at,
+      entity_class: "User"
     }
   end
 
@@ -85,7 +86,8 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
       name: campaign.name,
       description: campaign.description,
       active: campaign.active,
-      user_id: campaign.user_id
+      user_id: campaign.user_id,
+      entity_class: "Campaign"
     }
   end
 end

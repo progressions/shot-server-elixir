@@ -1,17 +1,25 @@
 defmodule ShotElixirWeb.Api.V2.WeaponJSON do
   # alias ShotElixir.Weapons.Weapon
 
-  def index(%{weapons: weapons, categories: categories, junctures: junctures, meta: meta}) do
+  def index(%{weapons: data}) when is_map(data) do
+    # Handle paginated response with metadata
+    weapons_list = Map.get(data, :weapons) || Map.get(data, "weapons") || []
+
     %{
-      weapons: Enum.map(weapons, &weapon_json/1),
-      categories: categories,
-      junctures: junctures,
-      meta: meta
+      weapons: Enum.map(weapons_list, &weapon_json/1),
+      categories: Map.get(data, :categories) || Map.get(data, "categories") || [],
+      junctures: Map.get(data, :junctures) || Map.get(data, "junctures") || [],
+      meta: Map.get(data, :meta) || Map.get(data, "meta") || %{}
     }
   end
 
+  def index(%{weapons: weapons}) when is_list(weapons) do
+    # Handle simple list response
+    %{weapons: Enum.map(weapons, &weapon_json/1)}
+  end
+
   def show(%{weapon: weapon}) do
-    %{weapon: weapon_json(weapon)}
+    weapon_json(weapon)
   end
 
   def error(%{changeset: changeset}) do

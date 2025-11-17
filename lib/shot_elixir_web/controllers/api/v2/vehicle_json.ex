@@ -1,12 +1,23 @@
 defmodule ShotElixirWeb.Api.V2.VehicleJSON do
   # alias ShotElixir.Vehicles.Vehicle
 
-  def index(%{vehicles: vehicles}) do
+  def index(%{vehicles: data}) when is_map(data) do
+    # Handle paginated response with metadata
+    vehicles_list = Map.get(data, :vehicles) || Map.get(data, "vehicles") || []
+
+    %{
+      vehicles: Enum.map(vehicles_list, &vehicle_json/1),
+      meta: Map.get(data, :meta) || Map.get(data, "meta") || %{}
+    }
+  end
+
+  def index(%{vehicles: vehicles}) when is_list(vehicles) do
+    # Handle simple list response
     %{vehicles: Enum.map(vehicles, &vehicle_json/1)}
   end
 
   def show(%{vehicle: vehicle}) do
-    %{vehicle: vehicle_json(vehicle)}
+    vehicle_json(vehicle)
   end
 
   def archetypes(%{archetypes: archetypes}) do
@@ -41,7 +52,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleJSON do
       faction_id: vehicle.faction_id,
       juncture_id: vehicle.juncture_id,
       created_at: vehicle.created_at,
-      updated_at: vehicle.updated_at
+      updated_at: vehicle.updated_at,
+      entity_class: "Vehicle"
     }
   end
 end

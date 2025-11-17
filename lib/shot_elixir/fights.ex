@@ -6,6 +6,7 @@ defmodule ShotElixir.Fights do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Fights.{Fight, Shot}
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_fights(campaign_id) do
@@ -14,7 +15,9 @@ defmodule ShotElixir.Fights do
         where: f.campaign_id == ^campaign_id and f.active == true,
         order_by: [desc: f.updated_at]
 
-    Repo.all(query)
+    query
+    |> Repo.all()
+    |> ImageLoader.load_image_urls("Fight")
   end
 
   def list_campaign_fights(campaign_id, params \\ %{}, _current_user \\ nil) do
@@ -198,9 +201,12 @@ defmodule ShotElixir.Fights do
       |> Repo.all()
       |> Repo.preload([:characters, :vehicles])
 
+    # Load image URLs for all fights efficiently
+    fights_with_images = ImageLoader.load_image_urls(fights, "Fight")
+
     # Return fights with pagination metadata and seasons
     %{
-      fights: fights,
+      fights: fights_with_images,
       seasons: seasons,
       meta: %{
         current_page: page,
@@ -287,14 +293,22 @@ defmodule ShotElixir.Fights do
     end
   end
 
-  def get_fight!(id), do: Repo.get!(Fight, id)
-  def get_fight(id), do: Repo.get(Fight, id)
+  def get_fight!(id) do
+    Repo.get!(Fight, id)
+    |> ImageLoader.load_image_url("Fight")
+  end
+
+  def get_fight(id) do
+    Repo.get(Fight, id)
+    |> ImageLoader.load_image_url("Fight")
+  end
 
   def get_fight_with_shots(id) do
     Fight
     |> Repo.get(id)
     |> Repo.preload(shots: [:character, :vehicle])
     |> Repo.preload([:characters, :vehicles])
+    |> ImageLoader.load_image_url("Fight")
   end
 
   def create_fight(attrs \\ %{}) do
@@ -305,10 +319,164 @@ defmodule ShotElixir.Fights do
   end
 
   def update_fight(%Fight{} = fight, attrs) do
-    fight
-    |> Fight.changeset(attrs)
-    |> Repo.update()
-    |> broadcast_result(:update, &Repo.preload(&1, fight_broadcast_preloads()))
+    # Extract character_ids and vehicle_ids from attrs
+    character_ids = attrs["character_ids"] || attrs[:character_ids]
+    vehicle_ids = attrs["vehicle_ids"] || attrs[:vehicle_ids]
+
+    # Remove them from attrs so they don't go through changeset
+    attrs =
+      attrs
+      |> Map.delete("character_ids")
+      |> Map.delete(:character_ids)
+      |> Map.delete("vehicle_ids")
+      |> Map.delete(:vehicle_ids)
+
+    # Start a transaction to update fight and manage shots
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:fight, Fight.changeset(fight, attrs))
+    |> Ecto.Multi.run(:character_shots, fn _repo, %{fight: updated_fight} ->
+      if character_ids do
+        sync_character_shots(updated_fight, character_ids)
+      else
+        {:ok, []}
+      end
+    end)
+    |> Ecto.Multi.run(:vehicle_shots, fn _repo, %{fight: updated_fight} ->
+      if vehicle_ids do
+        sync_vehicle_shots(updated_fight, vehicle_ids)
+      else
+        {:ok, []}
+      end
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{fight: updated_fight}} ->
+        result = Repo.preload(updated_fight, fight_broadcast_preloads(), force: true)
+        broadcast_change(result, :update)
+        {:ok, result}
+
+      {:error, _step, changeset, _changes} ->
+        {:error, changeset}
+    end
+  end
+
+  defp sync_character_shots(fight, character_ids) do
+    # Get current character IDs in the fight
+    existing_shots =
+      Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.character_id))
+
+    # Convert existing character IDs to binary format for comparison
+    existing_character_ids =
+      Enum.map(existing_shots, fn shot ->
+        case Ecto.UUID.dump(shot.character_id) do
+          {:ok, binary} -> binary
+          :error -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    # Convert incoming string UUIDs to binary for comparison
+    # character_ids come in as strings like "09a75d40-db41-41a3-af77-cf1c76de7e32"
+    new_character_ids_binary =
+      Enum.map(character_ids || [], fn id ->
+        case Ecto.UUID.dump(id) do
+          {:ok, binary} -> binary
+          :error -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    # Debug logging
+    IO.puts("=== Character Sync Debug ===")
+    IO.inspect(existing_character_ids, label: "Existing (binary)")
+    IO.inspect(new_character_ids_binary, label: "New (binary)")
+
+    # Find IDs to add and remove (comparing binary formats)
+    ids_to_add = new_character_ids_binary -- existing_character_ids
+    ids_to_remove = existing_character_ids -- new_character_ids_binary
+
+    IO.inspect(ids_to_add, label: "To Add")
+    IO.inspect(ids_to_remove, label: "To Remove")
+
+    # Add new shots for new characters
+    Enum.each(ids_to_add, fn char_id_binary ->
+      # Convert binary back to string for changeset
+      {:ok, char_id_string} = Ecto.UUID.cast(char_id_binary)
+
+      %Shot{}
+      |> Shot.changeset(%{fight_id: fight.id, character_id: char_id_string, shot: nil})
+      |> Repo.insert!()
+    end)
+
+    # Remove shots for characters no longer in the fight
+    if ids_to_remove != [] do
+      # Convert binary UUIDs back to strings for the query
+      ids_to_remove_strings =
+        Enum.map(ids_to_remove, fn binary ->
+          {:ok, string} = Ecto.UUID.cast(binary)
+          string
+        end)
+
+      from(s in Shot, where: s.fight_id == ^fight.id and s.character_id in ^ids_to_remove_strings)
+      |> Repo.delete_all()
+    end
+
+    {:ok, []}
+  end
+
+  defp sync_vehicle_shots(fight, vehicle_ids) do
+    # Get current vehicle IDs in the fight
+    existing_shots =
+      Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.vehicle_id))
+
+    # Convert existing vehicle IDs to binary format for comparison
+    existing_vehicle_ids =
+      Enum.map(existing_shots, fn shot ->
+        case Ecto.UUID.dump(shot.vehicle_id) do
+          {:ok, binary} -> binary
+          :error -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    # Convert incoming string UUIDs to binary for comparison
+    new_vehicle_ids_binary =
+      Enum.map(vehicle_ids || [], fn id ->
+        case Ecto.UUID.dump(id) do
+          {:ok, binary} -> binary
+          :error -> nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+
+    # Find IDs to add and remove (comparing binary formats)
+    ids_to_add = new_vehicle_ids_binary -- existing_vehicle_ids
+    ids_to_remove = existing_vehicle_ids -- new_vehicle_ids_binary
+
+    # Add new shots for new vehicles
+    Enum.each(ids_to_add, fn vehicle_id_binary ->
+      # Convert binary back to string for changeset
+      {:ok, vehicle_id_string} = Ecto.UUID.cast(vehicle_id_binary)
+
+      %Shot{}
+      |> Shot.changeset(%{fight_id: fight.id, vehicle_id: vehicle_id_string, shot: nil})
+      |> Repo.insert!()
+    end)
+
+    # Remove shots for vehicles no longer in the fight
+    if ids_to_remove != [] do
+      # Convert binary UUIDs back to strings for the query
+      ids_to_remove_strings =
+        Enum.map(ids_to_remove, fn binary ->
+          {:ok, string} = Ecto.UUID.cast(binary)
+          string
+        end)
+
+      from(s in Shot, where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove_strings)
+      |> Repo.delete_all()
+    end
+
+    {:ok, []}
   end
 
   @doc """

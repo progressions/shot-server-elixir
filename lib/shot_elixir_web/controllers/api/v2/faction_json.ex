@@ -13,7 +13,7 @@ defmodule ShotElixirWeb.Api.V2.FactionJSON do
   end
 
   def show(%{faction: faction}) do
-    %{faction: faction_json(faction)}
+    faction_json(faction)
   end
 
   def error(%{changeset: changeset}) do
@@ -35,7 +35,8 @@ defmodule ShotElixirWeb.Api.V2.FactionJSON do
       active: Map.get(faction, :active, true),
       campaign_id: Map.get(faction, :campaign_id),
       created_at: Map.get(faction, :created_at),
-      updated_at: Map.get(faction, :updated_at)
+      updated_at: Map.get(faction, :updated_at),
+      entity_class: "Faction"
     }
   end
 end

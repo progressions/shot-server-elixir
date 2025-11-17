@@ -6,6 +6,7 @@ defmodule ShotElixir.Factions do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Factions.Faction
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_factions(campaign_id) do
@@ -35,18 +36,10 @@ defmodule ShotElixir.Factions do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
       from f in Faction,
-        where: f.campaign_id == ^campaign_id,
-        select: [
-          :id,
-          :name,
-          :description,
-          :created_at,
-          :updated_at,
-          :active
-        ]
+        where: f.campaign_id == ^campaign_id
 
     # Apply basic filters
     query =
@@ -77,7 +70,7 @@ defmodule ShotElixir.Factions do
 
     # Character filtering (factions containing specific characters)
     query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from f in query,
           join: c in "characters",
           on: c.faction_id == f.id,
@@ -88,7 +81,7 @@ defmodule ShotElixir.Factions do
 
     # Vehicle filtering (factions containing specific vehicles)
     query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from f in query,
           join: v in "vehicles",
           on: v.faction_id == f.id,
@@ -99,7 +92,7 @@ defmodule ShotElixir.Factions do
 
     # Juncture filtering (factions containing specific junctures)
     query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         from f in query,
           join: j in "junctures",
           on: j.faction_id == f.id,
@@ -141,7 +134,7 @@ defmodule ShotElixir.Factions do
     count_query = apply_visibility_filter(count_query, params)
 
     count_query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from f in count_query,
           join: c in "characters",
           on: c.faction_id == f.id,
@@ -151,7 +144,7 @@ defmodule ShotElixir.Factions do
       end
 
     count_query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from f in count_query,
           join: v in "vehicles",
           on: v.faction_id == f.id,
@@ -161,7 +154,7 @@ defmodule ShotElixir.Factions do
       end
 
     count_query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         from f in count_query,
           join: j in "junctures",
           on: j.faction_id == f.id,
@@ -179,9 +172,12 @@ defmodule ShotElixir.Factions do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all factions efficiently
+    factions_with_images = ImageLoader.load_image_urls(factions, "Faction")
+
     # Return factions with pagination metadata
     %{
-      factions: factions,
+      factions: factions_with_images,
       meta: %{
         current_page: page,
         per_page: per_page,
@@ -238,8 +234,15 @@ defmodule ShotElixir.Factions do
     end
   end
 
-  def get_faction!(id), do: Repo.get!(Faction, id)
-  def get_faction(id), do: Repo.get(Faction, id)
+  def get_faction!(id) do
+    Repo.get!(Faction, id)
+    |> ImageLoader.load_image_url("Faction")
+  end
+
+  def get_faction(id) do
+    Repo.get(Faction, id)
+    |> ImageLoader.load_image_url("Faction")
+  end
 
   def create_faction(attrs \\ %{}) do
     %Faction{}

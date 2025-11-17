@@ -7,6 +7,7 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Repo
   alias ShotElixir.Characters.Character
   alias ShotElixir.Fights.Shot
+  alias ShotElixir.ImageLoader
   alias Ecto.Multi
   use ShotElixir.Models.Broadcastable
 
@@ -38,122 +39,84 @@ defmodule ShotElixir.Characters do
 
     offset = (page - 1) * per_page
 
+    # Base query always filters by campaign_id and active status
     query =
-      if fight_id = params["fight_id"] do
-        # If fight_id is present, create a simple query that ignores campaign_id and other filters.
-        character_ids_in_fight =
-          from s in Shot,
-            where: s.fight_id == ^fight_id,
-            select: s.character_id,
-            distinct: true
+      from c in Character,
+        where: c.campaign_id == ^campaign_id and c.active == true
 
-        from(
-          c in Character,
-          where: c.id in subquery(character_ids_in_fight)
-        )
+    # Apply ids filter if present
+    query =
+      if params["ids"] do
+        ids = parse_ids(params["ids"])
+        from c in query, where: c.id in ^ids
       else
-        # Original logic when no fight_id is present
-        query =
-          from c in Character,
-            where: c.campaign_id == ^campaign_id and c.active == true
-
-        # Apply template filtering (admin-only feature)
-        query = apply_template_filter(query, params, current_user)
-
-        # Apply basic filters
-        query =
-          if params["id"] do
-            from c in query, where: c.id == ^params["id"]
-          else
-            query
-          end
-
-        query =
-          if params["ids"] do
-            ids = parse_ids(params["ids"])
-            from c in query, where: c.id in ^ids
-          else
-            query
-          end
-
-        query =
-          if params["search"] do
-            from c in query, where: ilike(c.name, ^"%#{params["search"]}%")
-          else
-            query
-          end
-
-        query =
-          if params["character_type"] do
-            from c in query,
-              where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
-          else
-            query
-          end
-
-        query =
-          if params["archetype"] do
-            archetype_value =
-              if params["archetype"] == "__NONE__", do: "", else: params["archetype"]
-
-            from c in query,
-              where: fragment("?->>'Archetype' = ?", c.action_values, ^archetype_value)
-          else
-            query
-          end
-
-        # Relationship filters
-        query =
-          if params["faction_id"] do
-            if params["faction_id"] == "__NONE__" do
-              from c in query, where: is_nil(c.faction_id)
-            else
-              from c in query, where: c.faction_id == ^params["faction_id"]
-            end
-          else
-            query
-          end
-
-        query =
-          if params["juncture_id"] do
-            if params["juncture_id"] == "__NONE__" do
-              from c in query, where: is_nil(c.juncture_id)
-            else
-              from c in query, where: c.juncture_id == ^params["juncture_id"]
-            end
-          else
-            query
-          end
-
-        query =
-          if params["user_id"] do
-            from c in query, where: c.user_id == ^params["user_id"]
-          else
-            query
-          end
-
-        # Association-based filters
-        query =
-          if params["party_id"] do
-            from c in query,
-              join: m in "memberships",
-              on: m.character_id == c.id,
-              where: m.party_id == ^params["party_id"]
-          else
-            query
-          end
-
-        query =
-          if params["site_id"] do
-            from c in query,
-              join: a in "attunements",
-              on: a.character_id == c.id,
-              where: a.site_id == ^params["site_id"]
-          else
-            query
-          end
-
         query
+      end
+
+    # Apply fight_id filter if present
+    query =
+      if params["fight_id"] do
+        from c in query,
+          join: s in Shot,
+          on: s.character_id == c.id,
+          where: s.fight_id == ^params["fight_id"]
+      else
+        query
+      end
+
+    # Apply character_type filter if present
+    # character_type is stored in action_values["Type"]
+    query =
+      if params["character_type"] do
+        from c in query,
+          where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
+      else
+        query
+      end
+
+    # Apply faction_id filter if present
+    # Special case: "__NONE__" means faction_id IS NULL
+    # Empty string is treated as no filter
+    query =
+      if params["faction_id"] && params["faction_id"] != "" do
+        if params["faction_id"] == "__NONE__" do
+          from c in query, where: is_nil(c.faction_id)
+        else
+          from c in query, where: c.faction_id == ^params["faction_id"]
+        end
+      else
+        query
+      end
+
+    # Apply archetype filter if present
+    # archetype is stored in action_values["Archetype"]
+    # Special case: "__NONE__" means empty string archetype
+    query =
+      if params["archetype"] && params["archetype"] != "" do
+        archetype_value = if params["archetype"] == "__NONE__", do: "", else: params["archetype"]
+
+        from c in query,
+          where: fragment("?->>'Archetype' = ?", c.action_values, ^archetype_value)
+      else
+        query
+      end
+
+    # Apply search filter if present
+    query =
+      if params["search"] && params["search"] != "" do
+        search_term = "%#{params["search"]}%"
+        from c in query, where: ilike(c.name, ^search_term)
+      else
+        query
+      end
+
+    # Apply template filtering - defaults to excluding templates
+    # Skip template filter if specific IDs are requested
+    query =
+      if params["ids"] do
+        query
+      else
+        apply_template_filter(query, params, current_user)
       end
 
     # Apply sorting
@@ -173,9 +136,22 @@ defmodule ShotElixir.Characters do
       |> offset(^offset)
       |> Repo.all()
 
-    # Return characters with pagination metadata
+    # Load image URLs for all characters efficiently
+    characters_with_images = ImageLoader.load_image_urls(characters, "Character")
+
+    # Extract unique archetypes from characters
+    archetypes =
+      characters
+      |> Enum.map(fn c -> get_in(c.action_values, ["Archetype"]) end)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.uniq()
+      |> Enum.sort()
+
+    # Return characters with pagination metadata and archetypes
     %{
-      characters: characters,
+      characters: characters_with_images,
+      archetypes: archetypes,
       meta: %{
         current_page: page,
         per_page: per_page,
@@ -187,39 +163,46 @@ defmodule ShotElixir.Characters do
   end
 
   defp apply_template_filter(query, params, current_user) do
-    # Template filtering - only admins can access templates
-    # Non-admin users (gamemasters and players) should never see templates
+    # Template filtering - only admins and gamemasters can access templates
+    # Regular players should never see templates
     is_admin = current_user && current_user.admin
+    is_gamemaster = current_user && current_user.gamemaster
+    can_access_templates = is_admin || is_gamemaster
 
     template_filter = params["template_filter"] || params["is_template"]
 
-    if !is_admin do
-      # Non-admin users always get non-templates only
-      from c in query, where: c.is_template in [false, nil]
+    if !can_access_templates do
+      # Non-admin/non-gamemaster users always get non-templates only
+      from c in query, where: c.is_template == false or is_nil(c.is_template)
     else
-      # Admin users can use template filtering
+      # Admin users and gamemasters can use template filtering
       case template_filter do
         "templates" ->
           from c in query, where: c.is_template == true
 
         "all" ->
+          # No filter on is_template, show all
           query
 
         "true" ->
+          # Legacy parameter support
           from c in query, where: c.is_template == true
 
         "false" ->
-          from c in query, where: c.is_template in [false, nil]
+          # Legacy parameter support
+          from c in query, where: c.is_template == false or is_nil(c.is_template)
 
         nil ->
-          from c in query, where: c.is_template in [false, nil]
+          # Default to non-templates
+          from c in query, where: c.is_template == false or is_nil(c.is_template)
 
         "" ->
-          from c in query, where: c.is_template in [false, nil]
+          # Empty string defaults to non-templates
+          from c in query, where: c.is_template == false or is_nil(c.is_template)
 
         _ ->
           # Invalid value defaults to non-templates
-          from c in query, where: c.is_template in [false, nil]
+          from c in query, where: c.is_template == false or is_nil(c.is_template)
       end
     end
   end
@@ -281,14 +264,24 @@ defmodule ShotElixir.Characters do
     Repo.all(query)
   end
 
-  def get_character!(id), do: Repo.get!(Character, id)
-  def get_character(id), do: Repo.get(Character, id)
+  def get_character!(id) do
+    Repo.get!(Character, id)
+    |> ImageLoader.load_image_url("Character")
+  end
+
+  def get_character(id) do
+    Repo.get(Character, id)
+    |> ImageLoader.load_image_url("Character")
+  end
 
   def create_character(attrs \\ %{}) do
     Multi.new()
     |> Multi.insert(:character, Character.changeset(%Character{}, attrs))
     |> Multi.run(:broadcast, fn _repo, %{character: character} ->
-      broadcast_change(character, :insert)
+      # Preload associations before broadcasting
+      character_with_associations =
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+      broadcast_change(character_with_associations, :insert)
       {:ok, character}
     end)
     |> Repo.transaction()
@@ -302,7 +295,10 @@ defmodule ShotElixir.Characters do
     Multi.new()
     |> Multi.update(:character, Character.changeset(character, attrs))
     |> Multi.run(:broadcast, fn _repo, %{character: character} ->
-      broadcast_change(character, :update)
+      # Preload associations before broadcasting
+      character_with_associations =
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+      broadcast_change(character_with_associations, :update)
       {:ok, character}
     end)
     |> Repo.transaction()
@@ -316,7 +312,10 @@ defmodule ShotElixir.Characters do
     Multi.new()
     |> Multi.update(:character, Ecto.Changeset.change(character, active: false))
     |> Multi.run(:broadcast, fn _repo, %{character: character} ->
-      broadcast_change(character, :delete)
+      # Preload associations before broadcasting
+      character_with_associations =
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+      broadcast_change(character_with_associations, :delete)
       {:ok, character}
     end)
     |> Repo.transaction()

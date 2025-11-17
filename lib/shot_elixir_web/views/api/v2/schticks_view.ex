@@ -52,9 +52,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
   end
 
   def render("show.json", %{schtick: schtick}) do
-    %{
-      schtick: render_schtick_detail(schtick)
-    }
+    render_schtick_detail(schtick)
   end
 
   def render("error.json", %{changeset: changeset}) do

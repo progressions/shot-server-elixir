@@ -4,9 +4,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
   end
 
   def render("show.json", %{invitation: invitation}) do
-    %{
-      invitation: render_invitation_detail(invitation)
-    }
+    render_invitation_detail(invitation)
   end
 
   def render("redeem.json", %{campaign: campaign, message: message}) do
