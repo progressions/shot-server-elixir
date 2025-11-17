@@ -98,19 +98,33 @@ defmodule ShotElixir.Services.ImagekitService do
   # Private functions
 
   defp perform_upload(file_content, file_path, options) do
+    # ImageKit accepts either base64 string, binary, or URL
+    # Using base64 string for simplicity
     base64_file = Base.encode64(file_content)
 
-    body = %{
-      "file" => base64_file,
-      "fileName" => options[:file_name] || Path.basename(file_path),
-      "folder" => options[:folder] || build_folder_path(),
-      "tags" => options[:tags] || [],
-      "useUniqueFileName" => Map.get(options, :use_unique_file_name, true)
-    }
+    # Build multipart form data
+    multipart_data = [
+      {"file", base64_file},
+      {"fileName", options[:file_name] || Path.basename(file_path)},
+      {"folder", options[:folder] || build_folder_path()},
+      {"useUniqueFileName", to_string(Map.get(options, :use_unique_file_name, true))}
+    ]
 
-    headers = build_auth_headers()
+    # Add tags if provided
+    multipart_data = if options[:tags] && length(options[:tags]) > 0 do
+      multipart_data ++ [{"tags", Enum.join(options[:tags], ",")}]
+    else
+      multipart_data
+    end
 
-    case Req.post(@upload_url, json: body, headers: headers) do
+    # Build auth headers for form upload
+    auth_token = Base.encode64("#{private_key()}:")
+
+    headers = [
+      {"Authorization", "Basic #{auth_token}"}
+    ]
+
+    case Req.post(@upload_url, form: multipart_data, headers: headers) do
       {:ok, %{status: 200, body: response}} ->
         {:ok, response}
 
