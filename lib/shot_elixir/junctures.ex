@@ -185,10 +185,13 @@ defmodule ShotElixir.Junctures do
       if Enum.any?(faction_ids) do
         from(f in "factions",
           where: fragment("? = ANY(?)", f.id, type(^faction_ids, {:array, :binary_id})),
-          select: %{id: f.id, name: f.name},
+          select: %{id: type(f.id, :binary_id), name: f.name},
           order_by: [asc: fragment("LOWER(?)", f.name)]
         )
         |> Repo.all()
+        |> Enum.map(fn faction ->
+          %{id: Ecto.UUID.cast!(faction.id), name: faction.name}
+        end)
       else
         []
       end
