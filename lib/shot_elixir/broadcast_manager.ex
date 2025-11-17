@@ -109,10 +109,12 @@ defmodule ShotElixir.BroadcastManager do
       )
 
       # Broadcast reload signal (Rails format)
+      plural_type = pluralize_entity_type(entity_type)
+
       Phoenix.PubSub.broadcast!(
         ShotElixir.PubSub,
         "campaign:#{campaign_id}",
-        {:rails_message, %{"#{entity_type}s" => "reload"}}
+        {:rails_message, %{plural_type => "reload"}}
       )
 
       Logger.info(
@@ -131,13 +133,15 @@ defmodule ShotElixir.BroadcastManager do
 
     if campaign_id do
       # Only broadcast reload on delete
+      plural_type = pluralize_entity_type(entity_type)
+
       Phoenix.PubSub.broadcast!(
         ShotElixir.PubSub,
         "campaign:#{campaign_id}",
-        {:rails_message, %{"#{entity_type}s" => "reload"}}
+        {:rails_message, %{plural_type => "reload"}}
       )
 
-      Logger.info("Broadcasted delete reload for #{entity_type}s to campaign:#{campaign_id}")
+      Logger.info("Broadcasted delete reload for #{plural_type} to campaign:#{campaign_id}")
       emit_telemetry(entity_type, :delete)
     end
   end
@@ -320,4 +324,8 @@ defmodule ShotElixir.BroadcastManager do
   defp stringify_key(key) when is_atom(key), do: Atom.to_string(key)
   defp stringify_key(key) when is_binary(key), do: key
   defp stringify_key(key), do: to_string(key)
+
+  # Pluralize entity type names for Rails-compatible broadcast keys
+  defp pluralize_entity_type("party"), do: "parties"
+  defp pluralize_entity_type(entity_type), do: entity_type <> "s"
 end
