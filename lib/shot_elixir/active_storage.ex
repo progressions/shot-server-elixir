@@ -144,14 +144,16 @@ defmodule ShotElixir.ActiveStorage do
           {:ok, nil}
 
         existing_attachment ->
-          # Delete the old blob too
-          case repo.get(Blob, existing_attachment.blob_id) do
-            nil -> :ok
-            blob -> repo.delete(blob)
-          end
-
+          # Delete attachment first (foreign key constraint)
           repo.delete(existing_attachment)
-          {:ok, existing_attachment}
+
+          # Then delete the old blob
+          case repo.get(Blob, existing_attachment.blob_id) do
+            nil -> {:ok, existing_attachment}
+            blob ->
+              repo.delete(blob)
+              {:ok, existing_attachment}
+          end
       end
     end)
     |> Multi.insert(:blob, fn _changes ->
