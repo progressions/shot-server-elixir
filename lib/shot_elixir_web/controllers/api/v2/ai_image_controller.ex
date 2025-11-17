@@ -172,20 +172,19 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                               serialize_entity(entity_class, refreshed_entity)
                               |> Map.put(:image_url, image_url)
 
-                            # Broadcast character update via WebSocket (Rails-compatible format)
-                            if entity_class == "Character" do
-                              IO.puts("📡 Broadcasting character update to campaign:#{current_user.current_campaign_id}")
-                              IO.inspect(serialized_entity, label: "Character data")
+                            # Broadcast entity update via WebSocket (Rails-compatible format)
+                            entity_key = entity_class |> String.downcase() |> String.to_atom()
+                            IO.puts("📡 Broadcasting #{entity_class} update to campaign:#{current_user.current_campaign_id}")
+                            IO.inspect(serialized_entity, label: "#{entity_class} data")
 
-                              # Use Phoenix PubSub for Rails-compatible broadcast
-                              Phoenix.PubSub.broadcast!(
-                                ShotElixir.PubSub,
-                                "campaign:#{current_user.current_campaign_id}",
-                                {:rails_message, %{character: serialized_entity}}
-                              )
+                            # Use Phoenix PubSub for Rails-compatible broadcast
+                            Phoenix.PubSub.broadcast!(
+                              ShotElixir.PubSub,
+                              "campaign:#{current_user.current_campaign_id}",
+                              {:rails_message, %{entity_key => serialized_entity}}
+                            )
 
-                              IO.puts("✅ Broadcast sent successfully")
-                            end
+                            IO.puts("✅ Broadcast sent successfully")
 
                             conn
                             |> put_status(:ok)
