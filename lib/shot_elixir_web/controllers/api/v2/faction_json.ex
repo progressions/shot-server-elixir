@@ -13,7 +13,7 @@ defmodule ShotElixirWeb.Api.V2.FactionJSON do
   end
 
   def show(%{faction: faction}) do
-    %{faction: faction_json(faction)}
+    faction_json(faction)
   end
 
   def error(%{changeset: changeset}) do

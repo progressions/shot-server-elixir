@@ -6,7 +6,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleJSON do
   end
 
   def show(%{vehicle: vehicle}) do
-    %{vehicle: vehicle_json(vehicle)}
+    vehicle_json(vehicle)
   end
 
   def archetypes(%{archetypes: archetypes}) do

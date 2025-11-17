@@ -11,7 +11,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponJSON do
   end
 
   def show(%{weapon: weapon}) do
-    %{weapon: weapon_json(weapon)}
+    weapon_json(weapon)
   end
 
   def error(%{changeset: changeset}) do

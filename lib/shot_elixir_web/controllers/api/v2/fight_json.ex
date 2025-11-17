@@ -4,7 +4,7 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
   end
 
   def show(%{fight: fight}) do
-    %{fight: fight_json_with_shots(fight)}
+    fight_json_with_shots(fight)
   end
 
   def error(%{changeset: changeset}) do
@@ -33,6 +33,7 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       campaign_id: fight.campaign_id,
       created_at: fight.created_at,
       updated_at: fight.updated_at,
+      image_url: Map.get(fight, :image_url),
       image_positions: render_image_positions(fight),
       characters: render_characters(fight),
       character_ids: get_association_ids(fight, :characters),

@@ -16,7 +16,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksJSON do
   end
 
   def show(%{schtick: schtick}) do
-    %{schtick: schtick_json(schtick)}
+    schtick_json(schtick)
   end
 
   def error(%{changeset: changeset}) do

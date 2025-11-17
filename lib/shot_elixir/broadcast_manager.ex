@@ -9,12 +9,12 @@ defmodule ShotElixir.BroadcastManager do
   alias ShotElixirWeb.Api.V2.{
     CharacterView,
     VehicleView,
-    FightView,
-    SiteView,
-    PartyView,
-    FactionView,
-    JunctureView,
-    UserView
+    FightJSON,
+    SiteJSON,
+    PartyJSON,
+    FactionJSON,
+    JunctureJSON,
+    UserJSON
   }
 
   defstruct broadcast_count: 0,
@@ -173,7 +173,7 @@ defmodule ShotElixir.BroadcastManager do
   end
 
   defp serialize_entity(entity, "character") do
-    # Ensure we have the minimal structure for the view
+    # Ensure we have the minimal structure for serialization
     character = ensure_associations(entity, [:user, :faction, :juncture, :image_positions])
 
     CharacterView.render("show.json", %{character: character})
@@ -190,7 +190,7 @@ defmodule ShotElixir.BroadcastManager do
   defp serialize_entity(entity, "fight") do
     fight = ensure_associations(entity, [:campaign, :shots])
 
-    FightView.render("show.json", %{fight: fight})
+    FightJSON.show(%{fight: fight})
     |> Map.get(:fight)
   end
 
@@ -229,35 +229,35 @@ defmodule ShotElixir.BroadcastManager do
   defp serialize_entity(entity, "site") do
     site = ensure_associations(entity, [:campaign])
 
-    SiteView.render("show.json", %{site: site})
+    SiteJSON.show(%{site: site})
     |> Map.get(:site)
   end
 
   defp serialize_entity(entity, "party") do
     party = ensure_associations(entity, [:campaign])
 
-    PartyView.render("show.json", %{party: party})
+    PartyJSON.show(%{party: party})
     |> Map.get(:party)
   end
 
   defp serialize_entity(entity, "faction") do
     faction = ensure_associations(entity, [:campaign])
 
-    FactionView.render("show.json", %{faction: faction})
+    FactionJSON.show(%{faction: faction})
     |> Map.get(:faction)
   end
 
   defp serialize_entity(entity, "juncture") do
     juncture = ensure_associations(entity, [:campaign])
 
-    JunctureView.render("show.json", %{juncture: juncture})
+    JunctureJSON.show(%{juncture: juncture})
     |> Map.get(:juncture)
   end
 
   defp serialize_entity(entity, "user") do
     user = ensure_associations(entity, [])
 
-    UserView.render("show.json", %{user: user})
+    UserJSON.show(%{user: user})
     |> Map.get(:user)
   end
 

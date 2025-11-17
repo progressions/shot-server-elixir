@@ -14,7 +14,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureJSON do
   end
 
   def show(%{juncture: juncture}) do
-    %{juncture: juncture_json(juncture)}
+    juncture_json(juncture)
   end
 
   def error(%{changeset: changeset}) do

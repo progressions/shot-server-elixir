@@ -21,7 +21,7 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
   end
 
   def show(%{user: user}) do
-    %{user: user_json(user)}
+    user_json(user)
   end
 
   def current(%{user: user}) do

@@ -1,4 +1,6 @@
 defmodule ShotElixirWeb.Api.V2.PartyJSON do
+  require Logger
+
   def index(%{parties: data}) when is_map(data) do
     # Handle paginated response with metadata
     %{
@@ -14,7 +16,7 @@ defmodule ShotElixirWeb.Api.V2.PartyJSON do
   end
 
   def show(%{party: party}) do
-    %{party: party_json_with_members(party)}
+    party_json_with_members(party)
   end
 
   def error(%{changeset: changeset}) do
@@ -73,6 +75,7 @@ defmodule ShotElixirWeb.Api.V2.PartyJSON do
         end,
       created_at: Map.get(party, :created_at),
       updated_at: Map.get(party, :updated_at),
+      image_url: Map.get(party, :image_url),
       entity_class: "Party"
     }
   end
