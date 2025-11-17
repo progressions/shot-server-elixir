@@ -23,8 +23,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
-            # Extract AI image parameters
-            ai_image_params = params["ai_image"] || %{}
+            # Extract AI image parameters (handle both nested and flat formats)
+            ai_image_params = params["ai_image"] || params
             entity_class = ai_image_params["entity_class"]
             entity_id = ai_image_params["entity_id"]
 
@@ -96,8 +96,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
         campaign ->
           if authorize_campaign_modification(campaign, current_user) do
-            # Extract AI image parameters
-            ai_image_params = params["ai_image"] || %{}
+            # Extract AI image parameters (handle both nested and flat formats)
+            ai_image_params = params["ai_image"] || params
             entity_class = ai_image_params["entity_class"]
             entity_id = ai_image_params["entity_id"]
             image_url = ai_image_params["image_url"]

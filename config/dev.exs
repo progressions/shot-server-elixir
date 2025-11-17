@@ -69,3 +69,7 @@ config :shot_elixir, :imagekit,
   id: "nvqgwnjgv",
   url_endpoint: "https://ik.imagekit.io/nvqgwnjgv",
   environment: :dev
+
+# Grok/xAI credentials for development
+config :shot_elixir, :grok,
+  api_key: "xai-QtJ1dTm3ooF6gSuTn6H942V2HU7pMD10aDi7Rc88fbqqiPxP5jBxeIazGiCFDhC6xW4GgREQsXI6RdfN"
