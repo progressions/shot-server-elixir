@@ -370,6 +370,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
     %{
       id: character.id,
+      entity_class: "Character",
+      active: character.active,
       name: character.name,
       archetype: archetype,
       action_values: character.action_values,
@@ -384,6 +386,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp serialize_entity("Vehicle", vehicle) do
     %{
       id: vehicle.id,
+      entity_class: "Vehicle",
+      active: vehicle.active,
       name: vehicle.name,
       vehicle_type: vehicle.vehicle_type,
       description: vehicle.description,
@@ -396,6 +400,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp serialize_entity("Party", party) do
     %{
       id: party.id,
+      entity_class: "Party",
+      active: party.active,
       name: party.name,
       description: party.description,
       campaign_id: party.campaign_id,
@@ -407,6 +413,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp serialize_entity("Faction", faction) do
     %{
       id: faction.id,
+      entity_class: "Faction",
+      active: faction.active,
       name: faction.name,
       description: faction.description,
       campaign_id: faction.campaign_id,
@@ -418,6 +426,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp serialize_entity("Site", site) do
     %{
       id: site.id,
+      entity_class: "Site",
+      active: site.active,
       name: site.name,
       description: site.description,
       campaign_id: site.campaign_id,
@@ -429,6 +439,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp serialize_entity("Weapon", weapon) do
     %{
       id: weapon.id,
+      entity_class: "Weapon",
+      active: weapon.active,
       name: weapon.name,
       description: weapon.description,
       campaign_id: weapon.campaign_id,
@@ -440,6 +452,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp serialize_entity("Schtick", schtick) do
     %{
       id: schtick.id,
+      entity_class: "Schtick",
+      active: schtick.active,
       name: schtick.name,
       description: schtick.description,
       campaign_id: schtick.campaign_id,
@@ -451,6 +465,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp serialize_entity("Fight", fight) do
     %{
       id: fight.id,
+      entity_class: "Fight",
+      active: fight.active,
       name: fight.name,
       description: fight.description,
       campaign_id: fight.campaign_id,
