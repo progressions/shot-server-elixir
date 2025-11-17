@@ -76,9 +76,11 @@ defmodule ShotElixir.Services.AiService do
   defp upload_to_imagekit(file_path, entity_type, entity_id) do
     Logger.info("Uploading image to ImageKit for #{entity_type}:#{entity_id}")
 
+    plural_folder = pluralize_entity_type(String.downcase(entity_type))
+
     options = %{
       file_name: "#{String.downcase(entity_type)}_#{entity_id}_#{:os.system_time(:millisecond)}.jpg",
-      folder: "/chi-war-#{Mix.env()}/#{String.downcase(entity_type)}s"
+      folder: "/chi-war-#{Mix.env()}/#{plural_folder}"
     }
 
     ImagekitService.upload_file(file_path, options)
@@ -217,4 +219,8 @@ defmodule ShotElixir.Services.AiService do
       _ -> "Generate an image of: " <> Enum.join(parts, ". ")
     end
   end
+
+  # Pluralize entity type names for folder paths
+  defp pluralize_entity_type("party"), do: "parties"
+  defp pluralize_entity_type(entity_type), do: entity_type <> "s"
 end
