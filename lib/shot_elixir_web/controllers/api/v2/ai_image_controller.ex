@@ -30,12 +30,12 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
             # Validate required parameters
             cond do
-              not entity_class || String.trim(entity_class) == "" ->
+              is_nil(entity_class) || String.trim(entity_class) == "" ->
                 conn
                 |> put_status(:bad_request)
                 |> json(%{error: "entity_class parameter is required"})
 
-              not entity_id || String.trim(entity_id) == "" ->
+              is_nil(entity_id) || String.trim(entity_id) == "" ->
                 conn
                 |> put_status(:bad_request)
                 |> json(%{error: "entity_id parameter is required"})
@@ -104,17 +104,17 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
             # Validate required parameters
             cond do
-              not entity_class || String.trim(entity_class) == "" ->
+              is_nil(entity_class) || String.trim(entity_class) == "" ->
                 conn
                 |> put_status(:bad_request)
                 |> json(%{error: "entity_class parameter is required"})
 
-              not entity_id || String.trim(entity_id) == "" ->
+              is_nil(entity_id) || String.trim(entity_id) == "" ->
                 conn
                 |> put_status(:bad_request)
                 |> json(%{error: "entity_id parameter is required"})
 
-              not image_url || String.trim(image_url) == "" ->
+              is_nil(image_url) || String.trim(image_url) == "" ->
                 conn
                 |> put_status(:bad_request)
                 |> json(%{error: "image_url parameter is required"})
