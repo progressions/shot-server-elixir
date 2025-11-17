@@ -174,9 +174,11 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
                             # Broadcast entity update via WebSocket (Rails-compatible format)
                             entity_key = entity_class |> String.downcase() |> String.to_atom()
-                            plural_key = pluralize_entity(entity_class) |> String.to_atom()
+                            plural_string = pluralize_entity(entity_class)
+                            plural_key = String.to_atom(plural_string)
 
                             IO.puts("📡 Broadcasting #{entity_class} update to campaign:#{current_user.current_campaign_id}")
+                            IO.puts("🔑 Entity key: #{inspect(entity_key)}, Plural key: #{inspect(plural_key)} (from '#{plural_string}')")
                             IO.inspect(serialized_entity, label: "#{entity_class} data")
 
                             # Use Phoenix PubSub for Rails-compatible broadcast with plural reload signal
