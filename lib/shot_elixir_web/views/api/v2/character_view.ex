@@ -1,4 +1,17 @@
 defmodule ShotElixirWeb.Api.V2.CharacterView do
+  @default_description %{
+    "Nicknames" => "",
+    "Age" => "",
+    "Height" => "",
+    "Weight" => "",
+    "Hair Color" => "",
+    "Eye Color" => "",
+    "Style of Dress" => "",
+    "Appearance" => "",
+    "Background" => "",
+    "Melodramatic Hook" => ""
+  }
+
   def render("index.json", %{characters: data}) do
     # Handle both old format (list) and new format (map with meta)
     case data do
@@ -117,7 +130,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       created_at: character.created_at,
       active: character.active,
       entity_class: "Character",
-      description: character.description,
+      description: ensure_description_keys(character.description),
       schtick_ids: get_association_ids(character, :schticks),
       weapon_ids: get_association_ids(character, :weapons),
       skills: character.skills,
@@ -138,7 +151,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       campaign_id: character.campaign_id,
       action_values: character.action_values,
       faction_id: character.faction_id,
-      description: character.description,
+      description: ensure_description_keys(character.description),
       skills: character.skills,
       category: get_in(character.action_values, ["Type"]),
       image_url: get_image_url(character),
@@ -342,4 +355,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     # For now, return nil like Rails when no image is attached
     Map.get(record, :image_url)
   end
+
+  # Ensure description has all required keys with default values
+  defp ensure_description_keys(description) when is_map(description) do
+    Map.merge(@default_description, description)
+  end
+
+  defp ensure_description_keys(_), do: @default_description
 end
