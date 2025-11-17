@@ -362,7 +362,6 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
   # Pluralize entity class names for Rails-compatible broadcast keys
   defp pluralize_entity("Party"), do: "parties"
-  defp pluralize_entity("Schtick"), do: "schticks"
   defp pluralize_entity(entity_class), do: String.downcase(entity_class) <> "s"
 
   defp serialize_entity("Character", character) do
