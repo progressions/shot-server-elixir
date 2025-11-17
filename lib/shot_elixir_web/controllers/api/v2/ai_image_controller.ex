@@ -4,6 +4,12 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Vehicles
+  alias ShotElixir.Factions
+  alias ShotElixir.Parties
+  alias ShotElixir.Sites
+  alias ShotElixir.Weapons
+  alias ShotElixir.Schticks
+  alias ShotElixir.Fights
   alias ShotElixir.Guardian
 
   action_fallback ShotElixirWeb.FallbackController
@@ -39,11 +45,6 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                 conn
                 |> put_status(:bad_request)
                 |> json(%{error: "entity_id parameter is required"})
-
-              entity_class not in ["Character", "Vehicle"] ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "entity_class must be Character or Vehicle"})
 
               true ->
                 # Verify entity exists and belongs to campaign
@@ -148,11 +149,6 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                 conn
                 |> put_status(:bad_request)
                 |> json(%{error: "image_url parameter is required"})
-
-              entity_class not in ["Character", "Vehicle"] ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "entity_class must be Character or Vehicle"})
 
               true ->
                 # Verify entity exists and belongs to campaign
@@ -285,6 +281,90 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
     end
   end
 
+  defp get_entity("Party", entity_id, campaign_id) do
+    case Parties.get_party(entity_id) do
+      nil ->
+        {:error, :not_found}
+
+      party ->
+        if party.campaign_id == campaign_id do
+          {:ok, party}
+        else
+          {:error, :wrong_campaign}
+        end
+    end
+  end
+
+  defp get_entity("Faction", entity_id, campaign_id) do
+    case Factions.get_faction(entity_id) do
+      nil ->
+        {:error, :not_found}
+
+      faction ->
+        if faction.campaign_id == campaign_id do
+          {:ok, faction}
+        else
+          {:error, :wrong_campaign}
+        end
+    end
+  end
+
+  defp get_entity("Site", entity_id, campaign_id) do
+    case Sites.get_site(entity_id) do
+      nil ->
+        {:error, :not_found}
+
+      site ->
+        if site.campaign_id == campaign_id do
+          {:ok, site}
+        else
+          {:error, :wrong_campaign}
+        end
+    end
+  end
+
+  defp get_entity("Weapon", entity_id, campaign_id) do
+    case Weapons.get_weapon(entity_id) do
+      nil ->
+        {:error, :not_found}
+
+      weapon ->
+        if weapon.campaign_id == campaign_id do
+          {:ok, weapon}
+        else
+          {:error, :wrong_campaign}
+        end
+    end
+  end
+
+  defp get_entity("Schtick", entity_id, campaign_id) do
+    case Schticks.get_schtick(entity_id) do
+      nil ->
+        {:error, :not_found}
+
+      schtick ->
+        if schtick.campaign_id == campaign_id do
+          {:ok, schtick}
+        else
+          {:error, :wrong_campaign}
+        end
+    end
+  end
+
+  defp get_entity("Fight", entity_id, campaign_id) do
+    case Fights.get_fight(entity_id) do
+      nil ->
+        {:error, :not_found}
+
+      fight ->
+        if fight.campaign_id == campaign_id do
+          {:ok, fight}
+        else
+          {:error, :wrong_campaign}
+        end
+    end
+  end
+
   defp get_entity(_, _, _), do: {:error, :not_found}
 
   defp serialize_entity("Character", character) do
@@ -318,6 +398,72 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
       campaign_id: vehicle.campaign_id,
       created_at: vehicle.created_at,
       updated_at: vehicle.updated_at
+    }
+  end
+
+  defp serialize_entity("Party", party) do
+    %{
+      id: party.id,
+      name: party.name,
+      description: party.description,
+      campaign_id: party.campaign_id,
+      created_at: party.created_at,
+      updated_at: party.updated_at
+    }
+  end
+
+  defp serialize_entity("Faction", faction) do
+    %{
+      id: faction.id,
+      name: faction.name,
+      description: faction.description,
+      campaign_id: faction.campaign_id,
+      created_at: faction.created_at,
+      updated_at: faction.updated_at
+    }
+  end
+
+  defp serialize_entity("Site", site) do
+    %{
+      id: site.id,
+      name: site.name,
+      description: site.description,
+      campaign_id: site.campaign_id,
+      created_at: site.created_at,
+      updated_at: site.updated_at
+    }
+  end
+
+  defp serialize_entity("Weapon", weapon) do
+    %{
+      id: weapon.id,
+      name: weapon.name,
+      description: weapon.description,
+      campaign_id: weapon.campaign_id,
+      created_at: weapon.created_at,
+      updated_at: weapon.updated_at
+    }
+  end
+
+  defp serialize_entity("Schtick", schtick) do
+    %{
+      id: schtick.id,
+      name: schtick.name,
+      description: schtick.description,
+      campaign_id: schtick.campaign_id,
+      created_at: schtick.created_at,
+      updated_at: schtick.updated_at
+    }
+  end
+
+  defp serialize_entity("Fight", fight) do
+    %{
+      id: fight.id,
+      name: fight.name,
+      description: fight.description,
+      campaign_id: fight.campaign_id,
+      created_at: fight.created_at,
+      updated_at: fight.updated_at
     }
   end
 

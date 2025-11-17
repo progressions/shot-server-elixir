@@ -9,6 +9,12 @@ defmodule ShotElixir.Services.AiService do
   alias ShotElixir.Services.{ImagekitService, GrokService}
   alias ShotElixir.Characters
   alias ShotElixir.Vehicles
+  alias ShotElixir.Parties
+  alias ShotElixir.Factions
+  alias ShotElixir.Sites
+  alias ShotElixir.Weapons
+  alias ShotElixir.Schticks
+  alias ShotElixir.Fights
 
   @doc """
   Downloads an image from a URL and attaches it to an entity.
@@ -118,6 +124,48 @@ defmodule ShotElixir.Services.AiService do
     case Vehicles.get_vehicle(entity_id) do
       nil -> {:error, "Vehicle not found"}
       vehicle -> {:ok, vehicle}
+    end
+  end
+
+  defp get_entity("Party", entity_id) do
+    case Parties.get_party(entity_id) do
+      nil -> {:error, "Party not found"}
+      party -> {:ok, party}
+    end
+  end
+
+  defp get_entity("Faction", entity_id) do
+    case Factions.get_faction(entity_id) do
+      nil -> {:error, "Faction not found"}
+      faction -> {:ok, faction}
+    end
+  end
+
+  defp get_entity("Site", entity_id) do
+    case Sites.get_site(entity_id) do
+      nil -> {:error, "Site not found"}
+      site -> {:ok, site}
+    end
+  end
+
+  defp get_entity("Weapon", entity_id) do
+    case Weapons.get_weapon(entity_id) do
+      nil -> {:error, "Weapon not found"}
+      weapon -> {:ok, weapon}
+    end
+  end
+
+  defp get_entity("Schtick", entity_id) do
+    case Schticks.get_schtick(entity_id) do
+      nil -> {:error, "Schtick not found"}
+      schtick -> {:ok, schtick}
+    end
+  end
+
+  defp get_entity("Fight", entity_id) do
+    case Fights.get_fight(entity_id) do
+      nil -> {:error, "Fight not found"}
+      fight -> {:ok, fight}
     end
   end
 
