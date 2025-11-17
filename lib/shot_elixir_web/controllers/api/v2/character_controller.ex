@@ -112,6 +112,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
               # Attach image to character via ActiveStorage
               case ShotElixir.ActiveStorage.attach_image("Character", character.id, upload_result) do
                 {:ok, _attachment} ->
+                  # Reload character to get fresh data after image attachment
+                  character = Characters.get_character(character.id)
                   # Continue with character update
                   update_character_with_params(conn, character, parsed_params)
 

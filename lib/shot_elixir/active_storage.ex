@@ -28,6 +28,8 @@ defmodule ShotElixir.ActiveStorage do
         join: b in Blob,
         on: a.blob_id == b.id,
         where: a.record_type == ^record_type and a.record_id == ^record_id and a.name == "image",
+        order_by: [desc: a.created_at],
+        limit: 1,
         select: b
 
     case Repo.one(query) do
