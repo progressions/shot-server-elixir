@@ -349,9 +349,16 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
 
   # Rails-compatible image URL handling
   defp get_image_url(record) do
-    # TODO: Implement proper image attachment checking
-    # For now, return nil like Rails when no image is attached
-    Map.get(record, :image_url)
+    # Check if image_url is already in the struct (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Fetch from ActiveStorage based on entity type
+        entity_type = record.__struct__ |> Module.split() |> List.last()
+        ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+
+      url ->
+        url
+    end
   end
 
   # Ensure description has all required keys with default values
