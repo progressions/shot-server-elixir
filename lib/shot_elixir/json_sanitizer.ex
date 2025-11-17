@@ -22,7 +22,8 @@ defmodule ShotElixir.JsonSanitizer do
 
   def sanitize(value) when is_binary(value) do
     cond do
-      byte_size(value) == 16 -> normalize_uuid(value)
+      # Only treat as UUID if it's 16 bytes AND not printable text
+      byte_size(value) == 16 and not String.printable?(value) -> normalize_uuid(value)
       String.valid?(value) -> value
       true -> normalize_uuid(value)
     end
