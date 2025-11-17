@@ -194,6 +194,7 @@ defmodule ShotElixir.Sites do
       query
       |> limit(^per_page)
       |> offset(^offset)
+      |> preload([:faction, :juncture])
       |> Repo.all()
 
     # Load image URLs for all sites efficiently
