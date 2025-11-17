@@ -1,9 +1,10 @@
 defmodule ShotElixir.ActiveStorage.Blob do
   @moduledoc """
   Ecto schema for Rails ActiveStorage blobs table.
-  Provides read-only access to image metadata stored by Rails.
+  Stores file metadata for uploaded images.
   """
   use Ecto.Schema
+  import Ecto.Changeset
 
   @primary_key {:id, :id, autogenerate: true}
   @timestamps_opts [type: :utc_datetime]
@@ -18,6 +19,16 @@ defmodule ShotElixir.ActiveStorage.Blob do
     field :byte_size, :integer
     field :checksum, :string
     field :created_at, :utc_datetime
+  end
+
+  @doc """
+  Changeset for creating a new blob record.
+  """
+  def changeset(blob, attrs) do
+    blob
+    |> cast(attrs, [:key, :filename, :content_type, :metadata, :service_name, :byte_size, :checksum])
+    |> validate_required([:key, :filename, :content_type, :service_name])
+    |> unique_constraint(:key)
   end
 
   @doc """

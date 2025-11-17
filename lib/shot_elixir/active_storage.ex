@@ -1,13 +1,14 @@
 defmodule ShotElixir.ActiveStorage do
   @moduledoc """
-  Context for reading ActiveStorage attachments created by Rails.
-  Provides read-only access to image URLs and metadata.
+  Context for managing ActiveStorage attachments.
+  Provides read and write access to image URLs and metadata.
   """
 
   import Ecto.Query
   alias ShotElixir.Repo
   alias ShotElixir.ActiveStorage.{Attachment, Blob}
   alias ShotElixir.Services.ImagekitService
+  alias Ecto.Multi
 
   @doc """
   Gets the image URL for a record by querying ActiveStorage tables.
@@ -108,5 +109,124 @@ defmodule ShotElixir.ActiveStorage do
     else
       nil
     end
+  end
+
+  @doc """
+  Creates a blob record and attaches it to an entity.
+  Returns {:ok, attachment} or {:error, changeset}.
+
+  ## Parameters
+    - record_type: "Character", "Vehicle", etc.
+    - record_id: UUID of the entity
+    - upload_result: Map from ImagekitService.upload_file/2 containing:
+      - :file_id
+      - :name
+      - :url
+      - :size
+      - :metadata (full ImageKit response)
+
+  ## Examples
+      iex> attach_image("Character", character_id, upload_result)
+      {:ok, %Attachment{}}
+  """
+  def attach_image(record_type, record_id, upload_result) do
+    Multi.new()
+    |> Multi.run(:delete_existing, fn repo, _changes ->
+      # Delete existing attachment for this entity if it exists
+      query =
+        from a in Attachment,
+          where: a.record_type == ^record_type and
+                 a.record_id == ^record_id and
+                 a.name == "image"
+
+      case repo.one(query) do
+        nil ->
+          {:ok, nil}
+
+        existing_attachment ->
+          # Delete the old blob too
+          case repo.get(Blob, existing_attachment.blob_id) do
+            nil -> :ok
+            blob -> repo.delete(blob)
+          end
+
+          repo.delete(existing_attachment)
+          {:ok, existing_attachment}
+      end
+    end)
+    |> Multi.insert(:blob, fn _changes ->
+      # Build metadata JSON string (Rails format)
+      metadata =
+        Jason.encode!(%{
+          "imagekit_url" => upload_result.url,
+          "imagekit_file_path" => upload_result.name,
+          "imagekit_file_id" => upload_result.file_id
+        })
+
+      blob_attrs = %{
+        key: upload_result.name,
+        filename: Path.basename(upload_result.name),
+        content_type: upload_result.metadata["fileType"] || "image/jpeg",
+        metadata: metadata,
+        service_name: "imagekit",
+        byte_size: upload_result.size,
+        checksum: generate_checksum(upload_result.name)
+      }
+
+      Blob.changeset(%Blob{}, blob_attrs)
+    end)
+    |> Multi.insert(:attachment, fn %{blob: blob} ->
+      attachment_attrs = %{
+        name: "image",
+        record_type: record_type,
+        record_id: record_id,
+        blob_id: blob.id
+      }
+
+      Attachment.changeset(%Attachment{}, attachment_attrs)
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{attachment: attachment}} ->
+        {:ok, attachment}
+
+      {:error, _failed_operation, changeset, _changes} ->
+        {:error, changeset}
+    end
+  end
+
+  @doc """
+  Deletes an image attachment for an entity.
+  Removes both the attachment and blob records.
+  """
+  def delete_image(record_type, record_id) do
+    query =
+      from a in Attachment,
+        where: a.record_type == ^record_type and
+               a.record_id == ^record_id and
+               a.name == "image",
+        preload: :blob
+
+    case Repo.one(query) do
+      nil ->
+        {:ok, :no_image}
+
+      attachment ->
+        Multi.new()
+        |> Multi.delete(:attachment, attachment)
+        |> Multi.delete(:blob, attachment.blob)
+        |> Repo.transaction()
+        |> case do
+          {:ok, _} -> {:ok, :deleted}
+          {:error, _, changeset, _} -> {:error, changeset}
+        end
+    end
+  end
+
+  # Generate a simple checksum for the blob key
+  # Rails uses MD5, we'll do the same for compatibility
+  defp generate_checksum(key) do
+    :crypto.hash(:md5, key)
+    |> Base.encode64()
   end
 end

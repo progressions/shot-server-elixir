@@ -128,18 +128,33 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                 # Verify entity exists and belongs to campaign
                 case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
                   {:ok, entity} ->
-                    # TODO: Implement AI service to attach image from URL
-                    # updated_entity = AiService.attach_image_from_url(entity, image_url)
+                    # Attach image from URL using AI service
+                    case ShotElixir.Services.AiService.attach_image_from_url(
+                           entity_class,
+                           entity.id,
+                           image_url
+                         ) do
+                      {:ok, _attachment} ->
+                        # Return updated entity with image_url
+                        serialized_entity =
+                          serialize_entity(entity_class, entity)
+                          |> Map.put(
+                            :image_url,
+                            ShotElixir.ActiveStorage.get_image_url(entity_class, entity.id)
+                          )
 
-                    # For now, return the entity as-is
-                    serialized_entity = serialize_entity(entity_class, entity)
+                        conn
+                        |> put_status(:ok)
+                        |> json(%{
+                          entity: serialized_entity,
+                          serializer: "#{entity_class}Serializer"
+                        })
 
-                    conn
-                    |> put_status(:ok)
-                    |> json(%{
-                      entity: serialized_entity,
-                      serializer: "#{entity_class}Serializer"
-                    })
+                      {:error, reason} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> json(%{error: "Failed to attach image: #{inspect(reason)}"})
+                    end
 
                   {:error, :not_found} ->
                     conn

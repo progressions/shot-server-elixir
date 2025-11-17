@@ -104,23 +104,33 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user) do
       # Handle image upload if present
-      # TODO: Implement image upload functionality
-      # For now, just use the original character
-      updated_character = character
+      case conn.params["image"] do
+        %Plug.Upload{} = upload ->
+          # Upload image to ImageKit
+          case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+            {:ok, upload_result} ->
+              # Attach image to character via ActiveStorage
+              case ShotElixir.ActiveStorage.attach_image("Character", character.id, upload_result) do
+                {:ok, _attachment} ->
+                  # Continue with character update
+                  update_character_with_params(conn, character, parsed_params)
 
-      # Continue with normal update
-      case Characters.update_character(updated_character, parsed_params) do
-        {:ok, final_character} ->
-          # Broadcasting now happens automatically in Characters context
-          conn
-          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-          |> render("show.json", character: final_character)
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                  |> render("error.json", changeset: changeset)
+              end
 
-        {:error, %Ecto.Changeset{} = changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-          |> render("error.json", changeset: changeset)
+            {:error, reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Image upload failed: #{inspect(reason)}"})
+          end
+
+        _ ->
+          # No image uploaded, proceed with normal update
+          update_character_with_params(conn, character, parsed_params)
       end
     else
       nil ->
@@ -131,6 +141,23 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       {:error, :unauthorized} ->
         {:error, :forbidden}
+    end
+  end
+
+  defp update_character_with_params(conn, character, parsed_params) do
+    # Continue with normal update
+    case Characters.update_character(character, parsed_params) do
+      {:ok, final_character} ->
+        # Broadcasting now happens automatically in Characters context
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+        |> render("show.json", character: final_character)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+        |> render("error.json", changeset: changeset)
     end
   end
 
