@@ -53,9 +53,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
   end
 
   def render("show.json", %{vehicle: vehicle}) do
-    %{
-      vehicle: render_vehicle_detail(vehicle)
-    }
+    render_vehicle_detail(vehicle)
     |> JsonSanitizer.sanitize()
   end
 
