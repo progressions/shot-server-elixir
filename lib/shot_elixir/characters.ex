@@ -277,10 +277,10 @@ defmodule ShotElixir.Characters do
   def create_character(attrs \\ %{}) do
     Multi.new()
     |> Multi.insert(:character, Character.changeset(%Character{}, attrs))
-    |> Multi.run(:broadcast, fn repo, %{character: character} ->
+    |> Multi.run(:broadcast, fn _repo, %{character: character} ->
       # Preload associations before broadcasting
       character_with_associations =
-        repo.preload(character, [:user, :faction, :juncture, :image_positions])
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
       broadcast_change(character_with_associations, :insert)
       {:ok, character}
     end)
@@ -294,10 +294,10 @@ defmodule ShotElixir.Characters do
   def update_character(%Character{} = character, attrs) do
     Multi.new()
     |> Multi.update(:character, Character.changeset(character, attrs))
-    |> Multi.run(:broadcast, fn repo, %{character: character} ->
+    |> Multi.run(:broadcast, fn _repo, %{character: character} ->
       # Preload associations before broadcasting
       character_with_associations =
-        repo.preload(character, [:user, :faction, :juncture, :image_positions])
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
       broadcast_change(character_with_associations, :update)
       {:ok, character}
     end)
@@ -311,10 +311,10 @@ defmodule ShotElixir.Characters do
   def delete_character(%Character{} = character) do
     Multi.new()
     |> Multi.update(:character, Ecto.Changeset.change(character, active: false))
-    |> Multi.run(:broadcast, fn repo, %{character: character} ->
+    |> Multi.run(:broadcast, fn _repo, %{character: character} ->
       # Preload associations before broadcasting
       character_with_associations =
-        repo.preload(character, [:user, :faction, :juncture, :image_positions])
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
       broadcast_change(character_with_associations, :delete)
       {:ok, character}
     end)
