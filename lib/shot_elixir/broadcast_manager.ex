@@ -177,21 +177,18 @@ defmodule ShotElixir.BroadcastManager do
     character = ensure_associations(entity, [:user, :faction, :juncture, :image_positions])
 
     CharacterView.render("show.json", %{character: character})
-    |> Map.get(:character)
   end
 
   defp serialize_entity(entity, "vehicle") do
     vehicle = ensure_associations(entity, [:user, :campaign, :image_positions])
 
     VehicleView.render("show.json", %{vehicle: vehicle})
-    |> Map.get(:vehicle)
   end
 
   defp serialize_entity(entity, "fight") do
     fight = ensure_associations(entity, [:campaign, :shots])
 
     FightJSON.show(%{fight: fight})
-    |> Map.get(:fight)
   end
 
   defp serialize_entity(entity, "weapon") do
@@ -230,35 +227,30 @@ defmodule ShotElixir.BroadcastManager do
     site = ensure_associations(entity, [:campaign])
 
     SiteJSON.show(%{site: site})
-    |> Map.get(:site)
   end
 
   defp serialize_entity(entity, "party") do
     party = ensure_associations(entity, [:campaign])
 
     PartyJSON.show(%{party: party})
-    |> Map.get(:party)
   end
 
   defp serialize_entity(entity, "faction") do
     faction = ensure_associations(entity, [:campaign])
 
     FactionJSON.show(%{faction: faction})
-    |> Map.get(:faction)
   end
 
   defp serialize_entity(entity, "juncture") do
     juncture = ensure_associations(entity, [:campaign])
 
     JunctureJSON.show(%{juncture: juncture})
-    |> Map.get(:juncture)
   end
 
   defp serialize_entity(entity, "user") do
     user = ensure_associations(entity, [])
 
     UserJSON.show(%{user: user})
-    |> Map.get(:user)
   end
 
   defp serialize_entity(entity, "campaign") do
