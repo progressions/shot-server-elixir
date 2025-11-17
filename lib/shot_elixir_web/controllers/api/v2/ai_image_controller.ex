@@ -174,14 +174,16 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
                             # Broadcast entity update via WebSocket (Rails-compatible format)
                             entity_key = entity_class |> String.downcase() |> String.to_atom()
+                            plural_key = pluralize_entity(entity_class) |> String.to_atom()
+
                             IO.puts("📡 Broadcasting #{entity_class} update to campaign:#{current_user.current_campaign_id}")
                             IO.inspect(serialized_entity, label: "#{entity_class} data")
 
-                            # Use Phoenix PubSub for Rails-compatible broadcast
+                            # Use Phoenix PubSub for Rails-compatible broadcast with plural reload signal
                             Phoenix.PubSub.broadcast!(
                               ShotElixir.PubSub,
                               "campaign:#{current_user.current_campaign_id}",
-                              {:rails_message, %{entity_key => serialized_entity}}
+                              {:rails_message, %{entity_key => serialized_entity, plural_key => "reload"}}
                             )
 
                             IO.puts("✅ Broadcast sent successfully")
@@ -357,6 +359,11 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   end
 
   defp get_entity(_, _, _), do: {:error, :not_found}
+
+  # Pluralize entity class names for Rails-compatible broadcast keys
+  defp pluralize_entity("Party"), do: "parties"
+  defp pluralize_entity("Schtick"), do: "schticks"
+  defp pluralize_entity(entity_class), do: String.downcase(entity_class) <> "s"
 
   defp serialize_entity("Character", character) do
     # Extract archetype from action_values map if it exists
