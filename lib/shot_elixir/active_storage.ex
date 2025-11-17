@@ -33,15 +33,8 @@ defmodule ShotElixir.ActiveStorage do
         select: b
 
     case Repo.one(query) do
-      nil ->
-        require Logger
-        Logger.debug("No image found for #{record_type} #{record_id}")
-        nil
-      blob ->
-        url = build_image_url_from_blob(blob)
-        require Logger
-        Logger.debug("Image URL for #{record_type} #{record_id}: #{url} (blob key: #{blob.key})")
-        url
+      nil -> nil
+      blob -> build_image_url_from_blob(blob)
     end
   end
 
