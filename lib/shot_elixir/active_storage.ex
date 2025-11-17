@@ -170,7 +170,8 @@ defmodule ShotElixir.ActiveStorage do
         metadata: metadata,
         service_name: "imagekit",
         byte_size: upload_result.size,
-        checksum: generate_checksum(upload_result.name)
+        checksum: generate_checksum(upload_result.name),
+        created_at: DateTime.utc_now()
       }
 
       Blob.changeset(%Blob{}, blob_attrs)
@@ -180,7 +181,8 @@ defmodule ShotElixir.ActiveStorage do
         name: "image",
         record_type: record_type,
         record_id: record_id,
-        blob_id: blob.id
+        blob_id: blob.id,
+        created_at: DateTime.utc_now()
       }
 
       Attachment.changeset(%Attachment{}, attachment_attrs)

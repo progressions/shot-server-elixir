@@ -26,8 +26,8 @@ defmodule ShotElixir.ActiveStorage.Blob do
   """
   def changeset(blob, attrs) do
     blob
-    |> cast(attrs, [:key, :filename, :content_type, :metadata, :service_name, :byte_size, :checksum])
-    |> validate_required([:key, :filename, :content_type, :service_name])
+    |> cast(attrs, [:key, :filename, :content_type, :metadata, :service_name, :byte_size, :checksum, :created_at])
+    |> validate_required([:key, :filename, :content_type, :service_name, :created_at])
     |> unique_constraint(:key)
   end
 
