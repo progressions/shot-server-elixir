@@ -6,6 +6,7 @@ defmodule ShotElixir.Sites do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Sites.{Site, Attunement}
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_sites(campaign_id) do
@@ -15,7 +16,9 @@ defmodule ShotElixir.Sites do
         order_by: [asc: fragment("lower(?)", s.name)],
         preload: [:faction, :juncture]
 
-    Repo.all(query)
+    query
+    |> Repo.all()
+    |> ImageLoader.load_image_urls("Site")
   end
 
   def list_campaign_sites(campaign_id, params \\ %{}, _current_user \\ nil) do
@@ -36,20 +39,10 @@ defmodule ShotElixir.Sites do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
       from s in Site,
-        where: s.campaign_id == ^campaign_id,
-        select: [
-          :id,
-          :name,
-          :description,
-          :faction_id,
-          :juncture_id,
-          :created_at,
-          :updated_at,
-          :active
-        ]
+        where: s.campaign_id == ^campaign_id
 
     # Apply basic filters
     query =
@@ -203,9 +196,12 @@ defmodule ShotElixir.Sites do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all sites efficiently
+    sites_with_images = ImageLoader.load_image_urls(sites, "Site")
+
     # Return sites with pagination metadata and factions
     %{
-      sites: sites,
+      sites: sites_with_images,
       factions: factions,
       meta: %{
         current_page: page,
@@ -268,12 +264,14 @@ defmodule ShotElixir.Sites do
     Site
     |> preload([:faction, :juncture, attunements: [:character]])
     |> Repo.get!(id)
+    |> ImageLoader.load_image_url("Site")
   end
 
   def get_site(id) do
     Site
     |> preload([:faction, :juncture, attunements: [:character]])
     |> Repo.get(id)
+    |> ImageLoader.load_image_url("Site")
   end
 
   def create_site(attrs \\ %{}) do

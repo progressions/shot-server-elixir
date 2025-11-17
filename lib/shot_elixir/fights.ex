@@ -6,6 +6,7 @@ defmodule ShotElixir.Fights do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Fights.{Fight, Shot}
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_fights(campaign_id) do
@@ -14,7 +15,9 @@ defmodule ShotElixir.Fights do
         where: f.campaign_id == ^campaign_id and f.active == true,
         order_by: [desc: f.updated_at]
 
-    Repo.all(query)
+    query
+    |> Repo.all()
+    |> ImageLoader.load_image_urls("Fight")
   end
 
   def list_campaign_fights(campaign_id, params \\ %{}, _current_user \\ nil) do
@@ -198,9 +201,12 @@ defmodule ShotElixir.Fights do
       |> Repo.all()
       |> Repo.preload([:characters, :vehicles])
 
+    # Load image URLs for all fights efficiently
+    fights_with_images = ImageLoader.load_image_urls(fights, "Fight")
+
     # Return fights with pagination metadata and seasons
     %{
-      fights: fights,
+      fights: fights_with_images,
       seasons: seasons,
       meta: %{
         current_page: page,
@@ -287,14 +293,22 @@ defmodule ShotElixir.Fights do
     end
   end
 
-  def get_fight!(id), do: Repo.get!(Fight, id)
-  def get_fight(id), do: Repo.get(Fight, id)
+  def get_fight!(id) do
+    Repo.get!(Fight, id)
+    |> ImageLoader.load_image_url("Fight")
+  end
+
+  def get_fight(id) do
+    Repo.get(Fight, id)
+    |> ImageLoader.load_image_url("Fight")
+  end
 
   def get_fight_with_shots(id) do
     Fight
     |> Repo.get(id)
     |> Repo.preload(shots: [:character, :vehicle])
     |> Repo.preload([:characters, :vehicles])
+    |> ImageLoader.load_image_url("Fight")
   end
 
   def create_fight(attrs \\ %{}) do

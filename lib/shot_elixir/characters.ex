@@ -7,8 +7,7 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Repo
   alias ShotElixir.Characters.Character
   alias ShotElixir.Fights.Shot
-  alias ShotElixir.Parties.Membership
-  alias ShotElixir.Sites.Attunement
+  alias ShotElixir.ImageLoader
   alias Ecto.Multi
   use ShotElixir.Models.Broadcastable
 
@@ -137,6 +136,9 @@ defmodule ShotElixir.Characters do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all characters efficiently
+    characters_with_images = ImageLoader.load_image_urls(characters, "Character")
+
     # Extract unique archetypes from characters
     archetypes =
       characters
@@ -148,7 +150,7 @@ defmodule ShotElixir.Characters do
 
     # Return characters with pagination metadata and archetypes
     %{
-      characters: characters,
+      characters: characters_with_images,
       archetypes: archetypes,
       meta: %{
         current_page: page,
@@ -262,8 +264,15 @@ defmodule ShotElixir.Characters do
     Repo.all(query)
   end
 
-  def get_character!(id), do: Repo.get!(Character, id)
-  def get_character(id), do: Repo.get(Character, id)
+  def get_character!(id) do
+    Repo.get!(Character, id)
+    |> ImageLoader.load_image_url("Character")
+  end
+
+  def get_character(id) do
+    Repo.get(Character, id)
+    |> ImageLoader.load_image_url("Character")
+  end
 
   def create_character(attrs \\ %{}) do
     Multi.new()

@@ -6,6 +6,7 @@ defmodule ShotElixir.Junctures do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Junctures.Juncture
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_junctures(campaign_id) do
@@ -36,19 +37,10 @@ defmodule ShotElixir.Junctures do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
       from j in Juncture,
-        where: j.campaign_id == ^campaign_id,
-        select: [
-          :id,
-          :name,
-          :description,
-          :faction_id,
-          :created_at,
-          :updated_at,
-          :active
-        ]
+        where: j.campaign_id == ^campaign_id
 
     # Apply basic filters
     query =
@@ -183,6 +175,9 @@ defmodule ShotElixir.Junctures do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all junctures efficiently
+    junctures_with_images = ImageLoader.load_image_urls(junctures, "Juncture")
+
     # Fetch factions for the junctures
     faction_ids = junctures |> Enum.map(& &1.faction_id) |> Enum.uniq() |> Enum.reject(&is_nil/1)
 
@@ -200,7 +195,7 @@ defmodule ShotElixir.Junctures do
 
     # Return junctures with pagination metadata
     %{
-      junctures: junctures,
+      junctures: junctures_with_images,
       factions: factions,
       meta: %{
         current_page: page,

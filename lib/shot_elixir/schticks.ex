@@ -6,6 +6,7 @@ defmodule ShotElixir.Schticks do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Schticks.Schtick
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_campaign_schticks(campaign_id, params \\ %{}, _current_user \\ nil) do
@@ -26,21 +27,10 @@ defmodule ShotElixir.Schticks do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
       from s in Schtick,
-        where: s.campaign_id == ^campaign_id,
-        select: [
-          :id,
-          :name,
-          :description,
-          :category,
-          :path,
-          :prerequisite_id,
-          :created_at,
-          :updated_at,
-          :active
-        ]
+        where: s.campaign_id == ^campaign_id
 
     # Apply basic filters
     query =
@@ -204,9 +194,12 @@ defmodule ShotElixir.Schticks do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all schticks efficiently
+    schticks_with_images = ImageLoader.load_image_urls(schticks, "Schtick")
+
     # Return schticks with pagination metadata
     %{
-      schticks: schticks,
+      schticks: schticks_with_images,
       categories: categories,
       paths: paths,
       meta: %{
@@ -322,12 +315,14 @@ defmodule ShotElixir.Schticks do
     Schtick
     |> preload(:prerequisite)
     |> Repo.get!(id)
+    |> ImageLoader.load_image_url("Schtick")
   end
 
   def get_schtick(id) do
     Schtick
     |> preload(:prerequisite)
     |> Repo.get(id)
+    |> ImageLoader.load_image_url("Schtick")
   end
 
   def create_schtick(attrs \\ %{}) do
@@ -516,11 +511,13 @@ defmodule ShotElixir.Schticks do
     query =
       from s in Schtick,
         where: s.campaign_id == ^campaign_id and s.id in ^ids,
-        select: [:id, :name, :description, :category, :path],
         limit: ^per_page,
         offset: ^offset
 
-    schticks = Repo.all(query)
+    schticks =
+      query
+      |> Repo.all()
+      |> Enum.map(&ImageLoader.load_image_url(&1, "Schtick"))
 
     # Get total count for this batch
     total_count =

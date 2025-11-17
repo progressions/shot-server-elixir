@@ -101,7 +101,8 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       name: character.name,
       character_type: Map.get(action_values, "Type"),
       archetype: Map.get(action_values, "Archetype"),
-      image_url: character.image_url
+      image_url: character.image_url,
+      entity_class: "Character"
     }
   end
 
@@ -114,7 +115,8 @@ defmodule ShotElixirWeb.Api.V2.FightJSON do
       name: vehicle.name,
       color: vehicle.color,
       image_url: vehicle.image_url,
-      impairments: vehicle.impairments
+      impairments: vehicle.impairments,
+      entity_class: "Vehicle"
     }
   end
 

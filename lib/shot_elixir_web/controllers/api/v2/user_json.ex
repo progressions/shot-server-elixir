@@ -86,7 +86,8 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
       name: campaign.name,
       description: campaign.description,
       active: campaign.active,
-      user_id: campaign.user_id
+      user_id: campaign.user_id,
+      entity_class: "Campaign"
     }
   end
 end

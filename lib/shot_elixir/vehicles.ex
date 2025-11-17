@@ -6,6 +6,7 @@ defmodule ShotElixir.Vehicles do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Vehicles.Vehicle
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_vehicles(campaign_id) do
@@ -304,9 +305,12 @@ defmodule ShotElixir.Vehicles do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all vehicles efficiently
+    vehicles_with_images = ImageLoader.load_image_urls(vehicles, "Vehicle")
+
     # Return vehicles with pagination metadata, factions, archetypes, and types
     %{
-      vehicles: vehicles,
+      vehicles: vehicles_with_images,
       factions: factions,
       archetypes: archetypes,
       types: types,
@@ -364,8 +368,15 @@ defmodule ShotElixir.Vehicles do
     end
   end
 
-  def get_vehicle!(id), do: Repo.get!(Vehicle, id)
-  def get_vehicle(id), do: Repo.get(Vehicle, id)
+  def get_vehicle!(id) do
+    Repo.get!(Vehicle, id)
+    |> ImageLoader.load_image_url("Vehicle")
+  end
+
+  def get_vehicle(id) do
+    Repo.get(Vehicle, id)
+    |> ImageLoader.load_image_url("Vehicle")
+  end
 
   def get_vehicle_with_preloads(id) do
     Vehicle

@@ -7,6 +7,7 @@ defmodule ShotElixir.Weapons do
   alias Ecto.Changeset
   alias ShotElixir.Repo
   alias ShotElixir.Weapons.Weapon
+  alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
   def list_weapons(campaign_id, filters \\ %{}) do
@@ -45,8 +46,11 @@ defmodule ShotElixir.Weapons do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all weapons efficiently
+    weapons_with_images = ImageLoader.load_image_urls(weapons, "Weapon")
+
     %{
-      weapons: weapons,
+      weapons: weapons_with_images,
       categories: categories,
       junctures: junctures,
       meta: %{
@@ -76,8 +80,15 @@ defmodule ShotElixir.Weapons do
     from w in query, where: w.juncture == ^juncture
   end
 
-  def get_weapon!(id), do: Repo.get!(Weapon, id)
-  def get_weapon(id), do: Repo.get(Weapon, id)
+  def get_weapon!(id) do
+    Repo.get!(Weapon, id)
+    |> ImageLoader.load_image_url("Weapon")
+  end
+
+  def get_weapon(id) do
+    Repo.get(Weapon, id)
+    |> ImageLoader.load_image_url("Weapon")
+  end
 
   def create_weapon(attrs \\ %{}) do
     %Weapon{}

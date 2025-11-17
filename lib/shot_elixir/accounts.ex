@@ -6,6 +6,7 @@ defmodule ShotElixir.Accounts do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Accounts.User
+  alias ShotElixir.ImageLoader
 
   def list_users do
     Repo.all(User)
@@ -29,21 +30,9 @@ defmodule ShotElixir.Accounts do
 
     offset = (page - 1) * per_page
 
-    # Base query with minimal fields for performance
+    # Base query
     query =
-      from u in User,
-        select: [
-          :id,
-          :first_name,
-          :last_name,
-          :name,
-          :email,
-          :created_at,
-          :updated_at,
-          :active,
-          :admin,
-          :gamemaster
-        ]
+      from u in User
 
     # Apply basic filters
     query =
@@ -185,9 +174,12 @@ defmodule ShotElixir.Accounts do
       |> offset(^offset)
       |> Repo.all()
 
+    # Load image URLs for all users efficiently
+    users_with_images = ImageLoader.load_image_urls(users, "User")
+
     # Return users with pagination metadata
     %{
-      users: users,
+      users: users_with_images,
       meta: %{
         current_page: page,
         per_page: per_page,
@@ -265,9 +257,15 @@ defmodule ShotElixir.Accounts do
     end
   end
 
-  def get_user!(id), do: Repo.get!(User, id)
+  def get_user!(id) do
+    Repo.get!(User, id)
+    |> ImageLoader.load_image_url("User")
+  end
 
-  def get_user(id), do: Repo.get(User, id)
+  def get_user(id) do
+    Repo.get(User, id)
+    |> ImageLoader.load_image_url("User")
+  end
 
   def get_user_by_email(email) when is_binary(email) do
     Repo.get_by(User, email: email)
