@@ -284,6 +284,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
                       conn
                       |> put_status(:unprocessable_entity)
                       |> render(:error, changeset: changeset)
+                  end
               end
             end
         end
