@@ -190,7 +190,7 @@ defmodule ShotElixir.Vehicles do
       end
 
     count_query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from v in count_query, where: is_nil(v.faction_id)
         else
@@ -219,7 +219,7 @@ defmodule ShotElixir.Vehicles do
       end
 
     count_query =
-      if params["vehicle_type"] do
+      if params["vehicle_type"] && params["vehicle_type"] != "" do
         from v in count_query,
           where: fragment("?->>'Type' = ?", v.action_values, ^params["vehicle_type"])
       else
@@ -227,7 +227,7 @@ defmodule ShotElixir.Vehicles do
       end
 
     count_query =
-      if params["archetype"] do
+      if params["archetype"] && params["archetype"] != "" do
         if params["archetype"] == "__NONE__" do
           from v in count_query,
             where:
