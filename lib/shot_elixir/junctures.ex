@@ -184,7 +184,7 @@ defmodule ShotElixir.Junctures do
     factions =
       if Enum.any?(faction_ids) do
         from(f in "factions",
-          where: f.id in ^faction_ids,
+          where: fragment("? = ANY(?)", f.id, type(^faction_ids, {:array, :binary_id})),
           select: %{id: f.id, name: f.name},
           order_by: [asc: fragment("LOWER(?)", f.name)]
         )
