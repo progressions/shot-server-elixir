@@ -23,8 +23,8 @@ defmodule ShotElixir.ActiveStorage.Attachment do
   """
   def changeset(attachment, attrs) do
     attachment
-    |> cast(attrs, [:name, :record_type, :record_id, :blob_id])
-    |> validate_required([:name, :record_type, :record_id, :blob_id])
+    |> cast(attrs, [:name, :record_type, :record_id, :blob_id, :created_at])
+    |> validate_required([:name, :record_type, :record_id, :blob_id, :created_at])
     |> foreign_key_constraint(:blob_id)
     |> unique_constraint([:record_type, :record_id, :name],
       name: :index_active_storage_attachments_uniqueness
