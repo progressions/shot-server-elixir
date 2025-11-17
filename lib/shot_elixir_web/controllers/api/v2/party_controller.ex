@@ -184,14 +184,51 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
               if conn.halted do
                 conn
               else
-                case Parties.update_party(party, parsed_params) do
-                  {:ok, party} ->
-                    render(conn, :show, party: party)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    # Upload image to ImageKit
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        # Attach image to party via ActiveStorage
+                        case ShotElixir.ActiveStorage.attach_image("Party", party.id, upload_result) do
+                          {:ok, _attachment} ->
+                            # Reload party to get fresh data after image attachment
+                            party = Parties.get_party(party.id)
+                            # Continue with party update
+                            case Parties.update_party(party, parsed_params) do
+                              {:ok, party} ->
+                                render(conn, :show, party: party)
 
-                  {:error, changeset} ->
-                    conn
-                    |> put_status(:unprocessable_entity)
-                    |> render(:error, changeset: changeset)
+                              {:error, changeset} ->
+                                conn
+                                |> put_status(:unprocessable_entity)
+                                |> render(:error, changeset: changeset)
+                            end
+
+                          {:error, changeset} ->
+                            conn
+                            |> put_status(:unprocessable_entity)
+                            |> render(:error, changeset: changeset)
+                        end
+
+                      {:error, reason} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> json(%{error: "Failed to upload image: #{inspect(reason)}"})
+                    end
+
+                  _ ->
+                    # No image upload, just update party
+                    case Parties.update_party(party, parsed_params) do
+                      {:ok, party} ->
+                        render(conn, :show, party: party)
+
+                      {:error, changeset} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> render(:error, changeset: changeset)
+                    end
                 end
               end
             else
