@@ -228,7 +228,7 @@ defmodule ShotElixir.BroadcastManager do
   end
 
   defp serialize_entity(entity, "site") do
-    site = ensure_associations(entity, [:campaign])
+    site = ensure_associations(entity, [:campaign, :faction, :juncture, :attunements])
 
     SiteJSON.show(%{site: site})
   end
