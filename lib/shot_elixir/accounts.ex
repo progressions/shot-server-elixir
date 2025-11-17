@@ -73,18 +73,19 @@ defmodule ShotElixir.Accounts do
 
     # Character filtering
     query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
+        character_id = params["character_id"]
         from u in query,
           join: c in "characters",
           on: c.user_id == u.id,
-          where: c.id == ^params["character_id"]
+          where: c.id == type(^character_id, :binary_id)
       else
         query
       end
 
     # Campaign filtering - include both members and owner
     query =
-      if params["campaign_id"] do
+      if params["campaign_id"] && params["campaign_id"] != "" do
         campaign_id = params["campaign_id"]
 
         from u in query,
@@ -92,7 +93,7 @@ defmodule ShotElixir.Accounts do
           on: cm.user_id == u.id,
           left_join: camp in "campaigns",
           on: camp.user_id == u.id,
-          where: cm.campaign_id == ^campaign_id or camp.id == ^campaign_id,
+          where: cm.campaign_id == type(^campaign_id, :binary_id) or camp.id == type(^campaign_id, :binary_id),
           distinct: u.id
       else
         query
@@ -141,17 +142,18 @@ defmodule ShotElixir.Accounts do
     count_query = apply_visibility_filter(count_query, params)
 
     count_query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
+        character_id = params["character_id"]
         from u in count_query,
           join: c in "characters",
           on: c.user_id == u.id,
-          where: c.id == ^params["character_id"]
+          where: c.id == type(^character_id, :binary_id)
       else
         count_query
       end
 
     count_query =
-      if params["campaign_id"] do
+      if params["campaign_id"] && params["campaign_id"] != "" do
         campaign_id = params["campaign_id"]
 
         from u in count_query,
@@ -159,7 +161,7 @@ defmodule ShotElixir.Accounts do
           on: cm.user_id == u.id,
           left_join: camp in "campaigns",
           on: camp.user_id == u.id,
-          where: cm.campaign_id == ^campaign_id or camp.id == ^campaign_id,
+          where: cm.campaign_id == type(^campaign_id, :binary_id) or camp.id == type(^campaign_id, :binary_id),
           distinct: u.id
       else
         count_query
