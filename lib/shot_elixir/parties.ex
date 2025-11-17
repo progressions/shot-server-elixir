@@ -70,7 +70,7 @@ defmodule ShotElixir.Parties do
 
     # Faction filtering - handle "__NONE__" special case
     query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from p in query, where: is_nil(p.faction_id)
         else
@@ -82,7 +82,7 @@ defmodule ShotElixir.Parties do
 
     # Juncture filtering - handle "__NONE__" special case
     query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         if params["juncture_id"] == "__NONE__" do
           from p in query, where: is_nil(p.juncture_id)
         else
@@ -148,7 +148,7 @@ defmodule ShotElixir.Parties do
       end
 
     count_query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from p in count_query, where: is_nil(p.faction_id)
         else
@@ -159,7 +159,7 @@ defmodule ShotElixir.Parties do
       end
 
     count_query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         if params["juncture_id"] == "__NONE__" do
           from p in count_query, where: is_nil(p.juncture_id)
         else

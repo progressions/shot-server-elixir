@@ -98,7 +98,7 @@ defmodule ShotElixir.Campaigns do
 
     # Association-based filters
     query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from c in query,
           join: ch in "characters",
           on: ch.campaign_id == c.id,
@@ -108,7 +108,7 @@ defmodule ShotElixir.Campaigns do
       end
 
     query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from c in query,
           join: v in "vehicles",
           on: v.campaign_id == c.id,
@@ -155,7 +155,7 @@ defmodule ShotElixir.Campaigns do
       end
 
     count_query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from c in count_query,
           join: ch in "characters",
           on: ch.campaign_id == c.id,
@@ -165,7 +165,7 @@ defmodule ShotElixir.Campaigns do
       end
 
     count_query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from c in count_query,
           join: v in "vehicles",
           on: v.campaign_id == c.id,

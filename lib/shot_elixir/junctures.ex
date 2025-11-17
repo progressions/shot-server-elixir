@@ -68,7 +68,7 @@ defmodule ShotElixir.Junctures do
 
     # Faction filtering
     query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from j in query, where: is_nil(j.faction_id)
         else
@@ -83,7 +83,7 @@ defmodule ShotElixir.Junctures do
 
     # Character filtering (junctures containing specific characters)
     query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from j in query,
           join: c in "characters",
           on: c.juncture_id == j.id,
@@ -94,7 +94,7 @@ defmodule ShotElixir.Junctures do
 
     # Vehicle filtering (junctures containing specific vehicles)
     query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from j in query,
           join: v in "vehicles",
           on: v.juncture_id == j.id,
@@ -134,7 +134,7 @@ defmodule ShotElixir.Junctures do
       end
 
     count_query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from j in count_query, where: is_nil(j.faction_id)
         else
@@ -147,7 +147,7 @@ defmodule ShotElixir.Junctures do
     count_query = apply_visibility_filter(count_query, params)
 
     count_query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from j in count_query,
           join: c in "characters",
           on: c.juncture_id == j.id,
@@ -157,7 +157,7 @@ defmodule ShotElixir.Junctures do
       end
 
     count_query =
-      if params["vehicle_id"] do
+      if params["vehicle_id"] && params["vehicle_id"] != "" do
         from j in count_query,
           join: v in "vehicles",
           on: v.juncture_id == j.id,

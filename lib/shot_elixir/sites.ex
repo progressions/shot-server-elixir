@@ -70,7 +70,7 @@ defmodule ShotElixir.Sites do
 
     # Faction filtering - handle "__NONE__" special case
     query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from s in query, where: is_nil(s.faction_id)
         else
@@ -82,7 +82,7 @@ defmodule ShotElixir.Sites do
 
     # Juncture filtering - handle "__NONE__" special case
     query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         if params["juncture_id"] == "__NONE__" do
           from s in query, where: is_nil(s.juncture_id)
         else
@@ -97,7 +97,7 @@ defmodule ShotElixir.Sites do
 
     # Character filtering (sites with attunements to specific character)
     query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from s in query,
           join: a in "attunements",
           on: a.site_id == s.id,
@@ -137,7 +137,7 @@ defmodule ShotElixir.Sites do
       end
 
     count_query =
-      if params["faction_id"] do
+      if params["faction_id"] && params["faction_id"] != "" do
         if params["faction_id"] == "__NONE__" do
           from s in count_query, where: is_nil(s.faction_id)
         else
@@ -148,7 +148,7 @@ defmodule ShotElixir.Sites do
       end
 
     count_query =
-      if params["juncture_id"] do
+      if params["juncture_id"] && params["juncture_id"] != "" do
         if params["juncture_id"] == "__NONE__" do
           from s in count_query, where: is_nil(s.juncture_id)
         else
@@ -161,7 +161,7 @@ defmodule ShotElixir.Sites do
     count_query = apply_visibility_filter(count_query, params)
 
     count_query =
-      if params["character_id"] do
+      if params["character_id"] && params["character_id"] != "" do
         from s in count_query,
           join: a in "attunements",
           on: a.site_id == s.id,
