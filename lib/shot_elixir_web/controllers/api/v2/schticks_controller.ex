@@ -240,14 +240,50 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
             if conn.halted do
               conn
             else
-              case Schticks.update_schtick(schtick, parsed_params) do
-                {:ok, updated_schtick} ->
-                  render(conn, :show, schtick: updated_schtick)
+              # Handle image upload if present
+              case conn.params["image"] do
+                %Plug.Upload{} = upload ->
+                  # Upload image to ImageKit
+                  case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                    {:ok, upload_result} ->
+                      # Attach image to schtick via ActiveStorage
+                      case ShotElixir.ActiveStorage.attach_image("Schtick", schtick.id, upload_result) do
+                        {:ok, _attachment} ->
+                          # Reload schtick to get fresh data after image attachment
+                          schtick = Schticks.get_schtick(schtick.id)
+                          # Continue with schtick update
+                          case Schticks.update_schtick(schtick, parsed_params) do
+                            {:ok, updated_schtick} ->
+                              render(conn, :show, schtick: updated_schtick)
 
-                {:error, changeset} ->
-                  conn
-                  |> put_status(:unprocessable_entity)
-                  |> render(:error, changeset: changeset)
+                            {:error, changeset} ->
+                              conn
+                              |> put_status(:unprocessable_entity)
+                              |> render(:error, changeset: changeset)
+                          end
+
+                        {:error, changeset} ->
+                          conn
+                          |> put_status(:unprocessable_entity)
+                          |> render(:error, changeset: changeset)
+                      end
+
+                    {:error, reason} ->
+                      conn
+                      |> put_status(:unprocessable_entity)
+                      |> json(%{error: "Failed to upload image: #{inspect(reason)}"})
+                  end
+
+                _ ->
+                  # No image upload, just update schtick
+                  case Schticks.update_schtick(schtick, parsed_params) do
+                    {:ok, updated_schtick} ->
+                      render(conn, :show, schtick: updated_schtick)
+
+                    {:error, changeset} ->
+                      conn
+                      |> put_status(:unprocessable_entity)
+                      |> render(:error, changeset: changeset)
               end
             end
         end

@@ -88,11 +88,60 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Fight{} = fight <- Fights.get_fight(id),
-         :ok <- authorize_fight_edit(fight, current_user),
-         {:ok, updated_fight} <- Fights.update_fight(fight, parse_json_params(fight_params)) do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
-      |> render(:show, fight: updated_fight)
+         :ok <- authorize_fight_edit(fight, current_user) do
+      # Handle image upload if present
+      case conn.params["image"] do
+        %Plug.Upload{} = upload ->
+          # Upload image to ImageKit
+          case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+            {:ok, upload_result} ->
+              # Attach image to fight via ActiveStorage
+              case ShotElixir.ActiveStorage.attach_image("Fight", fight.id, upload_result) do
+                {:ok, _attachment} ->
+                  # Reload fight to get fresh data after image attachment
+                  fight = Fights.get_fight(fight.id)
+                  # Continue with fight update
+                  case Fights.update_fight(fight, parse_json_params(fight_params)) do
+                    {:ok, updated_fight} ->
+                      conn
+                      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+                      |> render(:show, fight: updated_fight)
+
+                    {:error, changeset} ->
+                      conn
+                      |> put_status(:unprocessable_entity)
+                      |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+                      |> render(:error, changeset: changeset)
+                  end
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+                  |> render(:error, changeset: changeset)
+              end
+
+            {:error, reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Failed to upload image: #{inspect(reason)}"})
+          end
+
+        _ ->
+          # No image upload, just update fight
+          case Fights.update_fight(fight, parse_json_params(fight_params)) do
+            {:ok, updated_fight} ->
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+              |> render(:show, fight: updated_fight)
+
+            {:error, %Ecto.Changeset{} = changeset} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> put_view(ShotElixirWeb.Api.V2.FightJSON)
+              |> render(:error, changeset: changeset)
+          end
+      end
     else
       nil ->
         conn
@@ -108,12 +157,6 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
-
-      {:error, %Ecto.Changeset{} = changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> put_view(ShotElixirWeb.Api.V2.FightJSON)
-        |> render(:error, changeset: changeset)
     end
   end
 

@@ -183,14 +183,51 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
               if conn.halted do
                 conn
               else
-                case Factions.update_faction(faction, parsed_params) do
-                  {:ok, faction} ->
-                    render(conn, :show, faction: faction)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    # Upload image to ImageKit
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        # Attach image to faction via ActiveStorage
+                        case ShotElixir.ActiveStorage.attach_image("Faction", faction.id, upload_result) do
+                          {:ok, _attachment} ->
+                            # Reload faction to get fresh data after image attachment
+                            faction = Factions.get_faction(faction.id)
+                            # Continue with faction update
+                            case Factions.update_faction(faction, parsed_params) do
+                              {:ok, faction} ->
+                                render(conn, :show, faction: faction)
 
-                  {:error, changeset} ->
-                    conn
-                    |> put_status(:unprocessable_entity)
-                    |> render(:error, changeset: changeset)
+                              {:error, changeset} ->
+                                conn
+                                |> put_status(:unprocessable_entity)
+                                |> render(:error, changeset: changeset)
+                            end
+
+                          {:error, changeset} ->
+                            conn
+                            |> put_status(:unprocessable_entity)
+                            |> render(:error, changeset: changeset)
+                        end
+
+                      {:error, reason} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> json(%{error: "Failed to upload image: #{inspect(reason)}"})
+                    end
+
+                  _ ->
+                    # No image upload, just update faction
+                    case Factions.update_faction(faction, parsed_params) do
+                      {:ok, faction} ->
+                        render(conn, :show, faction: faction)
+
+                      {:error, changeset} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> render(:error, changeset: changeset)
+                    end
                 end
               end
             else

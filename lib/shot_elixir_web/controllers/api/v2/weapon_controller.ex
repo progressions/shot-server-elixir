@@ -129,14 +129,51 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
         |> json(%{error: "Weapon not found"})
 
       true ->
-        case Weapons.update_weapon(weapon, weapon_params) do
-          {:ok, weapon} ->
-            render(conn, :show, weapon: weapon)
+        # Handle image upload if present
+        case conn.params["image"] do
+          %Plug.Upload{} = upload ->
+            # Upload image to ImageKit
+            case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+              {:ok, upload_result} ->
+                # Attach image to weapon via ActiveStorage
+                case ShotElixir.ActiveStorage.attach_image("Weapon", weapon.id, upload_result) do
+                  {:ok, _attachment} ->
+                    # Reload weapon to get fresh data after image attachment
+                    weapon = Weapons.get_weapon(weapon.id)
+                    # Continue with weapon update
+                    case Weapons.update_weapon(weapon, weapon_params) do
+                      {:ok, weapon} ->
+                        render(conn, :show, weapon: weapon)
 
-          {:error, changeset} ->
-            conn
-            |> put_status(:unprocessable_entity)
-            |> render(:error, changeset: changeset)
+                      {:error, changeset} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> render(:error, changeset: changeset)
+                    end
+
+                  {:error, changeset} ->
+                    conn
+                    |> put_status(:unprocessable_entity)
+                    |> render(:error, changeset: changeset)
+                end
+
+              {:error, reason} ->
+                conn
+                |> put_status(:unprocessable_entity)
+                |> json(%{error: "Failed to upload image: #{inspect(reason)}"})
+            end
+
+          _ ->
+            # No image upload, just update weapon
+            case Weapons.update_weapon(weapon, weapon_params) do
+              {:ok, weapon} ->
+                render(conn, :show, weapon: weapon)
+
+              {:error, changeset} ->
+                conn
+                |> put_status(:unprocessable_entity)
+                |> render(:error, changeset: changeset)
+            end
         end
     end
   end

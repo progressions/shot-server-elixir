@@ -180,14 +180,51 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
               if conn.halted do
                 conn
               else
-                case Sites.update_site(site, parsed_params) do
-                  {:ok, site} ->
-                    render(conn, :show, site: site)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    # Upload image to ImageKit
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        # Attach image to site via ActiveStorage
+                        case ShotElixir.ActiveStorage.attach_image("Site", site.id, upload_result) do
+                          {:ok, _attachment} ->
+                            # Reload site to get fresh data after image attachment
+                            site = Sites.get_site(site.id)
+                            # Continue with site update
+                            case Sites.update_site(site, parsed_params) do
+                              {:ok, site} ->
+                                render(conn, :show, site: site)
 
-                  {:error, changeset} ->
-                    conn
-                    |> put_status(:unprocessable_entity)
-                    |> render(:error, changeset: changeset)
+                              {:error, changeset} ->
+                                conn
+                                |> put_status(:unprocessable_entity)
+                                |> render(:error, changeset: changeset)
+                            end
+
+                          {:error, changeset} ->
+                            conn
+                            |> put_status(:unprocessable_entity)
+                            |> render(:error, changeset: changeset)
+                        end
+
+                      {:error, reason} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> json(%{error: "Failed to upload image: #{inspect(reason)}"})
+                    end
+
+                  _ ->
+                    # No image upload, just update site
+                    case Sites.update_site(site, parsed_params) do
+                      {:ok, site} ->
+                        render(conn, :show, site: site)
+
+                      {:error, changeset} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> render(:error, changeset: changeset)
+                    end
                 end
               end
             else
