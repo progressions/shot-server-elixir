@@ -6,7 +6,9 @@ defmodule ShotElixir.Services.AiService do
 
   require Logger
   alias ShotElixir.ActiveStorage
-  alias ShotElixir.Services.ImagekitService
+  alias ShotElixir.Services.{ImagekitService, GrokService}
+  alias ShotElixir.Characters
+  alias ShotElixir.Vehicles
 
   @doc """
   Downloads an image from a URL and attaches it to an entity.
@@ -74,5 +76,97 @@ defmodule ShotElixir.Services.AiService do
     }
 
     ImagekitService.upload_file(file_path, options)
+  end
+
+  @doc """
+  Generates AI images for an entity using Grok API.
+  Returns a list of image URLs.
+
+  ## Parameters
+    - entity_type: "Character" or "Vehicle"
+    - entity_id: UUID of the entity
+    - num_images: Number of images to generate (default 3)
+
+  ## Returns
+    - {:ok, [urls]} on success
+    - {:error, reason} on failure
+  """
+  def generate_images_for_entity(entity_type, entity_id, num_images \\ 3) do
+    Logger.info("Generating #{num_images} AI images for #{entity_type}:#{entity_id}")
+
+    with {:ok, entity} <- get_entity(entity_type, entity_id),
+         {:ok, prompt} <- build_image_prompt(entity),
+         {:ok, urls} <- GrokService.generate_image(prompt, num_images, "url") do
+      Logger.info("Successfully generated #{length(urls)} images")
+      {:ok, urls}
+    else
+      {:error, reason} = error ->
+        Logger.error("Failed to generate images: #{inspect(reason)}")
+        error
+    end
+  end
+
+  # Get entity by type and ID
+  defp get_entity("Character", entity_id) do
+    case Characters.get_character(entity_id) do
+      nil -> {:error, "Character not found"}
+      character -> {:ok, character}
+    end
+  end
+
+  defp get_entity("Vehicle", entity_id) do
+    case Vehicles.get_vehicle(entity_id) do
+      nil -> {:error, "Vehicle not found"}
+      vehicle -> {:ok, vehicle}
+    end
+  end
+
+  defp get_entity(entity_type, _entity_id) do
+    {:error, "Unsupported entity type: #{entity_type}"}
+  end
+
+  # Build image generation prompt from entity
+  defp build_image_prompt(entity) do
+    prompt =
+      cond do
+        # Check description field first
+        Map.has_key?(entity, :description) && is_binary(entity.description) && entity.description != "" ->
+          "Generate an image of: #{entity.description}"
+
+        # Check action_values map - extract relevant fields
+        Map.has_key?(entity, :action_values) && is_map(entity.action_values) ->
+          build_prompt_from_action_values(entity.action_values, entity.name)
+
+        # Fallback to name
+        Map.has_key?(entity, :name) && entity.name ->
+          "Generate an image of a character named #{entity.name}"
+
+        true ->
+          "Generate a character image"
+      end
+
+    {:ok, prompt}
+  end
+
+  # Build prompt from action_values map
+  defp build_prompt_from_action_values(action_values, name) do
+    # Extract relevant descriptive fields
+    background = action_values["Background"] || action_values["background"]
+    appearance = action_values["Appearance"] || action_values["appearance"]
+    style = action_values["Style of Dress"] || action_values["style"]
+
+    # Build description from available fields
+    parts = [
+      if(name, do: "Character named #{name}", else: nil),
+      if(appearance && appearance != "", do: "Appearance: #{appearance}", else: nil),
+      if(style && style != "", do: "Style: #{style}", else: nil),
+      if(background && background != "", do: "Background: #{String.slice(background, 0..200)}", else: nil)
+    ]
+    |> Enum.reject(&is_nil/1)
+
+    case parts do
+      [] -> "Generate a character image"
+      _ -> "Generate an image of: " <> Enum.join(parts, ". ")
+    end
   end
 end

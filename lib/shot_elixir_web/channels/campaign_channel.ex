@@ -43,11 +43,16 @@ defmodule ShotElixirWeb.CampaignChannel do
   # Handle Rails-compatible broadcast messages from PubSub
   @impl true
   def handle_info({:rails_message, payload}, socket) do
+    Logger.info("📨 CampaignChannel: Pushing message to client")
+    Logger.info("Payload: #{inspect(payload)}")
+
     # Push to both ActionCable and Phoenix Channels clients
     # ActionCable clients expect "message" event (no event name in received callback)
     # Phoenix clients expect named events like "update"
     push(socket, "message", payload)  # For ActionCable compatibility
     push(socket, "update", payload)    # For Phoenix Channels clients
+
+    Logger.info("✅ Message pushed to socket")
     {:noreply, socket}
   end
 
@@ -165,5 +170,19 @@ defmodule ShotElixirWeb.CampaignChannel do
       action: action,
       timestamp: DateTime.utc_now()
     })
+  end
+
+  @doc """
+  Broadcasts AI image generation status (Rails ActionCable compatible format).
+  Status can be 'preview_ready' with json, or 'error' with error message.
+  """
+  def broadcast_ai_image_status(campaign_id, status, data) do
+    # Use Phoenix.PubSub for Rails-compatible broadcast
+    # This will be received by handle_info({:rails_message, payload}, socket)
+    Phoenix.PubSub.broadcast!(
+      ShotElixir.PubSub,
+      "campaign:#{campaign_id}",
+      {:rails_message, Map.merge(%{status: status}, data)}
+    )
   end
 end

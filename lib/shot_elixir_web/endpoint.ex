@@ -54,6 +54,7 @@ defmodule ShotElixirWeb.Endpoint do
   plug CORSPlug,
     origin: ["http://localhost:3001", "http://localhost:3000"],
     credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     headers: [
       "Accept",
       "Authorization",
@@ -61,7 +62,8 @@ defmodule ShotElixirWeb.Endpoint do
       "Origin",
       "X-Requested-With"
     ],
-    expose: ["Authorization"]
+    expose: ["Authorization"],
+    max_age: 86400
 
   plug Plug.RequestId
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]

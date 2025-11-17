@@ -49,10 +49,38 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                 # Verify entity exists and belongs to campaign
                 case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
                   {:ok, _entity} ->
-                    # TODO: Start AI image creation job
-                    # AiImageCreationJob.perform_later(entity_class, entity_id, campaign.id)
+                    # Start AI image generation in background task
+                    campaign_id = campaign.id
 
-                    # For now, return immediate response like Rails
+                    Task.start(fn ->
+                      case ShotElixir.Services.AiService.generate_images_for_entity(
+                             entity_class,
+                             entity_id,
+                             3
+                           ) do
+                        {:ok, urls} when is_list(urls) ->
+                          # Broadcast success with image URLs as JSON
+                          json = Jason.encode!(urls)
+
+                          ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
+                            campaign_id,
+                            "preview_ready",
+                            %{json: json}
+                          )
+
+                        {:error, reason} ->
+                          # Broadcast error
+                          error_message = "Failed to generate images: #{inspect(reason)}"
+
+                          ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
+                            campaign_id,
+                            "error",
+                            %{error: error_message}
+                          )
+                      end
+                    end)
+
+                    # Return immediate response like Rails
                     conn
                     |> put_status(:accepted)
                     |> json(%{message: "Character generation in progress"})
@@ -84,7 +112,9 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   # POST /api/v2/ai_images/attach
   # Attaches image from URL to an entity
   def attach(conn, params) do
+    IO.inspect(params, label: "AI Image attach params")
     current_user = Guardian.Plug.current_resource(conn)
+    IO.inspect({current_user.id, current_user.current_campaign_id}, label: "User and Campaign")
 
     if current_user.current_campaign_id do
       # Verify user has access to campaign
@@ -135,20 +165,55 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                            image_url
                          ) do
                       {:ok, _attachment} ->
-                        # Return updated entity with image_url
-                        serialized_entity =
-                          serialize_entity(entity_class, entity)
-                          |> Map.put(
-                            :image_url,
-                            ShotElixir.ActiveStorage.get_image_url(entity_class, entity.id)
-                          )
+                        # Reload entity to get fresh data
+                        case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
+                          {:ok, refreshed_entity} ->
+                            # Get updated image URL
+                            image_url = ShotElixir.ActiveStorage.get_image_url(entity_class, refreshed_entity.id)
 
-                        conn
-                        |> put_status(:ok)
-                        |> json(%{
-                          entity: serialized_entity,
-                          serializer: "#{entity_class}Serializer"
-                        })
+                            # Return updated entity with image_url
+                            serialized_entity =
+                              serialize_entity(entity_class, refreshed_entity)
+                              |> Map.put(:image_url, image_url)
+
+                            # Broadcast character update via WebSocket (Rails-compatible format)
+                            if entity_class == "Character" do
+                              IO.puts("📡 Broadcasting character update to campaign:#{current_user.current_campaign_id}")
+                              IO.inspect(serialized_entity, label: "Character data")
+
+                              # Use Phoenix PubSub for Rails-compatible broadcast
+                              Phoenix.PubSub.broadcast!(
+                                ShotElixir.PubSub,
+                                "campaign:#{current_user.current_campaign_id}",
+                                {:rails_message, %{character: serialized_entity}}
+                              )
+
+                              IO.puts("✅ Broadcast sent successfully")
+                            end
+
+                            conn
+                            |> put_status(:ok)
+                            |> json(%{
+                              entity: serialized_entity,
+                              serializer: "#{entity_class}Serializer"
+                            })
+
+                          {:error, _} ->
+                            # Fallback to original entity if reload fails
+                            serialized_entity =
+                              serialize_entity(entity_class, entity)
+                              |> Map.put(
+                                :image_url,
+                                ShotElixir.ActiveStorage.get_image_url(entity_class, entity.id)
+                              )
+
+                            conn
+                            |> put_status(:ok)
+                            |> json(%{
+                              entity: serialized_entity,
+                              serializer: "#{entity_class}Serializer"
+                            })
+                        end
 
                       {:error, reason} ->
                         conn
@@ -223,11 +288,21 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   defp get_entity(_, _, _), do: {:error, :not_found}
 
   defp serialize_entity("Character", character) do
+    # Extract archetype from action_values map if it exists
+    archetype =
+      if is_map(character.action_values) do
+        character.action_values["Archetype"]
+      else
+        nil
+      end
+
     %{
       id: character.id,
       name: character.name,
-      archetype: character.archetype,
+      archetype: archetype,
+      action_values: character.action_values,
       description: character.description,
+      skills: character.skills,
       campaign_id: character.campaign_id,
       created_at: character.created_at,
       updated_at: character.updated_at

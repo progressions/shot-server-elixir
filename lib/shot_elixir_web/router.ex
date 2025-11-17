@@ -148,9 +148,8 @@ defmodule ShotElixirWeb.Router do
       patch "/extend", AiController, :extend
     end
 
-    resources "/ai_images", AiImageController, only: [:create] do
-      post "/attach", AiImageController, :attach
-    end
+    post "/ai_images", AiImageController, :create
+    post "/ai_images/attach", AiImageController, :attach
 
     resources "/chase_relationships", ChaseRelationshipController, except: [:new, :edit]
 
