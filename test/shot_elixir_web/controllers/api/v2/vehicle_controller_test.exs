@@ -181,7 +181,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
         |> authenticate(gamemaster)
         |> get("/api/v2/vehicles/#{vehicle.id}")
 
-      response = json_response(conn, 200)["vehicle"]
+      response = json_response(conn, 200)
       assert response["id"] == vehicle.id
       assert response["name"] == vehicle.name
       assert response["action_values"] == vehicle.action_values
@@ -215,7 +215,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
         |> authenticate(gamemaster)
         |> post("/api/v2/vehicles", vehicle: @create_attrs)
 
-      assert %{"id" => id} = json_response(conn, 201)["vehicle"]
+      assert %{"id" => id} = json_response(conn, 201)
 
       # Verify vehicle was created
       vehicle = Vehicles.get_vehicle(id)
@@ -244,7 +244,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
         |> authenticate(player)
         |> post("/api/v2/vehicles", vehicle: @create_attrs)
 
-      assert %{"id" => _id} = json_response(conn, 201)["vehicle"]
+      assert %{"id" => _id} = json_response(conn, 201)
     end
   end
 
@@ -271,7 +271,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
         |> authenticate(gamemaster)
         |> patch("/api/v2/vehicles/#{vehicle.id}", vehicle: @update_attrs)
 
-      response = json_response(conn, 200)["vehicle"]
+      response = json_response(conn, 200)
       assert response["id"] == vehicle.id
       assert response["name"] == "Updated Vehicle"
       assert response["color"] == "blue"

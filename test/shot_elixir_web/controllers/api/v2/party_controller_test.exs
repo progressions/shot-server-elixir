@@ -123,7 +123,7 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
     test "returns party when found", %{conn: conn, party: party} do
       conn = get(conn, ~p"/api/v2/parties/#{party.id}")
-      assert %{"party" => returned_party} = json_response(conn, 200)
+      assert returned_party = json_response(conn, 200)
       assert returned_party["id"] == party.id
       assert returned_party["name"] == "Heroes of Justice"
     end
@@ -159,7 +159,7 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       {:ok, _veh_membership} = Parties.add_member(party.id, %{"vehicle_id" => vehicle.id})
 
       conn = get(conn, ~p"/api/v2/parties/#{party.id}")
-      assert %{"party" => returned_party} = json_response(conn, 200)
+      assert returned_party = json_response(conn, 200)
       assert [char] = returned_party["characters"]
       assert char["name"] == "Test Character"
       assert char["category"] == "character"
@@ -184,7 +184,7 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       }
 
       conn = post(conn, ~p"/api/v2/parties", party: party_params)
-      assert %{"party" => party} = json_response(conn, 201)
+      assert party = json_response(conn, 201)
       assert party["name"] == "Brave Warriors"
       assert party["description"] == "A courageous band"
       assert party["campaign_id"] == campaign.id
@@ -220,7 +220,7 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
           }
         )
 
-      assert %{"party" => updated_party} = json_response(conn, 200)
+      assert updated_party = json_response(conn, 200)
       assert updated_party["name"] == "Updated Party"
       assert updated_party["description"] == "New description"
       assert updated_party["faction"]["name"] == "Test Faction"
@@ -293,7 +293,7 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
     test "adds character to party", %{conn: conn, party: party, character: character} do
       conn = post(conn, ~p"/api/v2/parties/#{party.id}/members", character_id: character.id)
-      assert %{"party" => returned_party} = json_response(conn, 200)
+      assert returned_party = json_response(conn, 200)
       assert [char] = returned_party["characters"]
       assert char["id"] == character.id
       assert char["name"] == "Test Character"
@@ -301,7 +301,7 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
     test "adds vehicle to party", %{conn: conn, party: party, vehicle: vehicle} do
       conn = post(conn, ~p"/api/v2/parties/#{party.id}/members", vehicle_id: vehicle.id)
-      assert %{"party" => returned_party} = json_response(conn, 200)
+      assert returned_party = json_response(conn, 200)
       assert [veh] = returned_party["vehicles"]
       assert veh["id"] == vehicle.id
       assert veh["name"] == "Test Vehicle"
@@ -326,7 +326,7 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
 
       # Second membership - now allowed after unique constraint removal
       conn = post(conn, ~p"/api/v2/parties/#{party.id}/members", character_id: character.id)
-      assert %{"party" => _} = json_response(conn, 200)
+      assert _ = json_response(conn, 200)
     end
 
     test "returns error when neither character_id nor vehicle_id provided", %{

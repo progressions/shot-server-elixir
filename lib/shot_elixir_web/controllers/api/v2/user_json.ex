@@ -54,7 +54,8 @@ defmodule ShotElixirWeb.Api.V2.UserJSON do
       gamemaster: user.gamemaster,
       current_campaign_id: user.current_campaign_id,
       created_at: user.created_at,
-      updated_at: user.updated_at
+      updated_at: user.updated_at,
+      entity_class: "User"
     }
   end
 

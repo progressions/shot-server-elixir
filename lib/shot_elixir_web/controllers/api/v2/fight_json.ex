@@ -1,5 +1,16 @@
 defmodule ShotElixirWeb.Api.V2.FightJSON do
-  def index(%{fights: fights}) do
+  def index(%{fights: data}) when is_map(data) do
+    # Handle paginated response with metadata
+    fights_list = Map.get(data, :fights) || Map.get(data, "fights") || []
+
+    %{
+      fights: Enum.map(fights_list, &fight_json/1),
+      meta: Map.get(data, :meta) || Map.get(data, "meta") || %{}
+    }
+  end
+
+  def index(%{fights: fights}) when is_list(fights) do
+    # Handle simple list response
     %{fights: Enum.map(fights, &fight_json/1)}
   end
 

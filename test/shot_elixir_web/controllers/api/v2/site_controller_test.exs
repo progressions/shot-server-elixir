@@ -123,7 +123,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
 
     test "returns site when found", %{conn: conn, site: site} do
       conn = get(conn, ~p"/api/v2/sites/#{site.id}")
-      assert %{"site" => returned_site} = json_response(conn, 200)
+      assert returned_site = json_response(conn, 200)
       assert returned_site["id"] == site.id
       assert returned_site["name"] == "Temple of Doom"
     end
@@ -147,7 +147,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
         })
 
       conn = get(conn, ~p"/api/v2/sites/#{site.id}")
-      assert %{"site" => returned_site} = json_response(conn, 200)
+      assert returned_site = json_response(conn, 200)
       assert [attunement] = returned_site["attunements"]
       assert attunement["character_id"] == character.id
       assert attunement["character"]["name"] == "Test Character"
@@ -169,7 +169,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
       }
 
       conn = post(conn, ~p"/api/v2/sites", site: site_params)
-      assert %{"site" => site} = json_response(conn, 201)
+      assert site = json_response(conn, 201)
       assert site["name"] == "Lost Temple"
       assert site["description"] == "An ancient ruin"
       assert site["campaign_id"] == campaign.id
@@ -205,7 +205,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
           }
         )
 
-      assert %{"site" => updated_site} = json_response(conn, 200)
+      assert updated_site = json_response(conn, 200)
       assert updated_site["name"] == "Updated Temple"
       assert updated_site["description"] == "New description"
       assert updated_site["faction"]["name"] == "Test Faction"
@@ -271,7 +271,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
       character: character
     } do
       conn = post(conn, ~p"/api/v2/sites/#{site.id}/attune", character_id: character.id)
-      assert %{"site" => returned_site} = json_response(conn, 200)
+      assert returned_site = json_response(conn, 200)
       assert [attunement] = returned_site["attunements"]
       assert attunement["character_id"] == character.id
     end

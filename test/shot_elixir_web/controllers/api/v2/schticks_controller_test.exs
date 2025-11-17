@@ -179,7 +179,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks/#{schtick.id}")
 
-      response = json_response(conn, 200)["schtick"]
+      response = json_response(conn, 200)
       assert response["id"] == schtick.id
       assert response["name"] == schtick.name
       assert response["category"] == schtick.category
@@ -213,7 +213,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks/#{schtick.id}")
 
-      response = json_response(conn, 200)["schtick"]
+      response = json_response(conn, 200)
       assert response["prerequisite"]["id"] == prereq.id
       assert response["prerequisite"]["name"] == "Prerequisite"
     end
@@ -246,7 +246,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
         |> authenticate(gamemaster)
         |> post("/api/v2/schticks", schtick: @create_attrs)
 
-      assert %{"id" => id} = json_response(conn, 201)["schtick"]
+      assert %{"id" => id} = json_response(conn, 201)
 
       # Verify schtick was created
       schtick = Schticks.get_schtick(id)
@@ -277,7 +277,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
         |> authenticate(gamemaster)
         |> post("/api/v2/schticks", schtick: advanced_attrs)
 
-      response = json_response(conn, 201)["schtick"]
+      response = json_response(conn, 201)
       assert response["prerequisite_id"] == prereq.id
     end
 
@@ -313,7 +313,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
         |> authenticate(player)
         |> post("/api/v2/schticks", schtick: @create_attrs)
 
-      assert %{"id" => _id} = json_response(conn, 201)["schtick"]
+      assert %{"id" => _id} = json_response(conn, 201)
     end
   end
 
@@ -339,7 +339,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
         |> authenticate(gamemaster)
         |> patch("/api/v2/schticks/#{schtick.id}", schtick: @update_attrs)
 
-      response = json_response(conn, 200)["schtick"]
+      response = json_response(conn, 200)
       assert response["id"] == schtick.id
       assert response["name"] == "Updated Schtick"
       assert response["category"] == "guns"

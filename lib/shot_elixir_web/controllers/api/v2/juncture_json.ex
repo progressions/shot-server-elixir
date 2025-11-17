@@ -58,7 +58,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureJSON do
       faction_id: Map.get(juncture, :faction_id),
       faction: faction,
       created_at: Map.get(juncture, :created_at),
-      updated_at: Map.get(juncture, :updated_at)
+      updated_at: Map.get(juncture, :updated_at),
+      entity_class: "Juncture"
     }
   end
 end

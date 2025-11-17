@@ -180,7 +180,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
         |> authenticate(gamemaster)
         |> get("/api/v2/weapons/#{weapon.id}")
 
-      response = json_response(conn, 200)["weapon"]
+      response = json_response(conn, 200)
       assert response["id"] == weapon.id
       assert response["name"] == weapon.name
       assert response["damage"] == weapon.damage
@@ -215,7 +215,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
         |> authenticate(gamemaster)
         |> post("/api/v2/weapons", weapon: @create_attrs)
 
-      assert %{"id" => id} = json_response(conn, 201)["weapon"]
+      assert %{"id" => id} = json_response(conn, 201)
 
       # Verify weapon was created
       weapon = Weapons.get_weapon(id)
@@ -268,7 +268,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
         |> authenticate(player)
         |> post("/api/v2/weapons", weapon: @create_attrs)
 
-      assert %{"id" => _id} = json_response(conn, 201)["weapon"]
+      assert %{"id" => _id} = json_response(conn, 201)
     end
   end
 
@@ -294,7 +294,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
         |> authenticate(gamemaster)
         |> patch("/api/v2/weapons/#{weapon.id}", weapon: @update_attrs)
 
-      response = json_response(conn, 200)["weapon"]
+      response = json_response(conn, 200)
       assert response["id"] == weapon.id
       assert response["name"] == "Updated Pistol"
       assert response["damage"] == 12

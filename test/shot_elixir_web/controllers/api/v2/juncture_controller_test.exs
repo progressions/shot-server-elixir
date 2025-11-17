@@ -117,9 +117,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
     test "shows juncture when found", %{conn: conn, juncture: juncture} do
       conn = get(conn, ~p"/api/v2/junctures/#{juncture.id}")
-      response = json_response(conn, 200)
+      returned_juncture = json_response(conn, 200)
 
-      assert %{"juncture" => returned_juncture} = response
       assert returned_juncture["id"] == juncture.id
       assert returned_juncture["name"] == juncture.name
       assert returned_juncture["description"] == juncture.description
@@ -140,9 +139,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
   describe "create" do
     test "creates juncture with valid data", %{conn: conn} do
       conn = post(conn, ~p"/api/v2/junctures", juncture: @create_attrs)
-      response = json_response(conn, 201)
+      juncture = json_response(conn, 201)
 
-      assert %{"juncture" => juncture} = response
       assert juncture["name"] == @create_attrs.name
       assert juncture["description"] == @create_attrs.description
     end
@@ -173,9 +171,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
     test "updates juncture with valid data", %{conn: conn, juncture: juncture} do
       conn = patch(conn, ~p"/api/v2/junctures/#{juncture.id}", juncture: @update_attrs)
-      response = json_response(conn, 200)
+      updated_juncture = json_response(conn, 200)
 
-      assert %{"juncture" => updated_juncture} = response
       assert updated_juncture["name"] == @update_attrs.name
       assert updated_juncture["description"] == @update_attrs.description
     end
