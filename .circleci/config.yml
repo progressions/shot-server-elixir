@@ -1,93 +1,7 @@
 version: 2.1
 
-orbs:
-  # Elixir orb for Phoenix projects
-  elixir: circleci/elixir@2.1.0
-
 jobs:
-  build_and_test:
-    docker:
-      # Primary container - Elixir image
-      - image: cimg/elixir:1.19.3-erlang-27.2-node
-        environment:
-          MIX_ENV: test
-          DATABASE_URL: postgres://postgres:postgres@localhost/shot_elixir_test
-
-      # PostgreSQL service container
-      - image: cimg/postgres:16.6
-        environment:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: shot_elixir_test
-
-    working_directory: ~/repo
-
-    steps:
-      - checkout
-
-      # Restore cached dependencies
-      - restore_cache:
-          keys:
-            - v1-mix-cache-{{ checksum "mix.lock" }}
-            - v1-mix-cache
-
-      # Install Hex and Rebar
-      - run:
-          name: Install Hex and Rebar
-          command: |
-            mix local.hex --force
-            mix local.rebar --force
-
-      # Install dependencies
-      - run:
-          name: Install dependencies
-          command: mix deps.get
-
-      # Save dependency cache
-      - save_cache:
-          key: v1-mix-cache-{{ checksum "mix.lock" }}
-          paths:
-            - deps
-            - _build
-
-      # Compile application
-      - run:
-          name: Compile application
-          command: mix compile --warnings-as-errors
-
-      # Wait for PostgreSQL to be ready
-      - run:
-          name: Wait for Postgres
-          command: |
-            for i in `seq 1 30`; do
-              mix ecto.create && break
-              echo "Waiting for Postgres..."
-              sleep 1
-            done
-
-      # Create and migrate test database
-      - run:
-          name: Setup database
-          command: |
-            mix ecto.create
-            mix ecto.migrate
-
-      # Run tests
-      - run:
-          name: Run tests
-          command: mix test
-
-      # Store test results
-      - store_test_results:
-          path: _build/test/lib/shot_elixir
-
-      # Store artifacts (coverage reports, etc.)
-      - store_artifacts:
-          path: cover
-          destination: coverage
-
-  # Code quality checks
-  code_quality:
+  format:
     docker:
       - image: cimg/elixir:1.19.3-erlang-27.2-node
         environment:
@@ -98,11 +12,11 @@ jobs:
     steps:
       - checkout
 
-      # Restore cached dependencies
+      # Cache dependencies
       - restore_cache:
           keys:
-            - v1-mix-cache-{{ checksum "mix.lock" }}
-            - v1-mix-cache
+            - v2-mix-cache-{{ checksum "mix.lock" }}
+            - v2-mix-cache
 
       # Install Hex and Rebar
       - run:
@@ -116,20 +30,102 @@ jobs:
           name: Install dependencies
           command: mix deps.get
 
-      # Check code formatting
+      # Save cache
+      - save_cache:
+          paths:
+            - deps
+            - _build
+          key: v2-mix-cache-{{ checksum "mix.lock" }}
+
+      # Run formatting check
       - run:
-          name: Check code formatting
+          name: Check formatting
           command: mix format --check-formatted
 
-      # Run Credo for code analysis (if configured)
-      # Uncomment when Credo is added to mix.exs
-      # - run:
-      #     name: Run Credo
-      #     command: mix credo --strict
+  test:
+    docker:
+      - image: cimg/elixir:1.19.3-erlang-27.2-node
+        environment:
+          MIX_ENV: test
+          DATABASE_URL: postgres://circleci:@localhost/shot_elixir_test
+
+      - image: cimg/postgres:16.6
+        environment:
+          POSTGRES_USER: circleci
+          POSTGRES_DB: shot_elixir_test
+          POSTGRES_PASSWORD: ""
+          POSTGRES_HOST_AUTH_METHOD: trust
+
+    working_directory: ~/repo
+
+    steps:
+      - checkout
+
+      # Cache dependencies
+      - restore_cache:
+          keys:
+            - v2-mix-cache-{{ checksum "mix.lock" }}
+            - v2-mix-cache
+
+      # Install Hex and Rebar
+      - run:
+          name: Install Hex and Rebar
+          command: |
+            mix local.hex --force
+            mix local.rebar --force
+
+      # Install dependencies
+      - run:
+          name: Install dependencies
+          command: mix deps.get
+
+      # Save cache
+      - save_cache:
+          paths:
+            - deps
+            - _build
+          key: v2-mix-cache-{{ checksum "mix.lock" }}
+
+      # Compile application with warnings as errors
+      - run:
+          name: Compile application
+          command: mix compile --warnings-as-errors
+
+      # Wait for database
+      - run:
+          name: Wait for DB
+          command: |
+            for i in {1..10}; do
+              pg_isready -h localhost -U circleci && break
+              echo "Waiting for database..."
+              sleep 2
+            done
+
+      # Database setup
+      - run:
+          name: Database setup
+          command: |
+            mix ecto.create
+            mix ecto.migrate
+
+      # Run tests with timeout
+      - run:
+          name: Run tests
+          command: mix test
+          no_output_timeout: 4m
+
+      # Store test results
+      - store_test_results:
+          path: _build/test/lib/shot_elixir
+
+      # Store coverage artifacts
+      - store_artifacts:
+          path: cover
+          destination: coverage
 
 workflows:
   version: 2
-  build_test_and_deploy:
+  test_and_format:
     jobs:
-      - build_and_test
-      - code_quality
+      - format
+      - test
