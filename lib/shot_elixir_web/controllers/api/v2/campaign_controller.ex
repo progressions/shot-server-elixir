@@ -198,9 +198,19 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       fights = ShotElixir.Fights.list_fights(campaign.id)
       current_fight = List.first(fights)
 
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-      |> render("current_fight.json", campaign: campaign, fight: current_fight)
+      if current_fight do
+        # Preload necessary associations for the fight
+        current_fight_with_associations =
+          ShotElixir.Repo.preload(current_fight, [:characters, :vehicles, :image_positions])
+
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+        |> render("fight_only.json", fight: current_fight_with_associations)
+      else
+        conn
+        |> put_status(:no_content)
+        |> text("")
+      end
     else
       nil ->
         conn

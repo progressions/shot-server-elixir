@@ -170,6 +170,7 @@ defmodule ShotElixir.Factions do
       query
       |> limit(^per_page)
       |> offset(^offset)
+      |> preload([:characters, :vehicles, :sites, :parties, :junctures])
       |> Repo.all()
 
     # Load image URLs for all factions efficiently

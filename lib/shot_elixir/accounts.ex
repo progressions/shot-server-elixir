@@ -266,7 +266,13 @@ defmodule ShotElixir.Accounts do
 
   def get_user(id) do
     Repo.get(User, id)
-    |> ImageLoader.load_image_url("User")
+    |> case do
+      nil -> nil
+      user ->
+        user
+        |> Repo.preload([:image_positions])
+        |> ImageLoader.load_image_url("User")
+    end
   end
 
   def get_user_by_email(email) when is_binary(email) do

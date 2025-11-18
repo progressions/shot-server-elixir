@@ -7,6 +7,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
 
   action_fallback ShotElixirWeb.FallbackController
 
+  plug :put_view, ShotElixirWeb.Api.V2.JunctureView
+
   # GET /api/v2/junctures
   def index(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)

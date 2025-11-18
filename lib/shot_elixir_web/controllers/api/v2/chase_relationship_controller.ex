@@ -4,7 +4,7 @@ defmodule ShotElixirWeb.Api.V2.ChaseRelationshipController do
   alias ShotElixir.Chases
   alias ShotElixir.Chases.ChaseRelationship
   alias ShotElixir.Guardian
-  alias ShotElixirWeb.Api.V2.VehicleJSON
+  alias ShotElixirWeb.Api.V2.VehicleView
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -193,6 +193,6 @@ defmodule ShotElixirWeb.Api.V2.ChaseRelationshipController do
   defp serialize_vehicle(nil), do: nil
 
   defp serialize_vehicle(vehicle) do
-    VehicleJSON.show(%{vehicle: vehicle})[:vehicle]
+    VehicleView.render("show.json", %{vehicle: vehicle})[:vehicle]
   end
 end

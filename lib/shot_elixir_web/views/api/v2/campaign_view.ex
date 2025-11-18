@@ -62,6 +62,10 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     }
   end
 
+  def render("fight_only.json", %{fight: fight}) do
+    render_fight_detailed(fight)
+  end
+
   def render("membership.json", %{membership: membership}) do
     %{
       membership: %{
@@ -171,6 +175,61 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       ended_at: fight.ended_at,
       created_at: fight.created_at,
       updated_at: fight.updated_at
+    }
+  end
+
+  defp render_fight_detailed(fight) do
+    # Handle potentially loaded or not loaded associations
+    characters = case Map.get(fight, :characters) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      chars -> Enum.map(chars, &render_character_simple/1)
+    end
+
+    vehicles = case Map.get(fight, :vehicles) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      vehs -> Enum.map(vehs, &render_vehicle_simple/1)
+    end
+
+    character_ids = Enum.map(characters, & &1[:id])
+    vehicle_ids = Enum.map(vehicles, & &1[:id])
+
+    %{
+      id: fight.id,
+      name: fight.name,
+      description: fight.description,
+      image_url: fight.image_url,
+      created_at: fight.created_at,
+      updated_at: fight.updated_at,
+      active: fight.active,
+      sequence: fight.sequence,
+      characters: characters,
+      character_ids: character_ids,
+      vehicles: vehicles,
+      vehicle_ids: vehicle_ids,
+      entity_class: "Fight",
+      started_at: fight.started_at,
+      ended_at: fight.ended_at,
+      season: fight.season,
+      session: fight.session,
+      campaign_id: fight.campaign_id,
+      image_positions: render_image_positions_if_loaded(fight)
+    }
+  end
+
+  defp render_character_simple(character) do
+    %{
+      id: character.id,
+      name: character.name,
+      character_type: get_in(character.action_values, ["Type"]) || "PC"
+    }
+  end
+
+  defp render_vehicle_simple(vehicle) do
+    %{
+      id: vehicle.id,
+      name: vehicle.name
     }
   end
 

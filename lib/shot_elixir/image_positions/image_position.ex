@@ -27,9 +27,5 @@ defmodule ShotElixir.ImagePositions.ImagePosition do
       :style_overrides
     ])
     |> validate_required([:positionable_type, :positionable_id, :context])
-    |> unique_constraint(
-      [:positionable_type, :positionable_id, :context],
-      name: :index_image_positions_on_positionable_and_context
-    )
   end
 end

@@ -18,8 +18,6 @@ defmodule ShotElixir.Application do
       {Cachex, name: :image_cache},
       # Redis connection for presence tracking
       {Redix, name: :redix, host: "localhost", port: 6379},
-      # BroadcastManager for Rails-compatible WebSocket broadcasting
-      ShotElixir.BroadcastManager,
       # Start a worker by calling: ShotElixir.Worker.start_link(arg)
       # {ShotElixir.Worker, arg},
       # Start to serve requests, typically the last entry

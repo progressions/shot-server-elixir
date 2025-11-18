@@ -27,7 +27,9 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                 current_user
               )
 
-            render(conn, :index, factions: result)
+            conn
+            |> put_view(ShotElixirWeb.Api.V2.FactionView)
+            |> render("index.json", factions: result)
           else
             conn
             |> put_status(:forbidden)
@@ -61,7 +63,9 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              render(conn, :show, faction: faction)
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.FactionView)
+              |> render("show.json", faction: faction)
             else
               conn
               |> put_status(:not_found)
@@ -119,7 +123,8 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
               {:ok, faction} ->
                 conn
                 |> put_status(:created)
-                |> render(:show, faction: faction)
+                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                |> render("show.json", faction: faction)
 
               {:error, changeset} ->
                 conn
@@ -197,7 +202,9 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                             # Continue with faction update
                             case Factions.update_faction(faction, parsed_params) do
                               {:ok, faction} ->
-                                render(conn, :show, faction: faction)
+                                conn
+                                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                                |> render("show.json", faction: faction)
 
                               {:error, changeset} ->
                                 conn
@@ -221,7 +228,9 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                     # No image upload, just update faction
                     case Factions.update_faction(faction, parsed_params) do
                       {:ok, faction} ->
-                        render(conn, :show, faction: faction)
+                        conn
+                                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                                |> render("show.json", faction: faction)
 
                       {:error, changeset} ->
                         conn
@@ -299,7 +308,9 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
             if authorize_campaign_modification(campaign, current_user) do
               # TODO: Implement image removal when Active Storage equivalent is added
               # For now, just return the faction
-              render(conn, :show, faction: faction)
+              conn
+                                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                                |> render("show.json", faction: faction)
             else
               conn
               |> put_status(:not_found)

@@ -4,6 +4,11 @@ defmodule ShotElixir.Factions.Faction do
   use Arc.Ecto.Schema
 
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Characters.Character
+  alias ShotElixir.Vehicles.Vehicle
+  alias ShotElixir.Sites.Site
+  alias ShotElixir.Parties.Party
+  alias ShotElixir.Junctures.Juncture
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -12,10 +17,15 @@ defmodule ShotElixir.Factions.Faction do
     field :name, :string
     field :description, :string
     field :active, :boolean, default: true
-    # Note: image storage handled by Rails app, not in this schema
     field :image_url, :string, virtual: true
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
+
+    has_many :characters, Character
+    has_many :vehicles, Vehicle
+    has_many :sites, Site
+    has_many :parties, Party
+    has_many :junctures, Juncture
 
     has_many :image_positions, ImagePosition,
       foreign_key: :positionable_id,
@@ -35,7 +45,6 @@ defmodule ShotElixir.Factions.Faction do
   Returns the image URL for a faction, using ImageKit if configured.
   """
   def image_url(%__MODULE__{} = faction) do
-    # Image storage handled by Rails app
     faction.image_url
   end
 end

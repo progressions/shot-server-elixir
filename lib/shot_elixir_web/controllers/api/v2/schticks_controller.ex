@@ -86,7 +86,10 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
           else
             ids = String.split(params["ids"], ",") |> Enum.map(&String.trim/1)
             result = Schticks.get_schticks_batch(campaign.id, ids, params)
-            render(conn, :batch, data: result)
+
+            conn
+            |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+            |> render("batch.json", data: result)
           end
         end
     end

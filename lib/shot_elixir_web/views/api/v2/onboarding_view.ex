@@ -33,7 +33,8 @@ defmodule ShotElixirWeb.Api.V2.OnboardingView do
       first_site_created_at: progress.first_site_created_at,
       congratulations_dismissed_at: progress.congratulations_dismissed_at,
       created_at: progress.created_at,
-      updated_at: progress.updated_at
+      updated_at: progress.updated_at,
+      entity_class: "OnboardingProgress"
     }
   end
 

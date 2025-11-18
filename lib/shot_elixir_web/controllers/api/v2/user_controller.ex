@@ -60,7 +60,9 @@ defmodule ShotElixirWeb.Api.V2.UserController do
       user ->
         # Then check authorization
         if current_user.admin || current_user.id == id do
-          render(conn, :show, user: user)
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.UserView)
+          |> render(:show, user: user)
         else
           conn
           |> put_status(:forbidden)
@@ -75,8 +77,10 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
     if user do
       # Preload associations if needed
-      user = user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
-      render(conn, :current, user: user)
+      user = user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns, :image_positions])
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.UserView)
+      |> render("current.json", user: user)
     else
       conn
       |> put_status(:unauthorized)
@@ -102,9 +106,11 @@ defmodule ShotElixirWeb.Api.V2.UserController do
               user ->
                 user =
                   user
-                  |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
+                  |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns, :image_positions])
 
-                render(conn, :profile, user: user)
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.UserView)
+                |> render(:profile, user: user)
             end
           else
             conn
@@ -116,9 +122,11 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           # Accessing own profile - always allowed
           user =
             current_user
-            |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
+            |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns, :image_positions])
 
-          render(conn, :profile, user: user)
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.UserView)
+          |> render(:profile, user: user)
       end
     else
       conn
@@ -159,16 +167,53 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     else
       case Accounts.create_user(parsed_params) do
         {:ok, user} ->
-          {:ok, token, _claims} = Guardian.encode_and_sign(user)
+          # Handle image upload if present
+          case conn.params["image"] do
+            %Plug.Upload{} = upload ->
+              # Upload image to ImageKit
+              case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                {:ok, upload_result} ->
+                  # Attach image to user via ActiveStorage
+                  case ShotElixir.ActiveStorage.attach_image("User", user.id, upload_result) do
+                    {:ok, _attachment} ->
+                      # Reload user to get fresh data after image attachment
+                      user = Accounts.get_user(user.id)
+                      {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
-          conn
-          |> put_status(:created)
-          |> put_resp_header("authorization", "Bearer #{token}")
-          |> render(:show, user: user, token: token)
+                      conn
+                      |> put_status(:created)
+                      |> put_resp_header("authorization", "Bearer #{token}")
+                      |> put_view(ShotElixirWeb.Api.V2.UserView)
+                      |> render(:show, user: user, token: token)
+
+                    {:error, changeset} ->
+                      conn
+                      |> put_status(:unprocessable_entity)
+                      |> put_view(ShotElixirWeb.Api.V2.UserView)
+                      |> render(:error, changeset: changeset)
+                  end
+
+                {:error, reason} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Image upload failed: #{inspect(reason)}"})
+              end
+
+            _ ->
+              # No image uploaded, proceed normally
+              {:ok, token, _claims} = Guardian.encode_and_sign(user)
+
+              conn
+              |> put_status(:created)
+              |> put_resp_header("authorization", "Bearer #{token}")
+              |> put_view(ShotElixirWeb.Api.V2.UserView)
+              |> render(:show, user: user, token: token)
+          end
 
         {:error, changeset} ->
           conn
           |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.UserView)
           |> render(:error, changeset: changeset)
       end
     end
@@ -225,6 +270,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
         {:error, changeset} ->
           conn
           |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.UserView)
           |> render(:error, changeset: changeset)
       end
     end
@@ -243,47 +289,36 @@ defmodule ShotElixirWeb.Api.V2.UserController do
       user ->
         # Check authorization - only admin or self can update
         if current_user.admin || current_user.id == user.id do
-          # Handle JSON string parsing like Rails
-          parsed_params =
-            case params do
-              %{"user" => user_data} when is_binary(user_data) ->
-                case Jason.decode(user_data) do
-                  {:ok, decoded} ->
-                    decoded
+          # Handle image upload if present
+          case conn.params["image"] do
+            %Plug.Upload{} = upload ->
+              # Upload image to ImageKit
+              case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                {:ok, upload_result} ->
+                  # Attach image to user via ActiveStorage
+                  case ShotElixir.ActiveStorage.attach_image("User", user.id, upload_result) do
+                    {:ok, _attachment} ->
+                      # Reload user to get fresh data after image attachment
+                      user = Accounts.get_user(user.id)
+                      # Continue with user update
+                      update_user_with_params(conn, user, params)
 
-                  {:error, _} ->
-                    conn
-                    |> put_status(:bad_request)
-                    |> json(%{error: "Invalid user data format"})
-                    |> halt()
-                end
+                    {:error, changeset} ->
+                      conn
+                      |> put_status(:unprocessable_entity)
+                      |> put_view(ShotElixirWeb.Api.V2.UserView)
+                      |> render(:error, changeset: changeset)
+                  end
 
-              %{"user" => user_data} when is_map(user_data) ->
-                user_data
+                {:error, reason} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Image upload failed: #{inspect(reason)}"})
+              end
 
-              _ ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "User parameters required"})
-                |> halt()
-            end
-
-          if conn.halted do
-            conn
-          else
-            case Accounts.update_user(user, parsed_params) do
-              {:ok, updated_user} ->
-                {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
-
-                conn
-                |> put_resp_header("authorization", "Bearer #{token}")
-                |> render(:show, user: updated_user)
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> render(:error, changeset: changeset)
-            end
+            _ ->
+              # No image uploaded, proceed with normal update
+              update_user_with_params(conn, user, params)
           end
         else
           conn
@@ -325,18 +360,64 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     if conn.halted do
       conn
     else
-      case Accounts.update_user(current_user, parsed_params) do
-        {:ok, updated_user} ->
-          {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
+      # Handle image upload if present
+      case conn.params["image"] do
+        %Plug.Upload{} = upload ->
+          # Upload image to ImageKit
+          case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+            {:ok, upload_result} ->
+              # Attach image to user via ActiveStorage
+              case ShotElixir.ActiveStorage.attach_image("User", current_user.id, upload_result) do
+                {:ok, _attachment} ->
+                  # Reload user to get fresh data after image attachment
+                  current_user = Accounts.get_user(current_user.id)
+                  # Continue with user update
+                  case Accounts.update_user(current_user, parsed_params) do
+                    {:ok, updated_user} ->
+                      {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
 
-          conn
-          |> put_resp_header("authorization", "Bearer #{token}")
-          |> render(:show, user: updated_user)
+                      conn
+                      |> put_resp_header("authorization", "Bearer #{token}")
+                      |> put_view(ShotElixirWeb.Api.V2.UserView)
+                      |> render(:show, user: updated_user)
 
-        {:error, changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> render(:error, changeset: changeset)
+                    {:error, changeset} ->
+                      conn
+                      |> put_status(:unprocessable_entity)
+                      |> put_view(ShotElixirWeb.Api.V2.UserView)
+                      |> render(:error, changeset: changeset)
+                  end
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.UserView)
+                  |> render(:error, changeset: changeset)
+              end
+
+            {:error, reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Image upload failed: #{inspect(reason)}"})
+          end
+
+        _ ->
+          # No image uploaded, proceed with normal update
+          case Accounts.update_user(current_user, parsed_params) do
+            {:ok, updated_user} ->
+              {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
+
+              conn
+              |> put_resp_header("authorization", "Bearer #{token}")
+              |> put_view(ShotElixirWeb.Api.V2.UserView)
+              |> render(:show, user: updated_user)
+
+            {:error, changeset} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> put_view(ShotElixirWeb.Api.V2.UserView)
+              |> render(:error, changeset: changeset)
+          end
       end
     end
   end
@@ -377,18 +458,77 @@ defmodule ShotElixirWeb.Api.V2.UserController do
       user ->
         # Only admin or self can remove image
         if current_user.admin || current_user.id == user.id do
-          # TODO: Implement image removal when Active Storage equivalent is added
-          # For now, just return success
-          {:ok, token, _claims} = Guardian.encode_and_sign(user)
+          # Remove image via ActiveStorage
+          case ShotElixir.ActiveStorage.delete_image("User", user.id) do
+            {:ok, _} ->
+              # Reload user to get fresh data after image removal
+              user = Accounts.get_user(user.id)
+              {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
-          conn
-          |> put_resp_header("authorization", "Bearer #{token}")
-          |> render(:show, user: user)
+              conn
+              |> put_resp_header("authorization", "Bearer #{token}")
+              |> put_view(ShotElixirWeb.Api.V2.UserView)
+              |> render(:show, user: user)
+
+            {:error, changeset} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> put_view(ShotElixirWeb.Api.V2.UserView)
+              |> render(:error, changeset: changeset)
+          end
         else
           conn
           |> put_status(:forbidden)
           |> json(%{error: "Admin access required to remove another user's image"})
         end
+    end
+  end
+
+  # Helper function for handling user update with potential image upload
+  defp update_user_with_params(conn, user, params) do
+    # Handle JSON string parsing like Rails
+    parsed_params =
+      case params do
+        %{"user" => user_data} when is_binary(user_data) ->
+          case Jason.decode(user_data) do
+            {:ok, decoded} ->
+              decoded
+
+            {:error, _} ->
+              conn
+              |> put_status(:bad_request)
+              |> json(%{error: "Invalid user data format"})
+              |> halt()
+          end
+
+        %{"user" => user_data} when is_map(user_data) ->
+          user_data
+
+        _ ->
+          conn
+          |> put_status(:bad_request)
+          |> json(%{error: "User parameters required"})
+          |> halt()
+      end
+
+    if conn.halted do
+      conn
+    else
+      case Accounts.update_user(user, parsed_params) do
+        {:ok, updated_user} ->
+          {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
+
+          conn
+          |> put_resp_header("authorization", "Bearer #{token}")
+          |> put_view(ShotElixirWeb.Api.V2.UserView)
+          |> render(:show, user: updated_user)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.UserView)
+          |> render(:error, changeset: changeset)
+      end
     end
   end
 

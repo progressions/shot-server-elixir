@@ -35,7 +35,12 @@ defmodule ShotElixirWeb.Api.V2.ImagePositionController do
         |> json(%{error: message})
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{
+          error: "Validation failed",
+          details: translate_changeset_errors(changeset)
+        })
     end
   end
 
@@ -51,7 +56,12 @@ defmodule ShotElixirWeb.Api.V2.ImagePositionController do
         |> json(%{error: message})
 
       {:error, %Ecto.Changeset{} = changeset} ->
-        {:error, changeset}
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{
+          error: "Validation failed",
+          details: translate_changeset_errors(changeset)
+        })
     end
   end
 
@@ -166,5 +176,14 @@ defmodule ShotElixirWeb.Api.V2.ImagePositionController do
       created_at: position.created_at,
       updated_at: position.updated_at
     }
+  end
+
+  # Helper to translate Ecto.Changeset errors to JSON format
+  defp translate_changeset_errors(%Ecto.Changeset{} = changeset) do
+    Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", to_string(value))
+      end)
+    end)
   end
 end

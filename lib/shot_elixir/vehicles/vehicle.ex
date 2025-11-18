@@ -58,7 +58,6 @@ defmodule ShotElixir.Vehicles.Vehicle do
   Returns the image URL for a vehicle, using ImageKit if configured.
   """
   def image_url(%__MODULE__{} = vehicle) do
-    # Image storage handled by Rails app
     vehicle.image_url
   end
 end

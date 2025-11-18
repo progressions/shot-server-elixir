@@ -24,7 +24,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
             result =
               Sites.list_campaign_sites(current_user.current_campaign_id, params, current_user)
 
-            render(conn, :index, sites: ShotElixir.JsonSanitizer.sanitize(result))
+            conn
+            |> put_view(ShotElixirWeb.Api.V2.SiteView)
+            |> render("index.json", sites: ShotElixir.JsonSanitizer.sanitize(result))
           else
             conn
             |> put_status(:forbidden)
@@ -58,7 +60,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              render(conn, :show, site: site)
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.SiteView)
+              |> render("show.json", site: site)
             else
               conn
               |> put_status(:not_found)
@@ -116,12 +120,14 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
               {:ok, site} ->
                 conn
                 |> put_status(:created)
-                |> render(:show, site: site)
+                |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                |> render("show.json", site: site)
 
               {:error, changeset} ->
                 conn
                 |> put_status(:unprocessable_entity)
-                |> render(:error, changeset: changeset)
+                |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                |> render("error.json", changeset: changeset)
             end
           else
             conn
@@ -194,18 +200,22 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
                             # Continue with site update
                             case Sites.update_site(site, parsed_params) do
                               {:ok, site} ->
-                                render(conn, :show, site: site)
+                                conn
+                                |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                                |> render("show.json", site: site)
 
                               {:error, changeset} ->
                                 conn
                                 |> put_status(:unprocessable_entity)
-                                |> render(:error, changeset: changeset)
+                                |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                                |> render("error.json", changeset: changeset)
                             end
 
                           {:error, changeset} ->
                             conn
                             |> put_status(:unprocessable_entity)
-                            |> render(:error, changeset: changeset)
+                            |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                            |> render("error.json", changeset: changeset)
                         end
 
                       {:error, reason} ->
@@ -218,12 +228,15 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
                     # No image upload, just update site
                     case Sites.update_site(site, parsed_params) do
                       {:ok, site} ->
-                        render(conn, :show, site: site)
+                        conn
+                        |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                        |> render("show.json", site: site)
 
                       {:error, changeset} ->
                         conn
                         |> put_status(:unprocessable_entity)
-                        |> render(:error, changeset: changeset)
+                        |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                        |> render("error.json", changeset: changeset)
                     end
                 end
               end
@@ -296,7 +309,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
             if authorize_campaign_modification(campaign, current_user) do
               # TODO: Implement image removal when Active Storage equivalent is added
               # For now, just return the site
-              render(conn, :show, site: site)
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.SiteView)
+              |> render("show.json", site: site)
             else
               conn
               |> put_status(:not_found)
@@ -331,12 +346,15 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
               case Sites.create_attunement(%{"site_id" => id, "character_id" => character_id}) do
                 {:ok, _attunement} ->
                   site = Sites.get_site!(id)
-                  render(conn, :show, site: site)
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                  |> render("show.json", site: site)
 
                 {:error, changeset} ->
                   conn
                   |> put_status(:unprocessable_entity)
-                  |> render(:error, changeset: changeset)
+                  |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                  |> render("error.json", changeset: changeset)
               end
             else
               conn
