@@ -39,10 +39,13 @@ defmodule ShotElixir.Characters do
 
     offset = (page - 1) * per_page
 
-    # Base query always filters by campaign_id and active status
+    # Base query filters by campaign_id
     query =
       from c in Character,
-        where: c.campaign_id == ^campaign_id and c.active == true
+        where: c.campaign_id == ^campaign_id
+
+    # Apply visibility filtering
+    query = apply_visibility_filter(query, params)
 
     # Apply ids filter if present
     query =
@@ -192,6 +195,10 @@ defmodule ShotElixir.Characters do
           # Legacy parameter support
           from c in query, where: c.is_template == false or is_nil(c.is_template)
 
+        "non-templates" ->
+          # Explicit non-templates filter
+          from c in query, where: c.is_template == false or is_nil(c.is_template)
+
         nil ->
           # Default to non-templates
           from c in query, where: c.is_template == false or is_nil(c.is_template)
@@ -204,6 +211,22 @@ defmodule ShotElixir.Characters do
           # Invalid value defaults to non-templates
           from c in query, where: c.is_template == false or is_nil(c.is_template)
       end
+    end
+  end
+
+  defp apply_visibility_filter(query, params) do
+    case params["show_hidden"] do
+      "true" ->
+        # Show both active and inactive characters
+        query
+
+      "false" ->
+        # Show only active characters
+        from c in query, where: c.active == true
+
+      _ ->
+        # Default to showing only active characters
+        from c in query, where: c.active == true
     end
   end
 
