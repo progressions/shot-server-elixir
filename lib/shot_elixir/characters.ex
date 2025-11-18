@@ -22,6 +22,9 @@ defmodule ShotElixir.Characters do
   end
 
   def list_campaign_characters(campaign_id, params \\ %{}, current_user \\ nil) do
+    require Logger
+    Logger.debug("Characters.list_campaign_characters called with params: #{inspect(params)}")
+
     # Get pagination parameters - handle both string and integer params
     per_page =
       case params["per_page"] do
@@ -39,10 +42,13 @@ defmodule ShotElixir.Characters do
 
     offset = (page - 1) * per_page
 
-    # Base query always filters by campaign_id and active status
+    # Base query filters by campaign_id
     query =
       from c in Character,
-        where: c.campaign_id == ^campaign_id and c.active == true
+        where: c.campaign_id == ^campaign_id
+
+    # Apply visibility filtering
+    query = apply_visibility_filter(query, params)
 
     # Apply ids filter if present
     query =
@@ -67,10 +73,12 @@ defmodule ShotElixir.Characters do
     # Apply character_type filter if present
     # character_type is stored in action_values["Type"]
     query =
-      if params["character_type"] do
+      if params["character_type"] && params["character_type"] != "" do
+        Logger.debug("Applying character_type filter: #{params["character_type"]}")
         from c in query,
           where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
       else
+        Logger.debug("No character_type filter applied (empty or nil)")
         query
       end
 
@@ -129,12 +137,16 @@ defmodule ShotElixir.Characters do
       |> select([c], count(c.id))
       |> Repo.one()
 
+    Logger.debug("Total count found: #{total_count}")
+
     # Apply pagination
     characters =
       query
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
+
+    Logger.debug("Characters returned after pagination: #{length(characters)}")
 
     # Load image URLs for all characters efficiently
     characters_with_images = ImageLoader.load_image_urls(characters, "Character")
@@ -192,6 +204,10 @@ defmodule ShotElixir.Characters do
           # Legacy parameter support
           from c in query, where: c.is_template == false or is_nil(c.is_template)
 
+        "non-templates" ->
+          # Explicit non-templates filter
+          from c in query, where: c.is_template == false or is_nil(c.is_template)
+
         nil ->
           # Default to non-templates
           from c in query, where: c.is_template == false or is_nil(c.is_template)
@@ -204,6 +220,22 @@ defmodule ShotElixir.Characters do
           # Invalid value defaults to non-templates
           from c in query, where: c.is_template == false or is_nil(c.is_template)
       end
+    end
+  end
+
+  defp apply_visibility_filter(query, params) do
+    case params["show_hidden"] do
+      "true" ->
+        # Show both active and inactive characters
+        query
+
+      "false" ->
+        # Show only active characters
+        from c in query, where: c.active == true
+
+      _ ->
+        # Default to showing only active characters
+        from c in query, where: c.active == true
     end
   end
 
@@ -266,11 +298,13 @@ defmodule ShotElixir.Characters do
 
   def get_character!(id) do
     Repo.get!(Character, id)
+    |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("Character")
   end
 
   def get_character(id) do
     Repo.get(Character, id)
+    |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("Character")
   end
 

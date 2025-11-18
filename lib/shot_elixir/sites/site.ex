@@ -12,7 +12,6 @@ defmodule ShotElixir.Sites.Site do
     field :name, :string
     field :description, :string
     field :active, :boolean, default: true
-    # Note: image storage handled by Rails app, not in this schema
     field :image_url, :string, virtual: true
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
@@ -41,7 +40,6 @@ defmodule ShotElixir.Sites.Site do
   Returns the image URL for a site, using ImageKit if configured.
   """
   def image_url(%__MODULE__{} = site) do
-    # Image storage handled by Rails app
     site.image_url
   end
 end

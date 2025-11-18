@@ -76,7 +76,9 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     if user do
       # Preload associations if needed
       user = user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns])
-      render(conn, :current, user: user)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.UserView)
+      |> render("current.json", user: user)
     else
       conn
       |> put_status(:unauthorized)
