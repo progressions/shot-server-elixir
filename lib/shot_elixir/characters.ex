@@ -22,6 +22,9 @@ defmodule ShotElixir.Characters do
   end
 
   def list_campaign_characters(campaign_id, params \\ %{}, current_user \\ nil) do
+    require Logger
+    Logger.debug("Characters.list_campaign_characters called with params: #{inspect(params)}")
+
     # Get pagination parameters - handle both string and integer params
     per_page =
       case params["per_page"] do
@@ -70,10 +73,12 @@ defmodule ShotElixir.Characters do
     # Apply character_type filter if present
     # character_type is stored in action_values["Type"]
     query =
-      if params["character_type"] do
+      if params["character_type"] && params["character_type"] != "" do
+        Logger.debug("Applying character_type filter: #{params["character_type"]}")
         from c in query,
           where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
       else
+        Logger.debug("No character_type filter applied (empty or nil)")
         query
       end
 
@@ -132,12 +137,16 @@ defmodule ShotElixir.Characters do
       |> select([c], count(c.id))
       |> Repo.one()
 
+    Logger.debug("Total count found: #{total_count}")
+
     # Apply pagination
     characters =
       query
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
+
+    Logger.debug("Characters returned after pagination: #{length(characters)}")
 
     # Load image URLs for all characters efficiently
     characters_with_images = ImageLoader.load_image_urls(characters, "Character")
