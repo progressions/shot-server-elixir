@@ -159,10 +159,4 @@ defmodule ShotElixir.Characters.Character do
     put_change(changeset, :description, merged_description)
   end
 
-  defp put_change_if_nil(changeset, key, value) do
-    case get_field(changeset, key) do
-      nil -> put_change(changeset, key, value)
-      _ -> changeset
-    end
-  end
 end

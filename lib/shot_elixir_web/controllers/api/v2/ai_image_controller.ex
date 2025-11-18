@@ -2,14 +2,6 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   use ShotElixirWeb, :controller
 
   alias ShotElixir.Campaigns
-  alias ShotElixir.Characters
-  alias ShotElixir.Vehicles
-  alias ShotElixir.Factions
-  alias ShotElixir.Parties
-  alias ShotElixir.Sites
-  alias ShotElixir.Weapons
-  alias ShotElixir.Schticks
-  alias ShotElixir.Fights
   alias ShotElixir.Guardian
 
   action_fallback ShotElixirWeb.FallbackController
@@ -87,11 +79,6 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                     |> json(%{message: "Character generation in progress"})
 
                   {:error, :not_found} ->
-                    conn
-                    |> put_status(:not_found)
-                    |> json(%{error: "#{entity_class} not found"})
-
-                  {:error, :wrong_campaign} ->
                     conn
                     |> put_status(:not_found)
                     |> json(%{error: "#{entity_class} not found"})
@@ -221,11 +208,6 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                     end
 
                   {:error, :not_found} ->
-                    conn
-                    |> put_status(:not_found)
-                    |> json(%{error: "#{entity_class} not found"})
-
-                  {:error, :wrong_campaign} ->
                     conn
                     |> put_status(:not_found)
                     |> json(%{error: "#{entity_class} not found"})
