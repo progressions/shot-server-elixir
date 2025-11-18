@@ -1,46 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.SchticksView do
-  def render("index.json", %{data: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{
-        schticks: schticks,
-        categories: categories,
-        paths: paths,
-        meta: meta,
-        is_autocomplete: is_autocomplete
-      } ->
-        schtick_serializer =
-          if is_autocomplete, do: &render_schtick_autocomplete/1, else: &render_schtick/1
-
-        %{
-          schticks: Enum.map(schticks, schtick_serializer),
-          categories: categories,
-          paths: paths,
-          meta: meta
-        }
-
-      %{schticks: schticks, categories: categories, paths: paths, meta: meta} ->
-        %{
-          schticks: Enum.map(schticks, &render_schtick/1),
-          categories: categories,
-          paths: paths,
-          meta: meta
-        }
-
-      schticks when is_list(schticks) ->
-        # Legacy format for backward compatibility
-        %{
-          schticks: Enum.map(schticks, &render_schtick/1),
-          categories: [],
-          paths: [],
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(schticks),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{schticks: schticks, meta: meta}) do
+    %{
+      schticks: Enum.map(schticks, &render_schtick/1),
+      meta: meta
+    }
   end
 
   def render("batch.json", %{data: data}) do
@@ -71,6 +34,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
       id: schtick.id,
       name: schtick.name,
       description: schtick.description,
+      image_url: get_image_url(schtick),
       category: schtick.category,
       path: schtick.path,
       prerequisite_id: schtick.prerequisite_id,
@@ -81,15 +45,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
     }
   end
 
-  defp render_schtick_autocomplete(schtick) do
-    %{
-      id: schtick.id,
-      name: schtick.name,
-      category: schtick.category,
-      active: schtick.active,
-      entity_class: "Schtick"
-    }
-  end
 
   defp render_encounter_schtick(schtick) do
     %{
@@ -126,4 +81,30 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
       category: prerequisite.category
     }
   end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
+  end
+
+  defp get_image_url(_), do: nil
 end

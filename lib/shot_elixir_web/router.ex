@@ -114,7 +114,9 @@ defmodule ShotElixirWeb.Router do
       delete "/image", SchticksController, :remove_image
     end
 
-    resources "/junctures", JunctureController
+    resources "/junctures", JunctureController do
+      delete "/image", JunctureController, :remove_image
+    end
 
     # Sites with attunement
     resources "/sites", SiteController do

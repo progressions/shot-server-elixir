@@ -49,8 +49,10 @@ defmodule ShotElixirWeb.CampaignChannel do
     # Push to both ActionCable and Phoenix Channels clients
     # ActionCable clients expect "message" event (no event name in received callback)
     # Phoenix clients expect named events like "update"
-    push(socket, "message", payload)  # For ActionCable compatibility
-    push(socket, "update", payload)    # For Phoenix Channels clients
+    # For ActionCable compatibility
+    push(socket, "message", payload)
+    # For Phoenix Channels clients
+    push(socket, "update", payload)
 
     Logger.info("✅ Message pushed to socket")
     {:noreply, socket}

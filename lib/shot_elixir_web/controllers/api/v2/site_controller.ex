@@ -26,7 +26,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
             conn
             |> put_view(ShotElixirWeb.Api.V2.SiteView)
-            |> render("index.json", sites: ShotElixir.JsonSanitizer.sanitize(result))
+            |> render("index.json", sites: result.sites, meta: result.meta)
           else
             conn
             |> put_status(:forbidden)
@@ -307,11 +307,22 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
-              # TODO: Implement image removal when Active Storage equivalent is added
-              # For now, just return the site
-              conn
-              |> put_view(ShotElixirWeb.Api.V2.SiteView)
-              |> render("show.json", site: site)
+              # Remove image from ActiveStorage
+              case ShotElixir.ActiveStorage.delete_image("Site", site.id) do
+                {:ok, _} ->
+                  # Reload site to get fresh data after image removal
+                  updated_site = Sites.get_site(site.id)
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                  |> render("show.json", site: updated_site)
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                  |> render("error.json", changeset: changeset)
+              end
             else
               conn
               |> put_status(:not_found)
@@ -346,6 +357,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
               case Sites.create_attunement(%{"site_id" => id, "character_id" => character_id}) do
                 {:ok, _attunement} ->
                   site = Sites.get_site!(id)
+
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.SiteView)
                   |> render("show.json", site: site)

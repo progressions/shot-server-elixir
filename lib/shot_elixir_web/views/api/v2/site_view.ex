@@ -1,34 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.SiteView do
-  def render("index.json", %{sites: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{sites: sites, meta: meta, is_autocomplete: is_autocomplete} ->
-        site_serializer =
-          if is_autocomplete, do: &render_site_autocomplete/1, else: &render_site/1
-
-        %{
-          sites: Enum.map(sites, site_serializer),
-          meta: meta
-        }
-
-      %{sites: sites, meta: meta} ->
-        %{
-          sites: Enum.map(sites, &render_site/1),
-          meta: meta
-        }
-
-      sites when is_list(sites) ->
-        # Legacy format for backward compatibility
-        %{
-          sites: Enum.map(sites, &render_site/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(sites),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{sites: sites, meta: meta}) do
+    %{
+      sites: Enum.map(sites, &render_site/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{site: site}) do
@@ -54,7 +29,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       character_ids: get_character_ids(site),
       created_at: site.created_at,
       updated_at: site.updated_at,
-      image_url: site.image_url,
+      image_url: get_image_url(site),
       characters: render_characters_if_loaded(site),
       faction: render_faction_if_loaded(site),
       image_positions: render_image_positions_if_loaded(site),
@@ -62,13 +37,6 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     }
   end
 
-  defp render_site_autocomplete(site) do
-    %{
-      id: site.id,
-      name: site.name,
-      entity_class: "Site"
-    }
-  end
 
   defp translate_errors(changeset) when is_map(changeset) do
     if Map.has_key?(changeset, :errors) do
@@ -86,25 +54,33 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
 
   defp get_character_ids(site) do
     case Map.get(site, :attunements) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       attunements ->
         attunements
         |> Enum.map(fn attunement -> attunement.character end)
-        |> Enum.filter(& &1 != nil)
+        |> Enum.filter(&(&1 != nil))
         |> Enum.map(& &1.id)
     end
   end
 
   defp render_characters_if_loaded(site) do
     case Map.get(site, :attunements) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       attunements ->
         characters =
           attunements
           |> Enum.map(fn attunement -> attunement.character end)
-          |> Enum.filter(& &1 != nil)
+          |> Enum.filter(&(&1 != nil))
 
         # Load image URLs for all characters efficiently
         characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
@@ -132,7 +108,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     %{
       id: character.id,
       name: character.name,
-      image_url: character.image_url,
+      image_url: get_image_url(character),
       entity_class: "Character"
     }
   end
@@ -154,4 +130,30 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       style_overrides: position.style_overrides
     }
   end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
+  end
+
+  defp get_image_url(_), do: nil
 end

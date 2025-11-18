@@ -32,7 +32,7 @@ defmodule ShotElixir.Accounts do
 
     # Base query
     query =
-      from u in User
+      from(u in User)
 
     # Apply basic filters
     query =
@@ -75,6 +75,7 @@ defmodule ShotElixir.Accounts do
     query =
       if params["character_id"] && params["character_id"] != "" do
         character_id = params["character_id"]
+
         from u in query,
           join: c in "characters",
           on: c.user_id == u.id,
@@ -93,7 +94,9 @@ defmodule ShotElixir.Accounts do
           on: cm.user_id == u.id,
           left_join: camp in "campaigns",
           on: camp.user_id == u.id,
-          where: cm.campaign_id == type(^campaign_id, :binary_id) or camp.id == type(^campaign_id, :binary_id),
+          where:
+            cm.campaign_id == type(^campaign_id, :binary_id) or
+              camp.id == type(^campaign_id, :binary_id),
           distinct: u.id
       else
         query
@@ -144,6 +147,7 @@ defmodule ShotElixir.Accounts do
     count_query =
       if params["character_id"] && params["character_id"] != "" do
         character_id = params["character_id"]
+
         from u in count_query,
           join: c in "characters",
           on: c.user_id == u.id,
@@ -161,7 +165,9 @@ defmodule ShotElixir.Accounts do
           on: cm.user_id == u.id,
           left_join: camp in "campaigns",
           on: camp.user_id == u.id,
-          where: cm.campaign_id == type(^campaign_id, :binary_id) or camp.id == type(^campaign_id, :binary_id),
+          where:
+            cm.campaign_id == type(^campaign_id, :binary_id) or
+              camp.id == type(^campaign_id, :binary_id),
           distinct: u.id
       else
         count_query
@@ -267,7 +273,9 @@ defmodule ShotElixir.Accounts do
   def get_user(id) do
     Repo.get(User, id)
     |> case do
-      nil -> nil
+      nil ->
+        nil
+
       user ->
         user
         |> Repo.preload([:image_positions])

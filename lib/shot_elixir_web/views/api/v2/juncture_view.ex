@@ -1,34 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.JunctureView do
-  def render("index.json", %{junctures: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{junctures: junctures, meta: meta, is_autocomplete: is_autocomplete} ->
-        juncture_serializer =
-          if is_autocomplete, do: &render_juncture_autocomplete/1, else: &render_juncture/1
-
-        %{
-          junctures: Enum.map(junctures, juncture_serializer),
-          meta: meta
-        }
-
-      %{junctures: junctures, meta: meta} ->
-        %{
-          junctures: Enum.map(junctures, &render_juncture/1),
-          meta: meta
-        }
-
-      junctures when is_list(junctures) ->
-        # Legacy format for backward compatibility
-        %{
-          junctures: Enum.map(junctures, &render_juncture/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(junctures),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{junctures: junctures, meta: meta}) do
+    %{
+      junctures: Enum.map(junctures, &render_juncture/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{juncture: juncture}) do
@@ -54,7 +29,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
       vehicle_ids: get_vehicle_ids(juncture),
       created_at: juncture.created_at,
       updated_at: juncture.updated_at,
-      image_url: juncture.image_url,
+      image_url: get_image_url(juncture),
       characters: render_characters_if_loaded(juncture),
       vehicles: render_vehicles_if_loaded(juncture),
       faction: render_faction_if_loaded(juncture),
@@ -63,13 +38,6 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
     }
   end
 
-  defp render_juncture_autocomplete(juncture) do
-    %{
-      id: juncture.id,
-      name: juncture.name,
-      entity_class: "Juncture"
-    }
-  end
 
   defp translate_errors(changeset) when is_map(changeset) do
     if Map.has_key?(changeset, :errors) do
@@ -103,8 +71,12 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
 
   defp render_characters_if_loaded(juncture) do
     case Map.get(juncture, :characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       characters ->
         # Load image URLs for all characters efficiently
         characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
@@ -140,7 +112,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
     %{
       id: character.id,
       name: character.name,
-      image_url: character.image_url,
+      image_url: get_image_url(character),
       entity_class: "Character"
     }
   end
@@ -170,4 +142,30 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
       style_overrides: position.style_overrides
     }
   end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
+  end
+
+  defp get_image_url(_), do: nil
 end

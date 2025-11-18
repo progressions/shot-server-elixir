@@ -12,70 +12,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     "Melodramatic Hook" => ""
   }
 
-  def render("index.json", %{characters: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{
-        characters: characters,
-        archetypes: archetypes,
-        meta: meta,
-        is_autocomplete: is_autocomplete
-      } ->
-        character_serializer =
-          if is_autocomplete,
-            do: &render_character_autocomplete/1,
-            else: &render_character_index/1
-
-        %{
-          characters: Enum.map(characters, character_serializer),
-          # TODO: Include factions from query
-          factions: [],
-          archetypes: archetypes,
-          meta: meta
-        }
-
-      %{characters: characters, archetypes: archetypes, meta: meta} ->
-        %{
-          characters: Enum.map(characters, &render_character_index/1),
-          # TODO: Include factions from query
-          factions: [],
-          archetypes: archetypes,
-          meta: meta
-        }
-
-      %{characters: characters, meta: meta, is_autocomplete: is_autocomplete} ->
-        character_serializer =
-          if is_autocomplete,
-            do: &render_character_autocomplete/1,
-            else: &render_character_index/1
-
-        %{
-          characters: Enum.map(characters, character_serializer),
-          factions: [],
-          archetypes: [],
-          meta: meta
-        }
-
-      %{characters: characters, meta: meta} ->
-        %{
-          characters: Enum.map(characters, &render_character_index/1),
-          factions: [],
-          archetypes: [],
-          meta: meta
-        }
-
-      characters when is_list(characters) ->
-        # Legacy format for backward compatibility
-        %{
-          characters: Enum.map(characters, &render_character_index/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(characters),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{characters: characters, meta: meta}) do
+    %{
+      characters: Enum.map(characters, &render_character_index/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{character: character}) do
@@ -348,18 +289,30 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
   end
 
   # Rails-compatible image URL handling
-  defp get_image_url(record) do
-    # Check if image_url is already in the struct (pre-loaded)
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
     case Map.get(record, :image_url) do
       nil ->
-        # Fetch from ActiveStorage based on entity type
-        entity_type = record.__struct__ |> Module.split() |> List.last()
-        ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
 
       url ->
         url
     end
   end
+
+  defp get_image_url(_), do: nil
 
   # Ensure description has all required keys with default values
   defp ensure_description_keys(description) when is_map(description) do

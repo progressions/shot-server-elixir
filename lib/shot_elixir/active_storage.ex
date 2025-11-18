@@ -22,7 +22,8 @@ defmodule ShotElixir.ActiveStorage do
       iex> get_image_url("Character", character_with_no_image_id)
       nil
   """
-  def get_image_url(record_type, record_id) when is_binary(record_type) and is_binary(record_id) do
+  def get_image_url(record_type, record_id)
+      when is_binary(record_type) and is_binary(record_id) do
     query =
       from a in Attachment,
         join: b in Blob,
@@ -49,7 +50,8 @@ defmodule ShotElixir.ActiveStorage do
       iex> get_image_urls_for_records("Character", [id1, id2, id3])
       %{id1 => "https://...", id2 => nil, id3 => "https://..."}
   """
-  def get_image_urls_for_records(record_type, record_ids) when is_binary(record_type) and is_list(record_ids) do
+  def get_image_urls_for_records(record_type, record_ids)
+      when is_binary(record_type) and is_list(record_ids) do
     query =
       from a in Attachment,
         join: b in Blob,
@@ -137,9 +139,10 @@ defmodule ShotElixir.ActiveStorage do
       # Delete existing attachment for this entity if it exists
       query =
         from a in Attachment,
-          where: a.record_type == ^record_type and
-                 a.record_id == ^record_id and
-                 a.name == "image"
+          where:
+            a.record_type == ^record_type and
+              a.record_id == ^record_id and
+              a.name == "image"
 
       case repo.one(query) do
         nil ->
@@ -151,7 +154,9 @@ defmodule ShotElixir.ActiveStorage do
 
           # Then delete the old blob
           case repo.get(Blob, existing_attachment.blob_id) do
-            nil -> {:ok, existing_attachment}
+            nil ->
+              {:ok, existing_attachment}
+
             blob ->
               repo.delete(blob)
               {:ok, existing_attachment}
@@ -208,9 +213,10 @@ defmodule ShotElixir.ActiveStorage do
   def delete_image(record_type, record_id) do
     query =
       from a in Attachment,
-        where: a.record_type == ^record_type and
-               a.record_id == ^record_id and
-               a.name == "image",
+        where:
+          a.record_type == ^record_type and
+            a.record_id == ^record_id and
+            a.name == "image",
         preload: :blob
 
     case Repo.one(query) do

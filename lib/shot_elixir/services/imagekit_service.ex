@@ -111,11 +111,12 @@ defmodule ShotElixir.Services.ImagekitService do
     ]
 
     # Add tags if provided
-    multipart_data = if options[:tags] && length(options[:tags]) > 0 do
-      multipart_data ++ [{"tags", Enum.join(options[:tags], ",")}]
-    else
-      multipart_data
-    end
+    multipart_data =
+      if options[:tags] && length(options[:tags]) > 0 do
+        multipart_data ++ [{"tags", Enum.join(options[:tags], ",")}]
+      else
+        multipart_data
+      end
 
     # Build auth headers for form upload
     auth_token = Base.encode64("#{private_key()}:")

@@ -1,34 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.CampaignView do
-  def render("index.json", %{campaigns: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{campaigns: campaigns, meta: meta, is_autocomplete: is_autocomplete} ->
-        campaign_serializer =
-          if is_autocomplete, do: &render_campaign_autocomplete/1, else: &render_campaign/1
-
-        %{
-          campaigns: Enum.map(campaigns, campaign_serializer),
-          meta: meta
-        }
-
-      %{campaigns: campaigns, meta: meta} ->
-        %{
-          campaigns: Enum.map(campaigns, &render_campaign/1),
-          meta: meta
-        }
-
-      campaigns when is_list(campaigns) ->
-        # Legacy format for backward compatibility
-        %{
-          campaigns: Enum.map(campaigns, &render_campaign/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(campaigns),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{campaigns: campaigns, meta: meta}) do
+    %{
+      campaigns: Enum.map(campaigns, &render_campaign/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{campaign: campaign}) do
@@ -108,13 +83,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     }
   end
 
-  defp render_campaign_autocomplete(campaign) do
-    %{
-      id: campaign.id,
-      name: campaign.name,
-      entity_class: "Campaign"
-    }
-  end
 
   defp render_campaign_detail(campaign) do
     base = render_campaign(campaign)
@@ -180,17 +148,19 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
 
   defp render_fight_detailed(fight) do
     # Handle potentially loaded or not loaded associations
-    characters = case Map.get(fight, :characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
-      chars -> Enum.map(chars, &render_character_simple/1)
-    end
+    characters =
+      case Map.get(fight, :characters) do
+        %Ecto.Association.NotLoaded{} -> []
+        nil -> []
+        chars -> Enum.map(chars, &render_character_simple/1)
+      end
 
-    vehicles = case Map.get(fight, :vehicles) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
-      vehs -> Enum.map(vehs, &render_vehicle_simple/1)
-    end
+    vehicles =
+      case Map.get(fight, :vehicles) do
+        %Ecto.Association.NotLoaded{} -> []
+        nil -> []
+        vehs -> Enum.map(vehs, &render_vehicle_simple/1)
+      end
 
     character_ids = Enum.map(characters, & &1[:id])
     vehicle_ids = Enum.map(vehicles, & &1[:id])
@@ -199,7 +169,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       id: fight.id,
       name: fight.name,
       description: fight.description,
-      image_url: fight.image_url,
+      image_url: get_image_url(fight),
       created_at: fight.created_at,
       updated_at: fight.updated_at,
       active: fight.active,
@@ -297,9 +267,28 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   # Rails-compatible image URL handling
-  defp get_image_url(record) do
-    # TODO: Implement proper image attachment checking
-    # For now, return nil like Rails when no image is attached
-    Map.get(record, :image_url)
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
   end
+
+  defp get_image_url(_), do: nil
 end

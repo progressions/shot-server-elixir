@@ -8,8 +8,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
     Characters,
     Vehicles,
     Factions,
-    Junctures,
-    Parties
+    Junctures
   }
 
   alias ShotElixir.Guardian

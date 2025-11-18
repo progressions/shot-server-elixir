@@ -42,7 +42,10 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
       _ ->
         result = Accounts.list_campaign_users(params, current_user)
-        render(conn, :index, data: result)
+
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.UserView)
+        |> render("index.json", users: result.users)
     end
   end
 
@@ -77,7 +80,15 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
     if user do
       # Preload associations if needed
-      user = user |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns, :image_positions])
+      user =
+        user
+        |> ShotElixir.Repo.preload([
+          :current_campaign,
+          :campaigns,
+          :player_campaigns,
+          :image_positions
+        ])
+
       conn
       |> put_view(ShotElixirWeb.Api.V2.UserView)
       |> render("current.json", user: user)
@@ -106,7 +117,12 @@ defmodule ShotElixirWeb.Api.V2.UserController do
               user ->
                 user =
                   user
-                  |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns, :image_positions])
+                  |> ShotElixir.Repo.preload([
+                    :current_campaign,
+                    :campaigns,
+                    :player_campaigns,
+                    :image_positions
+                  ])
 
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.UserView)
@@ -122,7 +138,12 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           # Accessing own profile - always allowed
           user =
             current_user
-            |> ShotElixir.Repo.preload([:current_campaign, :campaigns, :player_campaigns, :image_positions])
+            |> ShotElixir.Repo.preload([
+              :current_campaign,
+              :campaigns,
+              :player_campaigns,
+              :image_positions
+            ])
 
           conn
           |> put_view(ShotElixirWeb.Api.V2.UserView)

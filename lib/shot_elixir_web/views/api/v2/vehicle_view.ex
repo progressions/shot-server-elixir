@@ -1,55 +1,12 @@
 defmodule ShotElixirWeb.Api.V2.VehicleView do
   alias ShotElixir.JsonSanitizer
 
-  def render("index.json", %{vehicles: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{
-        vehicles: vehicles,
-        factions: factions,
-        archetypes: archetypes,
-        types: types,
-        meta: meta,
-        is_autocomplete: is_autocomplete
-      } ->
-        vehicle_serializer =
-          if is_autocomplete, do: &render_vehicle_autocomplete/1, else: &render_vehicle/1
-
-        %{
-          vehicles: Enum.map(vehicles, vehicle_serializer),
-          factions: factions,
-          archetypes: archetypes,
-          types: types,
-          meta: meta
-        }
-        |> JsonSanitizer.sanitize()
-
-      %{vehicles: vehicles, factions: factions, archetypes: archetypes, types: types, meta: meta} ->
-        %{
-          vehicles: Enum.map(vehicles, &render_vehicle/1),
-          factions: factions,
-          archetypes: archetypes,
-          types: types,
-          meta: meta
-        }
-        |> JsonSanitizer.sanitize()
-
-      vehicles when is_list(vehicles) ->
-        # Legacy format for backward compatibility
-        %{
-          vehicles: Enum.map(vehicles, &render_vehicle/1),
-          factions: [],
-          archetypes: [],
-          types: [],
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(vehicles),
-            total_pages: 1
-          }
-        }
-        |> JsonSanitizer.sanitize()
-    end
+  def render("index.json", %{vehicles: vehicles, meta: meta}) do
+    %{
+      vehicles: Enum.map(vehicles, &render_vehicle/1),
+      meta: meta
+    }
+    |> JsonSanitizer.sanitize()
   end
 
   def render("show.json", %{vehicle: vehicle}) do
@@ -77,6 +34,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
       id: vehicle.id,
       name: vehicle.name,
       description: vehicle.description,
+      image_url: get_image_url(vehicle),
       color: vehicle.color,
       impairments: vehicle.impairments,
       campaign_id: vehicle.campaign_id,
@@ -91,14 +49,6 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     }
   end
 
-  defp render_vehicle_autocomplete(vehicle) do
-    %{
-      id: vehicle.id,
-      name: vehicle.name,
-      active: vehicle.active,
-      entity_class: "Vehicle"
-    }
-  end
 
   defp render_vehicle_detail(vehicle) do
     base = render_vehicle(vehicle)
@@ -140,4 +90,30 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
       name: faction.name
     }
   end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
+  end
+
+  defp get_image_url(_), do: nil
 end

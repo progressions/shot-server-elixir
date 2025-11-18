@@ -215,7 +215,7 @@ defmodule ShotElixir.Parties do
       query
       |> limit(^per_page)
       |> offset(^offset)
-      |> preload([memberships: [:character, :vehicle]])
+      |> preload(memberships: [:character, :vehicle])
       |> Repo.all()
 
     # Load image URLs for all parties efficiently

@@ -24,7 +24,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-      |> render("index.json", vehicles: vehicles_data)
+      |> render("index.json", vehicles: vehicles_data.vehicles, meta: vehicles_data.meta)
     end
   end
 
@@ -204,10 +204,22 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
          :ok <- authorize_vehicle_edit(vehicle, current_user) do
-      # TODO: Implement image removal logic
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-      |> render("show.json", vehicle: vehicle)
+      # Remove image from ActiveStorage
+      case ShotElixir.ActiveStorage.delete_image("Vehicle", vehicle.id) do
+        {:ok, _} ->
+          # Reload vehicle to get fresh data after image removal
+          updated_vehicle = Vehicles.get_vehicle(vehicle.id)
+
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+          |> render("show.json", vehicle: updated_vehicle)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+          |> render("error.json", changeset: changeset)
+      end
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
