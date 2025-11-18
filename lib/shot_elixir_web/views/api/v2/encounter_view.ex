@@ -65,8 +65,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
 
   defp get_character_ids(fight) do
     case Map.get(fight, :shots) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       shots ->
         shots
         |> Enum.filter(& &1.character_id)
@@ -77,8 +81,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
 
   defp get_vehicle_ids(fight) do
     case Map.get(fight, :shots) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       shots ->
         shots
         |> Enum.filter(& &1.vehicle_id)
@@ -93,10 +101,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
     case Map.get(record, :image_url) do
       nil ->
         # Try to get entity type from struct, fallback to nil if plain map
-        entity_type = case Map.get(record, :__struct__) do
-          nil -> nil  # Plain map, skip ActiveStorage lookup
-          struct_module -> struct_module |> Module.split() |> List.last()
-        end
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
 
         if entity_type && Map.get(record, :id) do
           ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
@@ -156,32 +166,35 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
 
       character ->
         # Ensure we have a valid character with action_values
-        action_values = case character.action_values do
-          nil -> %{}  # Fallback to empty map if nil
-          values when is_map(values) -> values
-          _ -> %{}
-        end
+        action_values =
+          case character.action_values do
+            # Fallback to empty map if nil
+            nil -> %{}
+            values when is_map(values) -> values
+            _ -> %{}
+          end
 
         %{
           id: character.id,
           name: character.name,
           entity_class: "Character",
           action_values: action_values,
-      skills: character.skills,
-      faction_id: character.faction_id,
-      color: character.color,
-      count: shot.count,
-      impairments: get_character_impairments(character, shot),
-      shot_id: shot.id,
-      current_shot: shot.shot,
-      location: shot.location,
-      driving_id: shot.driving_id,
-      status: character.status,
-      image_url: get_image_url(character),
-      faction: render_faction_if_loaded(character),
+          skills: character.skills,
+          faction_id: character.faction_id,
+          color: character.color,
+          count: shot.count,
+          impairments: get_character_impairments(character, shot),
+          shot_id: shot.id,
+          current_shot: shot.shot,
+          location: shot.location,
+          driving_id: shot.driving_id,
+          status: character.status,
+          image_url: get_image_url(character),
+          faction: render_faction_if_loaded(character),
           weapon_ids: get_weapon_ids(character),
           schtick_ids: get_schtick_ids(character),
-          effects: [] # TODO: Implement character effects
+          # TODO: Implement character effects
+          effects: []
         }
     end
   end
@@ -200,23 +213,27 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       driver_id: shot.driver_id,
       was_rammed_or_damaged: shot.was_rammed_or_damaged,
       image_url: get_image_url(vehicle),
-      chase_relationships: [], # TODO: Implement chase relationships
-      effects: [] # TODO: Implement vehicle effects
+      # TODO: Implement chase relationships
+      chase_relationships: [],
+      # TODO: Implement vehicle effects
+      effects: []
     }
   end
 
   defp character_sort_key(character) do
     # Sort order: Uber-Boss, Boss, PC, Ally, Featured Foe, Mook
     type = character.action_values["Type"] || "Mook"
-    type_order = case type do
-      "Uber-Boss" -> 1
-      "Boss" -> 2
-      "PC" -> 3
-      "Ally" -> 4
-      "Featured Foe" -> 5
-      "Mook" -> 6
-      _ -> 7
-    end
+
+    type_order =
+      case type do
+        "Uber-Boss" -> 1
+        "Boss" -> 2
+        "PC" -> 3
+        "Ally" -> 4
+        "Featured Foe" -> 5
+        "Mook" -> 6
+        _ -> 7
+      end
 
     speed = (character.action_values["Speed"] || 0) - (character.impairments || 0)
     name = String.downcase(character.name || "")

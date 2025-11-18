@@ -193,7 +193,11 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
                     case ShotElixir.Services.ImagekitService.upload_plug(upload) do
                       {:ok, upload_result} ->
                         # Attach image to juncture via ActiveStorage
-                        case ShotElixir.ActiveStorage.attach_image("Juncture", juncture.id, upload_result) do
+                        case ShotElixir.ActiveStorage.attach_image(
+                               "Juncture",
+                               juncture.id,
+                               upload_result
+                             ) do
                           {:ok, _attachment} ->
                             # Reload juncture to get fresh data after image attachment
                             juncture = Junctures.get_juncture_with_preloads(juncture.id)

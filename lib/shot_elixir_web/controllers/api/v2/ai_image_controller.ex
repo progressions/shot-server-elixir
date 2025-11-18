@@ -152,7 +152,11 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                         case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
                           {:ok, refreshed_entity} ->
                             # Get updated image URL
-                            image_url = ShotElixir.ActiveStorage.get_image_url(entity_class, refreshed_entity.id)
+                            image_url =
+                              ShotElixir.ActiveStorage.get_image_url(
+                                entity_class,
+                                refreshed_entity.id
+                              )
 
                             # Return updated entity with image_url
                             serialized_entity =
@@ -164,15 +168,22 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                             plural_string = pluralize_entity(entity_class)
                             plural_key = String.to_atom(plural_string)
 
-                            IO.puts("📡 Broadcasting #{entity_class} update to campaign:#{current_user.current_campaign_id}")
-                            IO.puts("🔑 Entity key: #{inspect(entity_key)}, Plural key: #{inspect(plural_key)} (from '#{plural_string}')")
+                            IO.puts(
+                              "📡 Broadcasting #{entity_class} update to campaign:#{current_user.current_campaign_id}"
+                            )
+
+                            IO.puts(
+                              "🔑 Entity key: #{inspect(entity_key)}, Plural key: #{inspect(plural_key)} (from '#{plural_string}')"
+                            )
+
                             IO.inspect(serialized_entity, label: "#{entity_class} data")
 
                             # Use Phoenix PubSub for Rails-compatible broadcast with plural reload signal
                             Phoenix.PubSub.broadcast!(
                               ShotElixir.PubSub,
                               "campaign:#{current_user.current_campaign_id}",
-                              {:rails_message, %{entity_key => serialized_entity, plural_key => "reload"}}
+                              {:rails_message,
+                               %{entity_key => serialized_entity, plural_key => "reload"}}
                             )
 
                             IO.puts("✅ Broadcast sent successfully")

@@ -19,6 +19,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
 
       campaign ->
         result = Schticks.list_campaign_schticks(campaign.id, params, current_user)
+
         conn
         |> put_view(ShotElixirWeb.Api.V2.SchticksView)
         |> render("index.json", schticks: result.schticks, meta: result.meta)
@@ -254,7 +255,11 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
                   case ShotElixir.Services.ImagekitService.upload_plug(upload) do
                     {:ok, upload_result} ->
                       # Attach image to schtick via ActiveStorage
-                      case ShotElixir.ActiveStorage.attach_image("Schtick", schtick.id, upload_result) do
+                      case ShotElixir.ActiveStorage.attach_image(
+                             "Schtick",
+                             schtick.id,
+                             upload_result
+                           ) do
                         {:ok, _attachment} ->
                           # Reload schtick to get fresh data after image attachment
                           schtick = Schticks.get_schtick(schtick.id)

@@ -264,6 +264,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         {:ok, _} ->
           # Reload fight to get fresh data after image removal
           updated_fight = Fights.get_fight(fight.id)
+
           conn
           |> put_view(ShotElixirWeb.Api.V2.FightView)
           |> render("show.json", fight: updated_fight)

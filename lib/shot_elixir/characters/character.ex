@@ -157,5 +157,4 @@ defmodule ShotElixir.Characters.Character do
     merged_description = Map.merge(@default_description, description)
     put_change(changeset, :description, merged_description)
   end
-
 end

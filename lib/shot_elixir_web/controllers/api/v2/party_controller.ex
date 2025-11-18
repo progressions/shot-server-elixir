@@ -197,7 +197,11 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                     case ShotElixir.Services.ImagekitService.upload_plug(upload) do
                       {:ok, upload_result} ->
                         # Attach image to party via ActiveStorage
-                        case ShotElixir.ActiveStorage.attach_image("Party", party.id, upload_result) do
+                        case ShotElixir.ActiveStorage.attach_image(
+                               "Party",
+                               party.id,
+                               upload_result
+                             ) do
                           {:ok, _attachment} ->
                             # Reload party to get fresh data after image attachment
                             party = Parties.get_party(party.id)
@@ -205,21 +209,21 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                             case Parties.update_party(party, parsed_params) do
                               {:ok, party} ->
                                 conn
-              |> put_view(ShotElixirWeb.Api.V2.PartyView)
-              |> render("show.json", party: party)
+                                |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                                |> render("show.json", party: party)
 
                               {:error, changeset} ->
                                 conn
                                 |> put_status(:unprocessable_entity)
                                 |> put_view(ShotElixirWeb.Api.V2.PartyView)
-                |> render("error.json", changeset: changeset)
+                                |> render("error.json", changeset: changeset)
                             end
 
                           {:error, changeset} ->
                             conn
                             |> put_status(:unprocessable_entity)
                             |> put_view(ShotElixirWeb.Api.V2.PartyView)
-                |> render("error.json", changeset: changeset)
+                            |> render("error.json", changeset: changeset)
                         end
 
                       {:error, reason} ->
@@ -233,14 +237,14 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                     case Parties.update_party(party, parsed_params) do
                       {:ok, party} ->
                         conn
-              |> put_view(ShotElixirWeb.Api.V2.PartyView)
-              |> render("show.json", party: party)
+                        |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                        |> render("show.json", party: party)
 
                       {:error, changeset} ->
                         conn
                         |> put_status(:unprocessable_entity)
                         |> put_view(ShotElixirWeb.Api.V2.PartyView)
-                |> render("error.json", changeset: changeset)
+                        |> render("error.json", changeset: changeset)
                     end
                 end
               end
@@ -316,6 +320,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                 {:ok, _} ->
                   # Reload party to get fresh data after image removal
                   updated_party = Parties.get_party(party.id)
+
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.PartyView)
                   |> render("show.json", party: updated_party)
@@ -401,15 +406,16 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
               case Parties.add_member(id, member_attrs) do
                 {:ok, _membership} ->
                   party = Parties.get_party!(id)
+
                   conn
-              |> put_view(ShotElixirWeb.Api.V2.PartyView)
-              |> render("show.json", party: party)
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: party)
 
                 {:error, changeset} ->
                   conn
                   |> put_status(:unprocessable_entity)
                   |> put_view(ShotElixirWeb.Api.V2.PartyView)
-                |> render("error.json", changeset: changeset)
+                  |> render("error.json", changeset: changeset)
               end
             else
               conn

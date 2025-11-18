@@ -85,10 +85,11 @@ defmodule ShotElixir.Services.GrokService do
           end)
 
         # Check for errors
-        errors = Enum.filter(image_data, fn
-          {:error, _} -> true
-          _ -> false
-        end)
+        errors =
+          Enum.filter(image_data, fn
+            {:error, _} -> true
+            _ -> false
+          end)
 
         if Enum.empty?(errors) do
           urls = Enum.map(image_data, fn {:ok, url} -> url end)

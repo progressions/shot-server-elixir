@@ -195,7 +195,11 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                     case ShotElixir.Services.ImagekitService.upload_plug(upload) do
                       {:ok, upload_result} ->
                         # Attach image to faction via ActiveStorage
-                        case ShotElixir.ActiveStorage.attach_image("Faction", faction.id, upload_result) do
+                        case ShotElixir.ActiveStorage.attach_image(
+                               "Faction",
+                               faction.id,
+                               upload_result
+                             ) do
                           {:ok, _attachment} ->
                             # Reload faction to get fresh data after image attachment
                             faction = Factions.get_faction(faction.id)
@@ -229,8 +233,8 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                     case Factions.update_faction(faction, parsed_params) do
                       {:ok, faction} ->
                         conn
-                                |> put_view(ShotElixirWeb.Api.V2.FactionView)
-                                |> render("show.json", faction: faction)
+                        |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                        |> render("show.json", faction: faction)
 
                       {:error, changeset} ->
                         conn
@@ -311,6 +315,7 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                 {:ok, _} ->
                   # Reload faction to get fresh data after image removal
                   updated_faction = Factions.get_faction(faction.id)
+
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.FactionView)
                   |> render("show.json", faction: updated_faction)

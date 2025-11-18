@@ -32,14 +32,15 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
               fight ->
                 if fight.campaign_id == current_user.current_campaign_id do
                   # Preload all necessary associations for encounter serialization
-                  fight_with_associations = ShotElixir.Repo.preload(fight, [
-                    shots: [
-                      :character,
-                      :vehicle,
-                      character: [:faction, :character_schticks, :carries],
-                      vehicle: [:faction]
-                    ]
-                  ])
+                  fight_with_associations =
+                    ShotElixir.Repo.preload(fight,
+                      shots: [
+                        :character,
+                        :vehicle,
+                        character: [:faction, :character_schticks, :carries],
+                        vehicle: [:faction]
+                      ]
+                    )
 
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.EncounterView)
@@ -104,14 +105,15 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       )
 
                       # Return updated encounter with all associations
-                      fight_with_associations = ShotElixir.Repo.preload(fight, [
-                        shots: [
-                          :character,
-                          :vehicle,
-                          character: [:faction, :character_schticks, :carries],
-                          vehicle: [:faction]
-                        ]
-                      ])
+                      fight_with_associations =
+                        ShotElixir.Repo.preload(fight,
+                          shots: [
+                            :character,
+                            :vehicle,
+                            character: [:faction, :character_schticks, :carries],
+                            vehicle: [:faction]
+                          ]
+                        )
 
                       conn
                       |> put_view(ShotElixirWeb.Api.V2.EncounterView)
@@ -206,14 +208,15 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
               case get_fight(fight.id, current_user.current_campaign_id) do
                 {:ok, fresh_fight} ->
                   # Return updated encounter with all associations
-                  fight_with_associations = ShotElixir.Repo.preload(fresh_fight, [
-                    shots: [
-                      :character,
-                      :vehicle,
-                      character: [:faction, :character_schticks, :carries],
-                      vehicle: [:faction]
-                    ]
-                  ])
+                  fight_with_associations =
+                    ShotElixir.Repo.preload(fresh_fight,
+                      shots: [
+                        :character,
+                        :vehicle,
+                        character: [:faction, :character_schticks, :carries],
+                        vehicle: [:faction]
+                      ]
+                    )
 
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.EncounterView)
@@ -285,14 +288,15 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 end
 
               # Return updated encounter with all associations
-              fight_with_associations = ShotElixir.Repo.preload(result, [
-                shots: [
-                  :character,
-                  :vehicle,
-                  character: [:faction, :character_schticks, :carries],
-                  vehicle: [:faction]
-                ]
-              ])
+              fight_with_associations =
+                ShotElixir.Repo.preload(result,
+                  shots: [
+                    :character,
+                    :vehicle,
+                    character: [:faction, :character_schticks, :carries],
+                    vehicle: [:faction]
+                  ]
+                )
 
               conn
               |> put_view(ShotElixirWeb.Api.V2.EncounterView)
@@ -343,14 +347,15 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
               result = fight
 
               # Return updated encounter with all associations
-              fight_with_associations = ShotElixir.Repo.preload(result, [
-                shots: [
-                  :character,
-                  :vehicle,
-                  character: [:faction, :character_schticks, :carries],
-                  vehicle: [:faction]
-                ]
-              ])
+              fight_with_associations =
+                ShotElixir.Repo.preload(result,
+                  shots: [
+                    :character,
+                    :vehicle,
+                    character: [:faction, :character_schticks, :carries],
+                    vehicle: [:faction]
+                  ]
+                )
 
               conn
               |> put_view(ShotElixirWeb.Api.V2.EncounterView)
@@ -412,7 +417,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
         end
     end
   end
-
 
   defp translate_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->

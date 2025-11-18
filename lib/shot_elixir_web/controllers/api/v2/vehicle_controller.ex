@@ -209,6 +209,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
         {:ok, _} ->
           # Reload vehicle to get fresh data after image removal
           updated_vehicle = Vehicles.get_vehicle(vehicle.id)
+
           conn
           |> put_view(ShotElixirWeb.Api.V2.VehicleView)
           |> render("show.json", vehicle: updated_vehicle)

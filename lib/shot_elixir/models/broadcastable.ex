@@ -31,28 +31,38 @@ defmodule ShotElixir.Models.Broadcastable do
         topic = "campaign:#{entity.campaign_id}"
 
         # Use proper serialization with view system
-        serialized_entity = case entity_name do
-          "character" ->
-            ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
-          "weapon" ->
-            ShotElixirWeb.Api.V2.WeaponView.render("show.json", %{weapon: entity})
-          "schtick" ->
-            ShotElixirWeb.Api.V2.SchticksView.render("show.json", %{schtick: entity})
-          "site" ->
-            ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity})
-          "vehicle" ->
-            ShotElixirWeb.Api.V2.VehicleView.render("show.json", %{vehicle: entity})
-          "party" ->
-            ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity})
-          "faction" ->
-            ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity})
-          "juncture" ->
-            ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{juncture: entity})
-          "fight" ->
-            ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
-          "campaign" ->
-            ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
-        end
+        serialized_entity =
+          case entity_name do
+            "character" ->
+              ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
+
+            "weapon" ->
+              ShotElixirWeb.Api.V2.WeaponView.render("show.json", %{weapon: entity})
+
+            "schtick" ->
+              ShotElixirWeb.Api.V2.SchticksView.render("show.json", %{schtick: entity})
+
+            "site" ->
+              ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity})
+
+            "vehicle" ->
+              ShotElixirWeb.Api.V2.VehicleView.render("show.json", %{vehicle: entity})
+
+            "party" ->
+              ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity})
+
+            "faction" ->
+              ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity})
+
+            "juncture" ->
+              ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{juncture: entity})
+
+            "fight" ->
+              ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
+
+            "campaign" ->
+              ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
+          end
 
         Phoenix.PubSub.broadcast(
           ShotElixir.PubSub,
@@ -91,28 +101,38 @@ defmodule ShotElixir.Models.Broadcastable do
     topic = "campaign:#{entity.campaign_id}"
 
     # Use proper serialization with view system
-    serialized_entity = case entity_name do
-      "character" ->
-        ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
-      "weapon" ->
-        ShotElixirWeb.Api.V2.WeaponView.render("show.json", %{weapon: entity})
-      "schtick" ->
-        ShotElixirWeb.Api.V2.SchticksView.render("show.json", %{schtick: entity})
-      "site" ->
-        ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity})
-      "vehicle" ->
-        ShotElixirWeb.Api.V2.VehicleView.render("show.json", %{vehicle: entity})
-      "party" ->
-        ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity})
-      "faction" ->
-        ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity})
-      "juncture" ->
-        ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{juncture: entity})
-      "fight" ->
-        ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
-      "campaign" ->
-        ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
-    end
+    serialized_entity =
+      case entity_name do
+        "character" ->
+          ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
+
+        "weapon" ->
+          ShotElixirWeb.Api.V2.WeaponView.render("show.json", %{weapon: entity})
+
+        "schtick" ->
+          ShotElixirWeb.Api.V2.SchticksView.render("show.json", %{schtick: entity})
+
+        "site" ->
+          ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity})
+
+        "vehicle" ->
+          ShotElixirWeb.Api.V2.VehicleView.render("show.json", %{vehicle: entity})
+
+        "party" ->
+          ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity})
+
+        "faction" ->
+          ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity})
+
+        "juncture" ->
+          ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{juncture: entity})
+
+        "fight" ->
+          ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
+
+        "campaign" ->
+          ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
+      end
 
     Phoenix.PubSub.broadcast(
       ShotElixir.PubSub,

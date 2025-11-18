@@ -12,6 +12,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
     if current_user.current_campaign_id do
       result = Weapons.list_weapons(current_user.current_campaign_id, params)
+
       conn
       |> put_view(ShotElixirWeb.Api.V2.WeaponView)
       |> render("index.json", weapons: result.weapons, meta: result.meta)
@@ -147,21 +148,21 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
                     case Weapons.update_weapon(weapon, weapon_params) do
                       {:ok, weapon} ->
                         conn
-        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-        |> render("show.json", weapon: weapon)
+                        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+                        |> render("show.json", weapon: weapon)
 
                       {:error, changeset} ->
                         conn
                         |> put_status(:unprocessable_entity)
                         |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-        |> render("error.json", changeset: changeset)
+                        |> render("error.json", changeset: changeset)
                     end
 
                   {:error, changeset} ->
                     conn
                     |> put_status(:unprocessable_entity)
                     |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-        |> render("error.json", changeset: changeset)
+                    |> render("error.json", changeset: changeset)
                 end
 
               {:error, reason} ->
@@ -175,14 +176,14 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
             case Weapons.update_weapon(weapon, weapon_params) do
               {:ok, weapon} ->
                 conn
-        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-        |> render("show.json", weapon: weapon)
+                |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+                |> render("show.json", weapon: weapon)
 
               {:error, changeset} ->
                 conn
                 |> put_status(:unprocessable_entity)
                 |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-        |> render("error.json", changeset: changeset)
+                |> render("error.json", changeset: changeset)
             end
         end
     end

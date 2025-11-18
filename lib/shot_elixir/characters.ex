@@ -75,6 +75,7 @@ defmodule ShotElixir.Characters do
     query =
       if params["character_type"] && params["character_type"] != "" do
         Logger.debug("Applying character_type filter: #{params["character_type"]}")
+
         from c in query,
           where: fragment("?->>'Type' = ?", c.action_values, ^params["character_type"])
       else
@@ -315,6 +316,7 @@ defmodule ShotElixir.Characters do
       # Preload associations before broadcasting
       character_with_associations =
         Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+
       broadcast_change(character_with_associations, :insert)
       {:ok, character}
     end)
@@ -332,6 +334,7 @@ defmodule ShotElixir.Characters do
       # Preload associations before broadcasting
       character_with_associations =
         Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+
       broadcast_change(character_with_associations, :update)
       {:ok, character}
     end)
@@ -349,6 +352,7 @@ defmodule ShotElixir.Characters do
       # Preload associations before broadcasting
       character_with_associations =
         Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+
       broadcast_change(character_with_associations, :delete)
       {:ok, character}
     end)

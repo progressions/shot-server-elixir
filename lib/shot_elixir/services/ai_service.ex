@@ -50,7 +50,7 @@ defmodule ShotElixir.Services.AiService do
   defp download_image(url) do
     Logger.info("Downloading image from URL: #{url}")
 
-    case Req.get(url, [redirect: true]) do
+    case Req.get(url, redirect: true) do
       {:ok, %{status: 200, body: body}} ->
         # Create temp file
         temp_path = Path.join(System.tmp_dir!(), "ai_image_#{:os.system_time(:millisecond)}.jpg")
@@ -79,7 +79,8 @@ defmodule ShotElixir.Services.AiService do
     plural_folder = pluralize_entity_type(String.downcase(entity_type))
 
     options = %{
-      file_name: "#{String.downcase(entity_type)}_#{entity_id}_#{:os.system_time(:millisecond)}.jpg",
+      file_name:
+        "#{String.downcase(entity_type)}_#{entity_id}_#{:os.system_time(:millisecond)}.jpg",
       folder: "/chi-war-#{Mix.env()}/#{plural_folder}"
     }
 
@@ -180,7 +181,8 @@ defmodule ShotElixir.Services.AiService do
     prompt =
       cond do
         # Check description field first
-        Map.has_key?(entity, :description) && is_binary(entity.description) && entity.description != "" ->
+        Map.has_key?(entity, :description) && is_binary(entity.description) &&
+            entity.description != "" ->
           "Generate an image of: #{entity.description}"
 
         # Check action_values map - extract relevant fields
@@ -206,13 +208,17 @@ defmodule ShotElixir.Services.AiService do
     style = action_values["Style of Dress"] || action_values["style"]
 
     # Build description from available fields
-    parts = [
-      if(name, do: "Character named #{name}", else: nil),
-      if(appearance && appearance != "", do: "Appearance: #{appearance}", else: nil),
-      if(style && style != "", do: "Style: #{style}", else: nil),
-      if(background && background != "", do: "Background: #{String.slice(background, 0..200)}", else: nil)
-    ]
-    |> Enum.reject(&is_nil/1)
+    parts =
+      [
+        if(name, do: "Character named #{name}", else: nil),
+        if(appearance && appearance != "", do: "Appearance: #{appearance}", else: nil),
+        if(style && style != "", do: "Style: #{style}", else: nil),
+        if(background && background != "",
+          do: "Background: #{String.slice(background, 0..200)}",
+          else: nil
+        )
+      ]
+      |> Enum.reject(&is_nil/1)
 
     case parts do
       [] -> "Generate a character image"

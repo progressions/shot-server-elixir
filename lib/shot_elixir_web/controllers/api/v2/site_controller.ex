@@ -312,6 +312,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
                 {:ok, _} ->
                   # Reload site to get fresh data after image removal
                   updated_site = Sites.get_site(site.id)
+
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.SiteView)
                   |> render("show.json", site: updated_site)
@@ -356,6 +357,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
               case Sites.create_attunement(%{"site_id" => id, "character_id" => character_id}) do
                 {:ok, _attunement} ->
                   site = Sites.get_site!(id)
+
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.SiteView)
                   |> render("show.json", site: site)
