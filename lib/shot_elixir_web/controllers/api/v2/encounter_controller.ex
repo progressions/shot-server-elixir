@@ -31,9 +31,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
               fight ->
                 if fight.campaign_id == current_user.current_campaign_id do
-                  # TODO: Use proper EncounterSerializer
-                  serialized_fight = serialize_encounter(fight)
-                  json(conn, serialized_fight)
+                  # Preload necessary associations for proper serialization
+                  fight_with_associations = ShotElixir.Repo.preload(fight, [:shots])
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.EncounterView)
+                  |> render("show.json", encounter: fight_with_associations)
                 else
                   conn
                   |> put_status(:not_found)
@@ -94,8 +97,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       )
 
                       # Return updated encounter
-                      serialized_fight = serialize_encounter(fight)
-                      json(conn, serialized_fight)
+                      fight_with_associations = ShotElixir.Repo.preload(fight, [:shots])
+
+                      conn
+                      |> put_view(ShotElixirWeb.Api.V2.EncounterView)
+                      |> render("show.json", encounter: fight_with_associations)
 
                     {:error, changeset} ->
                       conn
@@ -178,8 +184,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
               # fight.broadcast_encounter_update!
 
               # Return updated encounter
-              serialized_fight = serialize_encounter(fight)
-              json(conn, serialized_fight)
+              fight_with_associations = ShotElixir.Repo.preload(fight, [:shots])
+
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.EncounterView)
+              |> render("show.json", encounter: fight_with_associations)
             rescue
               error ->
                 Logger.error("Error updating initiatives: #{inspect(error)}")
@@ -241,8 +250,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 end
 
               # Return updated encounter
-              serialized_fight = serialize_encounter(result)
-              json(conn, serialized_fight)
+              fight_with_associations = ShotElixir.Repo.preload(result, [:shots])
+
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.EncounterView)
+              |> render("show.json", encounter: fight_with_associations)
             rescue
               error ->
                 Logger.error("Error applying combat action: #{inspect(error)}")
@@ -289,8 +301,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
               result = fight
 
               # Return updated encounter
-              serialized_fight = serialize_encounter(result)
-              json(conn, serialized_fight)
+              fight_with_associations = ShotElixir.Repo.preload(result, [:shots])
+
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.EncounterView)
+              |> render("show.json", encounter: fight_with_associations)
             rescue
               error ->
                 Logger.error("Error applying chase action: #{inspect(error)}")
@@ -349,18 +364,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
     end
   end
 
-  defp serialize_encounter(fight) do
-    # TODO: Implement proper EncounterSerializer
-    # For now, return basic fight data
-    %{
-      id: fight.id,
-      name: fight.name,
-      description: fight.description,
-      campaign_id: fight.campaign_id,
-      created_at: fight.created_at,
-      updated_at: fight.updated_at
-    }
-  end
 
   defp translate_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
