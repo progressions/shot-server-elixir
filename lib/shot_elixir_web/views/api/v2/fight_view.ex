@@ -1,34 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.FightView do
-  def render("index.json", %{fights: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{fights: fights, meta: meta, is_autocomplete: is_autocomplete} ->
-        fight_serializer =
-          if is_autocomplete, do: &render_fight_autocomplete/1, else: &render_fight/1
-
-        %{
-          fights: Enum.map(fights, fight_serializer),
-          meta: meta
-        }
-
-      %{fights: fights, meta: meta} ->
-        %{
-          fights: Enum.map(fights, &render_fight/1),
-          meta: meta
-        }
-
-      fights when is_list(fights) ->
-        # Legacy format for backward compatibility
-        %{
-          fights: Enum.map(fights, &render_fight/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(fights),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{fights: fights, meta: meta}) do
+    %{
+      fights: Enum.map(fights, &render_fight/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{fight: fight}) do
@@ -127,7 +102,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     %{
       id: character.id,
       name: character.name,
-      image_url: character.image_url,
+      image_url: get_image_url(character),
       entity_class: "Character"
     }
   end
@@ -158,10 +133,29 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     }
   end
 
-  defp get_image_url(fight) do
-    # TODO: Implement proper image attachment checking
-    Map.get(fight, :image_url)
+  # Rails-compatible image URL handling
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type = case Map.get(record, :__struct__) do
+          nil -> nil  # Plain map, skip ActiveStorage lookup
+          struct_module -> struct_module |> Module.split() |> List.last()
+        end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
   end
+
+  defp get_image_url(_), do: nil
 
   defp translate_errors(changeset) when is_map(changeset) do
     if Map.has_key?(changeset, :errors) do

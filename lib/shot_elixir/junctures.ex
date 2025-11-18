@@ -173,7 +173,7 @@ defmodule ShotElixir.Junctures do
       query
       |> limit(^per_page)
       |> offset(^offset)
-      |> preload([:characters, :vehicles])
+      |> preload([:faction, :image_positions, :characters, :vehicles])
       |> Repo.all()
 
     # Load image URLs for all junctures efficiently
@@ -266,6 +266,12 @@ defmodule ShotElixir.Junctures do
   def get_juncture(id) do
     Juncture
     |> preload(:faction)
+    |> Repo.get(id)
+  end
+
+  def get_juncture_with_preloads(id) do
+    Juncture
+    |> preload([:faction, :image_positions, :characters, :vehicles])
     |> Repo.get(id)
   end
 

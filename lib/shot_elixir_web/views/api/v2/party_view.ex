@@ -1,34 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.PartyView do
-  def render("index.json", %{parties: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{parties: parties, meta: meta, is_autocomplete: is_autocomplete} ->
-        party_serializer =
-          if is_autocomplete, do: &render_party_autocomplete/1, else: &render_party/1
-
-        %{
-          parties: Enum.map(parties, party_serializer),
-          meta: meta
-        }
-
-      %{parties: parties, meta: meta} ->
-        %{
-          parties: Enum.map(parties, &render_party/1),
-          meta: meta
-        }
-
-      parties when is_list(parties) ->
-        # Legacy format for backward compatibility
-        %{
-          parties: Enum.map(parties, &render_party/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(parties),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{parties: parties, meta: meta}) do
+    %{
+      parties: Enum.map(parties, &render_party/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{party: party}) do
@@ -55,7 +30,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       vehicle_ids: get_vehicle_ids(party),
       created_at: party.created_at,
       updated_at: party.updated_at,
-      image_url: party.image_url,
+      image_url: get_image_url(party),
       characters: render_characters_if_loaded(party),
       vehicles: render_vehicles_if_loaded(party),
       faction: render_faction_if_loaded(party),
@@ -158,7 +133,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     %{
       id: character.id,
       name: character.name,
-      image_url: character.image_url,
+      image_url: get_image_url(character),
       entity_class: "Character"
     }
   end
@@ -188,4 +163,28 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       style_overrides: position.style_overrides
     }
   end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type = case Map.get(record, :__struct__) do
+          nil -> nil  # Plain map, skip ActiveStorage lookup
+          struct_module -> struct_module |> Module.split() |> List.last()
+        end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
+  end
+
+  defp get_image_url(_), do: nil
 end

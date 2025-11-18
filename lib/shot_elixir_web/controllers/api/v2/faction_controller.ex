@@ -29,7 +29,7 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
             conn
             |> put_view(ShotElixirWeb.Api.V2.FactionView)
-            |> render("index.json", factions: result)
+            |> render("index.json", factions: result.factions, meta: result.meta)
           else
             conn
             |> put_status(:forbidden)
@@ -306,11 +306,21 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
-              # TODO: Implement image removal when Active Storage equivalent is added
-              # For now, just return the faction
-              conn
-                                |> put_view(ShotElixirWeb.Api.V2.FactionView)
-                                |> render("show.json", faction: faction)
+              # Remove image from ActiveStorage
+              case ShotElixir.ActiveStorage.delete_image("Faction", faction.id) do
+                {:ok, _} ->
+                  # Reload faction to get fresh data after image removal
+                  updated_faction = Factions.get_faction(faction.id)
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                  |> render("show.json", faction: updated_faction)
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                  |> render("error.json", changeset: changeset)
+              end
             else
               conn
               |> put_status(:not_found)

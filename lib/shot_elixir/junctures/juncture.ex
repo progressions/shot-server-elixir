@@ -15,6 +15,9 @@ defmodule ShotElixir.Junctures.Juncture do
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction
 
+    has_many :characters, ShotElixir.Characters.Character, foreign_key: :juncture_id
+    has_many :vehicles, ShotElixir.Vehicles.Vehicle, foreign_key: :juncture_id
+
     has_many :image_positions, ImagePosition,
       foreign_key: :positionable_id,
       where: [positionable_type: "Juncture"]

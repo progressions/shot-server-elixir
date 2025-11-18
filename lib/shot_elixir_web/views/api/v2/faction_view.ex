@@ -1,34 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.FactionView do
-  def render("index.json", %{factions: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{factions: factions, meta: meta, is_autocomplete: is_autocomplete} ->
-        faction_serializer =
-          if is_autocomplete, do: &render_faction_autocomplete/1, else: &render_faction/1
-
-        %{
-          factions: Enum.map(factions, faction_serializer),
-          meta: meta
-        }
-
-      %{factions: factions, meta: meta} ->
-        %{
-          factions: Enum.map(factions, &render_faction/1),
-          meta: meta
-        }
-
-      factions when is_list(factions) ->
-        # Legacy format for backward compatibility
-        %{
-          factions: Enum.map(factions, &render_faction/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(factions),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{factions: factions, meta: meta}) do
+    %{
+      factions: Enum.map(factions, &render_faction/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{faction: faction}) do
@@ -51,7 +26,7 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       campaign_id: faction.campaign_id,
       created_at: faction.created_at,
       updated_at: faction.updated_at,
-      image_url: faction.image_url,
+      image_url: get_image_url(faction),
       character_ids: get_character_ids(faction),
       characters: render_characters_if_loaded(faction),
       vehicle_ids: get_vehicle_ids(faction),
@@ -184,7 +159,7 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
     %{
       id: character.id,
       name: character.name,
-      image_url: character.image_url,
+      image_url: get_image_url(character),
       entity_class: "Character"
     }
   end
@@ -230,4 +205,28 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       style_overrides: position.style_overrides
     }
   end
+
+  # Rails-compatible image URL handling
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type = case Map.get(record, :__struct__) do
+          nil -> nil  # Plain map, skip ActiveStorage lookup
+          struct_module -> struct_module |> Module.split() |> List.last()
+        end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
+  end
+
+  defp get_image_url(_), do: nil
 end

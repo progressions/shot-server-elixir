@@ -11,8 +11,10 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
     current_user = Guardian.Plug.current_resource(conn)
 
     if current_user.current_campaign_id do
-      weapons = Weapons.list_weapons(current_user.current_campaign_id, params)
-      render(conn, :index, weapons: weapons)
+      result = Weapons.list_weapons(current_user.current_campaign_id, params)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+      |> render("index.json", weapons: result.weapons, meta: result.meta)
     else
       conn
       |> put_status(:unprocessable_entity)
@@ -114,7 +116,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
       {:error, changeset} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> render(:error, changeset: changeset)
+        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("error.json", changeset: changeset)
     end
   end
 
@@ -143,18 +146,22 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
                     # Continue with weapon update
                     case Weapons.update_weapon(weapon, weapon_params) do
                       {:ok, weapon} ->
-                        render(conn, :show, weapon: weapon)
+                        conn
+        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("show.json", weapon: weapon)
 
                       {:error, changeset} ->
                         conn
                         |> put_status(:unprocessable_entity)
-                        |> render(:error, changeset: changeset)
+                        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("error.json", changeset: changeset)
                     end
 
                   {:error, changeset} ->
                     conn
                     |> put_status(:unprocessable_entity)
-                    |> render(:error, changeset: changeset)
+                    |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("error.json", changeset: changeset)
                 end
 
               {:error, reason} ->
@@ -167,12 +174,15 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
             # No image upload, just update weapon
             case Weapons.update_weapon(weapon, weapon_params) do
               {:ok, weapon} ->
-                render(conn, :show, weapon: weapon)
+                conn
+        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("show.json", weapon: weapon)
 
               {:error, changeset} ->
                 conn
                 |> put_status(:unprocessable_entity)
-                |> render(:error, changeset: changeset)
+                |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("error.json", changeset: changeset)
             end
         end
     end

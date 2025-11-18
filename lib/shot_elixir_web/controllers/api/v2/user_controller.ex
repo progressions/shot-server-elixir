@@ -42,7 +42,9 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
       _ ->
         result = Accounts.list_campaign_users(params, current_user)
-        render(conn, :index, data: result)
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.UserView)
+        |> render("index.json", users: result.users)
     end
   end
 

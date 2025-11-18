@@ -19,7 +19,9 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
 
       campaign ->
         result = Schticks.list_campaign_schticks(campaign.id, params, current_user)
-        render(conn, :index, schticks: result)
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+        |> render("index.json", schticks: result.schticks, meta: result.meta)
     end
   end
 
@@ -43,7 +45,9 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
           schtick ->
             if schtick.campaign_id == campaign.id do
               # Image removal handled by Rails Active Storage; mirror response for parity.
-              render(conn, :show, schtick: schtick)
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+              |> render("show.json", schtick: schtick)
             else
               conn
               |> put_status(:not_found)

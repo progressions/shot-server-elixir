@@ -13,7 +13,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
 
     conn
     |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-    |> render("index.json", campaigns: campaigns)
+    |> render("index.json", campaigns: campaigns.campaigns, meta: campaigns.meta)
   end
 
   def show(conn, %{"id" => id}) do

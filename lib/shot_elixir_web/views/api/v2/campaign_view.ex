@@ -1,34 +1,9 @@
 defmodule ShotElixirWeb.Api.V2.CampaignView do
-  def render("index.json", %{campaigns: data}) do
-    # Handle both old format (list) and new format (map with meta)
-    case data do
-      %{campaigns: campaigns, meta: meta, is_autocomplete: is_autocomplete} ->
-        campaign_serializer =
-          if is_autocomplete, do: &render_campaign_autocomplete/1, else: &render_campaign/1
-
-        %{
-          campaigns: Enum.map(campaigns, campaign_serializer),
-          meta: meta
-        }
-
-      %{campaigns: campaigns, meta: meta} ->
-        %{
-          campaigns: Enum.map(campaigns, &render_campaign/1),
-          meta: meta
-        }
-
-      campaigns when is_list(campaigns) ->
-        # Legacy format for backward compatibility
-        %{
-          campaigns: Enum.map(campaigns, &render_campaign/1),
-          meta: %{
-            current_page: 1,
-            per_page: 15,
-            total_count: length(campaigns),
-            total_pages: 1
-          }
-        }
-    end
+  def render("index.json", %{campaigns: campaigns, meta: meta}) do
+    %{
+      campaigns: Enum.map(campaigns, &render_campaign/1),
+      meta: meta
+    }
   end
 
   def render("show.json", %{campaign: campaign}) do
@@ -199,7 +174,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       id: fight.id,
       name: fight.name,
       description: fight.description,
-      image_url: fight.image_url,
+      image_url: get_image_url(fight),
       created_at: fight.created_at,
       updated_at: fight.updated_at,
       active: fight.active,
@@ -297,9 +272,26 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   # Rails-compatible image URL handling
-  defp get_image_url(record) do
-    # TODO: Implement proper image attachment checking
-    # For now, return nil like Rails when no image is attached
-    Map.get(record, :image_url)
+  defp get_image_url(record) when is_map(record) do
+    # Check if image_url is already in the record (pre-loaded)
+    case Map.get(record, :image_url) do
+      nil ->
+        # Try to get entity type from struct, fallback to nil if plain map
+        entity_type = case Map.get(record, :__struct__) do
+          nil -> nil  # Plain map, skip ActiveStorage lookup
+          struct_module -> struct_module |> Module.split() |> List.last()
+        end
+
+        if entity_type && Map.get(record, :id) do
+          ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)
+        else
+          nil
+        end
+
+      url ->
+        url
+    end
   end
+
+  defp get_image_url(_), do: nil
 end

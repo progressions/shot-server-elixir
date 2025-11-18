@@ -30,7 +30,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
                 current_user
               )
 
-            render(conn, :index, junctures: result)
+            render(conn, :index, junctures: result.junctures, meta: result.meta)
           else
             conn
             |> put_status(:forbidden)
@@ -48,7 +48,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
   def show(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    case Junctures.get_juncture(id) do
+    case Junctures.get_juncture_with_preloads(id) do
       nil ->
         conn
         |> put_status(:not_found)
@@ -186,14 +186,51 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
               if conn.halted do
                 conn
               else
-                case Junctures.update_juncture(juncture, parsed_params) do
-                  {:ok, juncture} ->
-                    render(conn, :show, juncture: juncture)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    # Upload image to ImageKit
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        # Attach image to juncture via ActiveStorage
+                        case ShotElixir.ActiveStorage.attach_image("Juncture", juncture.id, upload_result) do
+                          {:ok, _attachment} ->
+                            # Reload juncture to get fresh data after image attachment
+                            juncture = Junctures.get_juncture_with_preloads(juncture.id)
+                            # Continue with juncture update
+                            case Junctures.update_juncture(juncture, parsed_params) do
+                              {:ok, updated_juncture} ->
+                                render(conn, :show, juncture: updated_juncture)
 
-                  {:error, changeset} ->
-                    conn
-                    |> put_status(:unprocessable_entity)
-                    |> render(:error, changeset: changeset)
+                              {:error, changeset} ->
+                                conn
+                                |> put_status(:unprocessable_entity)
+                                |> render(:error, changeset: changeset)
+                            end
+
+                          {:error, changeset} ->
+                            conn
+                            |> put_status(:unprocessable_entity)
+                            |> render(:error, changeset: changeset)
+                        end
+
+                      {:error, reason} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> json(%{error: "Failed to upload image: #{inspect(reason)}"})
+                    end
+
+                  _ ->
+                    # No image upload, just update juncture
+                    case Junctures.update_juncture(juncture, parsed_params) do
+                      {:ok, juncture} ->
+                        render(conn, :show, juncture: juncture)
+
+                      {:error, changeset} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> render(:error, changeset: changeset)
+                    end
                 end
               end
             else
@@ -263,9 +300,18 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
 
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
-              # TODO: Implement image removal when Active Storage equivalent is added
-              # For now, just return the juncture
-              render(conn, :show, juncture: juncture)
+              # Remove image from ActiveStorage
+              case ShotElixir.ActiveStorage.delete_image("Juncture", juncture.id) do
+                {:ok, _} ->
+                  # Reload juncture to get fresh data after image removal
+                  updated_juncture = Junctures.get_juncture_with_preloads(juncture.id)
+                  render(conn, :show, juncture: updated_juncture)
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> render(:error, changeset: changeset)
+              end
             else
               conn
               |> put_status(:not_found)

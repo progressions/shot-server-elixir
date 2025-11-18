@@ -24,7 +24,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("index.json", fights: fights_data)
+      |> render("index.json", fights: fights_data.fights, meta: fights_data.meta)
     end
   end
 
@@ -259,10 +259,21 @@ defmodule ShotElixirWeb.Api.V2.FightController do
 
     with %Fight{} = fight <- Fights.get_fight(id),
          :ok <- authorize_fight_edit(fight, current_user) do
-      # TODO: Implement image removal
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("show.json", fight: fight)
+      # Remove image from ActiveStorage
+      case ShotElixir.ActiveStorage.delete_image("Fight", fight.id) do
+        {:ok, _} ->
+          # Reload fight to get fresh data after image removal
+          updated_fight = Fights.get_fight(fight.id)
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.FightView)
+          |> render("show.json", fight: updated_fight)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.FightView)
+          |> render("error.json", changeset: changeset)
+      end
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}

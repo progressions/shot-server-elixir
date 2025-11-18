@@ -30,7 +30,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
             conn
             |> put_view(ShotElixirWeb.Api.V2.PartyView)
-            |> render("index.json", parties: ShotElixir.JsonSanitizer.sanitize(result))
+            |> render("index.json", parties: result.parties, meta: result.meta)
           else
             conn
             |> put_status(:forbidden)
@@ -311,11 +311,21 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
-              # TODO: Implement image removal when Active Storage equivalent is added
-              # For now, just return the party
-              conn
-              |> put_view(ShotElixirWeb.Api.V2.PartyView)
-              |> render("show.json", party: party)
+              # Remove image from ActiveStorage
+              case ShotElixir.ActiveStorage.delete_image("Party", party.id) do
+                {:ok, _} ->
+                  # Reload party to get fresh data after image removal
+                  updated_party = Parties.get_party(party.id)
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: updated_party)
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("error.json", changeset: changeset)
+              end
             else
               conn
               |> put_status(:not_found)

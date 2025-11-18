@@ -33,7 +33,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-      |> render("index.json", characters: characters)
+      |> render("index.json", characters: characters.characters, meta: characters.meta)
     end
   end
 

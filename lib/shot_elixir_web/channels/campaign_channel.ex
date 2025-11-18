@@ -56,6 +56,7 @@ defmodule ShotElixirWeb.CampaignChannel do
     {:noreply, socket}
   end
 
+
   @impl true
   def handle_in("reload", _payload, socket) do
     broadcast!(socket, "reload", %{})
