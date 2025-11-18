@@ -47,11 +47,18 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       id: site.id,
       name: site.name,
       description: site.description,
+      active: site.active,
+      faction_id: site.faction_id,
       campaign_id: site.campaign_id,
+      juncture_id: site.juncture_id,
+      character_ids: get_character_ids(site),
       created_at: site.created_at,
       updated_at: site.updated_at,
       image_url: site.image_url,
-      entity_class: "SiteView"
+      characters: render_characters_if_loaded(site),
+      faction: render_faction_if_loaded(site),
+      image_positions: render_image_positions_if_loaded(site),
+      entity_class: "Site"
     }
   end
 
@@ -59,7 +66,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     %{
       id: site.id,
       name: site.name,
-      entity_class: "SiteView"
+      entity_class: "Site"
     }
   end
 
@@ -76,4 +83,62 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
   end
 
   defp translate_errors(errors), do: errors
+
+  defp get_character_ids(site) do
+    case Map.get(site, :characters) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      characters -> Enum.map(characters, & &1.id)
+    end
+  end
+
+  defp render_characters_if_loaded(site) do
+    case Map.get(site, :characters) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      characters -> Enum.map(characters, &render_character_lite/1)
+    end
+  end
+
+  defp render_faction_if_loaded(site) do
+    case Map.get(site, :faction) do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      faction -> render_faction_lite(faction)
+    end
+  end
+
+  defp render_image_positions_if_loaded(site) do
+    case Map.get(site, :image_positions) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      positions -> Enum.map(positions, &render_image_position/1)
+    end
+  end
+
+  defp render_character_lite(character) do
+    %{
+      id: character.id,
+      name: character.name,
+      entity_class: "Character"
+    }
+  end
+
+  defp render_faction_lite(faction) do
+    %{
+      id: faction.id,
+      name: faction.name,
+      entity_class: "Faction"
+    }
+  end
+
+  defp render_image_position(position) do
+    %{
+      id: position.id,
+      context: position.context,
+      x_position: position.x_position,
+      y_position: position.y_position,
+      style_overrides: position.style_overrides
+    }
+  end
 end

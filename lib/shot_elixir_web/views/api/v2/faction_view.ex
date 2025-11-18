@@ -51,7 +51,7 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       created_at: faction.created_at,
       updated_at: faction.updated_at,
       image_url: faction.image_url,
-      entity_class: "FactionView"
+      entity_class: "Faction"
     }
   end
 
@@ -59,7 +59,7 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
     %{
       id: faction.id,
       name: faction.name,
-      entity_class: "FactionView"
+      entity_class: "Faction"
     }
   end
 
