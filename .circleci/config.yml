@@ -47,12 +47,12 @@ jobs:
       - image: cimg/elixir:1.19.3-erlang-27.2-node
         environment:
           MIX_ENV: test
-          DATABASE_URL: postgres://circleci:@localhost/shot_elixir_test
+          DATABASE_URL: postgres://isaacpriestley:@localhost/shot_server_test
 
       - image: cimg/postgres:16.6
         environment:
-          POSTGRES_USER: circleci
-          POSTGRES_DB: shot_elixir_test
+          POSTGRES_USER: isaacpriestley
+          POSTGRES_DB: shot_server_test
           POSTGRES_PASSWORD: ""
           POSTGRES_HOST_AUTH_METHOD: trust
 
@@ -91,28 +91,17 @@ jobs:
           name: Compile application
           command: mix compile --warnings-as-errors
 
-      # Wait for database
-      - run:
-          name: Wait for DB
-          command: |
-            for i in {1..10}; do
-              pg_isready -h localhost -U circleci && break
-              echo "Waiting for database..."
-              sleep 2
-            done
-
-      # Database setup
-      - run:
-          name: Database setup
-          command: |
-            mix ecto.create
-            mix ecto.migrate
-
-      # Run tests with timeout
+      # Run tests (includes database setup via mix.exs alias)
       - run:
           name: Run tests
-          command: mix test
-          no_output_timeout: 4m
+          command: |
+            # Wait for PostgreSQL to be ready and run tests
+            for i in {1..30}; do
+              mix test && break
+              echo "Waiting for PostgreSQL or retrying tests..."
+              sleep 2
+            done
+          no_output_timeout: 5m
 
       # Store test results
       - store_test_results:
