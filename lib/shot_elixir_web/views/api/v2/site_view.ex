@@ -32,9 +32,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
   end
 
   def render("show.json", %{site: site}) do
-    %{
-      site: render_site(site)
-    }
+    render_site(site)
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -52,7 +50,8 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       campaign_id: site.campaign_id,
       created_at: site.created_at,
       updated_at: site.updated_at,
-      image_url: site.image_url
+      image_url: site.image_url,
+      entity_class: "SiteView"
     }
   end
 
@@ -60,7 +59,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     %{
       id: site.id,
       name: site.name,
-      entity_class: "Site"
+      entity_class: "SiteView"
     }
   end
 

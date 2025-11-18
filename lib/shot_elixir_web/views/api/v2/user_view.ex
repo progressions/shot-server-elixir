@@ -10,9 +10,7 @@ defmodule ShotElixirWeb.Api.V2.UserView do
   end
 
   def render("current.json", %{user: user}) do
-    %{
-      user: render_user_full(user)
-    }
+    render_user_full(user)
   end
 
   def render("error.json", %{errors: errors}) do

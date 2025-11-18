@@ -32,9 +32,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   end
 
   def render("show.json", %{party: party}) do
-    %{
-      party: render_party(party)
-    }
+    render_party(party)
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -52,7 +50,8 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       campaign_id: party.campaign_id,
       created_at: party.created_at,
       updated_at: party.updated_at,
-      image_url: party.image_url
+      image_url: party.image_url,
+      entity_class: "PartyView"
     }
   end
 
@@ -60,7 +59,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     %{
       id: party.id,
       name: party.name,
-      entity_class: "Party"
+      entity_class: "PartyView"
     }
   end
 
