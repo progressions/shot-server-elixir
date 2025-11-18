@@ -95,11 +95,12 @@ defmodule ShotElixirWeb.Router do
       end
     end
 
-    # Other resources
+    # Weapons with custom routes
+    post "/weapons/batch", WeaponController, :batch
+    get "/weapons/junctures", WeaponController, :junctures
+    get "/weapons/categories", WeaponController, :categories
+
     resources "/weapons", WeaponController do
-      post "/batch", WeaponController, :batch
-      get "/junctures", WeaponController, :junctures
-      get "/categories", WeaponController, :categories
       delete "/image", WeaponController, :remove_image
     end
 

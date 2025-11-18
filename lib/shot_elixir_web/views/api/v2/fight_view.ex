@@ -1,8 +1,34 @@
 defmodule ShotElixirWeb.Api.V2.FightView do
-  def render("index.json", %{fights: fights}) do
-    %{
-      fights: Enum.map(fights, &render_fight/1)
-    }
+  def render("index.json", %{fights: data}) do
+    # Handle both old format (list) and new format (map with meta)
+    case data do
+      %{fights: fights, meta: meta, is_autocomplete: is_autocomplete} ->
+        fight_serializer =
+          if is_autocomplete, do: &render_fight_autocomplete/1, else: &render_fight/1
+
+        %{
+          fights: Enum.map(fights, fight_serializer),
+          meta: meta
+        }
+
+      %{fights: fights, meta: meta} ->
+        %{
+          fights: Enum.map(fights, &render_fight/1),
+          meta: meta
+        }
+
+      fights when is_list(fights) ->
+        # Legacy format for backward compatibility
+        %{
+          fights: Enum.map(fights, &render_fight/1),
+          meta: %{
+            current_page: 1,
+            per_page: 15,
+            total_count: length(fights),
+            total_pages: 1
+          }
+        }
+    end
   end
 
   def render("show.json", %{fight: fight}) do
@@ -107,6 +133,14 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       id: vehicle.id,
       name: vehicle.name,
       entity_class: "Vehicle"
+    }
+  end
+
+  defp render_fight_autocomplete(fight) do
+    %{
+      id: fight.id,
+      name: fight.name,
+      entity_class: "Fight"
     }
   end
 

@@ -28,7 +28,9 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                 current_user
               )
 
-            render(conn, :index, parties: ShotElixir.JsonSanitizer.sanitize(result))
+            conn
+            |> put_view(ShotElixirWeb.Api.V2.PartyView)
+            |> render("index.json", parties: ShotElixir.JsonSanitizer.sanitize(result))
           else
             conn
             |> put_status(:forbidden)
@@ -62,7 +64,9 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              render(conn, :show, party: party)
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.PartyView)
+              |> render("show.json", party: party)
             else
               conn
               |> put_status(:not_found)
@@ -120,12 +124,14 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
               {:ok, party} ->
                 conn
                 |> put_status(:created)
-                |> render(:show, party: party)
+                |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("show.json", party: party)
 
               {:error, changeset} ->
                 conn
                 |> put_status(:unprocessable_entity)
-                |> render(:error, changeset: changeset)
+                |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("error.json", changeset: changeset)
             end
           else
             conn
@@ -198,18 +204,22 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                             # Continue with party update
                             case Parties.update_party(party, parsed_params) do
                               {:ok, party} ->
-                                render(conn, :show, party: party)
+                                conn
+              |> put_view(ShotElixirWeb.Api.V2.PartyView)
+              |> render("show.json", party: party)
 
                               {:error, changeset} ->
                                 conn
                                 |> put_status(:unprocessable_entity)
-                                |> render(:error, changeset: changeset)
+                                |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("error.json", changeset: changeset)
                             end
 
                           {:error, changeset} ->
                             conn
                             |> put_status(:unprocessable_entity)
-                            |> render(:error, changeset: changeset)
+                            |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("error.json", changeset: changeset)
                         end
 
                       {:error, reason} ->
@@ -222,12 +232,15 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                     # No image upload, just update party
                     case Parties.update_party(party, parsed_params) do
                       {:ok, party} ->
-                        render(conn, :show, party: party)
+                        conn
+              |> put_view(ShotElixirWeb.Api.V2.PartyView)
+              |> render("show.json", party: party)
 
                       {:error, changeset} ->
                         conn
                         |> put_status(:unprocessable_entity)
-                        |> render(:error, changeset: changeset)
+                        |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("error.json", changeset: changeset)
                     end
                 end
               end
@@ -300,7 +313,9 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
             if authorize_campaign_modification(campaign, current_user) do
               # TODO: Implement image removal when Active Storage equivalent is added
               # For now, just return the party
-              render(conn, :show, party: party)
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.PartyView)
+              |> render("show.json", party: party)
             else
               conn
               |> put_status(:not_found)
@@ -321,7 +336,9 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
          :ok <- validate_same_campaign(party.campaign_id, fight.campaign_id) do
       # Add party members to fight (this would need implementation in Fights context)
       # For now, just return the party
-      render(conn, :show, party: party)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.PartyView)
+      |> render("show.json", party: party)
     else
       nil ->
         conn
@@ -374,12 +391,15 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
               case Parties.add_member(id, member_attrs) do
                 {:ok, _membership} ->
                   party = Parties.get_party!(id)
-                  render(conn, :show, party: party)
+                  conn
+              |> put_view(ShotElixirWeb.Api.V2.PartyView)
+              |> render("show.json", party: party)
 
                 {:error, changeset} ->
                   conn
                   |> put_status(:unprocessable_entity)
-                  |> render(:error, changeset: changeset)
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("error.json", changeset: changeset)
               end
             else
               conn
