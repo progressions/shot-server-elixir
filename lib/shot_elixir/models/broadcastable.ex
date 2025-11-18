@@ -23,10 +23,22 @@ defmodule ShotElixir.Models.Broadcastable do
       end
 
       @doc """
-      Broadcasts an entity change via the BroadcastManager.
+      Broadcasts an entity change via Phoenix.PubSub.
       """
       def broadcast_change(entity, action) when action in [:insert, :update, :delete] do
-        ShotElixir.BroadcastManager.broadcast_entity_change(entity, action)
+        # Use Phoenix.PubSub directly instead of BroadcastManager
+        entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
+        topic = "campaign:#{entity.campaign_id}"
+
+        Phoenix.PubSub.broadcast(
+          ShotElixir.PubSub,
+          topic,
+          %{
+            type: "#{entity_name}_#{action}",
+            data: entity,
+            entity_class: String.capitalize(entity_name)
+          }
+        )
       end
 
       @doc """
@@ -54,6 +66,18 @@ defmodule ShotElixir.Models.Broadcastable do
   Helper function to broadcast changes for entities that don't use the macro.
   """
   def broadcast(entity, action) when action in [:insert, :update, :delete] do
-    ShotElixir.BroadcastManager.broadcast_entity_change(entity, action)
+    # Use Phoenix.PubSub directly instead of BroadcastManager
+    entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
+    topic = "campaign:#{entity.campaign_id}"
+
+    Phoenix.PubSub.broadcast(
+      ShotElixir.PubSub,
+      topic,
+      %{
+        type: "#{entity_name}_#{action}",
+        data: entity,
+        entity_class: String.capitalize(entity_name)
+      }
+    )
   end
 end
