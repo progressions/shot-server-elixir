@@ -173,6 +173,7 @@ defmodule ShotElixir.Junctures do
       query
       |> limit(^per_page)
       |> offset(^offset)
+      |> preload([:characters, :vehicles])
       |> Repo.all()
 
     # Load image URLs for all junctures efficiently

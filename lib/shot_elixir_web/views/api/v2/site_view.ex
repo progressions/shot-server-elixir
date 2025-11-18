@@ -85,18 +85,26 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
   defp translate_errors(errors), do: errors
 
   defp get_character_ids(site) do
-    case Map.get(site, :characters) do
+    case Map.get(site, :attunements) do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
-      characters -> Enum.map(characters, & &1.id)
+      attunements ->
+        attunements
+        |> Enum.map(fn attunement -> attunement.character end)
+        |> Enum.filter(& &1 != nil)
+        |> Enum.map(& &1.id)
     end
   end
 
   defp render_characters_if_loaded(site) do
-    case Map.get(site, :characters) do
+    case Map.get(site, :attunements) do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
-      characters -> Enum.map(characters, &render_character_lite/1)
+      attunements ->
+        attunements
+        |> Enum.map(fn attunement -> attunement.character end)
+        |> Enum.filter(& &1 != nil)
+        |> Enum.map(&render_character_lite/1)
     end
   end
 

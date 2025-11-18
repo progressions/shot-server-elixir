@@ -87,34 +87,50 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   defp translate_errors(errors), do: errors
 
   defp get_character_ids(party) do
-    case Map.get(party, :characters) do
+    case Map.get(party, :memberships) do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
-      characters -> Enum.map(characters, & &1.id)
+      memberships ->
+        memberships
+        |> Enum.map(fn membership -> membership.character end)
+        |> Enum.filter(& &1 != nil)
+        |> Enum.map(& &1.id)
     end
   end
 
   defp get_vehicle_ids(party) do
-    case Map.get(party, :vehicles) do
+    case Map.get(party, :memberships) do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
-      vehicles -> Enum.map(vehicles, & &1.id)
+      memberships ->
+        memberships
+        |> Enum.map(fn membership -> membership.vehicle end)
+        |> Enum.filter(& &1 != nil)
+        |> Enum.map(& &1.id)
     end
   end
 
   defp render_characters_if_loaded(party) do
-    case Map.get(party, :characters) do
+    case Map.get(party, :memberships) do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
-      characters -> Enum.map(characters, &render_character_lite/1)
+      memberships ->
+        memberships
+        |> Enum.map(fn membership -> membership.character end)
+        |> Enum.filter(& &1 != nil)
+        |> Enum.map(&render_character_lite/1)
     end
   end
 
   defp render_vehicles_if_loaded(party) do
-    case Map.get(party, :vehicles) do
+    case Map.get(party, :memberships) do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
-      vehicles -> Enum.map(vehicles, &render_vehicle_lite/1)
+      memberships ->
+        memberships
+        |> Enum.map(fn membership -> membership.vehicle end)
+        |> Enum.filter(& &1 != nil)
+        |> Enum.map(&render_vehicle_lite/1)
     end
   end
 
