@@ -126,7 +126,6 @@ defmodule ShotElixir.Characters.Character do
   Returns the image URL for a character, using ImageKit if configured.
   """
   def image_url(%__MODULE__{} = character) do
-    # Image storage handled by Rails app
     character.image_url
   end
 

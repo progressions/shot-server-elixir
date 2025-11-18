@@ -92,7 +92,10 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     case Map.get(fight, :characters) do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
-      characters -> Enum.map(characters, &render_character_autocomplete/1)
+      characters ->
+        # Load image URLs for all characters efficiently
+        characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
+        Enum.map(characters_with_images, &render_character_autocomplete/1)
     end
   end
 
@@ -124,6 +127,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     %{
       id: character.id,
       name: character.name,
+      image_url: character.image_url,
       entity_class: "Character"
     }
   end

@@ -101,10 +101,14 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       %Ecto.Association.NotLoaded{} -> []
       nil -> []
       attunements ->
-        attunements
-        |> Enum.map(fn attunement -> attunement.character end)
-        |> Enum.filter(& &1 != nil)
-        |> Enum.map(&render_character_lite/1)
+        characters =
+          attunements
+          |> Enum.map(fn attunement -> attunement.character end)
+          |> Enum.filter(& &1 != nil)
+
+        # Load image URLs for all characters efficiently
+        characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
+        Enum.map(characters_with_images, &render_character_lite/1)
     end
   end
 
@@ -128,6 +132,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     %{
       id: character.id,
       name: character.name,
+      image_url: character.image_url,
       entity_class: "Character"
     }
   end
