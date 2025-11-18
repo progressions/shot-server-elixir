@@ -65,8 +65,12 @@ defmodule ShotElixirWeb.Api.V2.FightView do
 
   defp render_characters_if_loaded(fight) do
     case Map.get(fight, :characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       characters ->
         # Load image URLs for all characters efficiently
         characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
@@ -115,13 +119,6 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     }
   end
 
-  defp render_fight_autocomplete(fight) do
-    %{
-      id: fight.id,
-      name: fight.name,
-      entity_class: "Fight"
-    }
-  end
 
   defp render_image_position(position) do
     %{
@@ -139,10 +136,12 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     case Map.get(record, :image_url) do
       nil ->
         # Try to get entity type from struct, fallback to nil if plain map
-        entity_type = case Map.get(record, :__struct__) do
-          nil -> nil  # Plain map, skip ActiveStorage lookup
-          struct_module -> struct_module |> Module.split() |> List.last()
-        end
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
 
         if entity_type && Map.get(record, :id) do
           ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)

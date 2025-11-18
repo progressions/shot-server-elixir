@@ -37,13 +37,6 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     }
   end
 
-  defp render_site_autocomplete(site) do
-    %{
-      id: site.id,
-      name: site.name,
-      entity_class: "Site"
-    }
-  end
 
   defp translate_errors(changeset) when is_map(changeset) do
     if Map.has_key?(changeset, :errors) do
@@ -61,25 +54,33 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
 
   defp get_character_ids(site) do
     case Map.get(site, :attunements) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       attunements ->
         attunements
         |> Enum.map(fn attunement -> attunement.character end)
-        |> Enum.filter(& &1 != nil)
+        |> Enum.filter(&(&1 != nil))
         |> Enum.map(& &1.id)
     end
   end
 
   defp render_characters_if_loaded(site) do
     case Map.get(site, :attunements) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       attunements ->
         characters =
           attunements
           |> Enum.map(fn attunement -> attunement.character end)
-          |> Enum.filter(& &1 != nil)
+          |> Enum.filter(&(&1 != nil))
 
         # Load image URLs for all characters efficiently
         characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
@@ -136,10 +137,12 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     case Map.get(record, :image_url) do
       nil ->
         # Try to get entity type from struct, fallback to nil if plain map
-        entity_type = case Map.get(record, :__struct__) do
-          nil -> nil  # Plain map, skip ActiveStorage lookup
-          struct_module -> struct_module |> Module.split() |> List.last()
-        end
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
 
         if entity_type && Map.get(record, :id) do
           ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)

@@ -16,7 +16,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
     active: false
   }
 
-  @invalid_attrs %{name: nil, user_id: nil}
 
   setup %{conn: conn} do
     {:ok, gamemaster} =

@@ -83,13 +83,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     }
   end
 
-  defp render_campaign_autocomplete(campaign) do
-    %{
-      id: campaign.id,
-      name: campaign.name,
-      entity_class: "Campaign"
-    }
-  end
 
   defp render_campaign_detail(campaign) do
     base = render_campaign(campaign)
@@ -155,17 +148,19 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
 
   defp render_fight_detailed(fight) do
     # Handle potentially loaded or not loaded associations
-    characters = case Map.get(fight, :characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
-      chars -> Enum.map(chars, &render_character_simple/1)
-    end
+    characters =
+      case Map.get(fight, :characters) do
+        %Ecto.Association.NotLoaded{} -> []
+        nil -> []
+        chars -> Enum.map(chars, &render_character_simple/1)
+      end
 
-    vehicles = case Map.get(fight, :vehicles) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
-      vehs -> Enum.map(vehs, &render_vehicle_simple/1)
-    end
+    vehicles =
+      case Map.get(fight, :vehicles) do
+        %Ecto.Association.NotLoaded{} -> []
+        nil -> []
+        vehs -> Enum.map(vehs, &render_vehicle_simple/1)
+      end
 
     character_ids = Enum.map(characters, & &1[:id])
     vehicle_ids = Enum.map(vehicles, & &1[:id])
@@ -277,10 +272,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     case Map.get(record, :image_url) do
       nil ->
         # Try to get entity type from struct, fallback to nil if plain map
-        entity_type = case Map.get(record, :__struct__) do
-          nil -> nil  # Plain map, skip ActiveStorage lookup
-          struct_module -> struct_module |> Module.split() |> List.last()
-        end
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
 
         if entity_type && Map.get(record, :id) do
           ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)

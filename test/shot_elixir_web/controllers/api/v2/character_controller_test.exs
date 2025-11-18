@@ -6,11 +6,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
     Campaigns,
     Accounts,
     Schticks,
-    Weapons,
-    Sites,
-    Parties,
-    Factions,
-    Junctures
+    Weapons
   }
 
   alias ShotElixir.Guardian

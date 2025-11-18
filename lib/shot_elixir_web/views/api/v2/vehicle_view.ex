@@ -49,14 +49,6 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     }
   end
 
-  defp render_vehicle_autocomplete(vehicle) do
-    %{
-      id: vehicle.id,
-      name: vehicle.name,
-      active: vehicle.active,
-      entity_class: "Vehicle"
-    }
-  end
 
   defp render_vehicle_detail(vehicle) do
     base = render_vehicle(vehicle)
@@ -105,10 +97,12 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     case Map.get(record, :image_url) do
       nil ->
         # Try to get entity type from struct, fallback to nil if plain map
-        entity_type = case Map.get(record, :__struct__) do
-          nil -> nil  # Plain map, skip ActiveStorage lookup
-          struct_module -> struct_module |> Module.split() |> List.last()
-        end
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
 
         if entity_type && Map.get(record, :id) do
           ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)

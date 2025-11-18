@@ -39,13 +39,6 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     }
   end
 
-  defp render_party_autocomplete(party) do
-    %{
-      id: party.id,
-      name: party.name,
-      entity_class: "Party"
-    }
-  end
 
   defp translate_errors(changeset) when is_map(changeset) do
     if Map.has_key?(changeset, :errors) do
@@ -63,37 +56,49 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
 
   defp get_character_ids(party) do
     case Map.get(party, :memberships) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       memberships ->
         memberships
         |> Enum.map(fn membership -> membership.character end)
-        |> Enum.filter(& &1 != nil)
+        |> Enum.filter(&(&1 != nil))
         |> Enum.map(& &1.id)
     end
   end
 
   defp get_vehicle_ids(party) do
     case Map.get(party, :memberships) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       memberships ->
         memberships
         |> Enum.map(fn membership -> membership.vehicle end)
-        |> Enum.filter(& &1 != nil)
+        |> Enum.filter(&(&1 != nil))
         |> Enum.map(& &1.id)
     end
   end
 
   defp render_characters_if_loaded(party) do
     case Map.get(party, :memberships) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       memberships ->
         characters =
           memberships
           |> Enum.map(fn membership -> membership.character end)
-          |> Enum.filter(& &1 != nil)
+          |> Enum.filter(&(&1 != nil))
 
         # Load image URLs for all characters efficiently
         characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
@@ -103,12 +108,16 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
 
   defp render_vehicles_if_loaded(party) do
     case Map.get(party, :memberships) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       memberships ->
         memberships
         |> Enum.map(fn membership -> membership.vehicle end)
-        |> Enum.filter(& &1 != nil)
+        |> Enum.filter(&(&1 != nil))
         |> Enum.map(&render_vehicle_lite/1)
     end
   end
@@ -170,10 +179,12 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     case Map.get(record, :image_url) do
       nil ->
         # Try to get entity type from struct, fallback to nil if plain map
-        entity_type = case Map.get(record, :__struct__) do
-          nil -> nil  # Plain map, skip ActiveStorage lookup
-          struct_module -> struct_module |> Module.split() |> List.last()
-        end
+        entity_type =
+          case Map.get(record, :__struct__) do
+            # Plain map, skip ActiveStorage lookup
+            nil -> nil
+            struct_module -> struct_module |> Module.split() |> List.last()
+          end
 
         if entity_type && Map.get(record, :id) do
           ShotElixir.ActiveStorage.get_image_url(entity_type, record.id)

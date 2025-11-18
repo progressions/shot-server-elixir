@@ -1,6 +1,5 @@
 defmodule ShotElixir.Services.ImagekitServiceTest do
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog
 
   alias ShotElixir.Services.ImagekitService
 
