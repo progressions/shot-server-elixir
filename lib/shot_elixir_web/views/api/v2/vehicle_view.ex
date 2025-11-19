@@ -49,7 +49,6 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     }
   end
 
-
   defp render_vehicle_detail(vehicle) do
     base = render_vehicle(vehicle)
 

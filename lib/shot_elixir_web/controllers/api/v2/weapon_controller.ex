@@ -93,7 +93,9 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
     weapon = Weapons.get_weapon(id)
 
     if weapon do
-      render(conn, :show, weapon: weapon)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+      |> render("show.json", weapon: weapon)
     else
       conn
       |> put_status(:not_found)
@@ -112,7 +114,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
       {:ok, weapon} ->
         conn
         |> put_status(:created)
-        |> render(:show, weapon: weapon)
+        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("show.json", weapon: weapon)
 
       {:error, changeset} ->
         conn
@@ -221,7 +224,9 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
          true <- weapon.campaign_id == campaign_id,
          :ok <- require_gamemaster(current_user),
          {:ok, weapon} <- Weapons.remove_image(weapon) do
-      render(conn, :show, weapon: weapon)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+      |> render("show.json", weapon: weapon)
     else
       {:error, :unauthorized} ->
         conn

@@ -31,6 +31,13 @@ defmodule ShotElixirWeb.Api.V2.UserView do
     }
   end
 
+  def render("error.json", %{changeset: changeset}) do
+    %{
+      success: false,
+      errors: translate_errors(changeset)
+    }
+  end
+
   defp render_user(user) do
     %{
       id: user.id,
@@ -156,7 +163,14 @@ defmodule ShotElixirWeb.Api.V2.UserView do
     if Map.has_key?(changeset, :errors) do
       Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
         Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
+          # Handle tuples and other non-string values safely
+          value_str =
+            case value do
+              v when is_binary(v) -> v
+              v -> inspect(v)
+            end
+
+          String.replace(acc, "%{#{key}}", value_str)
         end)
       end)
     else

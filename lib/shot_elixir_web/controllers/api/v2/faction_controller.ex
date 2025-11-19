@@ -129,7 +129,8 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
               {:error, changeset} ->
                 conn
                 |> put_status(:unprocessable_entity)
-                |> render(:error, changeset: changeset)
+                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                |> render("error.json", changeset: changeset)
             end
           else
             conn
@@ -213,13 +214,15 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                               {:error, changeset} ->
                                 conn
                                 |> put_status(:unprocessable_entity)
-                                |> render(:error, changeset: changeset)
+                                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                                |> render("error.json", changeset: changeset)
                             end
 
                           {:error, changeset} ->
                             conn
                             |> put_status(:unprocessable_entity)
-                            |> render(:error, changeset: changeset)
+                            |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                            |> render("error.json", changeset: changeset)
                         end
 
                       {:error, reason} ->
@@ -239,7 +242,8 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
                       {:error, changeset} ->
                         conn
                         |> put_status(:unprocessable_entity)
-                        |> render(:error, changeset: changeset)
+                        |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                        |> render("error.json", changeset: changeset)
                     end
                 end
               end

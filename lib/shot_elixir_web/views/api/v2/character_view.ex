@@ -12,10 +12,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     "Melodramatic Hook" => ""
   }
 
-  def render("index.json", %{characters: characters, meta: meta}) do
+  def render("index.json", %{characters: characters, meta: meta, archetypes: archetypes}) do
     %{
       characters: Enum.map(characters, &render_character_index/1),
-      meta: meta
+      meta: meta,
+      archetypes: archetypes
     }
   end
 

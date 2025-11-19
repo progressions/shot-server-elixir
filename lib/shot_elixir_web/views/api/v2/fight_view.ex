@@ -119,7 +119,6 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     }
   end
 
-
   defp render_image_position(position) do
     %{
       id: position.id,
