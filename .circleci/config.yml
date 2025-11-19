@@ -3,7 +3,7 @@ version: 2.1
 jobs:
   format:
     docker:
-      - image: cimg/elixir:1.19.3-erlang-27.2-node
+      - image: cimg/elixir:1.16
         environment:
           MIX_ENV: dev
 
@@ -44,7 +44,7 @@ jobs:
 
   test:
     docker:
-      - image: cimg/elixir:1.19.3-erlang-27.2-node
+      - image: cimg/elixir:1.16
         environment:
           MIX_ENV: test
           DATABASE_URL: postgres://isaacpriestley:@localhost/shot_server_test
