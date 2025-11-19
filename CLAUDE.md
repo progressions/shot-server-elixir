@@ -17,7 +17,26 @@ This is a Phoenix 1.8 API application that provides identical endpoints to the R
 - **Phoenix Channels** - WebSocket support (Action Cable equivalent)
 
 ### Database
-Uses the existing `shot_counter_local` PostgreSQL database with UUID primary keys. No migrations needed - works with existing Rails schema.
+Uses the existing `shot_counter_local` PostgreSQL database with UUID primary keys.
+
+**Local Development:**
+- Development: Shares `shot_counter_local` with Rails
+- Test: Shares `shot_server_test` with Rails (Rails must set up schema first)
+
+**Test Database Setup:**
+The test database schema comes from Rails. For CI environments, use the included schema dump:
+
+```bash
+# Set up test database with Rails schema (one-time setup)
+# Option 1: Use Mix task (recommended)
+mix setup_test_db
+
+# Option 2: Use shell script (for CI)
+./setup_ci_db.sh
+
+# Option 3: Manual setup
+psql -h localhost -U postgres -d shot_server_test < priv/repo/structure.sql
+```
 
 ### API Structure
 Implements Rails API V2 endpoints under `/api/v2/`:
@@ -109,6 +128,26 @@ curl -X POST http://localhost:4002/users/sign_in \
   -H "Content-Type: application/json" \
   -d '{"user":{"email":"progressions@gmail.com","password":"password"}}'
 ```
+
+## CircleCI Setup
+
+For CircleCI, add this to your `.circleci/config.yml`:
+
+```yaml
+- run:
+    name: Setup test database
+    command: |
+      cd shot-elixir
+      ./setup_ci_db.sh
+
+- run:
+    name: Run Elixir tests
+    command: |
+      cd shot-elixir
+      mix test
+```
+
+The `priv/repo/structure.sql` file contains the complete Rails schema and should be committed to version control.
 
 ## Migration Path
 
