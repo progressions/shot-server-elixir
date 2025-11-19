@@ -31,12 +31,20 @@ defmodule Mix.Tasks.SetupTestDb do
     Mix.shell().info("Creating database #{database}...")
 
     # Create database if it doesn't exist
-    create_cmd = build_psql_cmd(username, password, hostname, port, "postgres",
-      "CREATE DATABASE \"#{database}\";")
+    create_cmd =
+      build_psql_cmd(
+        username,
+        password,
+        hostname,
+        port,
+        "postgres",
+        "CREATE DATABASE \"#{database}\";"
+      )
 
     case System.cmd("psql", create_cmd, stderr_to_stdout: true) do
       {_output, 0} ->
         Mix.shell().info("Database created successfully")
+
       {output, _code} ->
         if String.contains?(output, "already exists") do
           Mix.shell().info("Database already exists")
@@ -51,25 +59,30 @@ defmodule Mix.Tasks.SetupTestDb do
     load_cmd = build_psql_cmd(username, password, hostname, port, database, nil)
 
     case System.cmd("psql", load_cmd ++ ["<", schema_file],
-                   stderr_to_stdout: true,
-                   into: IO.stream(:stdio, :line)) do
+           stderr_to_stdout: true,
+           into: IO.stream(:stdio, :line)
+         ) do
       {_, 0} ->
         Mix.shell().info("Schema loaded successfully")
+
       {_, code} ->
-        Mix.shell().info("Schema load completed with code #{code} (some errors expected if tables already exist)")
+        Mix.shell().info(
+          "Schema load completed with code #{code} (some errors expected if tables already exist)"
+        )
     end
   end
 
   defp build_psql_cmd(username, password, hostname, port, database, sql) do
     cmd = ["-h", hostname, "-p", to_string(port), "-U", username, "-d", database]
 
-    cmd = if password != "" do
-      # Set PGPASSWORD environment variable if password is provided
-      System.put_env("PGPASSWORD", password)
-      cmd
-    else
-      cmd
-    end
+    cmd =
+      if password != "" do
+        # Set PGPASSWORD environment variable if password is provided
+        System.put_env("PGPASSWORD", password)
+        cmd
+      else
+        cmd
+      end
 
     if sql do
       cmd ++ ["-c", sql]
