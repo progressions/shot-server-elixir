@@ -45,7 +45,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
     }
   end
 
-
   defp render_encounter_schtick(schtick) do
     %{
       id: schtick.id,

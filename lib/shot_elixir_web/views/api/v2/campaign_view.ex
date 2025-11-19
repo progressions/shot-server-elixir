@@ -83,7 +83,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     }
   end
 
-
   defp render_campaign_detail(campaign) do
     base = render_campaign(campaign)
 

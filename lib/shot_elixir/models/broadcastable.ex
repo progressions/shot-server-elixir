@@ -29,10 +29,11 @@ defmodule ShotElixir.Models.Broadcastable do
         # Use Phoenix.PubSub directly instead of BroadcastManager
         entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
 
-        topic = case entity_name do
-          "campaign" -> "campaign:#{entity.id}"
-          _ -> "campaign:#{entity.campaign_id}"
-        end
+        topic =
+          case entity_name do
+            "campaign" -> "campaign:#{entity.id}"
+            _ -> "campaign:#{entity.campaign_id}"
+          end
 
         # Use proper serialization with view system
         serialized_entity =
@@ -103,10 +104,11 @@ defmodule ShotElixir.Models.Broadcastable do
     # Use Phoenix.PubSub directly instead of BroadcastManager
     entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
 
-    topic = case entity_name do
-      "campaign" -> "campaign:#{entity.id}"
-      _ -> "campaign:#{entity.campaign_id}"
-    end
+    topic =
+      case entity_name do
+        "campaign" -> "campaign:#{entity.id}"
+        _ -> "campaign:#{entity.campaign_id}"
+      end
 
     # Use proper serialization with view system
     serialized_entity =
