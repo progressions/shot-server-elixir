@@ -33,10 +33,10 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       characters: render_characters_if_loaded(site),
       faction: render_faction_if_loaded(site),
       image_positions: render_image_positions_if_loaded(site),
+      attunements: render_attunements_if_loaded(site),
       entity_class: "Site"
     }
   end
-
 
   defp translate_errors(changeset) when is_map(changeset) do
     if Map.has_key?(changeset, :errors) do
@@ -104,6 +104,14 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     end
   end
 
+  defp render_attunements_if_loaded(site) do
+    case Map.get(site, :attunements) do
+      %Ecto.Association.NotLoaded{} -> []
+      nil -> []
+      attunements -> Enum.map(attunements, &render_attunement/1)
+    end
+  end
+
   defp render_character_lite(character) do
     %{
       id: character.id,
@@ -128,6 +136,16 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       x_position: position.x_position,
       y_position: position.y_position,
       style_overrides: position.style_overrides
+    }
+  end
+
+  defp render_attunement(attunement) do
+    %{
+      id: attunement.id,
+      character_id: attunement.character_id,
+      site_id: attunement.site_id,
+      created_at: attunement.created_at,
+      updated_at: attunement.updated_at
     }
   end
 

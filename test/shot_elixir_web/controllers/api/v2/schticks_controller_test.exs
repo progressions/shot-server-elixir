@@ -13,7 +13,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     color: "red",
     image_url: "https://example.com/schtick.jpg",
     bonus: false,
-    archetypes: %{"archetype" => "martial_artist"},
+    archetypes: ["martial_artist"],
     active: true
   }
 

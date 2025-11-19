@@ -39,7 +39,6 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     }
   end
 
-
   defp translate_errors(changeset) when is_map(changeset) do
     if Map.has_key?(changeset, :errors) do
       Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->

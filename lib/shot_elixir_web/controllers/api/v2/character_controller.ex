@@ -21,6 +21,15 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     else
       characters = Characters.list_campaign_characters(campaign_id, params, current_user)
 
+      # Extract archetypes dynamically like Rails does
+      archetypes =
+        characters.characters
+        |> Enum.map(fn c -> get_in(c.action_values, ["Archetype"]) end)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.uniq()
+        |> Enum.sort()
+
       Logger.debug(fn ->
         %{
           message: "Characters#index",
@@ -33,7 +42,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-      |> render("index.json", characters: characters.characters, meta: characters.meta)
+      |> render("index.json",
+        characters: characters.characters,
+        meta: characters.meta,
+        archetypes: archetypes
+      )
     end
   end
 

@@ -23,11 +23,6 @@ defmodule ShotElixirWeb.Endpoint do
     websocket: @websocket_options,
     longpoll: false
 
-  # ActionCable-compatible endpoint for Rails frontend
-  socket "/cable", ShotElixirWeb.UserSocket,
-    websocket: @websocket_options,
-    longpoll: false
-
   # socket "/live", Phoenix.LiveView.Socket,
   #   websocket: [connect_info: [session: @session_options]],
   #   longpoll: [connect_info: [session: @session_options]]

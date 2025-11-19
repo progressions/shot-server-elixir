@@ -137,7 +137,9 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
     schtick = Schticks.get_schtick(id)
 
     if schtick do
-      render(conn, :show, schtick: schtick)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+      |> render("show.json", schtick: schtick)
     else
       conn
       |> put_status(:not_found)
@@ -191,12 +193,14 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
             {:ok, schtick} ->
               conn
               |> put_status(:created)
-              |> render(:show, schtick: schtick)
+              |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+              |> render("show.json", schtick: schtick)
 
             {:error, changeset} ->
               conn
               |> put_status(:unprocessable_entity)
-              |> render(:error, changeset: changeset)
+              |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+              |> render("error.json", changeset: changeset)
           end
         end
     end
@@ -266,18 +270,22 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
                           # Continue with schtick update
                           case Schticks.update_schtick(schtick, parsed_params) do
                             {:ok, updated_schtick} ->
-                              render(conn, :show, schtick: updated_schtick)
+                              conn
+                              |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                              |> render("show.json", schtick: updated_schtick)
 
                             {:error, changeset} ->
                               conn
                               |> put_status(:unprocessable_entity)
-                              |> render(:error, changeset: changeset)
+                              |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                              |> render("error.json", changeset: changeset)
                           end
 
                         {:error, changeset} ->
                           conn
                           |> put_status(:unprocessable_entity)
-                          |> render(:error, changeset: changeset)
+                          |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                          |> render("error.json", changeset: changeset)
                       end
 
                     {:error, reason} ->
@@ -290,12 +298,15 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
                   # No image upload, just update schtick
                   case Schticks.update_schtick(schtick, parsed_params) do
                     {:ok, updated_schtick} ->
-                      render(conn, :show, schtick: updated_schtick)
+                      conn
+                      |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                      |> render("show.json", schtick: updated_schtick)
 
                     {:error, changeset} ->
                       conn
                       |> put_status(:unprocessable_entity)
-                      |> render(:error, changeset: changeset)
+                      |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                      |> render("error.json", changeset: changeset)
                   end
               end
             end

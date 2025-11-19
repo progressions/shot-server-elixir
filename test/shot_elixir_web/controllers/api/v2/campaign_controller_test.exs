@@ -16,7 +16,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
     active: false
   }
 
-
   setup %{conn: conn} do
     {:ok, gamemaster} =
       Accounts.create_user(%{
