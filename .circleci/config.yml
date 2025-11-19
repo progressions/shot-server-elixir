@@ -91,13 +91,28 @@ jobs:
           name: Compile application
           command: mix compile --warnings-as-errors
 
-      # Run tests (includes database setup via mix.exs alias)
+      # Set up test database with Rails schema
+      - run:
+          name: Setup test database
+          command: |
+            # Wait for PostgreSQL to be ready
+            for i in {1..30}; do
+              psql -h localhost -U isaacpriestley -d shot_server_test -c "SELECT 1;" && break
+              echo "Waiting for PostgreSQL..."
+              sleep 1
+            done
+            # Load schema dump
+            psql -h localhost -U isaacpriestley -d shot_server_test < priv/repo/structure.sql
+          environment:
+            PGPASSWORD: ""
+
+      # Run tests
       - run:
           name: Run tests
           command: |
             # Wait for PostgreSQL to be ready and run tests
-            for i in {1..30}; do
-              mix test && break
+            for i in {1..3}; do
+              mix test --max-failures 10 && break
               echo "Waiting for PostgreSQL or retrying tests..."
               sleep 2
             done
