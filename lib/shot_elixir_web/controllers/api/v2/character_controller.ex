@@ -42,7 +42,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-      |> render("index.json", characters: characters.characters, meta: characters.meta, archetypes: archetypes)
+      |> render("index.json",
+        characters: characters.characters,
+        meta: characters.meta,
+        archetypes: archetypes
+      )
     end
   end
 

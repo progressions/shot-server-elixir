@@ -30,11 +30,14 @@ defmodule ShotElixir.Models.Broadcastable do
 
         topic =
           case entity_name do
-            "campaign" -> "campaign:#{entity.id}"
+            "campaign" ->
+              "campaign:#{entity.id}"
+
             _ ->
               # Safely get campaign_id, handle case where it might not exist
               case Map.get(entity, :campaign_id) do
-                nil -> "campaign:unknown"  # Fallback for entities without campaign_id
+                # Fallback for entities without campaign_id
+                nil -> "campaign:unknown"
                 campaign_id -> "campaign:#{campaign_id}"
               end
           end
@@ -109,11 +112,14 @@ defmodule ShotElixir.Models.Broadcastable do
 
     topic =
       case entity_name do
-        "campaign" -> "campaign:#{entity.id}"
+        "campaign" ->
+          "campaign:#{entity.id}"
+
         _ ->
           # Safely get campaign_id, handle case where it might not exist
           case Map.get(entity, :campaign_id) do
-            nil -> "campaign:unknown"  # Fallback for entities without campaign_id
+            # Fallback for entities without campaign_id
+            nil -> "campaign:unknown"
             campaign_id -> "campaign:#{campaign_id}"
           end
       end
