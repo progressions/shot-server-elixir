@@ -112,7 +112,7 @@ jobs:
           command: |
             # Wait for PostgreSQL to be ready and run tests
             for i in {1..30}; do
-              mix test && break
+              mix test --max-failures 10 && break
               echo "Waiting for PostgreSQL or retrying tests..."
               sleep 2
             done
