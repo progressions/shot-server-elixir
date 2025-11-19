@@ -26,13 +26,17 @@ defmodule ShotElixir.Models.Broadcastable do
       Broadcasts an entity change via Phoenix.PubSub.
       """
       def broadcast_change(entity, action) when action in [:insert, :update, :delete] do
-        # Use Phoenix.PubSub directly instead of BroadcastManager
         entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
 
         topic =
           case entity_name do
             "campaign" -> "campaign:#{entity.id}"
-            _ -> "campaign:#{entity.campaign_id}"
+            _ ->
+              # Safely get campaign_id, handle case where it might not exist
+              case Map.get(entity, :campaign_id) do
+                nil -> "campaign:unknown"  # Fallback for entities without campaign_id
+                campaign_id -> "campaign:#{campaign_id}"
+              end
           end
 
         # Use proper serialization with view system
@@ -101,13 +105,17 @@ defmodule ShotElixir.Models.Broadcastable do
   Helper function to broadcast changes for entities that don't use the macro.
   """
   def broadcast(entity, action) when action in [:insert, :update, :delete] do
-    # Use Phoenix.PubSub directly instead of BroadcastManager
     entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
 
     topic =
       case entity_name do
         "campaign" -> "campaign:#{entity.id}"
-        _ -> "campaign:#{entity.campaign_id}"
+        _ ->
+          # Safely get campaign_id, handle case where it might not exist
+          case Map.get(entity, :campaign_id) do
+            nil -> "campaign:unknown"  # Fallback for entities without campaign_id
+            campaign_id -> "campaign:#{campaign_id}"
+          end
       end
 
     # Use proper serialization with view system

@@ -23,7 +23,12 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
       errors:
         Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
           Enum.reduce(opts, msg, fn {key, value}, acc ->
-            String.replace(acc, "%{#{key}}", to_string(value))
+            # Handle tuples and other non-string values safely
+            value_str = case value do
+              v when is_binary(v) -> v
+              v -> inspect(v)
+            end
+            String.replace(acc, "%{#{key}}", value_str)
           end)
         end)
     }
