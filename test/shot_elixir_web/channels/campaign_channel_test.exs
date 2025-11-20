@@ -38,7 +38,7 @@ defmodule ShotElixirWeb.CampaignChannelTest do
 
   describe "handle_info/2 - broadcast_update" do
     test "broadcasts update to all connected clients", %{socket: socket, campaign: campaign} do
-      {:ok, _reply, socket} =
+      {:ok, _reply, _socket} =
         subscribe_and_join(socket, CampaignChannel, "campaign:#{campaign.id}")
 
       # Simulate a broadcast
@@ -48,7 +48,7 @@ defmodule ShotElixirWeb.CampaignChannelTest do
     end
 
     test "broadcast includes timestamp", %{socket: socket, campaign: campaign} do
-      {:ok, _reply, socket} =
+      {:ok, _reply, _socket} =
         subscribe_and_join(socket, CampaignChannel, "campaign:#{campaign.id}")
 
       CampaignChannel.broadcast_update(campaign.id, "test_event", %{})
@@ -60,7 +60,7 @@ defmodule ShotElixirWeb.CampaignChannelTest do
 
   describe "broadcast_character_change/3" do
     test "broadcasts character created event", %{socket: socket, campaign: campaign} do
-      {:ok, _reply, socket} =
+      {:ok, _reply, _socket} =
         subscribe_and_join(socket, CampaignChannel, "campaign:#{campaign.id}")
 
       character = insert(:character, campaign: campaign)
@@ -76,7 +76,7 @@ defmodule ShotElixirWeb.CampaignChannelTest do
     end
 
     test "broadcasts character updated event", %{socket: socket, campaign: campaign} do
-      {:ok, _reply, socket} =
+      {:ok, _reply, _socket} =
         subscribe_and_join(socket, CampaignChannel, "campaign:#{campaign.id}")
 
       character = insert(:character, campaign: campaign)
@@ -92,7 +92,7 @@ defmodule ShotElixirWeb.CampaignChannelTest do
     end
 
     test "broadcasts character deleted event", %{socket: socket, campaign: campaign} do
-      {:ok, _reply, socket} =
+      {:ok, _reply, _socket} =
         subscribe_and_join(socket, CampaignChannel, "campaign:#{campaign.id}")
 
       character = insert(:character, campaign: campaign)
@@ -109,7 +109,7 @@ defmodule ShotElixirWeb.CampaignChannelTest do
   end
 
   describe "authorization" do
-    test "gamemaster can join any campaign channel", %{socket: socket} do
+    test "gamemaster can join any campaign channel", %{socket: _socket} do
       gm_user = insert(:user, gamemaster: true)
       {:ok, token, _claims} = Guardian.encode_and_sign(gm_user)
       {:ok, gm_socket} = connect(ShotElixirWeb.UserSocket, %{"token" => token})
@@ -122,7 +122,7 @@ defmodule ShotElixirWeb.CampaignChannelTest do
       assert reply == %{status: "ok"}
     end
 
-    test "regular user needs campaign membership", %{socket: socket} do
+    test "regular user needs campaign membership", %{socket: _socket} do
       other_user = insert(:user)
       other_campaign = insert(:campaign)
 

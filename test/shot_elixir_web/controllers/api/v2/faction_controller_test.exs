@@ -56,21 +56,21 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
 
   describe "index" do
     test "lists all factions for campaign", %{conn: conn, campaign: campaign} do
-      {:ok, faction1} =
-        Factions.create_faction(
-          Map.merge(@create_attrs, %{
-            campaign_id: campaign.id,
-            name: "Faction 1"
-          })
-        )
+      assert {:ok, _} =
+               Factions.create_faction(
+                 Map.merge(@create_attrs, %{
+                   campaign_id: campaign.id,
+                   name: "Faction 1"
+                 })
+               )
 
-      {:ok, faction2} =
-        Factions.create_faction(
-          Map.merge(@create_attrs, %{
-            campaign_id: campaign.id,
-            name: "Faction 2"
-          })
-        )
+      assert {:ok, _} =
+               Factions.create_faction(
+                 Map.merge(@create_attrs, %{
+                   campaign_id: campaign.id,
+                   name: "Faction 2"
+                 })
+               )
 
       conn = get(conn, ~p"/api/v2/factions")
       response = json_response(conn, 200)

@@ -185,7 +185,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
   end
 
   describe "update" do
-    setup %{campaign: campaign, faction: faction} do
+    setup %{campaign: campaign} do
       {:ok, site} =
         Sites.create_site(%{
           name: "Temple",

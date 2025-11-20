@@ -56,21 +56,21 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
 
   describe "index" do
     test "lists all junctures for campaign", %{conn: conn, campaign: campaign} do
-      {:ok, juncture1} =
-        Junctures.create_juncture(
-          Map.merge(@create_attrs, %{
-            campaign_id: campaign.id,
-            name: "Contemporary"
-          })
-        )
+      assert {:ok, _} =
+               Junctures.create_juncture(
+                 Map.merge(@create_attrs, %{
+                   campaign_id: campaign.id,
+                   name: "Contemporary"
+                 })
+               )
 
-      {:ok, juncture2} =
-        Junctures.create_juncture(
-          Map.merge(@create_attrs, %{
-            campaign_id: campaign.id,
-            name: "Ancient"
-          })
-        )
+      assert {:ok, _} =
+               Junctures.create_juncture(
+                 Map.merge(@create_attrs, %{
+                   campaign_id: campaign.id,
+                   name: "Ancient"
+                 })
+               )
 
       conn = get(conn, ~p"/api/v2/junctures")
       response = json_response(conn, 200)
