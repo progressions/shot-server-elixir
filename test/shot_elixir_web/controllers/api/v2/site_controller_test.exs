@@ -95,6 +95,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
       assert Jason.encode!(payload)
       assert Enum.all?(payload["sites"], &is_binary(&1["id"]))
       assert Enum.all?(payload["factions"], &is_binary(&1["id"]))
+      assert is_map(payload["meta"])
     end
 
     test "returns error when no campaign selected", %{conn: conn, user: user} do
@@ -148,9 +149,12 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
 
       conn = get(conn, ~p"/api/v2/sites/#{site.id}")
       assert returned_site = json_response(conn, 200)
-      assert [attunement] = returned_site["attunements"]
-      assert attunement["character_id"] == character.id
-      assert attunement["character"]["name"] == "Test Character"
+
+      assert [%{"character_id" => character_id, "character" => attuned_character}] =
+               returned_site["attunements"]
+
+      assert character_id == character.id
+      assert attuned_character["name"] == "Test Character"
     end
   end
 
@@ -185,7 +189,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
   end
 
   describe "update" do
-    setup %{campaign: campaign, faction: faction} do
+    setup %{campaign: campaign} do
       {:ok, site} =
         Sites.create_site(%{
           name: "Temple",

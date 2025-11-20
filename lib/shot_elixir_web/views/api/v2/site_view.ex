@@ -1,7 +1,8 @@
 defmodule ShotElixirWeb.Api.V2.SiteView do
-  def render("index.json", %{sites: sites, meta: meta}) do
+  def render("index.json", %{sites: sites, meta: meta} = assigns) do
     %{
       sites: Enum.map(sites, &render_site/1),
+      factions: Enum.map(Map.get(assigns, :factions, []), &render_faction_lite/1),
       meta: meta
     }
   end
@@ -32,6 +33,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       image_url: get_image_url(site),
       characters: render_characters_if_loaded(site),
       faction: render_faction_if_loaded(site),
+      juncture: render_juncture_if_loaded(site),
       image_positions: render_image_positions_if_loaded(site),
       attunements: render_attunements_if_loaded(site),
       entity_class: "Site"
@@ -96,6 +98,14 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     end
   end
 
+  defp render_juncture_if_loaded(site) do
+    case Map.get(site, :juncture) do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      juncture -> render_juncture_lite(juncture)
+    end
+  end
+
   defp render_image_positions_if_loaded(site) do
     case Map.get(site, :image_positions) do
       %Ecto.Association.NotLoaded{} -> []
@@ -144,8 +154,22 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       id: attunement.id,
       character_id: attunement.character_id,
       site_id: attunement.site_id,
+      character: render_character_if_present(attunement.character),
       created_at: attunement.created_at,
       updated_at: attunement.updated_at
+    }
+  end
+
+  defp render_character_if_present(%Ecto.Association.NotLoaded{}), do: nil
+  defp render_character_if_present(nil), do: nil
+  defp render_character_if_present(character), do: render_character_lite(character)
+
+  defp render_juncture_lite(juncture) do
+    %{
+      id: juncture.id,
+      name: juncture.name,
+      description: juncture.description,
+      entity_class: "Juncture"
     }
   end
 

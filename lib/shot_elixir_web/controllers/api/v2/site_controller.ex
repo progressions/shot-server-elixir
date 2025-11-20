@@ -26,7 +26,11 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
             conn
             |> put_view(ShotElixirWeb.Api.V2.SiteView)
-            |> render("index.json", sites: result.sites, meta: result.meta)
+            |> render("index.json",
+              sites: result.sites,
+              meta: result.meta,
+              factions: result.factions
+            )
           else
             conn
             |> put_status(:forbidden)
