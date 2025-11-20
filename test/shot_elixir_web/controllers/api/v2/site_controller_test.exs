@@ -76,17 +76,15 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
       assert %{"sites" => []} = json_response(conn, 200)
     end
 
-    test "includes string ids for sites and factions", %{
+    test "encodes site ids as strings", %{
       conn: conn,
       campaign: campaign,
-      faction: faction,
       user: user
     } do
       {:ok, _site} =
         Sites.create_site(%{
           name: "Encoded Site",
-          campaign_id: campaign.id,
-          faction_id: faction.id
+          campaign_id: campaign.id
         })
 
       conn = get(conn, ~p"/api/v2/sites", %{user_id: user.id})
@@ -94,7 +92,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
 
       assert Jason.encode!(payload)
       assert Enum.all?(payload["sites"], &is_binary(&1["id"]))
-      assert Enum.all?(payload["factions"], &is_binary(&1["id"]))
+      assert is_map(payload["meta"])
     end
 
     test "returns error when no campaign selected", %{conn: conn, user: user} do
@@ -148,9 +146,16 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
 
       conn = get(conn, ~p"/api/v2/sites/#{site.id}")
       assert returned_site = json_response(conn, 200)
-      assert [attunement] = returned_site["attunements"]
-      assert attunement["character_id"] == character.id
-      assert attunement["character"]["name"] == "Test Character"
+      assert [%{"character_id" => character_id}] = returned_site["attunements"]
+      assert character_id == character.id
+
+      assert [
+               %{
+                 "id" => ^character_id,
+                 "name" => "Test Character",
+                 "entity_class" => "Character"
+               }
+             ] = returned_site["characters"]
     end
   end
 
@@ -174,7 +179,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
       assert site["description"] == "An ancient ruin"
       assert site["campaign_id"] == campaign.id
       assert site["faction"]["name"] == "Test Faction"
-      assert site["juncture"]["name"] == "Contemporary"
+      assert site["juncture_id"] == juncture.id
     end
 
     test "returns error with invalid data", %{conn: conn} do
