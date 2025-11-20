@@ -149,6 +149,7 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
 
       conn = get(conn, ~p"/api/v2/sites/#{site.id}")
       assert returned_site = json_response(conn, 200)
+
       assert [%{"character_id" => character_id, "character" => attuned_character}] =
                returned_site["attunements"]
 
