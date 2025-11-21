@@ -1,6 +1,14 @@
 defmodule ShotElixirWeb.Router do
   use ShotElixirWeb, :router
 
+  pipeline :browser do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_flash
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
 
@@ -172,6 +180,14 @@ defmodule ShotElixirWeb.Router do
     scope "/onboarding" do
       patch "/dismiss_congratulations", OnboardingController, :dismiss_congratulations
       patch "/", OnboardingController, :update
+    end
+  end
+
+  # Email preview in development
+  if Mix.env() == :dev do
+    scope "/dev" do
+      pipe_through :browser
+      forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
   end
 
