@@ -108,7 +108,8 @@ if config_env() == :prod do
   config :shot_elixir, ShotElixir.Mailer,
     adapter: Swoosh.Adapters.Mailgun,
     api_key: System.get_env("MAILGUN_API_KEY"),
-    domain: System.get_env("MAILGUN_DOMAIN")
+    domain: System.get_env("MAILGUN_DOMAIN"),
+    base_url: "https://api.mailgun.net/v3"
 
   # URL options for email links in production
   config :shot_elixir, :mailer_url_options,

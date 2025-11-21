@@ -76,6 +76,7 @@ defmodule ShotElixir.MixProject do
       {:phoenix_view, "~> 2.0"},
       {:phoenix_live_view, "~> 1.0"},
       {:gen_smtp, "~> 1.2"},
+      {:multipart, "~> 0.4"},
 
       # Background jobs for email delivery
       {:oban, "~> 2.17"}
