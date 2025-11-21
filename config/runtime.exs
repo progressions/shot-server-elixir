@@ -115,8 +115,7 @@ if config_env() == :prod do
     tls: :if_available,
     auth: :always,
     ssl: false,
-    retries: 2,
-    tls_options: [verify: :verify_none]
+    retries: 2
 
   # URL options for email links in production
   config :shot_elixir, :mailer_url_options,
