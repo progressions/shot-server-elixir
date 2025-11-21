@@ -188,6 +188,26 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     else
       case Accounts.create_user(parsed_params) do
         {:ok, user} ->
+          # Generate confirmation token
+          confirmation_token =
+            :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+
+          # Update user with confirmation token
+          {:ok, user} =
+            Accounts.update_user(user, %{
+              confirmation_token: confirmation_token,
+              confirmation_sent_at: NaiveDateTime.utc_now()
+            })
+
+          # Queue confirmation email
+          %{
+            "type" => "confirmation_instructions",
+            "user_id" => user.id,
+            "token" => confirmation_token
+          }
+          |> ShotElixir.Workers.EmailWorker.new()
+          |> Oban.insert()
+
           # Handle image upload if present
           case conn.params["image"] do
             %Plug.Upload{} = upload ->
@@ -276,6 +296,26 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
       case Accounts.create_user(final_params) do
         {:ok, user} ->
+          # Generate confirmation token
+          confirmation_token =
+            :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+
+          # Update user with confirmation token
+          {:ok, user} =
+            Accounts.update_user(user, %{
+              confirmation_token: confirmation_token,
+              confirmation_sent_at: NaiveDateTime.utc_now()
+            })
+
+          # Queue confirmation email
+          %{
+            "type" => "confirmation_instructions",
+            "user_id" => user.id,
+            "token" => confirmation_token
+          }
+          |> ShotElixir.Workers.EmailWorker.new()
+          |> Oban.insert()
+
           {:ok, token, claims} = Guardian.encode_and_sign(user)
 
           conn
