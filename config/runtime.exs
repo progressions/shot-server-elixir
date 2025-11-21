@@ -111,10 +111,19 @@ if config_env() == :prod do
     port: 587,
     username: System.get_env("SMTP_USERNAME"),
     password: System.get_env("SMTP_PASSWORD"),
-    tls: :always,
+    tls: :if_available,
     auth: :always,
     ssl: false,
-    retries: 2
+    retries: 2,
+    tls_options: [
+      verify: :verify_peer,
+      cacerts: :public_key.cacerts_get(),
+      depth: 99,
+      reuse_sessions: false,
+      customize_hostname_check: [
+        match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
+      ]
+    ]
 
   # URL options for email links in production
   config :shot_elixir, :mailer_url_options,
