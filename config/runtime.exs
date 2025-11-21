@@ -109,6 +109,7 @@ if config_env() == :prod do
     adapter: Swoosh.Adapters.SMTP,
     relay: "smtp.office365.com",
     port: 587,
+    domain: "chiwar.net",
     username: System.get_env("SMTP_USERNAME"),
     password: System.get_env("SMTP_PASSWORD"),
     tls: :if_available,
