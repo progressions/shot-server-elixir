@@ -115,15 +115,7 @@ if config_env() == :prod do
     auth: :always,
     ssl: false,
     retries: 2,
-    tls_options: [
-      verify: :verify_peer,
-      cacerts: :public_key.cacerts_get(),
-      depth: 99,
-      reuse_sessions: false,
-      customize_hostname_check: [
-        match_fun: :public_key.pkix_verify_hostname_match_fun(:https)
-      ]
-    ]
+    tls_options: [verify: :verify_none]
 
   # URL options for email links in production
   config :shot_elixir, :mailer_url_options,
