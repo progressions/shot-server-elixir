@@ -11,7 +11,10 @@ config :shot_elixir,
   ecto_repos: [ShotElixir.Repo],
   generators: [timestamp_type: :utc_datetime, binary_id: true]
 
+# Configure Ecto for UUID primary keys and Rails compatibility
+# Use separate migration table to avoid conflicts with Rails schema_migrations
 config :shot_elixir, ShotElixir.Repo,
+  migration_source: "ecto_migrations",
   migration_primary_key: [type: :binary_id],
   migration_foreign_key: [type: :binary_id]
 
