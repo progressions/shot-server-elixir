@@ -39,9 +39,9 @@ defmodule ShotElixirWeb.Router do
     post "/sign_in", SessionsController, :create
     post "/sign_up", RegistrationsController, :create
     post "/", RegistrationsController, :create
-    post "/confirm", ConfirmationsController, :create
+    post "/confirmation", ConfirmationsController, :create
     post "/password", PasswordsController, :create
-    put "/password", PasswordsController, :update
+    patch "/password", PasswordsController, :update
   end
 
   # Authenticated endpoints
