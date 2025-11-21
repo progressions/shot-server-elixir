@@ -194,9 +194,16 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
          :ok <- authorize_campaign_access(campaign, current_user) do
-      # Get the most recent active fight for the campaign
+      # Get the most recent ongoing fight for the campaign
+      # Filter for fights that are started but not ended (ongoing)
       fights = ShotElixir.Fights.list_fights(campaign.id)
-      current_fight = List.first(fights)
+
+      current_fight =
+        fights
+        |> Enum.filter(fn fight ->
+          fight.started_at != nil && fight.ended_at == nil
+        end)
+        |> List.first()
 
       if current_fight do
         # Preload necessary associations for the fight
