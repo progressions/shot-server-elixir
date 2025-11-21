@@ -375,4 +375,62 @@ defmodule ShotElixir.Characters do
 
     create_character(attrs)
   end
+
+  # Advancement functions
+
+  alias ShotElixir.Characters.Advancement
+
+  @doc """
+  Returns the list of advancements for a character, ordered by creation date descending.
+  """
+  def list_advancements(character_id) do
+    query =
+      from a in Advancement,
+        where: a.character_id == ^character_id,
+        order_by: [desc: a.created_at]
+
+    Repo.all(query)
+  end
+
+  @doc """
+  Gets a single advancement.
+  Raises `Ecto.NoResultsError` if the Advancement does not exist.
+  """
+  def get_advancement!(id), do: Repo.get!(Advancement, id)
+
+  @doc """
+  Gets a single advancement. Returns nil if not found.
+  """
+  def get_advancement(id), do: Repo.get(Advancement, id)
+
+  @doc """
+  Creates an advancement for a character.
+  """
+  def create_advancement(character_id, attrs \\ %{}) do
+    # Ensure attrs uses string keys for consistency with Ecto casting
+    attrs =
+      attrs
+      |> Enum.into(%{}, fn {k, v} -> {to_string(k), v} end)
+      |> Map.put("character_id", character_id)
+
+    %Advancement{}
+    |> Advancement.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates an advancement.
+  """
+  def update_advancement(%Advancement{} = advancement, attrs) do
+    advancement
+    |> Advancement.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes an advancement.
+  """
+  def delete_advancement(%Advancement{} = advancement) do
+    Repo.delete(advancement)
+  end
 end

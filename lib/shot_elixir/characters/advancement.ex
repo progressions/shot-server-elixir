@@ -15,6 +15,6 @@ defmodule ShotElixir.Characters.Advancement do
   def changeset(advancement, attrs) do
     advancement
     |> cast(attrs, [:description, :character_id])
-    |> validate_required([:description, :character_id])
+    |> validate_required([:character_id])
   end
 end
