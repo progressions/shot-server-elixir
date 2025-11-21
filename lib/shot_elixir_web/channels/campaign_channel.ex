@@ -93,6 +93,13 @@ defmodule ShotElixirWeb.CampaignChannel do
     {:noreply, socket}
   end
 
+  # Handle outgoing broadcasts - intercept and push to clients
+  @impl true
+  def handle_out(event, payload, socket) do
+    push(socket, event, payload)
+    {:noreply, socket}
+  end
+
   # Private functions
 
   defp authorize_campaign_access(campaign_id, user) do

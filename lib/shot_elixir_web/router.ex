@@ -72,6 +72,7 @@ defmodule ShotElixirWeb.Router do
       post "/sync", CharacterController, :sync
       post "/duplicate", CharacterController, :duplicate
       get "/pdf", CharacterController, :pdf
+      resources "/advancements", AdvancementController
     end
 
     # Vehicles
