@@ -8,7 +8,8 @@ defmodule ShotElixirWeb.EmailView do
 
   use Phoenix.View,
     root: "lib/shot_elixir_web/templates",
-    namespace: ShotElixirWeb
+    namespace: ShotElixirWeb,
+    pattern: "**/*"
 
   @doc """
   Returns the root URL for the frontend application.

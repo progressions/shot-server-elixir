@@ -73,6 +73,8 @@ defmodule ShotElixir.MixProject do
       # Email functionality
       {:swoosh, "~> 1.16"},
       {:phoenix_swoosh, "~> 1.2"},
+      {:phoenix_view, "~> 2.0"},
+      {:phoenix_live_view, "~> 1.0"},
       {:gen_smtp, "~> 1.2"},
 
       # Background jobs for email delivery
