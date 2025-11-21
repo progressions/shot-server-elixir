@@ -63,6 +63,21 @@ config :shot_elixir, :cachex,
     ]
   ]
 
+# Email configuration
+config :shot_elixir, ShotElixir.Mailer, adapter: Swoosh.Adapters.Local
+
+config :swoosh, :api_client, Swoosh.ApiClient.Finch
+
+# Oban configuration for background jobs
+config :shot_elixir, Oban,
+  repo: ShotElixir.Repo,
+  queues: [
+    default: 10,
+    emails: 20,
+    high_priority: 5
+  ],
+  plugins: [Oban.Plugins.Pruner]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

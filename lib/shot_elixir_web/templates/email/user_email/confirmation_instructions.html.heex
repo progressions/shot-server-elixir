@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Confirm Your Account - Chi War</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+    .campaign-info {
+      background-color: #f8f9fa;
+      border-left: 4px solid #007bff;
+      padding: 15px;
+      margin: 20px 0;
+      border-radius: 4px;
+    }
+    .button {
+      display: inline-block;
+      background-color: #007bff;
+      color: white;
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 6px;
+      font-weight: bold;
+      margin: 20px 0;
+    }
+    .button:hover {
+      background-color: #0056b3;
+    }
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #eee;
+      font-size: 14px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Welcome to the Chi War!</h1>
+  </div>
+
+  <%= if @invitation && @campaign do %>
+    <p>Hello <%= @user.first_name || String.split(@user.email, "@") |> List.first() %>!</p>
+
+    <p>You're almost ready to join the action! You've been invited to join <strong><%= @campaign.name %></strong> and your account has been created successfully.</p>
+
+    <div class="campaign-info">
+      <h3>🎲 Campaign: <%= @campaign.name %></h3>
+      <p>You're joining a Feng Shui 2 RPG campaign. Once confirmed, you'll be automatically added to this campaign and can start creating characters!</p>
+    </div>
+
+    <p>To complete your registration and join the campaign, please confirm your email address by clicking the button below:</p>
+  <% else %>
+    <p>Welcome <%= @user.first_name || String.split(@user.email, "@") |> List.first() %>!</p>
+
+    <p>Thank you for joining the Chi War! Your account has been created successfully.</p>
+
+    <p>To complete your registration, please confirm your email address by clicking the button below:</p>
+  <% end %>
+
+  <div style="text-align: center;">
+    <a href="<%= @confirmation_url %>" class="button">
+      Confirm My Account
+    </a>
+  </div>
+
+  <%= if @invitation && @campaign do %>
+    <p>After confirmation, you'll be automatically logged in and taken to your new campaign dashboard.</p>
+  <% else %>
+    <p>After confirmation, you'll be able to log in and start creating campaigns and characters.</p>
+  <% end %>
+
+  <div class="footer">
+    <p>If you didn't sign up for this account, you can safely ignore this email.</p>
+    <p>This confirmation link will expire in 24 hours.</p>
+  </div>
+</body>
+</html>

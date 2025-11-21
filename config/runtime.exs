@@ -98,4 +98,23 @@ if config_env() == :prod do
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.
+
+  # Email configuration for production
+  # Uses SMTP via Office 365
+  config :shot_elixir, ShotElixir.Mailer,
+    adapter: Swoosh.Adapters.SMTP,
+    relay: "smtp.office365.com",
+    port: 587,
+    username: System.get_env("SMTP_USERNAME"),
+    password: System.get_env("SMTP_PASSWORD"),
+    tls: :always,
+    auth: :always,
+    ssl: false,
+    retries: 2
+
+  # URL options for email links in production
+  config :shot_elixir, :mailer_url_options,
+    scheme: "https",
+    host: "chiwar.net",
+    port: nil
 end
