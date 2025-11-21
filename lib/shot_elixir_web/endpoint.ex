@@ -47,7 +47,12 @@ defmodule ShotElixirWeb.Endpoint do
 
   # CORS configuration
   plug CORSPlug,
-    origin: ["http://localhost:3001", "http://localhost:3000"],
+    origin: [
+      "http://localhost:3001",
+      "http://localhost:3000",
+      "https://shot-client-phoenix.fly.dev",
+      "https://shot-client-next.fly.dev"
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     headers: [
