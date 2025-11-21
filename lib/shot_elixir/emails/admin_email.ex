@@ -46,7 +46,7 @@ defmodule ShotElixir.Emails.AdminEmail do
   defp render_template(template_name, assigns) do
     Phoenix.View.render_to_string(
       EmailView,
-      "email/admin_email/#{template_name}",
+      "admin_email/#{template_name}",
       assigns
     )
   end

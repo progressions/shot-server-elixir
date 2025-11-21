@@ -163,7 +163,7 @@ defmodule ShotElixir.Emails.UserEmail do
   defp render_template(template_name, assigns) do
     Phoenix.View.render_to_string(
       EmailView,
-      "email/user_email/#{template_name}",
+      "user_email/#{template_name}",
       assigns
     )
   end
