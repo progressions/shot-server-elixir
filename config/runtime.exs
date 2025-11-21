@@ -104,19 +104,11 @@ if config_env() == :prod do
   # Check `Plug.SSL` for all available options in `force_ssl`.
 
   # Email configuration for production
-  # Uses SMTP via Office 365
+  # Uses Mailgun HTTP API
   config :shot_elixir, ShotElixir.Mailer,
-    adapter: Swoosh.Adapters.SMTP,
-    relay: "smtp.office365.com",
-    port: 587,
-    domain: "chiwar.net",
-    username: System.get_env("SMTP_USERNAME"),
-    password: System.get_env("SMTP_PASSWORD"),
-    tls: :if_available,
-    auth: :always,
-    ssl: false,
-    retries: 2,
-    tls_options: [verify: :verify_none]
+    adapter: Swoosh.Adapters.Mailgun,
+    api_key: System.get_env("MAILGUN_API_KEY"),
+    domain: System.get_env("MAILGUN_DOMAIN")
 
   # URL options for email links in production
   config :shot_elixir, :mailer_url_options,
