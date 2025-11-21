@@ -68,7 +68,15 @@ defmodule ShotElixir.MixProject do
       {:image, "~> 0.54"},
 
       # Redis for presence tracking
-      {:redix, "~> 1.5"}
+      {:redix, "~> 1.5"},
+
+      # Email functionality
+      {:swoosh, "~> 1.16"},
+      {:phoenix_swoosh, "~> 1.2"},
+      {:gen_smtp, "~> 1.2"},
+
+      # Background jobs for email delivery
+      {:oban, "~> 2.17"}
     ]
   end
 

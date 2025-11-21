@@ -73,3 +73,13 @@ config :shot_elixir, :imagekit,
 # Grok/xAI credentials for development
 config :shot_elixir, :grok,
   api_key: "xai-QtJ1dTm3ooF6gSuTn6H942V2HU7pMD10aDi7Rc88fbqqiPxP5jBxeIazGiCFDhC6xW4GgREQsXI6RdfN"
+
+# Email configuration for development
+# Uses local adapter to preview emails in browser
+config :shot_elixir, ShotElixir.Mailer, adapter: Swoosh.Adapters.Local
+
+# URL options for email links
+config :shot_elixir, :mailer_url_options,
+  scheme: "http",
+  host: "localhost",
+  port: 3001

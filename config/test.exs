@@ -25,3 +25,16 @@ config :logger, level: :warning
 
 # Initialize plugs at runtime for faster test compilation
 config :phoenix, :plug_init_mode, :runtime
+
+# Email configuration for test environment
+# Uses test adapter for assertions
+config :shot_elixir, ShotElixir.Mailer, adapter: Swoosh.Adapters.Test
+
+# URL options for email links in tests
+config :shot_elixir, :mailer_url_options,
+  scheme: "http",
+  host: "localhost",
+  port: 3001
+
+# Disable Oban queues in test mode
+config :shot_elixir, Oban, testing: :inline

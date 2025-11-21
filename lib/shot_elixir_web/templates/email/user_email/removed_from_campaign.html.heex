@@ -1,0 +1,14 @@
+<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px;">
+    <p style="font-size: 16px; line-height: 1.6; color: #444;">Hello <%= @user.first_name || @user.email %>,</p>
+    <p style="font-size: 16px; line-height: 1.6; color: #444;">
+      You have been removed from the campaign <strong><%= @campaign.name %></strong>
+    </p>
+  </div>
+
+  <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
+    <p style="color: #888; font-size: 14px; margin: 0;">
+      <strong>The Chi War Team</strong>
+    </p>
+  </div>
+</div>

@@ -271,6 +271,12 @@ defmodule ShotElixir.Campaigns do
     |> case do
       {:ok, _membership} = result ->
         broadcast_change(campaign, :update)
+
+        # Queue email notification
+        %{"type" => "joined_campaign", "user_id" => user.id, "campaign_id" => campaign.id}
+        |> ShotElixir.Workers.EmailWorker.new()
+        |> Oban.insert()
+
         result
 
       error ->
@@ -287,6 +293,11 @@ defmodule ShotElixir.Campaigns do
       {count, _} ->
         if count > 0 do
           broadcast_change(campaign, :update)
+
+          # Queue email notification
+          %{"type" => "removed_from_campaign", "user_id" => user.id, "campaign_id" => campaign.id}
+          |> ShotElixir.Workers.EmailWorker.new()
+          |> Oban.insert()
         end
 
         {count, nil}

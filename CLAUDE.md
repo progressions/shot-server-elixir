@@ -149,6 +149,119 @@ For CircleCI, add this to your `.circleci/config.yml`:
 
 The `priv/repo/structure.sql` file contains the complete Rails schema and should be committed to version control.
 
+## Email System
+
+Shot Elixir uses **Swoosh** for email delivery with **Oban** for background job processing.
+
+### Email Configuration
+
+**Development:**
+- Uses `Swoosh.Adapters.Local` for email preview in browser
+- Emails are not actually sent, but can be viewed in the mailbox preview
+- Access preview at: `http://localhost:4002/dev/mailbox` (when configured)
+
+**Test:**
+- Uses `Swoosh.Adapters.Test` for email assertions
+- Oban runs in `:inline` mode (no background processing)
+- Use `Swoosh.TestAssertions` to verify emails in tests
+
+**Production:**
+- Uses `Swoosh.Adapters.SMTP` with Office 365
+- Emails queued via Oban `:emails` queue with 3 retry attempts
+- Requires `SMTP_USERNAME` and `SMTP_PASSWORD` environment variables
+
+### Email Types Implemented
+
+**User Emails (from admin@chiwar.net):**
+1. **Invitation Email** - Campaign invitations with acceptance link
+2. **Welcome Email** - Greeting for new users
+3. **Joined Campaign** - Notification when user joins a campaign
+4. **Removed from Campaign** - Notification when user is removed
+5. **Confirmation Instructions** - Account confirmation (template ready, needs token infrastructure)
+6. **Password Reset** - Password reset link (template ready, needs reset flow)
+
+**Admin Emails (from system@chiwar.net):**
+1. **Blob Sequence Error** - Critical system error notifications
+
+### Sending Emails
+
+Emails are queued via Oban workers for background delivery:
+
+```elixir
+# Queue an invitation email
+%{"type" => "invitation", "invitation_id" => invitation.id}
+|> ShotElixir.Workers.EmailWorker.new()
+|> Oban.insert()
+
+# Queue a campaign membership email
+%{"type" => "joined_campaign", "user_id" => user.id, "campaign_id" => campaign.id}
+|> ShotElixir.Workers.EmailWorker.new()
+|> Oban.insert()
+```
+
+### Email Templates
+
+Templates are located in `lib/shot_elixir_web/templates/email/`:
+- `user_email/*.html.heex` - User-facing emails (HTML)
+- `user_email/*.text.eex` - User-facing emails (plain text)
+- `admin_email/*.html.heex` - Admin emails (HTML)
+- `admin_email/*.text.eex` - Admin emails (plain text)
+
+Templates use inline CSS for email client compatibility and match the Rails email designs.
+
+### Email Modules
+
+**Core Modules:**
+- `ShotElixir.Mailer` - Base Swoosh mailer
+- `ShotElixir.Emails.UserEmail` - User-facing email builder
+- `ShotElixir.Emails.AdminEmail` - Admin email builder
+- `ShotElixir.Workers.EmailWorker` - Oban background worker
+- `ShotElixirWeb.EmailView` - Template view helpers
+
+### Production Setup
+
+Set SMTP credentials as Fly.io secrets:
+
+```bash
+fly secrets set SMTP_USERNAME=admin@chiwar.net -a shot-elixir
+fly secrets set SMTP_PASSWORD=<password> -a shot-elixir
+```
+
+### Monitoring Email Delivery
+
+Oban provides job monitoring. Failed emails are automatically retried up to 3 times with exponential backoff.
+
+Check Oban job status:
+```elixir
+# In IEx console
+ShotElixir.Repo.all(Oban.Job) |> Enum.filter(&(&1.queue == "emails"))
+```
+
+### Email Preview in Development
+
+To enable email preview in development, add this route to your router:
+
+```elixir
+if Mix.env() == :dev do
+  scope "/dev" do
+    pipe_through :browser
+    forward "/mailbox", Plug.Swoosh.MailboxPreview
+  end
+end
+```
+
+Then access `http://localhost:4002/dev/mailbox` to view sent emails.
+
+### Automatic Email Triggers
+
+Emails are automatically sent when:
+- ✅ **Invitation created** → Invitation email sent
+- ✅ **Invitation resent** → Invitation email sent
+- ✅ **User joins campaign** → Joined campaign email sent
+- ✅ **User removed from campaign** → Removed from campaign email sent
+- 📝 **User registers** → Confirmation email (needs token implementation)
+- 📝 **Password reset requested** → Reset email (needs reset flow)
+
 ## Migration Path
 
 1. Phoenix API runs alongside Rails API

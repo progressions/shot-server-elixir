@@ -10,6 +10,8 @@ defmodule ShotElixir.Application do
     children = [
       ShotElixirWeb.Telemetry,
       ShotElixir.Repo,
+      # Oban for background jobs (emails, etc.)
+      {Oban, Application.fetch_env!(:shot_elixir, Oban)},
       {DNSCluster, query: Application.get_env(:shot_elixir, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: ShotElixir.PubSub},
       # Phoenix Presence for tracking users in channels

@@ -5,6 +5,7 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Accounts
   alias ShotElixir.Guardian
+  alias ShotElixir.Workers.EmailWorker
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -68,8 +69,11 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
             case Invitations.create_invitation(invitation_params) do
               {:ok, invitation} ->
-                # TODO: Send invitation email
-                # UserMailer.with(invitation: invitation).invitation.deliver_later!
+                # Queue invitation email for delivery
+                %{"type" => "invitation", "invitation_id" => invitation.id}
+                |> EmailWorker.new()
+                |> Oban.insert()
+
                 conn
                 |> put_status(:created)
                 |> render(:show, invitation: invitation)
@@ -113,8 +117,11 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
               invitation ->
                 if invitation.campaign_id == current_user.current_campaign_id do
-                  # TODO: Send invitation email
-                  # UserMailer.with(invitation: invitation).invitation.deliver_later!
+                  # Queue invitation email for delivery
+                  %{"type" => "invitation", "invitation_id" => invitation.id}
+                  |> EmailWorker.new()
+                  |> Oban.insert()
+
                   render(conn, :show, invitation: invitation)
                 else
                   conn
@@ -266,7 +273,13 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
                 case Accounts.create_user(user_attrs) do
                   {:ok, user} ->
-                    # TODO: Devise sends confirmation email automatically
+                    # TODO: Implement email confirmation system
+                    # Generate confirmation token and send confirmation_instructions email
+                    # For now, user accounts are created without email confirmation
+                    # %{"type" => "confirmation_instructions", "user_id" => user.id, "token" => token}
+                    # |> EmailWorker.new()
+                    # |> Oban.insert()
+
                     conn
                     |> put_status(:created)
                     |> render("register.json", %{

@@ -1,0 +1,35 @@
+================================================================================
+CRITICAL ERROR: Campaign Seeding Failed - Blob Sequence Error
+================================================================================
+
+Time: <%= ShotElixirWeb.EmailView.format_timestamp(@timestamp) %>
+
+CAMPAIGN INFORMATION
+--------------------
+Campaign: <%= @campaign.name %> (ID: <%= @campaign.id %>)
+Gamemaster: <%= @campaign.user.email %>
+
+ERROR DETAILS
+-------------
+Active Storage blob ID sequence conflict occurred during seeding.
+
+Error Message:
+<%= @error_message %>
+
+IMMEDIATE ACTION REQUIRED
+-------------------------
+1. SSH into production:
+   fly ssh console --app shot-elixir
+
+2. Run database sequence fix command to reset blob ID sequence
+
+3. Then recreate the campaign or manually run seeding operation
+
+ROOT CAUSE
+----------
+This error occurs when the blob ID sequence is out of sync after importing
+data. The sequence needs to be reset to MAX(id) + 1.
+
+================================================================================
+Chi War System Alert - Automated error notification from shot-elixir
+================================================================================
