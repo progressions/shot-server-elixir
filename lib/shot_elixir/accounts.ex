@@ -291,6 +291,20 @@ defmodule ShotElixir.Accounts do
     Repo.get_by(User, jti: jti)
   end
 
+  def get_user_by_confirmation_token(token) when is_binary(token) do
+    Repo.get_by(User, confirmation_token: token)
+  end
+
+  def confirm_user(%User{} = user) do
+    user
+    |> User.update_changeset(%{
+      confirmation_token: nil,
+      confirmation_sent_at: nil,
+      confirmed_at: NaiveDateTime.utc_now()
+    })
+    |> Repo.update()
+  end
+
   def create_user(attrs \\ %{}) do
     %User{}
     |> User.registration_changeset(attrs)
@@ -342,12 +356,6 @@ defmodule ShotElixir.Accounts do
   def set_current_campaign(%User{} = user, campaign_id) do
     user
     |> Ecto.Changeset.change(current_campaign_id: campaign_id)
-    |> Repo.update()
-  end
-
-  def confirm_user(%User{} = user) do
-    user
-    |> Ecto.Changeset.change(confirmed_at: NaiveDateTime.utc_now())
     |> Repo.update()
   end
 
@@ -413,6 +421,20 @@ defmodule ShotElixir.Accounts do
     |> Ecto.Changeset.change(
       reset_password_token: token,
       reset_password_sent_at: NaiveDateTime.utc_now()
+    )
+    |> Repo.update()
+  end
+
+  def get_user_by_reset_password_token(token) when is_binary(token) do
+    Repo.get_by(User, reset_password_token: token)
+  end
+
+  def reset_password(%User{} = user, password) do
+    user
+    |> User.password_changeset(%{password: password})
+    |> Ecto.Changeset.change(
+      reset_password_token: nil,
+      reset_password_sent_at: nil
     )
     |> Repo.update()
   end

@@ -239,6 +239,15 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
          :ok <- authorize_campaign_owner(campaign, current_user),
          %ShotElixir.Accounts.User{} = user <- ShotElixir.Accounts.get_user(user_id),
          {:ok, membership} <- Campaigns.add_member(campaign, user) do
+      # Queue joined campaign email
+      %{
+        "type" => "joined_campaign",
+        "user_id" => user.id,
+        "campaign_id" => campaign.id
+      }
+      |> ShotElixir.Workers.EmailWorker.new()
+      |> Oban.insert()
+
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.CampaignView)
@@ -265,6 +274,15 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
          :ok <- authorize_campaign_owner(campaign, current_user),
          %ShotElixir.Accounts.User{} = user <- ShotElixir.Accounts.get_user(user_id),
          {_count, _} <- Campaigns.remove_member(campaign, user) do
+      # Queue removed from campaign email
+      %{
+        "type" => "removed_from_campaign",
+        "user_id" => user.id,
+        "campaign_id" => campaign.id
+      }
+      |> ShotElixir.Workers.EmailWorker.new()
+      |> Oban.insert()
+
       send_resp(conn, :no_content, "")
     else
       nil -> {:error, :not_found}

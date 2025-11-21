@@ -87,6 +87,14 @@ defmodule ShotElixir.Accounts.User do
     |> set_name()
   end
 
+  def password_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:password])
+    |> validate_required([:password])
+    |> validate_length(:password, min: 6, message: "should be at least 6 characters")
+    |> hash_password()
+  end
+
   defp set_name(changeset) do
     case {get_change(changeset, :first_name), get_change(changeset, :last_name)} do
       {nil, nil} ->
