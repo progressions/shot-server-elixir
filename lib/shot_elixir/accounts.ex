@@ -407,10 +407,10 @@ defmodule ShotElixir.Accounts do
     token = :crypto.strong_rand_bytes(32) |> Base.url_encode64()
 
     user
-    |> Ecto.Changeset.change(
+    |> User.confirmation_changeset(%{
       confirmation_token: token,
       confirmation_sent_at: NaiveDateTime.utc_now()
-    )
+    })
     |> Repo.update()
   end
 
