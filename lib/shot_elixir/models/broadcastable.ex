@@ -88,12 +88,20 @@ defmodule ShotElixir.Models.Broadcastable do
         entity_plural = pluralize_entity_name(entity_name_lower)
 
         # Broadcast BOTH reload signal and entity data
+        # For fights, also broadcast as "encounter" for real-time encounter updates
         payload =
           if serialized_entity do
-            %{
+            base_payload = %{
               entity_plural => "reload",
               entity_name_lower => serialized_entity
             }
+
+            # Add "encounter" key for fight updates so EncounterContext receives them
+            if entity_name_lower == "fight" do
+              Map.put(base_payload, "encounter", serialized_entity)
+            else
+              base_payload
+            end
           else
             %{entity_plural => "reload"}
           end
