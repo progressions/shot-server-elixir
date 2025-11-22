@@ -86,8 +86,8 @@ defmodule ShotElixirWeb.Users.SessionsController do
       first_name: user.first_name,
       last_name: user.last_name,
       email: user.email,
-      created_at: DateTime.to_iso8601(user.created_at),
-      updated_at: DateTime.to_iso8601(user.updated_at),
+      created_at: NaiveDateTime.to_iso8601(user.created_at),
+      updated_at: NaiveDateTime.to_iso8601(user.updated_at),
       avatar_url: nil,
       admin: user.admin,
       gamemaster: user.gamemaster,
@@ -120,8 +120,8 @@ defmodule ShotElixirWeb.Users.SessionsController do
   defp format_datetime_rails(datetime) do
     # Format datetime to match Rails format: "2022-12-30 19:10:13 UTC"
     datetime
-    |> DateTime.to_string()
+    |> NaiveDateTime.to_string()
     |> String.replace("T", " ")
-    |> String.replace("Z", " UTC")
+    |> Kernel.<>(" UTC")
   end
 end
