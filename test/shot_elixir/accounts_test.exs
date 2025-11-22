@@ -150,6 +150,79 @@ defmodule ShotElixir.AccountsTest do
     test "validate_token/1 with invalid token returns error" do
       assert {:error, _} = Accounts.validate_token("invalid_token")
     end
+
+    test "update_user/2 broadcasts to all associated campaigns" do
+      # Create user and campaigns
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      # Create a second user to own the member campaign
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "other@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User",
+          gamemaster: true
+        })
+
+      # Create campaigns - one owned by user, one where user is a member
+      {:ok, owned_campaign} =
+        ShotElixir.Campaigns.create_campaign(%{
+          name: "Owned Campaign",
+          user_id: user.id,
+          description: "Campaign owned by user"
+        })
+
+      {:ok, member_campaign} =
+        ShotElixir.Campaigns.create_campaign(%{
+          name: "Member Campaign",
+          user_id: other_user.id,
+          description: "Campaign where user is member"
+        })
+
+      # Add user as member to the second campaign
+      ShotElixir.Campaigns.add_member(member_campaign, user)
+
+      # Create image position for the user
+      {:ok, _image_position} =
+        ShotElixir.Repo.insert(%ShotElixir.ImagePositions.ImagePosition{
+          positionable_type: "User",
+          positionable_id: user.id,
+          context: "profile",
+          x_position: 50.0,
+          y_position: 50.0
+        })
+
+      # Subscribe to both campaign channels
+      Phoenix.PubSub.subscribe(ShotElixir.PubSub, "campaign:#{owned_campaign.id}")
+      Phoenix.PubSub.subscribe(ShotElixir.PubSub, "campaign:#{member_campaign.id}")
+
+      # Update the user
+      {:ok, updated_user} = Accounts.update_user(user, %{first_name: "UpdatedName"})
+
+      # Assert broadcasts were received for both campaigns
+      assert_receive {:rails_message, %{"user" => broadcast_user}}, 1000
+      assert_receive {:rails_message, %{"user" => broadcast_user2}}, 1000
+
+      # Verify broadcast includes updated user data
+      # The view renders with atom keys, not string keys
+      assert broadcast_user[:first_name] == "UpdatedName"
+      assert broadcast_user[:id] == updated_user.id
+
+      # Verify image_positions are included in broadcast
+      assert is_list(broadcast_user[:image_positions])
+      assert length(broadcast_user[:image_positions]) == 1
+
+      image_pos = List.first(broadcast_user[:image_positions])
+      assert image_pos[:context] == "profile"
+      assert image_pos[:x_position] == 50.0
+      assert image_pos[:y_position] == 50.0
+
+      # Verify second broadcast has same data
+      assert broadcast_user2[:first_name] == "UpdatedName"
+      assert broadcast_user2[:id] == updated_user.id
+      assert is_list(broadcast_user2[:image_positions])
+    end
   end
 
   defp changeset_errors(changeset) do
