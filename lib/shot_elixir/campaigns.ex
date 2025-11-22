@@ -244,10 +244,21 @@ defmodule ShotElixir.Campaigns do
   end
 
   def create_campaign(attrs \\ %{}) do
-    %Campaign{}
-    |> Campaign.changeset(attrs)
-    |> Repo.insert()
-    |> broadcast_result(:insert)
+    result =
+      %Campaign{}
+      |> Campaign.changeset(attrs)
+      |> Repo.insert()
+      |> broadcast_result(:insert)
+
+    # Track onboarding milestone
+    case result do
+      {:ok, campaign} ->
+        ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(campaign)
+        {:ok, campaign}
+
+      error ->
+        error
+    end
   end
 
   def update_campaign(%Campaign{} = campaign, attrs) do

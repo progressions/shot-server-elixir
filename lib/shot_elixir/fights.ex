@@ -312,10 +312,21 @@ defmodule ShotElixir.Fights do
   end
 
   def create_fight(attrs \\ %{}) do
-    %Fight{}
-    |> Fight.changeset(attrs)
-    |> Repo.insert()
-    |> broadcast_result(:insert, &Repo.preload(&1, fight_broadcast_preloads()))
+    result =
+      %Fight{}
+      |> Fight.changeset(attrs)
+      |> Repo.insert()
+      |> broadcast_result(:insert, &Repo.preload(&1, fight_broadcast_preloads()))
+
+    # Track onboarding milestone
+    case result do
+      {:ok, fight} ->
+        ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(fight)
+        {:ok, fight}
+
+      error ->
+        error
+    end
   end
 
   def update_fight(%Fight{} = fight, attrs) do

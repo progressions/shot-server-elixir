@@ -320,6 +320,11 @@ defmodule ShotElixir.Characters do
       broadcast_change(character_with_associations, :insert)
       {:ok, character}
     end)
+    |> Multi.run(:track_milestone, fn _repo, %{character: character} ->
+      # Track onboarding milestone
+      ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(character)
+      {:ok, character}
+    end)
     |> Repo.transaction()
     |> case do
       {:ok, %{character: character}} -> {:ok, character}

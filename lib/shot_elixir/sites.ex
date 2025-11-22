@@ -283,6 +283,8 @@ defmodule ShotElixir.Sites do
       {:ok, site} ->
         site = Repo.preload(site, [:faction, :juncture])
         broadcast_change(site, :insert)
+        # Track onboarding milestone
+        ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(site)
         {:ok, site}
 
       error ->
