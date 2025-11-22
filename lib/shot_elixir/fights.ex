@@ -661,7 +661,12 @@ defmodule ShotElixir.Fights do
       :image_positions,
       :characters,
       :vehicles,
-      shots: [:character, :vehicle]
+      shots: [
+        :character,
+        :vehicle,
+        character: [:faction, :character_schticks, :carries],
+        vehicle: [:faction]
+      ]
     ]
   end
 
