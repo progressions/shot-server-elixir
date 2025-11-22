@@ -70,6 +70,9 @@ defmodule ShotElixirWeb.Api.V2.FightController do
 
         case Fights.create_fight(params) do
           {:ok, fight} ->
+            # Broadcast reload signal to campaign channel (Rails compatible)
+            ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Fight")
+
             conn
             |> put_status(:created)
             |> put_view(ShotElixirWeb.Api.V2.FightView)

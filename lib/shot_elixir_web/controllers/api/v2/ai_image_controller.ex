@@ -178,11 +178,11 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
                             IO.inspect(serialized_entity, label: "#{entity_class} data")
 
-                            # Use Phoenix PubSub for Rails-compatible broadcast with plural reload signal
+                            # Use Phoenix PubSub for campaign broadcast with plural reload signal
                             Phoenix.PubSub.broadcast!(
                               ShotElixir.PubSub,
                               "campaign:#{current_user.current_campaign_id}",
-                              {:rails_message,
+                              {:campaign_broadcast,
                                %{entity_key => serialized_entity, plural_key => "reload"}}
                             )
 
