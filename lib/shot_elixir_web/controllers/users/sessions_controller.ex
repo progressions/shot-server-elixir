@@ -120,8 +120,8 @@ defmodule ShotElixirWeb.Users.SessionsController do
   defp format_datetime_rails(datetime) do
     # Format datetime to match Rails format: "2022-12-30 19:10:13 UTC"
     datetime
-    |> DateTime.to_string()
+    |> NaiveDateTime.to_string()
     |> String.replace("T", " ")
-    |> String.replace("Z", " UTC")
+    |> Kernel.<>(" UTC")
   end
 end
