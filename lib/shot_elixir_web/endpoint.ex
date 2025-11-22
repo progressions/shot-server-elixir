@@ -58,6 +58,7 @@ defmodule ShotElixirWeb.Endpoint do
     headers: [
       "Accept",
       "Authorization",
+      "Cache-Control",
       "Content-Type",
       "Origin",
       "X-Requested-With"
