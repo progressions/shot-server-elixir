@@ -99,8 +99,17 @@ defmodule ShotElixir.Models.Broadcastable do
             # Add "encounter" key for fight updates so EncounterContext receives them
             # Use EncounterView which includes shots array with embedded character data
             if entity_name_lower == "fight" do
+              # Ensure shots are preloaded before rendering, or pass empty list
+              encounter =
+                case Map.get(entity, :shots) do
+                  %Ecto.Association.NotLoaded{} ->
+                    Map.put(entity, :shots, [])
+                  _ ->
+                    entity
+                end
+
               encounter_data =
-                ShotElixirWeb.Api.V2.EncounterView.render("show.json", %{encounter: entity})
+                ShotElixirWeb.Api.V2.EncounterView.render("show.json", %{encounter: encounter})
 
               Map.put(base_payload, "encounter", encounter_data)
             else
