@@ -14,6 +14,9 @@ config :shot_elixir,
 # Configure Phoenix.Template to use HEEx engine for .heex templates
 config :phoenix, :template_engines, heex: Phoenix.LiveView.HTMLEngine
 
+# Configure Phoenix.Template to use HEEx engine for .heex templates
+config :phoenix, :template_engines, heex: Phoenix.LiveView.HTMLEngine
+
 # Configure Ecto for UUID primary keys and Rails compatibility
 # Use separate migration table to avoid conflicts with Rails schema_migrations
 config :shot_elixir, ShotElixir.Repo,
