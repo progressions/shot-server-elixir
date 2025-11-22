@@ -95,6 +95,11 @@ defmodule ShotElixir.Accounts.User do
     |> hash_password()
   end
 
+  def confirmation_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:confirmation_token, :confirmation_sent_at, :confirmed_at])
+  end
+
   defp set_name(changeset) do
     case {get_change(changeset, :first_name), get_change(changeset, :last_name)} do
       {nil, nil} ->

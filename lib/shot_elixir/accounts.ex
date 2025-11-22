@@ -326,6 +326,12 @@ defmodule ShotElixir.Accounts do
     |> Repo.update()
   end
 
+  def set_confirmation_token(%User{} = user, attrs) do
+    user
+    |> User.confirmation_changeset(attrs)
+    |> Repo.update()
+  end
+
   def delete_user(%User{} = user) do
     user
     |> Ecto.Changeset.change(active: false)

@@ -194,7 +194,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
           # Update user with confirmation token
           {:ok, user} =
-            Accounts.update_user(user, %{
+            Accounts.set_confirmation_token(user, %{
               confirmation_token: confirmation_token,
               confirmation_sent_at: NaiveDateTime.utc_now()
             })
@@ -302,7 +302,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
           # Update user with confirmation token
           {:ok, user} =
-            Accounts.update_user(user, %{
+            Accounts.set_confirmation_token(user, %{
               confirmation_token: confirmation_token,
               confirmation_sent_at: NaiveDateTime.utc_now()
             })
