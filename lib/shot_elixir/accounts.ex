@@ -325,9 +325,9 @@ defmodule ShotElixir.Accounts do
          |> User.update_changeset(attrs)
          |> Repo.update() do
       {:ok, updated_user} ->
-        # Broadcast user updates to all associated campaigns
-        broadcast_user_update(updated_user)
-        {:ok, updated_user}
+        # Broadcast user updates and return the preloaded user
+        preloaded_user = broadcast_user_update(updated_user)
+        {:ok, preloaded_user}
 
       error ->
         error
@@ -336,6 +336,7 @@ defmodule ShotElixir.Accounts do
 
   @doc """
   Broadcasts user updates to all campaigns the user is associated with.
+  Returns the user with preloaded associations.
   """
   def broadcast_user_update(%User{} = user) do
     # Preload associations and image data for complete user representation
@@ -369,7 +370,7 @@ defmodule ShotElixir.Accounts do
       )
     end)
 
-    :ok
+    user
   end
 
   def delete_user(%User{} = user) do
