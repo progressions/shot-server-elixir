@@ -44,15 +44,9 @@ defmodule ShotElixir.Invitations do
       attrs
       |> Map.put("pending_user_id", pending_user && pending_user.id)
 
-    # TODO: Fix struct reference issue
-    {:ok,
-     %{
-       id: Ecto.UUID.generate(),
-       email: invitation_attrs["email"],
-       user_id: invitation_attrs["user_id"],
-       campaign_id: invitation_attrs["campaign_id"],
-       pending_user_id: invitation_attrs["pending_user_id"]
-     }}
+    %Invitation{}
+    |> Invitation.changeset(invitation_attrs)
+    |> Repo.insert()
   end
 
   def redeem_invitation(invitation, user_id) do
@@ -100,15 +94,82 @@ defmodule ShotElixir.Invitations do
   end
 
   # Rate limiting functions
-  def check_invitation_rate_limit(_user_id) do
-    # TODO: Implement with Redis or ETS cache
-    # For now, always allow
-    :ok
+  @rate_limit_table :invitation_rate_limits
+
+  # Initialize ETS table for rate limiting (called from application.ex)
+  def init_rate_limiting do
+    case :ets.whereis(@rate_limit_table) do
+      :undefined ->
+        :ets.new(@rate_limit_table, [:named_table, :public, :set, read_concurrency: true])
+
+      _table ->
+        :ok
+    end
   end
 
-  def check_registration_rate_limit(_ip_address, _email) do
-    # TODO: Implement with Redis or ETS cache
-    # For now, always allow
+  # Check if user can send invitations (max 10 per hour)
+  def check_invitation_rate_limit(user_id) do
+    check_rate_limit("invitation_#{user_id}", 10, 3600)
+  end
+
+  # Check if IP/email can register (max 5 attempts per hour per IP, 3 per email)
+  def check_registration_rate_limit(ip_address, email) do
+    with :ok <- check_rate_limit("registration_ip_#{ip_address}", 5, 3600),
+         :ok <- check_rate_limit("registration_email_#{email}", 3, 3600) do
+      :ok
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Generic rate limit checker using sliding window
+  defp check_rate_limit(key, max_attempts, window_seconds) do
+    init_rate_limiting()
+    now = System.system_time(:second)
+    cutoff = now - window_seconds
+
+    # Get existing attempts, filtering out expired ones
+    attempts =
+      case :ets.lookup(@rate_limit_table, key) do
+        [{^key, timestamps}] ->
+          Enum.filter(timestamps, &(&1 > cutoff))
+
+        [] ->
+          []
+      end
+
+    if length(attempts) >= max_attempts do
+      {:error, :rate_limit_exceeded}
+    else
+      # Add current attempt
+      new_attempts = [now | attempts]
+      :ets.insert(@rate_limit_table, {key, new_attempts})
+      :ok
+    end
+  end
+
+  # Clean up expired rate limit entries (can be called periodically)
+  def cleanup_rate_limits do
+    init_rate_limiting()
+    now = System.system_time(:second)
+
+    :ets.foldl(
+      fn {key, timestamps}, acc ->
+        # Keep only timestamps from last 2 hours
+        recent = Enum.filter(timestamps, &(&1 > now - 7200))
+
+        if recent == [] do
+          :ets.delete(@rate_limit_table, key)
+        else
+          :ets.insert(@rate_limit_table, {key, recent})
+        end
+
+        acc
+      end,
+      nil,
+      @rate_limit_table
+    )
+
     :ok
   end
 
@@ -146,36 +207,5 @@ defmodule ShotElixir.Invitations do
     # Also strip HTML entities like &amp;
     |> String.replace(~r/&[^;]+;/, "")
     |> String.trim()
-  end
-
-  defmodule Invitation do
-    use Ecto.Schema
-    import Ecto.Changeset
-
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-
-    schema "invitations" do
-      field :email, :string
-      field :redeemed, :boolean, default: false
-      field :redeemed_at, :naive_datetime
-
-      belongs_to :user, ShotElixir.Accounts.User
-      belongs_to :pending_user, ShotElixir.Accounts.User
-      belongs_to :campaign, ShotElixir.Campaigns.Campaign
-
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-
-    def changeset(invitation, attrs) do
-      invitation
-      |> cast(attrs, [:email, :redeemed, :redeemed_at, :user_id, :pending_user_id, :campaign_id])
-      |> validate_required([:email, :user_id, :campaign_id])
-      |> validate_format(:email, ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/)
-      |> validate_length(:email, max: 254)
-      |> unique_constraint([:email, :campaign_id],
-        message: "An invitation for this email already exists for this campaign"
-      )
-    end
   end
 end
