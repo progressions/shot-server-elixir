@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
   alias ShotElixir.Guardian
   alias ShotElixir.Repo
   alias ShotElixir.Services.CombatActionService
+  alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -116,6 +117,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                           ]
                         )
 
+                      # Broadcast encounter update to all connected clients
+                      CampaignChannel.broadcast_encounter_update(
+                        fight.campaign_id,
+                        fight_with_associations
+                      )
+
                       conn
                       |> put_view(ShotElixirWeb.Api.V2.EncounterView)
                       |> render("show.json", encounter: fight_with_associations)
@@ -202,9 +209,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 end)
               end)
 
-              # TODO: Broadcast the update after all shots are updated
-              # fight.broadcast_encounter_update!
-
               # Reload fight from database to get fresh shot data after updates
               case get_fight(fight.id, current_user.current_campaign_id) do
                 {:ok, fresh_fight} ->
@@ -218,6 +222,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                         vehicle: [:faction]
                       ]
                     )
+
+                  # Broadcast encounter update to all connected clients
+                  CampaignChannel.broadcast_encounter_update(
+                    fresh_fight.campaign_id,
+                    fight_with_associations
+                  )
 
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.EncounterView)
@@ -306,6 +316,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   ]
                 )
 
+              # Broadcast encounter update to all connected clients
+              CampaignChannel.broadcast_encounter_update(
+                result.campaign_id,
+                fight_with_associations
+              )
+
               conn
               |> put_view(ShotElixirWeb.Api.V2.EncounterView)
               |> render("show.json", encounter: fight_with_associations)
@@ -364,6 +380,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                     vehicle: [:faction]
                   ]
                 )
+
+              # Broadcast encounter update to all connected clients
+              CampaignChannel.broadcast_encounter_update(
+                result.campaign_id,
+                fight_with_associations
+              )
 
               conn
               |> put_view(ShotElixirWeb.Api.V2.EncounterView)
