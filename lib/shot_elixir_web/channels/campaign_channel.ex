@@ -211,6 +211,40 @@ defmodule ShotElixirWeb.CampaignChannel do
     )
   end
 
+  @doc """
+  Broadcasts encounter update to all clients subscribed to this campaign.
+  Sends full encounter data in Rails-compatible format: {encounter: <data>}
+  """
+  def broadcast_encounter_update(campaign_id, fight_with_associations) do
+    Logger.info(
+      "🔄 WEBSOCKET: broadcast_encounter_update called for fight #{fight_with_associations.id}"
+    )
+
+    # Only broadcast if fight is active (started but not ended)
+    if fight_with_associations.started_at && is_nil(fight_with_associations.ended_at) do
+      Logger.info("🔄 WEBSOCKET: Fight is active, broadcasting encounter update")
+
+      # Format encounter data using the EncounterView
+      encounter_data =
+        ShotElixirWeb.Api.V2.EncounterView.render("show.json", %{
+          encounter: fight_with_associations
+        })
+
+      # Broadcast to campaign channel with Rails-compatible format
+      Phoenix.PubSub.broadcast!(
+        ShotElixir.PubSub,
+        "campaign:#{campaign_id}",
+        {:campaign_broadcast, %{encounter: encounter_data}}
+      )
+
+      Logger.info("✅ Encounter update broadcasted to campaign:#{campaign_id}")
+    else
+      Logger.info(
+        "🔄 WEBSOCKET: Fight is not active (started_at: #{fight_with_associations.started_at}, ended_at: #{fight_with_associations.ended_at}), skipping broadcast"
+      )
+    end
+  end
+
   # Simple pluralization for common entity types
   defp pluralize_entity(entity_class) do
     base = String.downcase(entity_class)
