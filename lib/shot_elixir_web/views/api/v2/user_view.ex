@@ -116,6 +116,8 @@ defmodule ShotElixirWeb.Api.V2.UserView do
   end
 
   defp render_onboarding_progress(progress) do
+    alias ShotElixir.Onboarding.Progress
+
     %{
       id: progress.id,
       user_id: progress.user_id,
@@ -127,6 +129,10 @@ defmodule ShotElixirWeb.Api.V2.UserView do
       first_party_created_at: progress.first_party_created_at,
       first_site_created_at: progress.first_site_created_at,
       congratulations_dismissed_at: progress.congratulations_dismissed_at,
+      all_milestones_complete: Progress.all_milestones_complete?(progress),
+      onboarding_complete: Progress.onboarding_complete?(progress),
+      ready_for_congratulations: Progress.ready_for_congratulations?(progress),
+      next_milestone: Progress.next_milestone(progress),
       created_at: progress.created_at,
       updated_at: progress.updated_at,
       entity_class: "OnboardingProgress"

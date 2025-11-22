@@ -305,6 +305,8 @@ defmodule ShotElixir.Parties do
       {:ok, party} ->
         party = Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]])
         broadcast_change(party, :insert)
+        # Track onboarding milestone
+        ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(party)
         {:ok, party}
 
       error ->

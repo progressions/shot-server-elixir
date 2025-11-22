@@ -246,10 +246,21 @@ defmodule ShotElixir.Factions do
   end
 
   def create_faction(attrs \\ %{}) do
-    %Faction{}
-    |> Faction.changeset(attrs)
-    |> Repo.insert()
-    |> broadcast_result(:insert)
+    result =
+      %Faction{}
+      |> Faction.changeset(attrs)
+      |> Repo.insert()
+      |> broadcast_result(:insert)
+
+    # Track onboarding milestone
+    case result do
+      {:ok, faction} ->
+        ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(faction)
+        {:ok, faction}
+
+      error ->
+        error
+    end
   end
 
   def update_faction(%Faction{} = faction, attrs) do

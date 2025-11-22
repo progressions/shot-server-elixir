@@ -401,9 +401,29 @@ defmodule ShotElixir.Accounts do
   end
 
   def set_current_campaign(%User{} = user, campaign_id) do
-    user
-    |> Ecto.Changeset.change(current_campaign_id: campaign_id)
-    |> Repo.update()
+    result =
+      user
+      |> Ecto.Changeset.change(current_campaign_id: campaign_id)
+      |> Repo.update()
+
+    # Track campaign activation milestone
+    case result do
+      {:ok, updated_user} when not is_nil(campaign_id) ->
+        # Only track if this is the first time activating a campaign
+        progress = ShotElixir.Onboarding.ensure_onboarding_progress!(updated_user)
+
+        if progress.first_campaign_activated_at == nil do
+          ShotElixir.Onboarding.update_progress(
+            progress,
+            %{first_campaign_activated_at: DateTime.utc_now()}
+          )
+        end
+
+        {:ok, updated_user}
+
+      result ->
+        result
+    end
   end
 
   def lock_user(%User{} = user) do
