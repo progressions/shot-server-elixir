@@ -93,6 +93,9 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     user = Guardian.Plug.current_resource(conn)
 
     if user do
+      # Ensure user has onboarding progress
+      ShotElixir.Onboarding.ensure_onboarding_progress!(user)
+
       # Preload associations if needed
       user =
         user
@@ -100,7 +103,8 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           :current_campaign,
           :campaigns,
           :player_campaigns,
-          :image_positions
+          :image_positions,
+          :onboarding_progress
         ])
 
       conn
