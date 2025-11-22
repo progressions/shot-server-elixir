@@ -96,12 +96,11 @@ defmodule ShotElixir.Models.Broadcastable do
               entity_name_lower => serialized_entity
             }
 
-            # Add "encounter" key for fight updates so EncounterContext receives them
-            if entity_name_lower == "fight" do
-              Map.put(base_payload, "encounter", serialized_entity)
-            else
-              base_payload
-            end
+            ShotElixir.Models.Broadcastable.add_encounter_key_if_fight(
+              base_payload,
+              entity_name_lower,
+              entity
+            )
           else
             %{entity_plural => "reload"}
           end
@@ -210,12 +209,19 @@ defmodule ShotElixir.Models.Broadcastable do
       end
 
     # Broadcast BOTH reload signal and entity data
+    # For fights, also broadcast as "encounter" for real-time encounter updates
     payload =
       if serialized_entity do
-        %{
+        base_payload = %{
           entity_plural => "reload",
           entity_name_lower => serialized_entity
         }
+
+        ShotElixir.Models.Broadcastable.add_encounter_key_if_fight(
+          base_payload,
+          entity_name_lower,
+          entity
+        )
       else
         %{entity_plural => "reload"}
       end
@@ -225,5 +231,30 @@ defmodule ShotElixir.Models.Broadcastable do
       topic,
       {:campaign_broadcast, payload}
     )
+  end
+
+  @doc """
+  Helper to add "encounter" key for fight broadcasts.
+  Ensures shots are preloaded before rendering with EncounterView.
+  """
+  def add_encounter_key_if_fight(base_payload, entity_name_lower, entity) do
+    if entity_name_lower == "fight" do
+      # Ensure shots are preloaded before rendering, or pass empty list
+      encounter =
+        case Map.get(entity, :shots) do
+          %Ecto.Association.NotLoaded{} ->
+            Map.put(entity, :shots, [])
+
+          _ ->
+            entity
+        end
+
+      encounter_data =
+        ShotElixirWeb.Api.V2.EncounterView.render("show.json", %{encounter: encounter})
+
+      Map.put(base_payload, "encounter", encounter_data)
+    else
+      base_payload
+    end
   end
 end
