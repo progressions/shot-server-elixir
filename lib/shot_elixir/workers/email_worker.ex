@@ -17,10 +17,13 @@ defmodule ShotElixir.Workers.EmailWorker do
   def perform(%Oban.Job{args: %{"type" => type} = args}) do
     Logger.info("Processing #{type} email job")
 
-    args
-    |> build_email()
-    |> Mailer.deliver()
-    |> case do
+    email = build_email(args)
+    Logger.info("Email built, attempting delivery...")
+
+    result = Mailer.deliver(email)
+    Logger.info("Mailer.deliver result: #{inspect(result)}")
+
+    case result do
       {:ok, _metadata} ->
         Logger.info("Email sent successfully: #{type}")
         :ok
@@ -28,7 +31,16 @@ defmodule ShotElixir.Workers.EmailWorker do
       {:error, reason} ->
         Logger.error("Email delivery failed: #{inspect(reason)}")
         {:error, reason}
+
+      other ->
+        Logger.error("Unexpected mailer result: #{inspect(other)}")
+        {:error, :unexpected_result}
     end
+  rescue
+    e ->
+      Logger.error("Exception in email worker: #{inspect(e)}")
+      Logger.error(Exception.format(:error, e, __STACKTRACE__))
+      reraise e, __STACKTRACE__
   end
 
   # Build invitation email

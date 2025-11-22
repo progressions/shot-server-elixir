@@ -40,6 +40,7 @@ defmodule ShotElixirWeb.Router do
     post "/sign_up", RegistrationsController, :create
     post "/", RegistrationsController, :create
     post "/confirmation", ConfirmationsController, :create
+    get "/confirmation", ConfirmationsController, :create
     post "/password", PasswordsController, :create
     patch "/password", PasswordsController, :update
   end

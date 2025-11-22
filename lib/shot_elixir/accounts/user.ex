@@ -18,13 +18,13 @@ defmodule ShotElixir.Accounts.User do
     field :admin, :boolean, default: false
     field :gamemaster, :boolean, default: true
     field :jti, :string
-    field :confirmed_at, :naive_datetime
+    field :confirmed_at, :naive_datetime_usec
     field :confirmation_token, :string
-    field :confirmation_sent_at, :naive_datetime
+    field :confirmation_sent_at, :naive_datetime_usec
     field :unconfirmed_email, :string
     field :reset_password_token, :string
-    field :reset_password_sent_at, :naive_datetime
-    field :locked_at, :naive_datetime
+    field :reset_password_sent_at, :naive_datetime_usec
+    field :locked_at, :naive_datetime_usec
     field :failed_attempts, :integer, default: 0
     field :unlock_token, :string
 
@@ -43,7 +43,7 @@ defmodule ShotElixir.Accounts.User do
       foreign_key: :positionable_id,
       where: [positionable_type: "User"]
 
-    timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
+    timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :naive_datetime_usec)
   end
 
   def changeset(user, attrs) do
@@ -74,6 +74,11 @@ defmodule ShotElixir.Accounts.User do
     |> cast(attrs, [:password])
     |> validate_required([:password])
     |> generate_jti()
+  end
+
+  def confirmation_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:confirmed_at, :confirmation_token, :confirmation_sent_at])
   end
 
   def update_changeset(user, attrs) do
