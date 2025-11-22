@@ -273,22 +273,14 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
                 case Accounts.create_user(user_attrs) do
                   {:ok, user} ->
-                    # Generate confirmation token
-                    confirmation_token =
-                      :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-
-                    # Update user with confirmation token
-                    {:ok, user} =
-                      Accounts.update_user(user, %{
-                        confirmation_token: confirmation_token,
-                        confirmation_sent_at: NaiveDateTime.utc_now()
-                      })
+                    # Generate and persist confirmation token
+                    {:ok, user} = Accounts.generate_confirmation_token(user)
 
                     # Queue confirmation email
                     %{
                       "type" => "confirmation_instructions",
                       "user_id" => user.id,
-                      "token" => confirmation_token
+                      "token" => user.confirmation_token
                     }
                     |> EmailWorker.new()
                     |> Oban.insert()
