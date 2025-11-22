@@ -6,6 +6,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Repo
+  alias ShotElixir.Services.CombatActionService
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -255,7 +256,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
   # POST /api/v2/encounters/:id/apply_combat_action
   # Processes combat actions including boost, up check, and batched combat updates
-  def apply_combat_action(conn, %{"id" => fight_id} = params) do
+  def apply_combat_action(conn, %{"encounter_id" => fight_id} = params) do
     current_user = Guardian.Plug.current_resource(conn)
 
     if current_user.current_campaign_id do
@@ -283,8 +284,15 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       "🔄 BATCHED COMBAT: Applying #{length(character_updates)} character updates to fight #{fight.id}"
                     )
 
-                    # TODO: Implement CombatActionService.apply_combat_action
-                    fight
+                    case CombatActionService.apply_combat_action(fight, character_updates) do
+                      {:ok, updated_fight} ->
+                        Logger.info("✅ Combat action applied successfully")
+                        updated_fight
+
+                      {:error, reason} ->
+                        Logger.error("❌ Combat action failed: #{inspect(reason)}")
+                        raise "Combat action failed: #{inspect(reason)}"
+                    end
                 end
 
               # Return updated encounter with all associations
@@ -329,7 +337,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
   # POST /api/v2/encounters/:id/apply_chase_action
   # Handles vehicle chase actions
-  def apply_chase_action(conn, %{"id" => fight_id} = params) do
+  def apply_chase_action(conn, %{"encounter_id" => fight_id} = params) do
     current_user = Guardian.Plug.current_resource(conn)
 
     if current_user.current_campaign_id do
