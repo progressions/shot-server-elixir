@@ -22,7 +22,7 @@ defmodule ShotElixir.Campaigns do
 
   def get_campaign(id) do
     Repo.get(Campaign, id)
-    |> Repo.preload(:user)
+    |> Repo.preload([:user, :members])
     |> ImageLoader.load_image_url("Campaign")
   end
 
