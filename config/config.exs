@@ -8,8 +8,7 @@
 import Config
 
 config :shot_elixir,
-  ecto_repos: [ShotElixir.Repo],
-  generators: [timestamp_type: :utc_datetime, binary_id: true]
+  ecto_repos: [ShotElixir.Repo]
 
 # Configure Phoenix.Template to use HEEx engine for .heex templates
 config :phoenix, :template_engines, heex: Phoenix.LiveView.HTMLEngine

@@ -297,7 +297,7 @@ defmodule ShotElixir.Accounts do
 
   def confirm_user(%User{} = user) do
     user
-    |> User.update_changeset(%{
+    |> User.confirmation_changeset(%{
       confirmation_token: nil,
       confirmation_sent_at: nil,
       confirmed_at: NaiveDateTime.utc_now()
