@@ -22,7 +22,7 @@ defmodule ShotElixir.Campaigns do
 
   def get_campaign(id) do
     Repo.get(Campaign, id)
-    |> Repo.preload(:user)
+    |> Repo.preload([:user, :members])
     |> ImageLoader.load_image_url("Campaign")
   end
 
@@ -251,10 +251,56 @@ defmodule ShotElixir.Campaigns do
   end
 
   def update_campaign(%Campaign{} = campaign, attrs) do
-    campaign
-    |> Campaign.changeset(attrs)
-    |> Repo.update()
-    |> broadcast_result(:update)
+    # Handle user_ids separately for membership sync
+    {user_ids, campaign_attrs} = Map.pop(attrs, "user_ids")
+
+    result =
+      campaign
+      |> Campaign.changeset(campaign_attrs)
+      |> Repo.update()
+      |> broadcast_result(:update)
+
+    # Sync memberships if user_ids provided
+    case {result, user_ids} do
+      {{:ok, updated_campaign}, user_ids} when is_list(user_ids) ->
+        sync_campaign_members(updated_campaign, user_ids)
+        {:ok, Repo.preload(updated_campaign, [:user, :members], force: true)}
+
+      _ ->
+        result
+    end
+  end
+
+  defp sync_campaign_members(campaign, user_ids) do
+    # Normalize user_ids to strings to match UUID format from database
+    normalized_user_ids = Enum.map(user_ids, &to_string/1)
+
+    # Get current member IDs
+    current_member_ids =
+      campaign
+      |> Repo.preload(:members)
+      |> Map.get(:members)
+      |> Enum.map(&to_string(&1.id))
+
+    # Find users to add and remove
+    ids_to_add = Enum.reject(normalized_user_ids, &(&1 in current_member_ids))
+    ids_to_remove = Enum.reject(current_member_ids, &(&1 in normalized_user_ids))
+
+    # Add new members
+    Enum.each(ids_to_add, fn user_id ->
+      case Repo.get(ShotElixir.Accounts.User, user_id) do
+        nil -> :ok
+        user -> add_member(campaign, user)
+      end
+    end)
+
+    # Remove members
+    Enum.each(ids_to_remove, fn user_id ->
+      case Repo.get(ShotElixir.Accounts.User, user_id) do
+        nil -> :ok
+        user -> remove_member(campaign, user)
+      end
+    end)
   end
 
   def delete_campaign(%Campaign{} = campaign) do

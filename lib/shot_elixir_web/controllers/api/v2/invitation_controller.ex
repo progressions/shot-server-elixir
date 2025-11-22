@@ -273,12 +273,17 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
                 case Accounts.create_user(user_attrs) do
                   {:ok, user} ->
-                    # TODO: Implement email confirmation system
-                    # Generate confirmation token and send confirmation_instructions email
-                    # For now, user accounts are created without email confirmation
-                    # %{"type" => "confirmation_instructions", "user_id" => user.id, "token" => token}
-                    # |> EmailWorker.new()
-                    # |> Oban.insert()
+                    # Generate and persist confirmation token
+                    {:ok, user} = Accounts.generate_confirmation_token(user)
+
+                    # Queue confirmation email
+                    %{
+                      "type" => "confirmation_instructions",
+                      "user_id" => user.id,
+                      "token" => user.confirmation_token
+                    }
+                    |> EmailWorker.new()
+                    |> Oban.insert()
 
                     conn
                     |> put_status(:created)

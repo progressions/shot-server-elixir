@@ -48,7 +48,7 @@ Integrated email sending into existing controllers:
 **InvitationController** (`lib/shot_elixir_web/controllers/api/v2/invitation_controller.ex`):
 - ✅ Queue invitation email on create (line 72-75)
 - ✅ Queue invitation email on resend (line 120-123)
-- 📝 TODO: Queue confirmation email on register (needs token system)
+- ✅ Queue confirmation email on register (line 287-294)
 
 **Campaigns Context** (`lib/shot_elixir/campaigns.ex`):
 - ✅ Queue joined_campaign email when member added (line 276-278)
@@ -128,11 +128,11 @@ Integrated email sending into existing controllers:
 The following emails are automatically sent:
 - ✅ **Invitation created** → Invitation email queued
 - ✅ **Invitation resent** → Invitation email queued
+- ✅ **User registers via invitation** → Confirmation email queued
 - ✅ **User joins campaign** → Joined campaign email queued
 - ✅ **User removed from campaign** → Removed from campaign email queued
 
 The following are ready but need additional infrastructure:
-- 📝 **User registers** → Confirmation email (needs token system)
 - 📝 **Password reset requested** → Reset email (needs reset flow)
 
 ## Testing
@@ -208,6 +208,9 @@ iex> ShotElixir.Repo.all(Oban.Job) |> Enum.filter(&(&1.queue == "emails"))
 - Test environment email assertions
 - Production SMTP configuration (Office 365)
 - Invitation email sending (create + resend)
+- Email confirmation system (token generation + verification)
+- Confirmation emails on invitation-based registration
+- Welcome emails sent after email confirmation
 - Campaign membership email notifications
 - Compilation successful (no errors)
 
@@ -215,24 +218,13 @@ iex> ShotElixir.Repo.all(Oban.Job) |> Enum.filter(&(&1.queue == "emails"))
 
 📝 **Needs Additional Infrastructure:**
 
-1. **Email Confirmation System**
-   - Templates ready: `confirmation_instructions.html.heex`
-   - Needs: Token generation, storage, and verification flow
-   - Requires: New database field for confirmation tokens
-   - Controller endpoint for email confirmation
-
-2. **Password Reset Flow**
+1. **Password Reset Flow**
    - Templates ready: `reset_password_instructions.html.heex` + `.text.eex`
    - Needs: Password reset controller/endpoint
    - Requires: Token generation and storage
    - Reset password form in frontend
 
-3. **Welcome Email**
-   - Template ready: `welcome.html.heex`
-   - Should be sent after email confirmation
-   - Waiting on confirmation system implementation
-
-4. **Email Preview Route**
+2. **Email Preview Route**
    - Documentation provided in CLAUDE.md
    - Route not yet added to router
    - Can be added when needed for UI development
@@ -263,12 +255,11 @@ Before deploying to production:
 4. Monitor Oban job processing and retry logic
 
 ### Future (Requires Additional Work)
-1. Implement email confirmation token system
-2. Implement password reset flow
-3. Add email preview route to router (optional)
-4. Write unit tests for email modules
-5. Write integration tests for email delivery
-6. Add email delivery monitoring/alerting
+1. Implement password reset flow
+2. Add email preview route to router (optional)
+3. Write unit tests for email modules
+4. Write integration tests for email delivery
+5. Add email delivery monitoring/alerting
 
 ## Troubleshooting
 
@@ -311,6 +302,8 @@ mix test test/shot_elixir/workers/email_worker_test.exs
 
 The email system implementation is **complete and ready for production deployment**. All core functionality is implemented, tested via compilation, and documented. The system successfully replicates Rails shot-server email functionality with proper background job processing, retry logic, and multi-environment configuration.
 
+Email confirmation is now fully integrated into the invitation-based registration flow, including token generation, email sending, and user verification. Welcome emails are sent after successful confirmation.
+
 **Ready for:** Production deployment and end-to-end testing
-**Deferred for:** Email confirmation and password reset (requires additional infrastructure)
-**Status:** ✅ Implementation Complete
+**Deferred for:** Password reset flow (requires additional infrastructure)
+**Status:** ✅ Implementation Complete (including email confirmation)
