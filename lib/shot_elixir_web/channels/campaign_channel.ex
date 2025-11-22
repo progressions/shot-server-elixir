@@ -40,9 +40,9 @@ defmodule ShotElixirWeb.CampaignChannel do
     {:noreply, socket}
   end
 
-  # Handle Rails-compatible broadcast messages from PubSub
+  # Handle campaign broadcast messages from PubSub
   @impl true
-  def handle_info({:rails_message, payload}, socket) do
+  def handle_info({:campaign_broadcast, payload}, socket) do
     Logger.info("📨 CampaignChannel: Pushing message to client")
     Logger.info("Payload: #{inspect(payload)}")
 
@@ -182,16 +182,50 @@ defmodule ShotElixirWeb.CampaignChannel do
   end
 
   @doc """
-  Broadcasts AI image generation status (Rails ActionCable compatible format).
+  Broadcasts AI image generation status.
   Status can be 'preview_ready' with json, or 'error' with error message.
   """
   def broadcast_ai_image_status(campaign_id, status, data) do
-    # Use Phoenix.PubSub for Rails-compatible broadcast
-    # This will be received by handle_info({:rails_message, payload}, socket)
+    # Use Phoenix.PubSub for campaign broadcast
+    # This will be received by handle_info({:campaign_broadcast, payload}, socket)
     Phoenix.PubSub.broadcast!(
       ShotElixir.PubSub,
       "campaign:#{campaign_id}",
-      {:rails_message, Map.merge(%{status: status}, data)}
+      {:campaign_broadcast, Map.merge(%{status: status}, data)}
     )
+  end
+
+  @doc """
+  Broadcasts a reload signal for a specific entity type.
+  Example: broadcast_entity_reload(campaign_id, "Fight") sends {fights: "reload"}
+  """
+  def broadcast_entity_reload(campaign_id, entity_class) do
+    # Convert "Fight" to "fights", "Character" to "characters", etc.
+    entity_key = pluralize_entity(entity_class) |> String.to_atom()
+
+    # Use Phoenix.PubSub for campaign broadcast
+    Phoenix.PubSub.broadcast!(
+      ShotElixir.PubSub,
+      "campaign:#{campaign_id}",
+      {:campaign_broadcast, %{entity_key => "reload"}}
+    )
+  end
+
+  # Simple pluralization for common entity types
+  defp pluralize_entity(entity_class) do
+    base = String.downcase(entity_class)
+
+    case base do
+      "fight" -> "fights"
+      "character" -> "characters"
+      "vehicle" -> "vehicles"
+      "campaign" -> "campaigns"
+      "site" -> "sites"
+      "party" -> "parties"
+      "faction" -> "factions"
+      "weapon" -> "weapons"
+      "schtick" -> "schticks"
+      _ -> base <> "s"
+    end
   end
 end

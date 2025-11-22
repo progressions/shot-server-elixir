@@ -24,12 +24,14 @@ defmodule ShotElixir.Models.Broadcastable do
 
       @doc """
       Broadcasts an entity change via Phoenix.PubSub.
+      Sends both reload signal and serialized entity for maximum flexibility.
       """
       def broadcast_change(entity, action) when action in [:insert, :update, :delete] do
-        entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
+        entity_name = entity.__struct__ |> Module.split() |> List.last()
+        entity_name_lower = String.downcase(entity_name)
 
         topic =
-          case entity_name do
+          case entity_name_lower do
             "campaign" ->
               "campaign:#{entity.id}"
 
@@ -42,9 +44,9 @@ defmodule ShotElixir.Models.Broadcastable do
               end
           end
 
-        # Use proper serialization with view system
+        # Serialize entity using appropriate view
         serialized_entity =
-          case entity_name do
+          case entity_name_lower do
             "character" ->
               ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
 
@@ -77,13 +79,38 @@ defmodule ShotElixir.Models.Broadcastable do
 
             "user" ->
               ShotElixirWeb.Api.V2.UserView.render("show.json", %{user: entity})
+
+            _ ->
+              nil
+          end
+
+        # Get pluralized entity key for reload signal
+        entity_plural = pluralize_entity_name(entity_name_lower)
+
+        # Broadcast BOTH reload signal and entity data
+        payload =
+          if serialized_entity do
+            %{
+              entity_plural => "reload",
+              entity_name_lower => serialized_entity
+            }
+          else
+            %{entity_plural => "reload"}
           end
 
         Phoenix.PubSub.broadcast(
           ShotElixir.PubSub,
           topic,
-          {:rails_message, %{entity_name => serialized_entity}}
+          {:campaign_broadcast, payload}
         )
+      end
+
+      # Simple pluralization helper
+      defp pluralize_entity_name(entity_name) do
+        case entity_name do
+          "party" -> "parties"
+          _ -> entity_name <> "s"
+        end
       end
 
       @doc """
@@ -109,27 +136,27 @@ defmodule ShotElixir.Models.Broadcastable do
 
   @doc """
   Helper function to broadcast changes for entities that don't use the macro.
+  Sends both reload signal and serialized entity.
   """
   def broadcast(entity, action) when action in [:insert, :update, :delete] do
-    entity_name = entity.__struct__ |> Module.split() |> List.last() |> String.downcase()
+    entity_name = entity.__struct__ |> Module.split() |> List.last()
+    entity_name_lower = String.downcase(entity_name)
 
     topic =
-      case entity_name do
+      case entity_name_lower do
         "campaign" ->
           "campaign:#{entity.id}"
 
         _ ->
-          # Safely get campaign_id, handle case where it might not exist
           case Map.get(entity, :campaign_id) do
-            # Fallback for entities without campaign_id
             nil -> "campaign:unknown"
             campaign_id -> "campaign:#{campaign_id}"
           end
       end
 
-    # Use proper serialization with view system
+    # Serialize entity using appropriate view
     serialized_entity =
-      case entity_name do
+      case entity_name_lower do
         "character" ->
           ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
 
@@ -162,12 +189,33 @@ defmodule ShotElixir.Models.Broadcastable do
 
         "user" ->
           ShotElixirWeb.Api.V2.UserView.render("show.json", %{user: entity})
+
+        _ ->
+          nil
+      end
+
+    # Get pluralized entity key
+    entity_plural =
+      case entity_name_lower do
+        "party" -> "parties"
+        _ -> entity_name_lower <> "s"
+      end
+
+    # Broadcast BOTH reload signal and entity data
+    payload =
+      if serialized_entity do
+        %{
+          entity_plural => "reload",
+          entity_name_lower => serialized_entity
+        }
+      else
+        %{entity_plural => "reload"}
       end
 
     Phoenix.PubSub.broadcast(
       ShotElixir.PubSub,
       topic,
-      {:rails_message, %{entity_name => serialized_entity}}
+      {:campaign_broadcast, payload}
     )
   end
 end
