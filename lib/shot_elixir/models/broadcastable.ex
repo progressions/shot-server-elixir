@@ -74,6 +74,9 @@ defmodule ShotElixir.Models.Broadcastable do
 
             "campaign" ->
               ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
+
+            "user" ->
+              ShotElixirWeb.Api.V2.UserView.render("show.json", %{user: entity})
           end
 
         Phoenix.PubSub.broadcast(
@@ -156,6 +159,9 @@ defmodule ShotElixir.Models.Broadcastable do
 
         "campaign" ->
           ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
+
+        "user" ->
+          ShotElixirWeb.Api.V2.UserView.render("show.json", %{user: entity})
       end
 
     Phoenix.PubSub.broadcast(
