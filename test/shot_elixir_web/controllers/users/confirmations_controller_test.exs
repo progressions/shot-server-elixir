@@ -24,7 +24,6 @@ defmodule ShotElixirWeb.Users.ConfirmationsControllerTest do
       response = json_response(conn, 200)
 
       assert response["message"] == "Email confirmed successfully"
-      # assert response["token"] # Removing this assertion until verified
       assert response["user"]["email"] == user.email
 
       # Verify user is confirmed in DB
