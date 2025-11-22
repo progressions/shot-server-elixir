@@ -19,11 +19,16 @@ defmodule ShotElixir.Models.Concerns.OnboardingTrackable do
   Call this after inserting a record to track the onboarding milestone.
   """
   def track_milestone(record) do
-    Logger.info("🎯 OnboardingTrackable: Tracking milestone for #{record.__struct__} (ID: #{record.id})")
+    Logger.info(
+      "🎯 OnboardingTrackable: Tracking milestone for #{record.__struct__} (ID: #{record.id})"
+    )
 
     # Skip tracking for template characters
     if skip_tracking?(record) do
-      Logger.info("⏭️ Skipping milestone tracking for template: #{Map.get(record, :name, "unnamed")}")
+      Logger.info(
+        "⏭️ Skipping milestone tracking for template: #{Map.get(record, :name, "unnamed")}"
+      )
+
       :ok
     else
       # Get the user - either directly or through campaign
@@ -43,7 +48,6 @@ defmodule ShotElixir.Models.Concerns.OnboardingTrackable do
   end
 
   defp do_track_milestone(record, target_user) do
-
     # Determine milestone type and field
     milestone_type = get_milestone_type(record)
     timestamp_field = String.to_atom("first_#{milestone_type}_created_at")
