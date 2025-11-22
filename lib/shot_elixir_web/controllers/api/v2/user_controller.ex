@@ -419,6 +419,16 @@ defmodule ShotElixirWeb.Api.V2.UserController do
                   # Continue with user update
                   case Accounts.update_user(current_user, parsed_params) do
                     {:ok, updated_user} ->
+                      # Preload associations for full user data
+                      updated_user =
+                        updated_user
+                        |> ShotElixir.Repo.preload([
+                          :image_positions,
+                          :current_campaign,
+                          :campaigns,
+                          :player_campaigns
+                        ])
+
                       {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
 
                       conn
@@ -450,6 +460,16 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           # No image uploaded, proceed with normal update
           case Accounts.update_user(current_user, parsed_params) do
             {:ok, updated_user} ->
+              # Preload associations for full user data
+              updated_user =
+                updated_user
+                |> ShotElixir.Repo.preload([
+                  :image_positions,
+                  :current_campaign,
+                  :campaigns,
+                  :player_campaigns
+                ])
+
               {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
 
               conn
@@ -561,6 +581,16 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     else
       case Accounts.update_user(user, parsed_params) do
         {:ok, updated_user} ->
+          # Preload associations for full user data
+          updated_user =
+            updated_user
+            |> ShotElixir.Repo.preload([
+              :image_positions,
+              :current_campaign,
+              :campaigns,
+              :player_campaigns
+            ])
+
           {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
 
           conn
