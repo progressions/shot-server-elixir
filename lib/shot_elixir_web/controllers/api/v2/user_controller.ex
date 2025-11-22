@@ -63,6 +63,20 @@ defmodule ShotElixirWeb.Api.V2.UserController do
       user ->
         # Then check authorization
         if current_user.admin || current_user.id == id do
+          # Preload associations for full user data
+          # force: true ensures fresh data since get_user already preloaded :image_positions
+          user =
+            user
+            |> ShotElixir.Repo.preload(
+              [
+                :image_positions,
+                :current_campaign,
+                :campaigns,
+                :player_campaigns
+              ],
+              force: true
+            )
+
           conn
           |> put_view(ShotElixirWeb.Api.V2.UserView)
           |> render(:show, user: user)
@@ -210,7 +224,19 @@ defmodule ShotElixirWeb.Api.V2.UserController do
                   case ShotElixir.ActiveStorage.attach_image("User", user.id, upload_result) do
                     {:ok, _attachment} ->
                       # Reload user to get fresh data after image attachment
-                      user = Accounts.get_user(user.id)
+                      # force: true ensures fresh data since get_user already preloaded :image_positions
+                      user =
+                        Accounts.get_user(user.id)
+                        |> ShotElixir.Repo.preload(
+                          [
+                            :image_positions,
+                            :current_campaign,
+                            :campaigns,
+                            :player_campaigns
+                          ],
+                          force: true
+                        )
+
                       {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
                       conn
@@ -419,6 +445,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
                   # Continue with user update
                   case Accounts.update_user(current_user, parsed_params) do
                     {:ok, updated_user} ->
+                      # update_user now returns user with preloaded associations via broadcast_user_update
                       {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
 
                       conn
@@ -450,6 +477,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           # No image uploaded, proceed with normal update
           case Accounts.update_user(current_user, parsed_params) do
             {:ok, updated_user} ->
+              # update_user now returns user with preloaded associations via broadcast_user_update
               {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
 
               conn
@@ -507,7 +535,19 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           case ShotElixir.ActiveStorage.delete_image("User", user.id) do
             {:ok, _} ->
               # Reload user to get fresh data after image removal
-              user = Accounts.get_user(user.id)
+              # force: true ensures fresh data since get_user already preloaded :image_positions
+              user =
+                Accounts.get_user(user.id)
+                |> ShotElixir.Repo.preload(
+                  [
+                    :image_positions,
+                    :current_campaign,
+                    :campaigns,
+                    :player_campaigns
+                  ],
+                  force: true
+                )
+
               {:ok, token, _claims} = Guardian.encode_and_sign(user)
 
               conn
@@ -561,6 +601,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     else
       case Accounts.update_user(user, parsed_params) do
         {:ok, updated_user} ->
+          # update_user now returns user with preloaded associations via broadcast_user_update
           {:ok, token, _claims} = Guardian.encode_and_sign(updated_user)
 
           conn

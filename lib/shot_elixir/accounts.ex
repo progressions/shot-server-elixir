@@ -321,9 +321,56 @@ defmodule ShotElixir.Accounts do
   end
 
   def update_user(%User{} = user, attrs) do
+    case user
+         |> User.update_changeset(attrs)
+         |> Repo.update() do
+      {:ok, updated_user} ->
+        # Broadcast user updates and return the preloaded user
+        preloaded_user = broadcast_user_update(updated_user)
+        {:ok, preloaded_user}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Broadcasts user updates to all campaigns the user is associated with.
+  Returns the user with preloaded associations.
+  """
+  def broadcast_user_update(%User{} = user) do
+    # Preload associations and image data for complete user representation
+    user =
+      user
+      |> Repo.preload([
+        :campaigns,
+        :player_campaigns,
+        :image_positions,
+        :current_campaign
+      ])
+
+    # Get serialized user data using the view
+    serialized_user = ShotElixirWeb.Api.V2.UserView.render("show.json", %{user: user})
+
+    # Broadcast to all campaigns the user owns (as gamemaster)
+    Enum.each(user.campaigns, fn campaign ->
+      Phoenix.PubSub.broadcast(
+        ShotElixir.PubSub,
+        "campaign:#{campaign.id}",
+        {:rails_message, %{"user" => serialized_user}}
+      )
+    end)
+
+    # Broadcast to all campaigns the user is a member of (as player)
+    Enum.each(user.player_campaigns, fn campaign ->
+      Phoenix.PubSub.broadcast(
+        ShotElixir.PubSub,
+        "campaign:#{campaign.id}",
+        {:rails_message, %{"user" => serialized_user}}
+      )
+    end)
+
     user
-    |> User.update_changeset(attrs)
-    |> Repo.update()
   end
 
   def delete_user(%User{} = user) do
