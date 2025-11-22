@@ -97,8 +97,12 @@ defmodule ShotElixir.Models.Broadcastable do
             }
 
             # Add "encounter" key for fight updates so EncounterContext receives them
+            # Use EncounterView which includes shots array with embedded character data
             if entity_name_lower == "fight" do
-              Map.put(base_payload, "encounter", serialized_entity)
+              encounter_data =
+                ShotElixirWeb.Api.V2.EncounterView.render("show.json", %{encounter: entity})
+
+              Map.put(base_payload, "encounter", encounter_data)
             else
               base_payload
             end
@@ -210,12 +214,24 @@ defmodule ShotElixir.Models.Broadcastable do
       end
 
     # Broadcast BOTH reload signal and entity data
+    # For fights, also broadcast as "encounter" for real-time encounter updates
     payload =
       if serialized_entity do
-        %{
+        base_payload = %{
           entity_plural => "reload",
           entity_name_lower => serialized_entity
         }
+
+        # Add "encounter" key for fight updates so EncounterContext receives them
+        # Use EncounterView which includes shots array with embedded character data
+        if entity_name_lower == "fight" do
+          encounter_data =
+            ShotElixirWeb.Api.V2.EncounterView.render("show.json", %{encounter: entity})
+
+          Map.put(base_payload, "encounter", encounter_data)
+        else
+          base_payload
+        end
       else
         %{entity_plural => "reload"}
       end
