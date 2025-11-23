@@ -24,6 +24,9 @@ defmodule ShotElixir.Services.GrokService do
       {:ok, %{"choices" => [%{"message" => %{"content" => "..."}}]}}
   """
   def send_request(prompt, max_tokens \\ 2048) do
+    Logger.info("Sending Grok API request with max_tokens: #{max_tokens}")
+    Logger.debug("Prompt length: #{String.length(prompt)} characters")
+
     payload = %{
       model: "grok-4",
       messages: [%{role: "user", content: prompt}],
@@ -35,14 +38,24 @@ defmodule ShotElixir.Services.GrokService do
       {"Content-Type", "application/json"}
     ]
 
-    case Req.post("#{@base_url}/v1/chat/completions", json: payload, headers: headers) do
+    Logger.info("Making request to #{@base_url}/v1/chat/completions")
+
+    # AI requests can take a while, set a longer timeout (60 seconds)
+    case Req.post("#{@base_url}/v1/chat/completions",
+           json: payload,
+           headers: headers,
+           receive_timeout: 60_000
+         ) do
       {:ok, %{status: 200, body: response}} ->
+        Logger.info("Grok API request successful")
         {:ok, response}
 
       {:ok, %{status: status, body: body}} ->
+        Logger.error("Grok API request failed with status #{status}: #{inspect(body)}")
         {:error, "Request failed with status #{status}: #{inspect(body)}"}
 
       {:error, reason} ->
+        Logger.error("Grok API HTTP request failed: #{inspect(reason)}")
         {:error, "HTTP request failed: #{inspect(reason)}"}
     end
   end
@@ -84,7 +97,12 @@ defmodule ShotElixir.Services.GrokService do
       {"Content-Type", "application/json"}
     ]
 
-    case Req.post("#{@base_url}/v1/images/generations", json: payload, headers: headers) do
+    # Image generation can take a while, set a longer timeout (60 seconds)
+    case Req.post("#{@base_url}/v1/images/generations",
+           json: payload,
+           headers: headers,
+           receive_timeout: 60_000
+         ) do
       {:ok, %{status: 200, body: response}} ->
         extract_image_data(response, response_format, num_images)
 
@@ -149,9 +167,17 @@ defmodule ShotElixir.Services.GrokService do
 
   # Get API key from config
   defp api_key do
-    Application.get_env(:shot_elixir, :grok)[:api_key] ||
-      System.get_env("GROK_API_KEY") ||
+    key =
+      Application.get_env(:shot_elixir, :grok)[:api_key] ||
+        System.get_env("GROK_API_KEY")
+
+    if is_nil(key) || key == "" do
+      Logger.error("Grok API key not configured!")
       raise "Grok API key not configured"
+    end
+
+    Logger.debug("Grok API key loaded: #{String.slice(key, 0..10)}...")
+    key
   end
 
   # Clamp value between min and max
