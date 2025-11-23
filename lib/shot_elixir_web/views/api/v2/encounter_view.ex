@@ -212,8 +212,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       driver_id: shot.driver_id,
       was_rammed_or_damaged: shot.was_rammed_or_damaged,
       image_url: get_image_url(vehicle),
-      # TODO: Implement chase relationships
-      chase_relationships: [],
+      chase_relationships: get_chase_relationships_for_vehicle(shot.fight_id, vehicle.id),
       effects: render_effects(shot)
     }
   end
@@ -303,4 +302,24 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
   defp sort_shots_desc_nulls_last(nil, _), do: false
   defp sort_shots_desc_nulls_last(_, nil), do: true
   defp sort_shots_desc_nulls_last(a, b), do: a >= b
+
+  defp get_chase_relationships_for_vehicle(fight_id, vehicle_id) do
+    # Load active chase relationships for this fight and vehicle
+    # Matches Rails: chase_relationships.select { |cr| cr.pursuer_id == vehicle_id || cr.evader_id == vehicle_id }
+    import Ecto.Query
+
+    ShotElixir.Chases.ChaseRelationship
+    |> where([cr], cr.fight_id == ^fight_id and cr.active == true)
+    |> where([cr], cr.pursuer_id == ^vehicle_id or cr.evader_id == ^vehicle_id)
+    |> ShotElixir.Repo.all()
+    |> Enum.map(fn cr ->
+      %{
+        id: cr.id,
+        position: cr.position,
+        pursuer_id: cr.pursuer_id,
+        evader_id: cr.evader_id,
+        is_pursuer: cr.pursuer_id == vehicle_id
+      }
+    end)
+  end
 end
