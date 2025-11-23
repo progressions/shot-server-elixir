@@ -45,20 +45,29 @@ defmodule ShotElixir.Services.BoostService do
         Fights.update_shot(booster_shot, %{shot: new_shot})
 
         # Deduct fortune
+
         if can_use_fortune do
           current_fortune = get_av(booster, "Fortune")
 
+          current_values = booster.action_values || %{}
+
+          updated_values = Map.put(current_values, "Fortune", current_fortune - 1)
+
           Characters.update_character(booster, %{
-            "action_values" => %{"Fortune" => current_fortune - 1}
+            "action_values" => updated_values
           })
         end
 
         # Calculate value
+
         values = @boost_values[boost_type] || @boost_values["attack"]
+
         boost_value = if can_use_fortune, do: values.fortune, else: values.base
 
         # Create Effect
+
         effect_name = if boost_type == "attack", do: "Attack Boost", else: "Defense Boost"
+
         effect_name = if can_use_fortune, do: "#{effect_name} (Fortune)", else: effect_name
 
         action_value =
@@ -79,28 +88,35 @@ defmodule ShotElixir.Services.BoostService do
         })
 
         # Create Event
-        Fights.create_fight_event(%{
-          fight_id: fight.id,
-          event_type: "boost",
-          description: "#{booster.name} boosted #{target.name}'s #{boost_type} (+#{boost_value})",
-          details: %{
-            "booster_id" => booster.id,
-            "target_id" => target.id,
-            "boost_type" => boost_type,
-            "boost_value" => boost_value,
-            "fortune_used" => can_use_fortune
-          }
-        })
 
-        # Touch fight
-        Fights.touch_fight(fight)
+        case Fights.create_fight_event(%{
+               "fight_id" => fight.id,
+               "event_type" => "boost",
+               "description" =>
+                 "#{booster.name} boosted #{target.name}'s #{boost_type} (+#{boost_value})",
+               "details" => %{
+                 "booster_id" => booster.id,
+                 "target_id" => target.id,
+                 "boost_type" => boost_type,
+                 "boost_value" => boost_value,
+                 "fortune_used" => can_use_fortune
+               }
+             }) do
+          {:ok, _} ->
+            # Touch fight
+
+            {:ok, updated_fight} = Fights.touch_fight(fight)
+
+            updated_fight
+
+          {:error, reason} ->
+            Repo.rollback(reason)
+        end
       else
         {:error, reason} -> Repo.rollback(reason)
         nil -> Repo.rollback("Missing parameters or resources")
       end
     end)
-
-    fight
   end
 
   defp get_shot_by_character(fight, character_id) do

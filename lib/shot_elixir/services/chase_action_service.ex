@@ -11,13 +11,14 @@ defmodule ShotElixir.Services.ChaseActionService do
     Logger.info("Applying chase action for fight #{fight.id}")
 
     # Record the event
-    Fights.create_fight_event(%{
-      "fight_id" => fight.id,
-      "event_type" => "chase_action",
-      "description" => "Chase action performed with #{length(vehicle_updates)} updates",
-      "details" => %{"updates_count" => length(vehicle_updates)}
-    })
-
-    fight
+    case Fights.create_fight_event(%{
+           "fight_id" => fight.id,
+           "event_type" => "chase_action",
+           "description" => "Chase action performed with #{length(vehicle_updates)} updates",
+           "details" => %{"updates_count" => length(vehicle_updates)}
+         }) do
+      {:ok, _event} -> {:ok, fight}
+      error -> error
+    end
   end
 end

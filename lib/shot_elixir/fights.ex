@@ -567,6 +567,14 @@ defmodule ShotElixir.Fights do
     %FightEvent{}
     |> FightEvent.changeset(attrs)
     |> Repo.insert()
+    |> case do
+      {:ok, fight_event} = result ->
+        broadcast_fight_update(fight_event.fight_id)
+        result
+
+      error ->
+        error
+    end
   end
 
   # Shot management

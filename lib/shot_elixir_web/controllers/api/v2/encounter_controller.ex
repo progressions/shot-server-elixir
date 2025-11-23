@@ -292,11 +292,19 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 case params["action_type"] do
                   "boost" ->
                     Logger.info("💪 BOOST ACTION: Processing boost for fight #{fight.id}")
-                    BoostService.apply_boost(fight, params)
+
+                    case BoostService.apply_boost(fight, params) do
+                      {:ok, updated_fight} -> updated_fight
+                      {:error, reason} -> raise reason
+                    end
 
                   "up_check" ->
                     Logger.info("🎲 UP CHECK ACTION: Processing Up Check for fight #{fight.id}")
-                    UpCheckService.apply_up_check(fight, params)
+
+                    case UpCheckService.apply_up_check(fight, params) do
+                      {:ok, updated_fight} -> updated_fight
+                      {:error, reason} -> raise reason
+                    end
 
                   _ ->
                     character_updates = params["character_updates"] || []
@@ -379,7 +387,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 "🏎️ CHASE ACTION: Applying #{length(vehicle_updates)} vehicle updates to fight #{fight.id}"
               )
 
-              result = ChaseActionService.apply_chase_action(fight, vehicle_updates)
+              result =
+                case ChaseActionService.apply_chase_action(fight, vehicle_updates) do
+                  {:ok, updated_fight} -> updated_fight
+                  {:error, reason} -> raise reason
+                end
 
               # Return updated encounter with all associations
               fight_with_associations =
