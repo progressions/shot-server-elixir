@@ -79,8 +79,9 @@ defmodule ShotElixir.Services.CombatActionService do
            "details" => event_data["details"] || event_data
          }) do
       {:ok, _} -> :ok
-      {:error, changeset} -> {:error, "Failed to create fight event: #{inspect(changeset)}"}
-    end
+      {:error, changeset} ->
+        Logger.warning("Failed to create fight event: #{inspect(changeset)}")
+        {:error, "Failed to create fight event: #{inspect(changeset)}"}
   end
 
   defp maybe_create_event(_fight, _update), do: :ok
