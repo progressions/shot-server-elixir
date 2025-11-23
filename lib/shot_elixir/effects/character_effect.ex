@@ -52,3 +52,4 @@ defmodule ShotElixir.Effects.CharacterEffect do
       )
     end
   end
+end
