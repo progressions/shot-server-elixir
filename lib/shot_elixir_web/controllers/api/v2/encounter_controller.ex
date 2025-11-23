@@ -40,6 +40,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       shots: [
                         :character,
                         :vehicle,
+                        :character_effects,
                         character: [:faction, :character_schticks, :carries],
                         vehicle: [:faction]
                       ]
@@ -122,6 +123,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                           shots: [
                             :character,
                             :vehicle,
+                            :character_effects,
                             character: [:faction, :character_schticks, :carries],
                             vehicle: [:faction]
                           ]
@@ -228,6 +230,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       shots: [
                         :character,
                         :vehicle,
+                        :character_effects,
                         character: [:faction, :character_schticks, :carries],
                         vehicle: [:faction]
                       ]
@@ -319,6 +322,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   shots: [
                     :character,
                     :vehicle,
+                    :character_effects,
                     character: [:faction, :character_schticks, :carries],
                     vehicle: [:faction]
                   ]
@@ -383,6 +387,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   shots: [
                     :character,
                     :vehicle,
+                    :character_effects,
                     character: [:faction, :character_schticks, :carries],
                     vehicle: [:faction]
                   ]
