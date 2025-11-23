@@ -166,9 +166,8 @@ defmodule ShotElixirWeb.Router do
     end
 
     # AI
-    resources "/ai", AiController, only: [:create] do
-      patch "/extend", AiController, :extend
-    end
+    post "/ai", AiController, :create
+    post "/ai/:id/extend", AiController, :extend
 
     post "/ai_images", AiImageController, :create
     post "/ai_images/attach", AiImageController, :attach
