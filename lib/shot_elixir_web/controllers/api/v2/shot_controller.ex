@@ -132,13 +132,6 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
             # Assign the new driver
             case Fights.assign_driver(driver_shot, shot.id) do
               {:ok, _driver_shot} ->
-                # Broadcast the driver assignment
-                ShotElixirWeb.FightChannel.broadcast_shot_change(
-                  fight.id,
-                  driver_shot_id,
-                  "driver_assigned"
-                )
-
                 json(conn, %{success: true, message: "Driver assigned successfully"})
 
               {:error, _changeset} ->
@@ -189,13 +182,6 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
       else
         # Clear any driver for this vehicle
         Fights.clear_vehicle_drivers(fight.id, shot.id)
-
-        # Broadcast the driver removal
-        ShotElixirWeb.FightChannel.broadcast_shot_change(
-          fight.id,
-          shot.id,
-          "driver_removed"
-        )
 
         json(conn, %{success: true, message: "Driver removed successfully"})
       end
