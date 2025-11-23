@@ -357,7 +357,7 @@ defmodule ShotElixir.Accounts do
       Phoenix.PubSub.broadcast(
         ShotElixir.PubSub,
         "campaign:#{campaign.id}",
-        {:rails_message, %{"user" => serialized_user}}
+        {:campaign_broadcast, %{"user" => serialized_user}}
       )
     end)
 
@@ -366,7 +366,7 @@ defmodule ShotElixir.Accounts do
       Phoenix.PubSub.broadcast(
         ShotElixir.PubSub,
         "campaign:#{campaign.id}",
-        {:rails_message, %{"user" => serialized_user}}
+        {:campaign_broadcast, %{"user" => serialized_user}}
       )
     end)
 
