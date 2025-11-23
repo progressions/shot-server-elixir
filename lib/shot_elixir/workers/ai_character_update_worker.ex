@@ -96,16 +96,32 @@ defmodule ShotElixir.Workers.AiCharacterUpdateWorker do
   end
 
   defp broadcast_character_update(character) do
-    # Preload campaign to get campaign_id
-    character_with_campaign = Repo.preload(character, :campaign)
+    # Note: This broadcasts AI completion status, not a duplicate of the
+    # normal character update broadcast from Characters.update_character.
+    # The frontend listens for {status: "character_ready"} to know AI processing is done.
+
+    # Preload campaign and all associations required for rendering
+    character_with_assocs =
+      Repo.preload(character, [
+        :campaign,
+        :user,
+        :faction,
+        :juncture,
+        :image_positions,
+        :schticks,
+        :weapons,
+        :parties,
+        :sites,
+        :advancements
+      ])
 
     # Get serialized character data
     character_data =
-      ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: character})
+      ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: character_with_assocs})
 
     # Broadcast to campaign channel
     CampaignChannel.broadcast_ai_image_status(
-      character_with_campaign.campaign_id,
+      character_with_assocs.campaign_id,
       "character_ready",
       %{
         character: character_data

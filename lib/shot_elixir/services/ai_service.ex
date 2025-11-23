@@ -349,20 +349,30 @@ defmodule ShotElixir.Services.AiService do
   defp do_send_request_with_retry(prompt, max_tokens, max_retries, retry_count) do
     case GrokService.send_request(prompt, max_tokens) do
       {:ok, response} ->
-        parse_character_response(response)
+        case parse_character_response(response) do
+          {:ok, json} ->
+            {:ok, json}
 
-      {:error, reason} when retry_count < max_retries ->
+          {:error, "Incomplete response: truncated due to length"}
+          when retry_count < max_retries ->
+            Logger.warning(
+              "AI response truncated due to length (#{retry_count + 1}/#{max_retries}). Retrying with increased max_tokens."
+            )
+
+            new_max_tokens = max_tokens + 1024
+            Logger.info("Retrying with increased max_tokens: #{new_max_tokens}")
+            do_send_request_with_retry(prompt, new_max_tokens, max_retries, retry_count + 1)
+
+          {:error, reason} ->
+            {:error, "Failed after #{retry_count} retries: #{inspect(reason)}"}
+        end
+
+      {:error, reason} ->
         Logger.warning(
           "AI request failed (#{retry_count + 1}/#{max_retries}): #{inspect(reason)}"
         )
 
-        # Increase max_tokens for retry
-        new_max_tokens = max_tokens + 1024
-        Logger.info("Retrying with increased max_tokens: #{new_max_tokens}")
-        do_send_request_with_retry(prompt, new_max_tokens, max_retries, retry_count + 1)
-
-      {:error, reason} ->
-        {:error, "Failed after #{max_retries} retries: #{inspect(reason)}"}
+        {:error, "Failed after #{retry_count} retries: #{inspect(reason)}"}
     end
   end
 
@@ -425,8 +435,17 @@ defmodule ShotElixir.Services.AiService do
 
   # Build prompt for new character generation
   defp build_character_prompt(description, campaign) do
-    faction_names = Enum.map(campaign.factions, & &1.name) |> Enum.join(", ")
-    juncture_names = Enum.map(campaign.junctures, & &1.name) |> Enum.join(", ")
+    faction_names =
+      case Enum.map(campaign.factions, & &1.name) do
+        [] -> "None specified (use a generic faction)"
+        names -> Enum.join(names, ", ")
+      end
+
+    juncture_names =
+      case Enum.map(campaign.junctures, & &1.name) do
+        [] -> "None specified (use a generic juncture)"
+        names -> Enum.join(names, ", ")
+      end
 
     prompt = """
     You are a creative AI character generator for a game of Feng Shui 2, the action movie roleplaying game.
@@ -473,10 +492,16 @@ defmodule ShotElixir.Services.AiService do
     archetype = get_in(character.action_values, ["Archetype"]) || ""
 
     faction_names =
-      Enum.map(character.campaign.factions, & &1.name) |> Enum.join(", ")
+      case Enum.map(character.campaign.factions, & &1.name) do
+        [] -> "None specified (use a generic faction)"
+        names -> Enum.join(names, ", ")
+      end
 
     juncture_names =
-      Enum.map(character.campaign.junctures, & &1.name) |> Enum.join(", ")
+      case Enum.map(character.campaign.junctures, & &1.name) do
+        [] -> "None specified (use a generic juncture)"
+        names -> Enum.join(names, ", ")
+      end
 
     prompt = """
     You are a creative AI character generator for a game of Feng Shui 2, the action movie roleplaying game.
