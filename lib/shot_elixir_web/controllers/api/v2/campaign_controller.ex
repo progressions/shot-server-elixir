@@ -205,19 +205,20 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
         end)
         |> List.first()
 
-      if current_fight do
-        # Preload necessary associations for the fight
-        current_fight_with_associations =
+      # Preload necessary associations for the fight if it exists
+      current_fight_with_associations =
+        if current_fight do
           ShotElixir.Repo.preload(current_fight, [:characters, :vehicles, :image_positions])
+        else
+          nil
+        end
 
-        conn
-        |> put_view(ShotElixirWeb.Api.V2.CampaignView)
-        |> render("fight_only.json", fight: current_fight_with_associations)
-      else
-        conn
-        |> put_status(:no_content)
-        |> text("")
-      end
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+      |> render("current_fight.json",
+        campaign: campaign,
+        fight: current_fight_with_associations
+      )
     else
       nil ->
         conn

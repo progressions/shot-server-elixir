@@ -7,7 +7,9 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   def render("show.json", %{campaign: campaign}) do
-    render_campaign_detail(campaign)
+    %{
+      campaign: render_campaign_detail(campaign)
+    }
   end
 
   def render("current.json", %{campaign: campaign}) do
@@ -39,6 +41,13 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
 
   def render("fight_only.json", %{fight: fight}) do
     render_fight_detailed(fight)
+  end
+
+  def render("current_fight.json", %{campaign: campaign, fight: fight}) do
+    %{
+      campaign: render_campaign(campaign),
+      current_fight: if(fight, do: render_fight_detailed(fight), else: nil)
+    }
   end
 
   def render("membership.json", %{membership: membership}) do

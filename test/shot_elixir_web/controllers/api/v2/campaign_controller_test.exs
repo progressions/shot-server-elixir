@@ -385,11 +385,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
     end
 
     test "returns current fight for campaign", %{conn: conn, gamemaster: gm, campaign: campaign} do
-      # Create a fight for the campaign
+      # Create and start a fight for the campaign
       {:ok, fight} =
         ShotElixir.Fights.create_fight(%{
           name: "Test Fight",
-          campaign_id: campaign.id
+          campaign_id: campaign.id,
+          started_at: DateTime.utc_now()
         })
 
       conn = authenticate(conn, gm)
