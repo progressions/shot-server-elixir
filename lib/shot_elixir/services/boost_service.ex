@@ -30,14 +30,11 @@ defmodule ShotElixir.Services.BoostService do
         target = Repo.preload(target_shot, :character).character
 
         can_use_fortune = is_pc?(booster) && use_fortune
+        current_fortune = if can_use_fortune, do: get_av(booster, "Fortune"), else: 0
 
         # Check fortune
-        if can_use_fortune do
-          current_fortune = get_av(booster, "Fortune")
-
-          if current_fortune < 1 do
-            Repo.rollback("Insufficient Fortune")
-          end
+        if can_use_fortune && current_fortune < 1 do
+          Repo.rollback("Insufficient Fortune")
         end
 
         # Deduct shots
@@ -45,12 +42,8 @@ defmodule ShotElixir.Services.BoostService do
         Fights.update_shot(booster_shot, %{shot: new_shot})
 
         # Deduct fortune
-
         if can_use_fortune do
-          current_fortune = get_av(booster, "Fortune")
-
           current_values = booster.action_values || %{}
-
           updated_values = Map.put(current_values, "Fortune", current_fortune - 1)
 
           Characters.update_character(booster, %{

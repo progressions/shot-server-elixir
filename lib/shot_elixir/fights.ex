@@ -724,6 +724,7 @@ defmodule ShotElixir.Fights do
       shots: [
         :character,
         :vehicle,
+        :character_effects,
         character: [:faction, :character_schticks, :carries],
         vehicle: [:faction]
       ]
