@@ -22,9 +22,17 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     else
       fights_data = Fights.list_campaign_fights(campaign_id, params, current_user)
 
+      # Determine if this is an autocomplete request
+      is_autocomplete = params["autocomplete"] == "true" || params["autocomplete"] == true
+
       conn
       |> put_view(ShotElixirWeb.Api.V2.FightView)
-      |> render("index.json", fights: fights_data.fights, meta: fights_data.meta)
+      |> render("index.json",
+        fights: fights_data.fights,
+        meta: fights_data.meta,
+        seasons: fights_data.seasons,
+        is_autocomplete: is_autocomplete
+      )
     end
   end
 

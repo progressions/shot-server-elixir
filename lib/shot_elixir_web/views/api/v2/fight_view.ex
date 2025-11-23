@@ -1,4 +1,25 @@
 defmodule ShotElixirWeb.Api.V2.FightView do
+  def render("index.json", %{
+        fights: fights,
+        meta: meta,
+        seasons: seasons,
+        is_autocomplete: is_autocomplete
+      }) do
+    %{
+      fights:
+        Enum.map(fights, fn fight ->
+          if is_autocomplete do
+            render_fight_autocomplete(fight)
+          else
+            render_fight(fight)
+          end
+        end),
+      seasons: seasons,
+      meta: meta
+    }
+  end
+
+  # Fallback for backward compatibility
   def render("index.json", %{fights: fights, meta: meta}) do
     %{
       fights: Enum.map(fights, &render_fight/1),
@@ -56,7 +77,17 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       ended_at: fight.ended_at,
       season: fight.season,
       session: fight.session,
-      campaign_id: fight.campaign_id
+      campaign_id: fight.campaign_id,
+      image_positions: []
+    }
+  end
+
+  # Minimal version for autocomplete requests (Rails FightLiteSerializer)
+  defp render_fight_autocomplete(fight) do
+    %{
+      id: fight.id,
+      name: fight.name,
+      entity_class: "Fight"
     }
   end
 
