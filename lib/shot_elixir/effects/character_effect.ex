@@ -32,5 +32,23 @@ defmodule ShotElixir.Effects.CharacterEffect do
       :shot_id
     ])
     |> validate_required([:name, :shot_id])
+    |> validate_at_least_one_present([:character_id, :vehicle_id])
   end
-end
+
+  defp validate_at_least_one_present(changeset, fields) do
+    present? =
+      Enum.any?(fields, fn field ->
+        value = get_field(changeset, field)
+        not is_nil(value)
+      end)
+
+    if present? do
+      changeset
+    else
+      add_error(
+        changeset,
+        hd(fields),
+        "at least one of #{Enum.join(fields, ", ")} must be present"
+      )
+    end
+  end
