@@ -4,24 +4,121 @@ defmodule ShotElixir.Services.BoostService do
   """
 
   require Logger
-  alias ShotElixir.Fights
-  alias ShotElixir.Fights.Fight
+  alias ShotElixir.{Repo, Fights, Effects, Characters}
+  alias ShotElixir.Fights.{Fight, Shot}
+  alias ShotElixir.Characters.Character
+
+  @boost_cost 3
+
+  @boost_values %{
+    "attack" => %{base: 1, fortune: 2},
+    "defense" => %{base: 3, fortune: 5}
+  }
 
   def apply_boost(%Fight{} = fight, params) do
     Logger.info("Applying boost for fight #{fight.id}")
 
-    # Extract details from params if available
-    description = params["description"] || "Boost action performed"
+    Repo.transaction(fn ->
+      booster_id = params["booster_id"] || params["character_id"]
+      target_id = params["target_id"]
+      boost_type = params["boost_type"] || "attack"
+      use_fortune = params["use_fortune"] || false
 
-    # Record the event
-    Fights.create_fight_event(%{
-      "fight_id" => fight.id,
-      "event_type" => "boost",
-      "description" => description,
-      "details" => Map.take(params, ["character_id", "cost", "target_id"])
-    })
+      with {:ok, booster_shot} <- get_shot_by_character(fight, booster_id),
+           {:ok, target_shot} <- get_shot_by_character(fight, target_id) do
+        booster = Repo.preload(booster_shot, :character).character
+        target = Repo.preload(target_shot, :character).character
 
-    # Return the fight (potentially reloaded if we modified it)
+        can_use_fortune = is_pc?(booster) && use_fortune
+
+        # Check fortune
+        if can_use_fortune do
+          current_fortune = get_av(booster, "Fortune")
+
+          if current_fortune < 1 do
+            Repo.rollback("Insufficient Fortune")
+          end
+        end
+
+        # Deduct shots
+        new_shot = max((booster_shot.shot || 0) - @boost_cost, 0)
+        Fights.update_shot(booster_shot, %{shot: new_shot})
+
+        # Deduct fortune
+        if can_use_fortune do
+          current_fortune = get_av(booster, "Fortune")
+
+          Characters.update_character(booster, %{
+            "action_values" => %{"Fortune" => current_fortune - 1}
+          })
+        end
+
+        # Calculate value
+        values = @boost_values[boost_type] || @boost_values["attack"]
+        boost_value = if can_use_fortune, do: values.fortune, else: values.base
+
+        # Create Effect
+        effect_name = if boost_type == "attack", do: "Attack Boost", else: "Defense Boost"
+        effect_name = if can_use_fortune, do: "#{effect_name} (Fortune)", else: effect_name
+
+        action_value =
+          if boost_type == "attack" do
+            get_av(target, "MainAttack") || "Guns"
+          else
+            "Defense"
+          end
+
+        Effects.create_character_effect(%{
+          name: effect_name,
+          description: "Boost from #{booster.name}",
+          severity: "info",
+          action_value: action_value,
+          change: "+#{boost_value}",
+          character_id: target.id,
+          shot_id: target_shot.id
+        })
+
+        # Create Event
+        Fights.create_fight_event(%{
+          fight_id: fight.id,
+          event_type: "boost",
+          description: "#{booster.name} boosted #{target.name}'s #{boost_type} (+#{boost_value})",
+          details: %{
+            "booster_id" => booster.id,
+            "target_id" => target.id,
+            "boost_type" => boost_type,
+            "boost_value" => boost_value,
+            "fortune_used" => can_use_fortune
+          }
+        })
+
+        # Touch fight
+        Fights.touch_fight(fight)
+      else
+        {:error, reason} -> Repo.rollback(reason)
+        nil -> Repo.rollback("Missing parameters or resources")
+      end
+    end)
+
     fight
   end
+
+  defp get_shot_by_character(fight, character_id) do
+    case Repo.get_by(Shot, fight_id: fight.id, character_id: character_id) do
+      nil -> {:error, "Shot not found for character #{character_id}"}
+      shot -> {:ok, shot}
+    end
+  end
+
+  defp is_pc?(%Character{action_values: action_values}) when is_map(action_values) do
+    action_values["Type"] == "PC"
+  end
+
+  defp is_pc?(_), do: false
+
+  defp get_av(%Character{action_values: action_values}, key) when is_map(action_values) do
+    action_values[key] || 0
+  end
+
+  defp get_av(_, _), do: 0
 end

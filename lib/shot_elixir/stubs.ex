@@ -34,18 +34,3 @@ end
 # Sites moved to sites/ directory
 
 # Parties moved to parties/ directory
-
-defmodule ShotElixir.Effects do
-  defmodule CharacterEffect do
-    use Ecto.Schema
-    @primary_key {:id, :binary_id, autogenerate: true}
-    @foreign_key_type :binary_id
-    schema "character_effects" do
-      field :description, :string
-      belongs_to :character, ShotElixir.Characters.Character
-      belongs_to :fight, ShotElixir.Fights.Fight
-      belongs_to :shot, ShotElixir.Fights.Shot
-      timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
-    end
-  end
-end
