@@ -53,7 +53,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       # Render vehicles for this shot
       vehicles =
         vehicle_shots
-        |> Enum.map(&render_encounter_vehicle/1)
+        |> Enum.map(&render_encounter_vehicle(&1, fight))
 
       %{
         shot: shot_number,
@@ -198,7 +198,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
     end
   end
 
-  defp render_encounter_vehicle(shot) do
+  defp render_encounter_vehicle(shot, fight) do
     vehicle = shot.vehicle
 
     %{
@@ -212,8 +212,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       driver_id: shot.driver_id,
       was_rammed_or_damaged: shot.was_rammed_or_damaged,
       image_url: get_image_url(vehicle),
-      # TODO: Implement chase relationships
-      chase_relationships: [],
+      chase_relationships: get_chase_relationships_for_vehicle(fight, vehicle.id),
       effects: render_effects(shot)
     }
   end
@@ -303,4 +302,31 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
   defp sort_shots_desc_nulls_last(nil, _), do: false
   defp sort_shots_desc_nulls_last(_, nil), do: true
   defp sort_shots_desc_nulls_last(a, b), do: a >= b
+
+  defp get_chase_relationships_for_vehicle(fight, vehicle_id) do
+    # Filter preloaded chase relationships for this fight and vehicle
+    # Matches Rails: chase_relationships.select { |cr| cr.pursuer_id == vehicle_id || cr.evader_id == vehicle_id }
+    case Map.get(fight, :chase_relationships) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      chase_relationships ->
+        chase_relationships
+        |> Enum.filter(fn cr ->
+          cr.active && (cr.pursuer_id == vehicle_id || cr.evader_id == vehicle_id)
+        end)
+        |> Enum.map(fn cr ->
+          %{
+            id: cr.id,
+            position: cr.position,
+            pursuer_id: cr.pursuer_id,
+            evader_id: cr.evader_id,
+            is_pursuer: cr.pursuer_id == vehicle_id
+          }
+        end)
+    end
+  end
 end

@@ -36,7 +36,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 if fight.campaign_id == current_user.current_campaign_id do
                   # Preload all necessary associations for encounter serialization
                   fight_with_associations =
-                    ShotElixir.Repo.preload(fight,
+                    ShotElixir.Repo.preload(fight, [
+                      :chase_relationships,
                       shots: [
                         :character,
                         :vehicle,
@@ -44,7 +45,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                         character: [:faction, :character_schticks, :carries],
                         vehicle: [:faction]
                       ]
-                    )
+                    ])
 
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.EncounterView)
@@ -119,7 +120,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
                           # Return updated encounter with all associations
                           fight_with_associations =
-                            ShotElixir.Repo.preload(fight,
+                            ShotElixir.Repo.preload(fight, [
+                              :chase_relationships,
                               shots: [
                                 :character,
                                 :vehicle,
@@ -127,7 +129,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                                 character: [:faction, :character_schticks, :carries],
                                 vehicle: [:faction]
                               ]
-                            )
+                            ])
 
                           # Broadcast encounter update to all connected clients
                           CampaignChannel.broadcast_encounter_update(
@@ -232,7 +234,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 {:ok, fresh_fight} ->
                   # Return updated encounter with all associations
                   fight_with_associations =
-                    ShotElixir.Repo.preload(fresh_fight,
+                    ShotElixir.Repo.preload(fresh_fight, [
+                      :chase_relationships,
                       shots: [
                         :character,
                         :vehicle,
@@ -240,7 +243,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                         character: [:faction, :character_schticks, :carries],
                         vehicle: [:faction]
                       ]
-                    )
+                    ])
 
                   # Broadcast encounter update to all connected clients
                   CampaignChannel.broadcast_encounter_update(
@@ -340,7 +343,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
               # Return updated encounter with all associations
               fight_with_associations =
-                ShotElixir.Repo.preload(result,
+                ShotElixir.Repo.preload(result, [
+                  :chase_relationships,
                   shots: [
                     :character,
                     :vehicle,
@@ -348,7 +352,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                     character: [:faction, :character_schticks, :carries],
                     vehicle: [:faction]
                   ]
-                )
+                ])
 
               # Broadcast encounter update to all connected clients
               CampaignChannel.broadcast_encounter_update(
@@ -413,7 +417,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
               # Return updated encounter with all associations
               fight_with_associations =
-                ShotElixir.Repo.preload(result,
+                ShotElixir.Repo.preload(result, [
+                  :chase_relationships,
                   shots: [
                     :character,
                     :vehicle,
@@ -421,7 +426,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                     character: [:faction, :character_schticks, :carries],
                     vehicle: [:faction]
                   ]
-                )
+                ])
 
               # Broadcast encounter update to all connected clients
               CampaignChannel.broadcast_encounter_update(
