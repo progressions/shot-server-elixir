@@ -57,6 +57,7 @@ defmodule ShotElixir.Services.CombatActionService do
 
       shot ->
         if shot.fight_id == fight.id do
+          maybe_create_event(fight, update)
           apply_shot_updates(shot, update)
         else
           {:error, "Shot #{shot_id} does not belong to fight #{fight.id}"}
@@ -68,6 +69,17 @@ defmodule ShotElixir.Services.CombatActionService do
     Logger.warning("Character update missing shot_id: #{inspect(update)}")
     {:ok, :skipped}
   end
+
+  defp maybe_create_event(fight, %{"event" => event_data}) when is_map(event_data) do
+    Fights.create_fight_event(%{
+      "fight_id" => fight.id,
+      "event_type" => event_data["event_type"] || event_data["type"] || "combat_action",
+      "description" => event_data["description"] || "Combat action",
+      "details" => event_data["details"] || event_data
+    })
+  end
+
+  defp maybe_create_event(_fight, _update), do: :ok
 
   # Apply all updates to a shot
   defp apply_shot_updates(shot, update) do
