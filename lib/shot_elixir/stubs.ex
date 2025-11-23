@@ -44,6 +44,7 @@ defmodule ShotElixir.Effects do
       field :description, :string
       belongs_to :character, ShotElixir.Characters.Character
       belongs_to :fight, ShotElixir.Fights.Fight
+      belongs_to :shot, ShotElixir.Fights.Shot
       timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
     end
   end

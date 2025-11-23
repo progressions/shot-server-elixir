@@ -428,6 +428,22 @@ defmodule ShotElixir.Fights do
           string
         end)
 
+      # Get IDs of shots to be removed
+      shots_to_remove_ids =
+        from(s in Shot,
+          where: s.fight_id == ^fight.id and s.character_id in ^ids_to_remove_strings,
+          select: s.id
+        )
+        |> Repo.all()
+
+      # Clear driver_id on any shots referencing the shots to be removed
+      if shots_to_remove_ids != [] do
+        from(s in Shot,
+          where: s.driver_id in ^shots_to_remove_ids
+        )
+        |> Repo.update_all(set: [driver_id: nil])
+      end
+
       from(s in Shot, where: s.fight_id == ^fight.id and s.character_id in ^ids_to_remove_strings)
       |> Repo.delete_all()
     end
@@ -482,6 +498,22 @@ defmodule ShotElixir.Fights do
           {:ok, string} = Ecto.UUID.cast(binary)
           string
         end)
+
+      # Get IDs of shots to be removed
+      shots_to_remove_ids =
+        from(s in Shot,
+          where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove_strings,
+          select: s.id
+        )
+        |> Repo.all()
+
+      # Clear driving_id on any shots referencing the shots to be removed
+      if shots_to_remove_ids != [] do
+        from(s in Shot,
+          where: s.driving_id in ^shots_to_remove_ids
+        )
+        |> Repo.update_all(set: [driving_id: nil])
+      end
 
       from(s in Shot, where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove_strings)
       |> Repo.delete_all()
