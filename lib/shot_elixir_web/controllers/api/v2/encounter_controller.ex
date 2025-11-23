@@ -300,16 +300,24 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                     Logger.info("💪 BOOST ACTION: Processing boost for fight #{fight.id}")
 
                     case BoostService.apply_boost(fight, params) do
-                      {:ok, updated_fight} -> updated_fight
-                      {:error, reason} -> raise reason
+                      {:ok, updated_fight} ->
+                        updated_fight
+
+                      {:error, reason} ->
+                        Logger.error("Boost action failed: #{inspect(reason)}")
+                        raise "Boost action failed: #{inspect(reason)}"
                     end
 
                   "up_check" ->
                     Logger.info("🎲 UP CHECK ACTION: Processing Up Check for fight #{fight.id}")
 
                     case UpCheckService.apply_up_check(fight, params) do
-                      {:ok, updated_fight} -> updated_fight
-                      {:error, reason} -> raise reason
+                      {:ok, updated_fight} ->
+                        updated_fight
+
+                      {:error, reason} ->
+                        Logger.error("Up check failed: #{inspect(reason)}")
+                        raise "Up check failed: #{inspect(reason)}"
                     end
 
                   _ ->
@@ -395,8 +403,12 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
               result =
                 case ChaseActionService.apply_chase_action(fight, vehicle_updates) do
-                  {:ok, updated_fight} -> updated_fight
-                  {:error, reason} -> raise reason
+                  {:ok, updated_fight} ->
+                    updated_fight
+
+                  {:error, reason} ->
+                    Logger.error("Chase action failed: #{inspect(reason)}")
+                    raise "Chase action failed: #{inspect(reason)}"
                 end
 
               # Return updated encounter with all associations

@@ -26,35 +26,45 @@ defmodule ShotElixir.Services.ChaseActionService do
       end
 
       # Apply updates
-      Enum.each(vehicle_updates, fn update ->
-        vehicle_id = update["vehicle_id"] || update["id"]
-
-        if vehicle_id do
-          vehicle = Vehicles.get_vehicle(vehicle_id)
-
-          if vehicle do
-            # Merge action_values to prevent data loss if present
-            attrs =
-              if update["action_values"] do
-                merged_av = Map.merge(vehicle.action_values || %{}, update["action_values"])
-                Map.put(update, "action_values", merged_av)
-              else
-                update
-              end
-
-            case Vehicles.update_vehicle(vehicle, attrs) do
-              {:ok, _} -> :ok
-              {:error, reason} -> Repo.rollback(reason)
-            end
-          end
-        end
-      end)
-
-      fight
+      case apply_updates(vehicle_updates) do
+        :ok -> fight
+        {:error, reason} -> Repo.rollback(reason)
+      end
     end)
     |> case do
       {:ok, fight} -> Fights.touch_fight(fight)
       error -> error
     end
+  end
+
+  defp apply_updates(vehicle_updates) do
+    Enum.reduce_while(vehicle_updates, :ok, fn update, _ ->
+      vehicle_id = update["vehicle_id"] || update["id"]
+
+      if vehicle_id do
+        vehicle = Vehicles.get_vehicle(vehicle_id)
+
+        if vehicle do
+          attrs =
+            if update["action_values"] do
+              merged_av = Map.merge(vehicle.action_values || %{}, update["action_values"])
+              Map.put(update, "action_values", merged_av)
+            else
+              update
+            end
+
+          case Vehicles.update_vehicle(vehicle, attrs) do
+            {:ok, _} -> {:cont, :ok}
+            {:error, reason} -> {:halt, {:error, reason}}
+          end
+        else
+          # Vehicle not found, skip
+          {:cont, :ok}
+        end
+      else
+        # No ID, skip
+        {:cont, :ok}
+      end
+    end)
   end
 end

@@ -39,28 +39,31 @@ defmodule ShotElixir.Services.BoostService do
 
         # Deduct shots
         new_shot = max((booster_shot.shot || 0) - @boost_cost, 0)
-        Fights.update_shot(booster_shot, %{shot: new_shot})
+
+        case Fights.update_shot(booster_shot, %{shot: new_shot}) do
+          {:ok, _} -> :ok
+          {:error, reason} -> Repo.rollback(reason)
+        end
 
         # Deduct fortune
         if can_use_fortune do
           current_values = booster.action_values || %{}
           updated_values = Map.put(current_values, "Fortune", current_fortune - 1)
 
-          Characters.update_character(booster, %{
-            "action_values" => updated_values
-          })
+          case Characters.update_character(booster, %{
+                 "action_values" => updated_values
+               }) do
+            {:ok, _} -> :ok
+            {:error, reason} -> Repo.rollback(reason)
+          end
         end
 
         # Calculate value
-
         values = @boost_values[boost_type] || @boost_values["attack"]
-
         boost_value = if can_use_fortune, do: values.fortune, else: values.base
 
         # Create Effect
-
         effect_name = if boost_type == "attack", do: "Attack Boost", else: "Defense Boost"
-
         effect_name = if can_use_fortune, do: "#{effect_name} (Fortune)", else: effect_name
 
         action_value =
@@ -70,18 +73,20 @@ defmodule ShotElixir.Services.BoostService do
             "Defense"
           end
 
-        Effects.create_character_effect(%{
-          name: effect_name,
-          description: "Boost from #{booster.name}",
-          severity: "info",
-          action_value: action_value,
-          change: "+#{boost_value}",
-          character_id: target.id,
-          shot_id: target_shot.id
-        })
+        case Effects.create_character_effect(%{
+               name: effect_name,
+               description: "Boost from #{booster.name}",
+               severity: "info",
+               action_value: action_value,
+               change: "+#{boost_value}",
+               character_id: target.id,
+               shot_id: target_shot.id
+             }) do
+          {:ok, _} -> :ok
+          {:error, reason} -> Repo.rollback(reason)
+        end
 
         # Create Event
-
         case Fights.create_fight_event(
                %{
                  "fight_id" => fight.id,
