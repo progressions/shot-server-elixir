@@ -465,7 +465,7 @@ defmodule ShotElixir.Services.AiService do
     - Main Attack: Either Guns, Sorcery, Martial Arts, Scroungetech, Genome, or Creature
     - Attack Value: A number between 13 and 16. A Mook has the attack value of 9. A Boss has an attack value of between 17 and 20.
     - Defense: A number between 13 and 16. A Mook has the defense value of 13. A Boss has a defense of between 17 and 20.
-    - Toughness: A number between 5 and 8. A Mook has a null value. A Boss has a defense of between 8 and 10.
+    - Toughness: A number between 5 and 8. A Mook has a null value. A Boss has a toughness of between 8 and 10.
     - Speed: A number between 5 and 8. A Mook has the speed of 6. A Boss has a speed of between 6 and 9.
     - Damage: A number between 7 and 12. A Mook has a damage value of 7.
     - Faction: The name of the faction the character belongs to, if not specified in the description. Use one of the following factions from the campaign: #{faction_names}.
