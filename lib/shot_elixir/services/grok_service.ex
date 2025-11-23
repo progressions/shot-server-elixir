@@ -40,11 +40,13 @@ defmodule ShotElixir.Services.GrokService do
 
     Logger.info("Making request to #{@base_url}/v1/chat/completions")
 
-    # AI requests can take a while, set a longer timeout (60 seconds)
+    # AI requests can take a while, set a longer timeout (2 minutes)
+    # Also set connect_timeout for initial connection
     case Req.post("#{@base_url}/v1/chat/completions",
            json: payload,
            headers: headers,
-           receive_timeout: 60_000
+           receive_timeout: 120_000,
+           connect_options: [timeout: 30_000]
          ) do
       {:ok, %{status: 200, body: response}} ->
         Logger.info("Grok API request successful")
@@ -97,11 +99,12 @@ defmodule ShotElixir.Services.GrokService do
       {"Content-Type", "application/json"}
     ]
 
-    # Image generation can take a while, set a longer timeout (60 seconds)
+    # Image generation can take a while, set a longer timeout (2 minutes)
     case Req.post("#{@base_url}/v1/images/generations",
            json: payload,
            headers: headers,
-           receive_timeout: 60_000
+           receive_timeout: 120_000,
+           connect_options: [timeout: 30_000]
          ) do
       {:ok, %{status: 200, body: response}} ->
         extract_image_data(response, response_format, num_images)
