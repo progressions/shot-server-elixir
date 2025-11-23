@@ -9,6 +9,45 @@ defmodule ShotElixir.Services.GrokService do
   @max_prompt_length 1024
 
   @doc """
+  Sends a chat completion request to Grok API.
+
+  ## Parameters
+    - prompt: Text prompt for the AI
+    - max_tokens: Maximum tokens in response (default 2048)
+
+  ## Returns
+    - {:ok, response_map} on success
+    - {:error, reason} on failure
+
+  ## Examples
+      iex> send_request("Generate a character...", 1000)
+      {:ok, %{"choices" => [%{"message" => %{"content" => "..."}}]}}
+  """
+  def send_request(prompt, max_tokens \\ 2048) do
+    payload = %{
+      model: "grok-4",
+      messages: [%{role: "user", content: prompt}],
+      max_tokens: max_tokens
+    }
+
+    headers = [
+      {"Authorization", "Bearer #{api_key()}"},
+      {"Content-Type", "application/json"}
+    ]
+
+    case Req.post("#{@base_url}/v1/chat/completions", json: payload, headers: headers) do
+      {:ok, %{status: 200, body: response}} ->
+        {:ok, response}
+
+      {:ok, %{status: status, body: body}} ->
+        {:error, "Request failed with status #{status}: #{inspect(body)}"}
+
+      {:error, reason} ->
+        {:error, "HTTP request failed: #{inspect(reason)}"}
+    end
+  end
+
+  @doc """
   Generates images using Grok's image generation API.
 
   ## Parameters

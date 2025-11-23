@@ -4,6 +4,7 @@ defmodule ShotElixirWeb.Api.V2.AiController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Guardian
+  alias ShotElixir.Workers.{AiCharacterCreationWorker, AiCharacterUpdateWorker}
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -27,10 +28,12 @@ defmodule ShotElixirWeb.Api.V2.AiController do
             description = ai_params["description"]
 
             if description && String.trim(description) != "" do
-              # TODO: Start AI character creation job
-              # AiCharacterCreationJob.perform_later(description, campaign.id)
+              # Enqueue AI character creation job
+              %{description: description, campaign_id: campaign.id}
+              |> AiCharacterCreationWorker.new()
+              |> Oban.insert()
 
-              # For now, return immediate response like Rails
+              # Return immediate response like Rails
               conn
               |> put_status(:accepted)
               |> json(%{message: "Character generation in progress"})
@@ -76,10 +79,12 @@ defmodule ShotElixirWeb.Api.V2.AiController do
 
               character ->
                 if character.campaign_id == current_user.current_campaign_id do
-                  # TODO: Start AI character update job
-                  # AiCharacterUpdateJob.perform_later(character.id)
+                  # Enqueue AI character update job
+                  %{character_id: character.id}
+                  |> AiCharacterUpdateWorker.new()
+                  |> Oban.insert()
 
-                  # For now, return success response
+                  # Return success response
                   conn
                   |> put_status(:accepted)
                   |> json(%{message: "Character AI update in progress"})
