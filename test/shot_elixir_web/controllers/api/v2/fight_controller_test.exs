@@ -497,7 +497,8 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       {:ok, fight} =
         Fights.create_fight(
           Map.merge(@create_attrs, %{
-            campaign_id: campaign.id
+            campaign_id: campaign.id,
+            started_at: DateTime.utc_now()
           })
         )
 
@@ -514,11 +515,11 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
       response = json_response(conn, 200)
 
-      assert response["current_fight"]["id"] == fight.id
-      assert response["campaign"]["id"] == campaign.id
+      assert response["id"] == fight.id
+      assert response["campaign_id"] == campaign.id
     end
 
-    test "returns 404 when no active fight found", %{conn: conn, gamemaster: gm} do
+    test "returns nil when no active fight found", %{conn: conn, gamemaster: gm} do
       {:ok, empty_campaign} =
         Campaigns.create_campaign(%{
           name: "Empty Campaign",
@@ -529,8 +530,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/campaigns/#{empty_campaign.id}/current_fight")
       response = json_response(conn, 200)
-      assert response["current_fight"] == nil
-      assert response["campaign"]["id"] == empty_campaign.id
+      assert response == nil
     end
 
     test "allows campaign members to view current fight", %{
@@ -543,8 +543,8 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
       response = json_response(conn, 200)
 
-      assert response["current_fight"]["id"] == fight.id
-      assert response["campaign"]["id"] == campaign.id
+      assert response["id"] == fight.id
+      assert response["campaign_id"] == campaign.id
     end
 
     test "returns 404 for non-existent campaign", %{conn: conn, gamemaster: gm} do

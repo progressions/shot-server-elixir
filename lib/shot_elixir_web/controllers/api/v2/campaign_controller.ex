@@ -216,7 +216,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
       conn
       |> put_view(ShotElixirWeb.Api.V2.CampaignView)
       |> render("current_fight.json",
-        campaign: campaign,
         fight: current_fight_with_associations
       )
     else

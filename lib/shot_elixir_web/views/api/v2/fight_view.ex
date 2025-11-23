@@ -7,7 +7,9 @@ defmodule ShotElixirWeb.Api.V2.FightView do
   end
 
   def render("show.json", %{fight: fight}) do
-    render_fight_detailed(fight)
+    %{
+      fight: render_fight_detailed(fight)
+    }
   end
 
   def render("error.json", %{errors: errors}) do
@@ -21,6 +23,17 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     %{
       success: false,
       errors: %{base: [error]}
+    }
+  end
+
+  def render("error.json", %{changeset: changeset}) do
+    %{
+      errors:
+        Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
+          Enum.reduce(opts, msg, fn {key, value}, acc ->
+            String.replace(acc, "%{#{key}}", to_string(value))
+          end)
+        end)
     }
   end
 
