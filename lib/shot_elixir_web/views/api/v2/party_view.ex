@@ -142,6 +142,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       id: character.id,
       name: character.name,
       image_url: get_image_url(character),
+      category: "character",
       entity_class: "Character"
     }
   end
@@ -150,6 +151,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     %{
       id: vehicle.id,
       name: vehicle.name,
+      category: "vehicle",
       entity_class: "Vehicle"
     }
   end
