@@ -1,7 +1,8 @@
 defmodule ShotElixirWeb.Api.V2.PartyView do
-  def render("index.json", %{parties: parties, meta: meta}) do
+  def render("index.json", %{parties: parties, meta: meta, factions: factions}) do
     %{
       parties: Enum.map(parties, &render_party/1),
+      factions: Enum.map(factions, &render_faction_lite/1),
       meta: meta
     }
   end
@@ -34,6 +35,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       characters: render_characters_if_loaded(party),
       vehicles: render_vehicles_if_loaded(party),
       faction: render_faction_if_loaded(party),
+      juncture: render_juncture_if_loaded(party),
       image_positions: render_image_positions_if_loaded(party),
       entity_class: "Party"
     }
@@ -129,6 +131,14 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     end
   end
 
+  defp render_juncture_if_loaded(party) do
+    case Map.get(party, :juncture) do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      juncture -> render_juncture_lite(juncture)
+    end
+  end
+
   defp render_image_positions_if_loaded(party) do
     case Map.get(party, :image_positions) do
       %Ecto.Association.NotLoaded{} -> []
@@ -142,6 +152,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       id: character.id,
       name: character.name,
       image_url: get_image_url(character),
+      category: "character",
       entity_class: "Character"
     }
   end
@@ -150,6 +161,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     %{
       id: vehicle.id,
       name: vehicle.name,
+      category: "vehicle",
       entity_class: "Vehicle"
     }
   end
@@ -159,6 +171,14 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       id: faction.id,
       name: faction.name,
       entity_class: "Faction"
+    }
+  end
+
+  defp render_juncture_lite(juncture) do
+    %{
+      id: juncture.id,
+      name: juncture.name,
+      entity_class: "Juncture"
     }
   end
 

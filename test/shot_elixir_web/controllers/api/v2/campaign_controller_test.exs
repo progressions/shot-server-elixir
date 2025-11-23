@@ -385,20 +385,22 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
     end
 
     test "returns current fight for campaign", %{conn: conn, gamemaster: gm, campaign: campaign} do
-      # Create a fight for the campaign
+      # Create and start a fight for the campaign
       {:ok, fight} =
         ShotElixir.Fights.create_fight(%{
           name: "Test Fight",
-          campaign_id: campaign.id
+          campaign_id: campaign.id,
+          started_at: DateTime.utc_now()
         })
 
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
       response = json_response(conn, 200)
 
-      assert response["campaign"]["id"] == campaign.id
-      assert response["current_fight"]["id"] == fight.id
-      assert response["current_fight"]["name"] == "Test Fight"
+      # Response is the fight directly, not wrapped
+      assert response["id"] == fight.id
+      assert response["name"] == "Test Fight"
+      assert response["campaign_id"] == campaign.id
     end
 
     test "returns nil when no active fight", %{conn: conn, gamemaster: gm, campaign: campaign} do
@@ -406,8 +408,8 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}/current_fight")
       response = json_response(conn, 200)
 
-      assert response["campaign"]["id"] == campaign.id
-      assert response["current_fight"] == nil
+      # Response is nil directly when no fight
+      assert response == nil
     end
   end
 

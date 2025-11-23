@@ -201,8 +201,8 @@ defmodule ShotElixir.AccountsTest do
       {:ok, updated_user} = Accounts.update_user(user, %{first_name: "UpdatedName"})
 
       # Assert broadcasts were received for both campaigns
-      assert_receive {:rails_message, %{"user" => broadcast_user}}, 1000
-      assert_receive {:rails_message, %{"user" => broadcast_user2}}, 1000
+      assert_receive {:campaign_broadcast, %{"user" => broadcast_user}}, 1000
+      assert_receive {:campaign_broadcast, %{"user" => broadcast_user2}}, 1000
 
       # Verify broadcast includes updated user data
       # The view renders with atom keys, not string keys

@@ -4,6 +4,7 @@ defmodule ShotElixirWeb.Api.V2.AiController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Guardian
+  alias ShotElixir.Workers.{AiCharacterCreationWorker, AiCharacterUpdateWorker}
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -27,13 +28,21 @@ defmodule ShotElixirWeb.Api.V2.AiController do
             description = ai_params["description"]
 
             if description && String.trim(description) != "" do
-              # TODO: Start AI character creation job
-              # AiCharacterCreationJob.perform_later(description, campaign.id)
+              # Enqueue AI character creation job
+              case %{description: description, campaign_id: campaign.id}
+                   |> AiCharacterCreationWorker.new()
+                   |> Oban.insert() do
+                {:ok, _job} ->
+                  # Return immediate response like Rails
+                  conn
+                  |> put_status(:accepted)
+                  |> json(%{message: "Character generation in progress"})
 
-              # For now, return immediate response like Rails
-              conn
-              |> put_status(:accepted)
-              |> json(%{message: "Character generation in progress"})
+                {:error, _changeset} ->
+                  conn
+                  |> put_status(:internal_server_error)
+                  |> json(%{error: "Failed to queue character generation"})
+              end
             else
               conn
               |> put_status(:bad_request)
@@ -76,13 +85,21 @@ defmodule ShotElixirWeb.Api.V2.AiController do
 
               character ->
                 if character.campaign_id == current_user.current_campaign_id do
-                  # TODO: Start AI character update job
-                  # AiCharacterUpdateJob.perform_later(character.id)
+                  # Enqueue AI character update job
+                  case %{character_id: character.id}
+                       |> AiCharacterUpdateWorker.new()
+                       |> Oban.insert() do
+                    {:ok, _job} ->
+                      # Return success response
+                      conn
+                      |> put_status(:accepted)
+                      |> json(%{message: "Character AI update in progress"})
 
-                  # For now, return success response
-                  conn
-                  |> put_status(:accepted)
-                  |> json(%{message: "Character AI update in progress"})
+                    {:error, _changeset} ->
+                      conn
+                      |> put_status(:internal_server_error)
+                      |> json(%{error: "Failed to queue character update"})
+                  end
                 else
                   conn
                   |> put_status(:not_found)

@@ -21,7 +21,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
   end
 
   def render("show.json", %{character: character}) do
-    render_character_full(character)
+    %{
+      character: render_character_full(character)
+    }
   end
 
   def render("autocomplete.json", %{characters: characters}) do
