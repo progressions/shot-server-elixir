@@ -193,8 +193,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           faction: render_faction_if_loaded(character),
           weapon_ids: get_weapon_ids(character),
           schtick_ids: get_schtick_ids(character),
-          # TODO: Implement character effects
-          effects: []
+          effects: render_effects(shot)
         }
     end
   end
@@ -215,9 +214,33 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       image_url: get_image_url(vehicle),
       # TODO: Implement chase relationships
       chase_relationships: [],
-      # TODO: Implement vehicle effects
-      effects: []
+      effects: render_effects(shot)
     }
+  end
+
+  defp render_effects(shot) do
+    case Map.get(shot, :character_effects) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      effects ->
+        Enum.map(effects, fn effect ->
+          %{
+            id: effect.id,
+            name: effect.name,
+            description: effect.description,
+            severity: effect.severity,
+            action_value: effect.action_value,
+            change: effect.change,
+            shot_id: effect.shot_id,
+            character_id: effect.character_id,
+            vehicle_id: effect.vehicle_id
+          }
+        end)
+    end
   end
 
   defp character_sort_key(character) do

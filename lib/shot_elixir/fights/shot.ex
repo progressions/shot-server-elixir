@@ -20,6 +20,8 @@ defmodule ShotElixir.Fights.Shot do
     belongs_to :driver, __MODULE__
     belongs_to :driving, __MODULE__
 
+    has_many :character_effects, ShotElixir.Effects.CharacterEffect
+
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 

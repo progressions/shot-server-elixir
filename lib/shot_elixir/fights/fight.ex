@@ -24,7 +24,8 @@ defmodule ShotElixir.Fights.Fight do
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
 
     has_many :shots, ShotElixir.Fights.Shot
-    has_many :character_effects, ShotElixir.Effects.CharacterEffect
+    has_many :fight_events, ShotElixir.Fights.FightEvent
+    has_many :character_effects, through: [:shots, :character_effects]
     has_many :characters, through: [:shots, :character]
     has_many :vehicles, through: [:shots, :vehicle]
 

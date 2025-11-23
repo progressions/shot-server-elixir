@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
   alias ShotElixir.Guardian
   alias ShotElixir.Repo
   alias ShotElixir.Services.CombatActionService
+  alias ShotElixir.Services.{BoostService, UpCheckService, ChaseActionService}
   alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
@@ -39,6 +40,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       shots: [
                         :character,
                         :vehicle,
+                        :character_effects,
                         character: [:faction, :character_schticks, :carries],
                         vehicle: [:faction]
                       ]
@@ -99,33 +101,49 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   # Process the action
                   case Fights.act_shot(shot, shot_cost) do
                     {:ok, _updated_shot} ->
-                      # TODO: Create fight event for the movement
-                      # fight.fight_events.create!(...)
+                      # Create fight event for the movement
+                      case Fights.create_fight_event(%{
+                             "fight_id" => fight.id,
+                             "event_type" => "movement",
+                             "description" => "#{entity_name} spent #{shot_cost} shot(s)",
+                             "details" => %{
+                               "shot_cost" => shot_cost,
+                               "shot_id" => shot.id,
+                               "entity_name" => entity_name
+                             }
+                           }) do
+                        {:ok, _event} ->
+                          Logger.info(
+                            "#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}"
+                          )
 
-                      Logger.info(
-                        "#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}"
-                      )
+                          # Return updated encounter with all associations
+                          fight_with_associations =
+                            ShotElixir.Repo.preload(fight,
+                              shots: [
+                                :character,
+                                :vehicle,
+                                :character_effects,
+                                character: [:faction, :character_schticks, :carries],
+                                vehicle: [:faction]
+                              ]
+                            )
 
-                      # Return updated encounter with all associations
-                      fight_with_associations =
-                        ShotElixir.Repo.preload(fight,
-                          shots: [
-                            :character,
-                            :vehicle,
-                            character: [:faction, :character_schticks, :carries],
-                            vehicle: [:faction]
-                          ]
-                        )
+                          # Broadcast encounter update to all connected clients
+                          CampaignChannel.broadcast_encounter_update(
+                            fight.campaign_id,
+                            fight_with_associations
+                          )
 
-                      # Broadcast encounter update to all connected clients
-                      CampaignChannel.broadcast_encounter_update(
-                        fight.campaign_id,
-                        fight_with_associations
-                      )
+                          conn
+                          |> put_view(ShotElixirWeb.Api.V2.EncounterView)
+                          |> render("show.json", encounter: fight_with_associations)
 
-                      conn
-                      |> put_view(ShotElixirWeb.Api.V2.EncounterView)
-                      |> render("show.json", encounter: fight_with_associations)
+                        {:error, changeset} ->
+                          conn
+                          |> put_status(:bad_request)
+                          |> json(%{errors: translate_errors(changeset)})
+                      end
 
                     {:error, changeset} ->
                       conn
@@ -218,6 +236,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                       shots: [
                         :character,
                         :vehicle,
+                        :character_effects,
                         character: [:faction, :character_schticks, :carries],
                         vehicle: [:faction]
                       ]
@@ -279,13 +298,27 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 case params["action_type"] do
                   "boost" ->
                     Logger.info("💪 BOOST ACTION: Processing boost for fight #{fight.id}")
-                    # TODO: Implement BoostService.apply_boost
-                    fight
+
+                    case BoostService.apply_boost(fight, params) do
+                      {:ok, updated_fight} ->
+                        updated_fight
+
+                      {:error, reason} ->
+                        Logger.error("Boost action failed: #{inspect(reason)}")
+                        raise "Boost action failed: #{inspect(reason)}"
+                    end
 
                   "up_check" ->
                     Logger.info("🎲 UP CHECK ACTION: Processing Up Check for fight #{fight.id}")
-                    # TODO: Implement UpCheckService.apply_up_check
-                    fight
+
+                    case UpCheckService.apply_up_check(fight, params) do
+                      {:ok, updated_fight} ->
+                        updated_fight
+
+                      {:error, reason} ->
+                        Logger.error("Up check failed: #{inspect(reason)}")
+                        raise "Up check failed: #{inspect(reason)}"
+                    end
 
                   _ ->
                     character_updates = params["character_updates"] || []
@@ -311,6 +344,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   shots: [
                     :character,
                     :vehicle,
+                    :character_effects,
                     character: [:faction, :character_schticks, :carries],
                     vehicle: [:faction]
                   ]
@@ -367,8 +401,15 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 "🏎️ CHASE ACTION: Applying #{length(vehicle_updates)} vehicle updates to fight #{fight.id}"
               )
 
-              # TODO: Implement ChaseActionService.apply_chase_action
-              result = fight
+              result =
+                case ChaseActionService.apply_chase_action(fight, vehicle_updates) do
+                  {:ok, updated_fight} ->
+                    updated_fight
+
+                  {:error, reason} ->
+                    Logger.error("Chase action failed: #{inspect(reason)}")
+                    raise "Chase action failed: #{inspect(reason)}"
+                end
 
               # Return updated encounter with all associations
               fight_with_associations =
@@ -376,6 +417,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   shots: [
                     :character,
                     :vehicle,
+                    :character_effects,
                     character: [:faction, :character_schticks, :carries],
                     vehicle: [:faction]
                   ]

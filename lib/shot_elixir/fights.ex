@@ -5,7 +5,7 @@ defmodule ShotElixir.Fights do
 
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
-  alias ShotElixir.Fights.{Fight, Shot}
+  alias ShotElixir.Fights.{Fight, Shot, FightEvent}
   alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
@@ -563,6 +563,23 @@ defmodule ShotElixir.Fights do
     |> broadcast_result(:update, &Repo.preload(&1, fight_broadcast_preloads()))
   end
 
+  def create_fight_event(attrs, opts \\ []) do
+    %FightEvent{}
+    |> FightEvent.changeset(attrs)
+    |> Repo.insert()
+    |> case do
+      {:ok, fight_event} = result ->
+        if Keyword.get(opts, :broadcast, true) do
+          broadcast_fight_update(fight_event.fight_id)
+        end
+
+        result
+
+      error ->
+        error
+    end
+  end
+
   # Shot management
   def create_shot(attrs \\ %{}) do
     %Shot{}
@@ -707,6 +724,7 @@ defmodule ShotElixir.Fights do
       shots: [
         :character,
         :vehicle,
+        :character_effects,
         character: [:faction, :character_schticks, :carries],
         vehicle: [:faction]
       ]
