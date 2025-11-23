@@ -30,7 +30,11 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
             conn
             |> put_view(ShotElixirWeb.Api.V2.PartyView)
-            |> render("index.json", parties: result.parties, meta: result.meta)
+            |> render("index.json",
+              parties: result.parties,
+              meta: result.meta,
+              factions: result.factions
+            )
           else
             conn
             |> put_status(:forbidden)
