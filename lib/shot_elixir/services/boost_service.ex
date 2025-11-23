@@ -89,25 +89,24 @@ defmodule ShotElixir.Services.BoostService do
 
         # Create Event
 
-        case Fights.create_fight_event(%{
-               "fight_id" => fight.id,
-               "event_type" => "boost",
-               "description" =>
-                 "#{booster.name} boosted #{target.name}'s #{boost_type} (+#{boost_value})",
-               "details" => %{
-                 "booster_id" => booster.id,
-                 "target_id" => target.id,
-                 "boost_type" => boost_type,
-                 "boost_value" => boost_value,
-                 "fortune_used" => can_use_fortune
-               }
-             }) do
+        case Fights.create_fight_event(
+               %{
+                 "fight_id" => fight.id,
+                 "event_type" => "boost",
+                 "description" =>
+                   "#{booster.name} boosted #{target.name}'s #{boost_type} (+#{boost_value})",
+                 "details" => %{
+                   "booster_id" => booster.id,
+                   "target_id" => target.id,
+                   "boost_type" => boost_type,
+                   "boost_value" => boost_value,
+                   "fortune_used" => can_use_fortune
+                 }
+               },
+               broadcast: false
+             ) do
           {:ok, _} ->
-            # Touch fight
-
-            {:ok, updated_fight} = Fights.touch_fight(fight)
-
-            updated_fight
+            fight
 
           {:error, reason} ->
             Repo.rollback(reason)
@@ -117,6 +116,10 @@ defmodule ShotElixir.Services.BoostService do
         nil -> Repo.rollback("Missing parameters or resources")
       end
     end)
+    |> case do
+      {:ok, fight} -> Fights.touch_fight(fight)
+      error -> error
+    end
   end
 
   defp get_shot_by_character(fight, character_id) do

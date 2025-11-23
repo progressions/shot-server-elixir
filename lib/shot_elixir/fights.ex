@@ -563,13 +563,16 @@ defmodule ShotElixir.Fights do
     |> broadcast_result(:update, &Repo.preload(&1, fight_broadcast_preloads()))
   end
 
-  def create_fight_event(attrs \\ %{}) do
+  def create_fight_event(attrs, opts \\ []) do
     %FightEvent{}
     |> FightEvent.changeset(attrs)
     |> Repo.insert()
     |> case do
       {:ok, fight_event} = result ->
-        broadcast_fight_update(fight_event.fight_id)
+        if Keyword.get(opts, :broadcast, true) do
+          broadcast_fight_update(fight_event.fight_id)
+        end
+
         result
 
       error ->

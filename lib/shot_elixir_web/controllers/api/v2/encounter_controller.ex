@@ -102,42 +102,48 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   case Fights.act_shot(shot, shot_cost) do
                     {:ok, _updated_shot} ->
                       # Create fight event for the movement
-                      Fights.create_fight_event(%{
-                        "fight_id" => fight.id,
-                        "event_type" => "movement",
-                        "description" => "#{entity_name} spent #{shot_cost} shot(s)",
-                        "details" => %{
-                          "shot_cost" => shot_cost,
-                          "shot_id" => shot.id,
-                          "entity_name" => entity_name
-                        }
-                      })
+                      case Fights.create_fight_event(%{
+                             "fight_id" => fight.id,
+                             "event_type" => "movement",
+                             "description" => "#{entity_name} spent #{shot_cost} shot(s)",
+                             "details" => %{
+                               "shot_cost" => shot_cost,
+                               "shot_id" => shot.id,
+                               "entity_name" => entity_name
+                             }
+                           }) do
+                        {:ok, _event} ->
+                          Logger.info(
+                            "#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}"
+                          )
 
-                      Logger.info(
-                        "#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}"
-                      )
+                          # Return updated encounter with all associations
+                          fight_with_associations =
+                            ShotElixir.Repo.preload(fight,
+                              shots: [
+                                :character,
+                                :vehicle,
+                                :character_effects,
+                                character: [:faction, :character_schticks, :carries],
+                                vehicle: [:faction]
+                              ]
+                            )
 
-                      # Return updated encounter with all associations
-                      fight_with_associations =
-                        ShotElixir.Repo.preload(fight,
-                          shots: [
-                            :character,
-                            :vehicle,
-                            :character_effects,
-                            character: [:faction, :character_schticks, :carries],
-                            vehicle: [:faction]
-                          ]
-                        )
+                          # Broadcast encounter update to all connected clients
+                          CampaignChannel.broadcast_encounter_update(
+                            fight.campaign_id,
+                            fight_with_associations
+                          )
 
-                      # Broadcast encounter update to all connected clients
-                      CampaignChannel.broadcast_encounter_update(
-                        fight.campaign_id,
-                        fight_with_associations
-                      )
+                          conn
+                          |> put_view(ShotElixirWeb.Api.V2.EncounterView)
+                          |> render("show.json", encounter: fight_with_associations)
 
-                      conn
-                      |> put_view(ShotElixirWeb.Api.V2.EncounterView)
-                      |> render("show.json", encounter: fight_with_associations)
+                        {:error, changeset} ->
+                          conn
+                          |> put_status(:bad_request)
+                          |> json(%{errors: translate_errors(changeset)})
+                      end
 
                     {:error, changeset} ->
                       conn
