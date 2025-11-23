@@ -17,8 +17,6 @@ defmodule ShotElixir.Services.AiService do
   alias ShotElixir.Fights
   alias ShotElixir.Campaigns
 
-  @max_prompt_length 1024
-
   @doc """
   Generates a new character using AI based on a description.
 
@@ -364,7 +362,7 @@ defmodule ShotElixir.Services.AiService do
             do_send_request_with_retry(prompt, new_max_tokens, max_retries, retry_count + 1)
 
           {:error, reason} ->
-            {:error, "Failed after #{retry_count} retries: #{inspect(reason)}"}
+            {:error, "Failed after #{retry_count + 1} attempts: #{inspect(reason)}"}
         end
 
       {:error, reason} ->
@@ -372,7 +370,7 @@ defmodule ShotElixir.Services.AiService do
           "AI request failed (#{retry_count + 1}/#{max_retries}): #{inspect(reason)}"
         )
 
-        {:error, "Failed after #{retry_count} retries: #{inspect(reason)}"}
+        {:error, "Failed after #{retry_count + 1} attempts: #{inspect(reason)}"}
     end
   end
 
