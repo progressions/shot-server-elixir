@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
   alias ShotElixir.Guardian
   alias ShotElixir.Repo
   alias ShotElixir.Services.CombatActionService
+  alias ShotElixir.Services.{BoostService, UpCheckService, ChaseActionService}
   alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
@@ -99,8 +100,17 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                   # Process the action
                   case Fights.act_shot(shot, shot_cost) do
                     {:ok, _updated_shot} ->
-                      # TODO: Create fight event for the movement
-                      # fight.fight_events.create!(...)
+                      # Create fight event for the movement
+                      Fights.create_fight_event(%{
+                        "fight_id" => fight.id,
+                        "event_type" => "movement",
+                        "description" => "#{entity_name} spent #{shot_cost} shot(s)",
+                        "details" => %{
+                          "shot_cost" => shot_cost,
+                          "shot_id" => shot.id,
+                          "entity_name" => entity_name
+                        }
+                      })
 
                       Logger.info(
                         "#{entity_name} spent #{shot_cost} shot(s) in fight #{fight.id}"
@@ -279,13 +289,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 case params["action_type"] do
                   "boost" ->
                     Logger.info("💪 BOOST ACTION: Processing boost for fight #{fight.id}")
-                    # TODO: Implement BoostService.apply_boost
-                    fight
+                    BoostService.apply_boost(fight, params)
 
                   "up_check" ->
                     Logger.info("🎲 UP CHECK ACTION: Processing Up Check for fight #{fight.id}")
-                    # TODO: Implement UpCheckService.apply_up_check
-                    fight
+                    UpCheckService.apply_up_check(fight, params)
 
                   _ ->
                     character_updates = params["character_updates"] || []
@@ -367,8 +375,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 "🏎️ CHASE ACTION: Applying #{length(vehicle_updates)} vehicle updates to fight #{fight.id}"
               )
 
-              # TODO: Implement ChaseActionService.apply_chase_action
-              result = fight
+              result = ChaseActionService.apply_chase_action(fight, vehicle_updates)
 
               # Return updated encounter with all associations
               fight_with_associations =
