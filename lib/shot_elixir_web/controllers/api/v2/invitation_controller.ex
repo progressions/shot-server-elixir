@@ -180,8 +180,9 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
         else
           case Invitations.redeem_invitation(invitation, current_user.id) do
             {:ok, campaign} ->
-              # TODO: Broadcast update for real-time UI updates
-              # BroadcastCampaignUpdateJob.perform_later("Campaign", campaign.id)
+              # Broadcast campaign update for real-time UI updates
+              ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign.id, "Campaign")
+
               conn
               |> put_status(:created)
               |> render("redeem.json", %{
