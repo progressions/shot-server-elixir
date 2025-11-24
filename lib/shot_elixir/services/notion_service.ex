@@ -193,8 +193,6 @@ defmodule ShotElixir.Services.NotionService do
   def add_image_to_notion(%Character{image_url: nil}), do: nil
 
   def add_image_to_notion(%Character{} = character) do
-    return(unless(character.image_url))
-
     child = %{
       "object" => "block",
       "type" => "image",
