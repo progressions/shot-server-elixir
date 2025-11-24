@@ -83,9 +83,16 @@ config :shot_elixir, Oban,
   queues: [
     default: 10,
     emails: 20,
-    high_priority: 5
+    high_priority: 5,
+    notion: 3
   ],
   plugins: [Oban.Plugins.Pruner]
+
+# Notion API configuration
+config :shot_elixir, :notion,
+  token: System.get_env("NOTION_TOKEN"),
+  database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
+  factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

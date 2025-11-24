@@ -5,6 +5,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
   alias ShotElixir.Guardian
+  alias ShotElixir.Workers.SyncCharacterToNotionWorker
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -164,6 +165,12 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     case Characters.update_character(character, parsed_params) do
       {:ok, final_character} ->
         # Broadcasting now happens automatically in Characters context
+
+        # Queue Notion sync
+        %{"character_id" => final_character.id}
+        |> SyncCharacterToNotionWorker.new()
+        |> Oban.insert()
+
         conn
         |> put_view(ShotElixirWeb.Api.V2.CharacterView)
         |> render("show.json", character: final_character)
@@ -197,6 +204,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user),
          {:ok, new_character} <- Characters.duplicate_character(character, current_user) do
+      # Queue Notion sync
+      %{"character_id" => new_character.id}
+      |> SyncCharacterToNotionWorker.new()
+      |> Oban.insert()
+
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
