@@ -196,18 +196,11 @@ defmodule ShotElixir.Fights do
     # Get seasons - only from actual results to match Rails behavior
     # When filter returns no results, seasons should be empty
     seasons =
-      if Enum.empty?(fights) do
-        []
-      else
-        from(f in Fight,
-          where: f.campaign_id == ^campaign_id and f.active == true,
-          select: f.season,
-          distinct: true
-        )
-        |> Repo.all()
-        |> Enum.reject(&is_nil/1)
-        |> Enum.sort()
-      end
+      fights
+      |> Enum.map(& &1.season)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.sort()
 
     # Load image URLs for all fights efficiently
     fights_with_images = ImageLoader.load_image_urls(fights, "Fight")
