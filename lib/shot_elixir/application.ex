@@ -21,10 +21,12 @@ defmodule ShotElixir.Application do
       ShotElixirWeb.Presence,
       # Cachex for image URL caching
       {Cachex, name: :image_cache},
-      # Redis connection for presence tracking
-      {Redix, name: :redix, host: "localhost", port: 6379},
       # Finch HTTP client for Swoosh email delivery
       {Finch, name: Swoosh.Finch},
+      # Discord bot consumer
+      ShotElixir.Discord.Consumer,
+      # Discord current fight Agent
+      ShotElixir.Discord.CurrentFight,
       # Start a worker by calling: ShotElixir.Worker.start_link(arg)
       # {ShotElixir.Worker, arg},
       # Start to serve requests, typically the last entry

@@ -20,6 +20,11 @@ if System.get_env("PHX_SERVER") do
   config :shot_elixir, ShotElixirWeb.Endpoint, server: true
 end
 
+# Discord bot configuration - loaded from environment variables
+if discord_token = System.get_env("DISCORD_TOKEN") do
+  config :nostrum, token: discord_token
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

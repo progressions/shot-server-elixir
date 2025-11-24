@@ -83,3 +83,5 @@ config :shot_elixir, :mailer_url_options,
   scheme: "http",
   host: "localhost",
   port: 3001
+
+# Discord bot credentials are loaded from runtime.exs using environment variables

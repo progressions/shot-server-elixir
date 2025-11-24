@@ -67,9 +67,6 @@ defmodule ShotElixir.MixProject do
       # Image processing (optional)
       {:image, "~> 0.54"},
 
-      # Redis for presence tracking
-      {:redix, "~> 1.5"},
-
       # Email functionality
       {:swoosh, "~> 1.16"},
       {:phoenix_swoosh, "~> 1.2"},
@@ -79,7 +76,10 @@ defmodule ShotElixir.MixProject do
       {:multipart, "~> 0.4"},
 
       # Background jobs for email delivery
-      {:oban, "~> 2.17"}
+      {:oban, "~> 2.17"},
+
+      # Discord bot integration
+      {:nostrum, "~> 0.10"}
     ]
   end
 
