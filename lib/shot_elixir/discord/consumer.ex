@@ -4,16 +4,12 @@ defmodule ShotElixir.Discord.Consumer do
   """
   use Nostrum.Consumer
 
-  alias Nostrum.Api
-  alias ShotElixir.Fights
   alias ShotElixir.Discord.Commands
-  alias ShotElixir.Discord.FightPoster
-  alias ShotElixir.Workers.DiscordNotificationWorker
 
   require Logger
 
   @doc """
-  Handles interaction create events (slash commands).
+  Handles Discord events (interactions, ready, etc.).
   """
   def handle_event({:INTERACTION_CREATE, interaction, _ws_state}) do
     case interaction.data.name do
@@ -27,17 +23,11 @@ defmodule ShotElixir.Discord.Consumer do
     end
   end
 
-  @doc """
-  Handle READY event to log bot start.
-  """
   def handle_event({:READY, %{user: user}, _ws_state}) do
     Logger.info("DISCORD: Bot logged in as #{user.username}##{user.discriminator}")
     :ok
   end
 
-  @doc """
-  Catch-all for other events.
-  """
   def handle_event(_event) do
     :noop
   end

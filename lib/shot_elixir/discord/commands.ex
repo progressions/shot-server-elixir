@@ -3,8 +3,8 @@ defmodule ShotElixir.Discord.Commands do
   Handles Discord slash command interactions.
   """
   alias Nostrum.Api
-  alias ShotElixir.{Fights, Campaigns, Repo}
-  alias ShotElixir.Discord.{FightPoster, CurrentFight}
+  alias ShotElixir.{Fights, Campaigns}
+  alias ShotElixir.Discord.CurrentFight
   alias ShotElixir.Workers.DiscordNotificationWorker
   alias ShotElixir.Services.DiceRoller
 
@@ -20,7 +20,7 @@ defmodule ShotElixir.Discord.Commands do
 
     unless channel_id do
       respond(interaction, "Error: Discord channel ID is missing.", ephemeral: true)
-      return(:ok)
+      :ok
     end
 
     case get_campaign(server_id) do
@@ -67,7 +67,7 @@ defmodule ShotElixir.Discord.Commands do
 
     unless channel_id do
       respond(interaction, "Error: Discord channel ID is missing.", ephemeral: true)
-      return(:ok)
+      :ok
     end
 
     case CurrentFight.get(server_id) do
@@ -180,10 +180,10 @@ defmodule ShotElixir.Discord.Commands do
     end
   end
 
-  defp get_campaign(server_id) do
+  defp get_campaign(_server_id) do
     # In Rails, this uses CurrentCampaign.get(server_id: server_id)
     # For now, we'll get the first active campaign - you may need to implement
-    # a Redis-based CurrentCampaign service similar to CurrentFight
+    # an Agent-based CurrentCampaign service similar to CurrentFight
     Campaigns.list_campaigns()
     |> Enum.find(& &1.active)
   end

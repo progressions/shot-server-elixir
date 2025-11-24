@@ -18,40 +18,40 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
     # Check if fight has Discord info
     unless fight.server_id && fight.channel_id do
       Logger.info("DISCORD: Fight #{fight_id} has no Discord info, skipping notification")
-      return(:ok)
-    end
+      {:ok, :skipped}
+    else
+      # Generate fight content
+      content = FightPoster.shots(fight_id)
+      {message_content, embed} = build_message_params(content)
 
-    # Generate fight content
-    content = FightPoster.shots(fight_id)
-    {message_content, embed} = build_message_params(content)
+      # Try to edit existing message or send new one
+      result =
+        if fight.fight_message_id do
+          case Api.edit_message(fight.channel_id, fight.fight_message_id,
+                 content: message_content,
+                 embeds: [embed]
+               ) do
+            {:ok, _message} ->
+              Logger.info(
+                "DISCORD: Updated message #{fight.fight_message_id} for fight #{fight_id}"
+              )
 
-    # Try to edit existing message or send new one
-    result =
-      if fight.fight_message_id do
-        case Api.edit_message(fight.channel_id, fight.fight_message_id,
-               content: message_content,
-               embeds: [embed]
-             ) do
-          {:ok, _message} ->
-            Logger.info(
-              "DISCORD: Updated message #{fight.fight_message_id} for fight #{fight_id}"
-            )
+              :ok
 
-            :ok
+            {:error, %{status_code: 404}} ->
+              # Message not found, send new one
+              send_new_message(fight, message_content, embed)
 
-          {:error, %{status_code: 404}} ->
-            # Message not found, send new one
-            send_new_message(fight, message_content, embed)
-
-          {:error, reason} ->
-            Logger.error("DISCORD: Failed to edit message: #{inspect(reason)}")
-            send_new_message(fight, message_content, embed)
+            {:error, reason} ->
+              Logger.error("DISCORD: Failed to edit message: #{inspect(reason)}")
+              send_new_message(fight, message_content, embed)
+          end
+        else
+          send_new_message(fight, message_content, embed)
         end
-      else
-        send_new_message(fight, message_content, embed)
-      end
 
-    result
+      result
+    end
   end
 
   defp send_new_message(fight, message_content, embed) do
@@ -98,7 +98,7 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
 
   defp build_fields("", acc), do: Enum.reverse(acc)
 
-  defp build_fields(remaining, acc) when length(acc) >= 25 do
+  defp build_fields(_remaining, acc) when length(acc) >= 25 do
     # Discord limit: 25 fields per embed
     truncated_field = %{
       name: "Truncated",

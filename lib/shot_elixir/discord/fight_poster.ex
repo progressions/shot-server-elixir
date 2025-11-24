@@ -42,7 +42,7 @@ defmodule ShotElixir.Discord.FightPoster do
     |> String.trim()
   end
 
-  defp active_effects_section(fight) do
+  defp active_effects_section(_fight) do
     # TODO: Implement active effects display
     # This would require loading fight effects and filtering by sequence/shot
     ""
@@ -128,7 +128,7 @@ defmodule ShotElixir.Discord.FightPoster do
     |> Enum.join(" | ")
   end
 
-  defp latest_event(fight) do
+  defp latest_event(_fight) do
     # TODO: Load and display the latest fight event
     ""
   end
