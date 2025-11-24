@@ -1115,7 +1115,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       response = json_response(conn, 200)
 
       fight_data = List.first(response["fights"])
-      assert Map.keys(fight_data) == ["entity_class", "id", "name"]
+      assert Map.keys(fight_data) == ["entity_class", "id", "image_url", "name"]
       assert fight_data["id"] == fight.id
       assert fight_data["name"] == "Test Fight"
       assert fight_data["entity_class"] == "Fight"
@@ -1152,7 +1152,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       response = json_response(conn, 200)
       fight_data = List.first(response["fights"])
 
-      assert Enum.sort(Map.keys(fight_data)) == ["entity_class", "id", "name"]
+      assert Enum.sort(Map.keys(fight_data)) == ["entity_class", "id", "image_url", "name"]
     end
   end
 end

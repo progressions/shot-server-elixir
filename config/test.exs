@@ -38,3 +38,6 @@ config :shot_elixir, :mailer_url_options,
 
 # Disable Oban queues in test mode
 config :shot_elixir, Oban, testing: :inline
+
+# Disable Nostrum Discord bot in test mode
+config :nostrum, :token, nil

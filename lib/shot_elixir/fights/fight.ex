@@ -25,6 +25,7 @@ defmodule ShotElixir.Fights.Fight do
 
     has_many :shots, ShotElixir.Fights.Shot
     has_many :fight_events, ShotElixir.Fights.FightEvent
+    has_many :effects, ShotElixir.Effects.Effect
     has_many :character_effects, through: [:shots, :character_effects]
     has_many :characters, through: [:shots, :character]
     has_many :vehicles, through: [:shots, :vehicle]
