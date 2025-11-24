@@ -273,7 +273,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
-  def import(conn, _params) do
+  def import(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
     campaign_id = current_user.current_campaign_id
 
@@ -282,10 +282,82 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> put_status(:bad_request)
       |> json(%{error: "No current campaign set"})
     else
-      # TODO: Implement PDF import
-      conn
-      |> put_status(:not_implemented)
-      |> json(%{error: "PDF import not yet implemented"})
+      # Handle PDF upload
+      case params["pdf_file"] do
+        %Plug.Upload{} = upload ->
+          campaign = ShotElixir.Campaigns.get_campaign(campaign_id)
+
+          case ShotElixir.Services.PdfService.pdf_to_character(upload, campaign, current_user) do
+            {:ok, character_attrs, weapons, schticks} ->
+              # Create character with attributes from PDF
+              case Characters.create_character(character_attrs) do
+                {:ok, character} ->
+                  # Associate weapons with character
+                  if Enum.any?(weapons) do
+                    now = DateTime.utc_now()
+                    weapon_records =
+                      Enum.map(weapons, fn weapon ->
+                        %{
+                          character_id: Ecto.UUID.dump!(character.id),
+                          weapon_id: Ecto.UUID.dump!(weapon.id),
+                          created_at: now,
+                          updated_at: now
+                        }
+                      end)
+
+                    ShotElixir.Repo.insert_all(
+                      "character_weapons",
+                      weapon_records,
+                      on_conflict: :nothing
+                    )
+                  end
+
+                  # Associate schticks with character
+                  if Enum.any?(schticks) do
+                    now = DateTime.utc_now()
+                    schtick_records =
+                      Enum.map(schticks, fn schtick ->
+                        %{
+                          character_id: Ecto.UUID.dump!(character.id),
+                          schtick_id: Ecto.UUID.dump!(schtick.id),
+                          created_at: now,
+                          updated_at: now
+                        }
+                      end)
+
+                    ShotElixir.Repo.insert_all(
+                      "character_schticks",
+                      schtick_records,
+                      on_conflict: :nothing
+                    )
+                  end
+
+                  # Reload character with associations
+                  character = Characters.get_character(character.id)
+
+                  conn
+                  |> put_status(:created)
+                  |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                  |> render("show.json", character: character)
+
+                {:error, %Ecto.Changeset{} = changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                  |> render("error.json", changeset: changeset)
+              end
+
+            {:error, reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "PDF import failed: #{reason}"})
+          end
+
+        _ ->
+          conn
+          |> put_status(:bad_request)
+          |> json(%{error: "No PDF file provided"})
+      end
     end
   end
 

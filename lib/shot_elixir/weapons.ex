@@ -92,6 +92,10 @@ defmodule ShotElixir.Weapons do
     |> ImageLoader.load_image_url("Weapon")
   end
 
+  def get_weapon_by_name(campaign_id, name) do
+    Repo.get_by(Weapon, campaign_id: campaign_id, name: name)
+  end
+
   def create_weapon(attrs \\ %{}) do
     %Weapon{}
     |> Weapon.changeset(attrs)

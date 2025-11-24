@@ -311,4 +311,8 @@ defmodule ShotElixir.Junctures do
     |> Repo.update()
     |> broadcast_result(:delete)
   end
+
+  def get_juncture_by_name(campaign_id, name) do
+    Repo.get_by(Juncture, campaign_id: campaign_id, name: name)
+  end
 end
