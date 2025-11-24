@@ -83,3 +83,7 @@ config :shot_elixir, :mailer_url_options,
   scheme: "http",
   host: "localhost",
   port: 3001
+
+# Discord bot credentials for development
+config :nostrum,
+  token: "MTA1NjAyNDk2OTk3ODU4MTAwMw.G7Kgmi.T810KB-HySaeGREiqtzQZfgSN7cvbf7qzY_08o"

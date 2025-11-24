@@ -90,8 +90,9 @@ config :shot_elixir, Oban,
   plugins: [Oban.Plugins.Pruner]
 
 # Discord configuration
+# Token can be set via DISCORD_BOT_TOKEN env var or overridden in dev.exs/prod.exs
 config :nostrum,
-  token: System.get_env("DISCORD_BOT_TOKEN"),
+  token: System.get_env("DISCORD_BOT_TOKEN") || "",
   gateway_intents: [:guilds, :guild_messages, :message_content]
 
 # Notion API configuration
