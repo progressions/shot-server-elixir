@@ -222,7 +222,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
-  def pdf(conn, %{"id" => id}) do
+  def pdf(conn, %{"character_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
     case Characters.get_character(id) do
