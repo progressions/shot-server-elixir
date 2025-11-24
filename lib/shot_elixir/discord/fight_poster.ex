@@ -60,8 +60,10 @@ defmodule ShotElixir.Discord.FightPoster do
   end
 
   defp format_shot_character(%Shot{character: %Character{} = char}) when not is_nil(char) do
+    player_info = if Map.get(char, :player_name), do: "(#{Map.get(char, :player_name)})", else: ""
+
     """
-    **#{char.name}** #{if char.player_name, do: "(#{char.player_name})", else: ""}
+    **#{char.name}** #{player_info}
     #{action_values_line(char)}
     #{wounds_line(char)}
     """
