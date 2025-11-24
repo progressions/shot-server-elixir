@@ -87,6 +87,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     %{
       id: fight.id,
       name: fight.name,
+      image_url: get_image_url(fight),
       entity_class: "Fight"
     }
   end
