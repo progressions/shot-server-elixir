@@ -225,15 +225,43 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   def pdf(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %Character{} = character <- Characters.get_character(id),
-         :ok <- authorize_character_access(character, current_user) do
-      # TODO: Implement PDF generation
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-      |> render("pdf.json", character: character, url: nil)
-    else
-      nil -> {:error, :not_found}
-      {:error, reason} -> {:error, reason}
+    case Characters.get_character(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Character not found"})
+
+      character ->
+        # Check authorization
+        case authorize_character_access(character, current_user) do
+          :ok ->
+            # Generate PDF
+            case ShotElixir.Services.PdfService.character_to_pdf(character) do
+              {:ok, temp_path} ->
+                filename =
+                  "#{character.name |> String.downcase() |> String.replace(" ", "_")}_character_sheet.pdf"
+
+                conn
+                |> put_resp_content_type("application/pdf")
+                |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
+                |> send_file(200, temp_path)
+                |> then(fn conn ->
+                  # Clean up temp file after sending
+                  File.rm(temp_path)
+                  conn
+                end)
+
+              {:error, reason} ->
+                conn
+                |> put_status(:internal_server_error)
+                |> json(%{error: "Failed to generate PDF: #{reason}"})
+            end
+
+          {:error, :forbidden} ->
+            conn
+            |> put_status(:forbidden)
+            |> json(%{error: "You don't have permission to access this character"})
+        end
     end
   end
 
