@@ -183,7 +183,7 @@ defmodule ShotElixir.Discord.Commands do
 
     messages = [
       "Rolling swerve#{if username, do: " for #{username}", else: ""}",
-      DiceRoller.discord_format(swerve)
+      DiceRoller.discord_format(swerve, username)
     ]
 
     respond(interaction, Enum.join(messages, "\n"))
@@ -208,7 +208,7 @@ defmodule ShotElixir.Discord.Commands do
                  Calendar.strftime(swerve.rolled_at, "%Y-%m-%d %l:%M %p")
                end
 
-             message = DiceRoller.discord_format(swerve)
+             message = DiceRoller.discord_format(swerve, username)
              [if(rolled_at, do: "Rolled on #{rolled_at}", else: nil), message]
            end))
         |> Enum.reject(&is_nil/1)
