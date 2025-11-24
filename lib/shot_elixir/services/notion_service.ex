@@ -20,28 +20,28 @@ defmodule ShotElixir.Services.NotionService do
   """
   def sync_character(%Character{} = character) do
     # Only sync in production
-    unless Application.get_env(:shot_elixir, :env) == :prod do
+    if Application.get_env(:shot_elixir, :env) != :prod do
       {:ok, :skipped_non_production}
-    end
+    else
+      character = Repo.preload(character, :faction)
 
-    character = Repo.preload(character, :faction)
+      result =
+        if character.notion_page_id do
+          update_notion_from_character(character)
+        else
+          create_notion_from_character(character)
+        end
 
-    result =
-      if character.notion_page_id do
-        update_notion_from_character(character)
-      else
-        create_notion_from_character(character)
+      case result do
+        {:ok, _} ->
+          Characters.update_character(character, %{
+            last_synced_to_notion_at: DateTime.utc_now()
+          })
+
+        {:error, _reason} ->
+          # Silent failure matching Rails behavior
+          {:ok, :failed_silently}
       end
-
-    case result do
-      {:ok, _} ->
-        Characters.update_character(character, %{
-          last_synced_to_notion_at: DateTime.utc_now()
-        })
-
-      {:error, _reason} ->
-        # Silent failure matching Rails behavior
-        {:ok, :failed_silently}
     end
   rescue
     _ -> {:ok, :failed_silently}
@@ -67,10 +67,11 @@ defmodule ShotElixir.Services.NotionService do
       })
 
     # Update character with notion_page_id
-    Characters.update_character(character, %{notion_page_id: page["id"]})
+    {:ok, updated_character} =
+      Characters.update_character(character, %{notion_page_id: page["id"]})
 
     # Add image if present
-    add_image_to_notion(character)
+    add_image_to_notion(updated_character)
 
     {:ok, page}
   rescue

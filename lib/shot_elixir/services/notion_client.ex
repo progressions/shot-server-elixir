@@ -10,6 +10,10 @@ defmodule ShotElixir.Services.NotionClient do
   def client do
     token = Application.get_env(:shot_elixir, :notion)[:token]
 
+    unless token do
+      raise "NOTION_TOKEN environment variable is not set"
+    end
+
     Req.new(
       base_url: @base_url,
       headers: [
