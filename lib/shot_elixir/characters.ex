@@ -369,13 +369,16 @@ defmodule ShotElixir.Characters do
   end
 
   def duplicate_character(%Character{} = character, user) do
+    # Generate unique name for the duplicate
+    unique_name = generate_unique_name(character.name, character.campaign_id)
+
     attrs =
       Map.from_struct(character)
       |> Map.delete(:id)
       |> Map.delete(:__meta__)
       |> Map.delete(:created_at)
       |> Map.delete(:updated_at)
-      |> Map.put(:name, "#{character.name} (Copy)")
+      |> Map.put(:name, unique_name)
       |> Map.put(:user_id, user.id)
 
     create_character(attrs)
@@ -437,5 +440,50 @@ defmodule ShotElixir.Characters do
   """
   def delete_advancement(%Advancement{} = advancement) do
     Repo.delete(advancement)
+  end
+
+  @doc """
+  Generates a unique character name within a campaign by appending a number if the name already exists.
+  Strips any existing trailing number suffix before generating a new unique name.
+
+  ## Examples
+
+      iex> generate_unique_name("Carson Freeman", campaign_id)
+      "Carson Freeman (1)"  # if "Carson Freeman" already exists
+
+      iex> generate_unique_name("Carson Freeman (1)", campaign_id)
+      "Carson Freeman (2)"  # strips (1) and finds next available number
+
+      iex> generate_unique_name("New Character", campaign_id)
+      "New Character"  # if name doesn't exist yet
+  """
+  def generate_unique_name(name, campaign_id) when is_binary(name) and is_binary(campaign_id) do
+    trimmed_name = String.trim(name)
+
+    # Strip any existing trailing number suffix like " (1)", " (2)", etc.
+    base_name = Regex.replace(~r/ \(\d+\)$/, trimmed_name, "")
+
+    # Check if the base name exists
+    case Repo.exists?(
+           from c in Character, where: c.campaign_id == ^campaign_id and c.name == ^base_name
+         ) do
+      false ->
+        base_name
+
+      true ->
+        # Find the next available number
+        find_next_available_name(base_name, campaign_id, 1)
+    end
+  end
+
+  defp find_next_available_name(base_name, campaign_id, counter) do
+    new_name = "#{base_name} (#{counter})"
+
+    case Repo.exists?(
+           from c in Character, where: c.campaign_id == ^campaign_id and c.name == ^new_name
+         ) do
+      false -> new_name
+      true -> find_next_available_name(base_name, campaign_id, counter + 1)
+    end
   end
 end

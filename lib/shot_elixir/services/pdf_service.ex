@@ -238,4 +238,292 @@ defmodule ShotElixir.Services.PdfService do
     |> String.replace(~r/<[^>]*>/, "")
     |> String.trim()
   end
+
+  @doc """
+  Creates a character from an uploaded PDF file.
+  Returns {:ok, character_attrs, weapons, schticks} or {:error, reason}
+  The character attrs can be used to create a new character, and weapons/schticks
+  should be associated after the character is saved.
+  """
+  def pdf_to_character(%Plug.Upload{} = upload, campaign, user) do
+    # Save uploaded file temporarily
+    temp_file_path =
+      Path.join(
+        System.tmp_dir!(),
+        "uploaded_#{System.unique_integer([:positive, :monotonic])}.pdf"
+      )
+
+    case File.cp(upload.path, temp_file_path) do
+      :ok ->
+        result = extract_character_from_pdf(temp_file_path, campaign, user)
+        File.rm(temp_file_path)
+        result
+
+      {:error, reason} ->
+        {:error, "Failed to save uploaded PDF: #{inspect(reason)}"}
+    end
+  end
+
+  # Extract character data from PDF using pdftk
+  defp extract_character_from_pdf(pdf_path, campaign, user) do
+    case get_pdf_fields(pdf_path) do
+      {:ok, fields} ->
+        if has_required_fields?(fields) do
+          build_character_from_fields(fields, campaign, user)
+        else
+          {:error, "Invalid PDF: Missing required fields"}
+        end
+
+      {:error, _reason} = error ->
+        error
+    end
+  end
+
+  # Get form fields from PDF using pdftk
+  defp get_pdf_fields(pdf_path) do
+    pdftk_path =
+      System.find_executable("pdftk") ||
+        Application.get_env(:shot_elixir, :pdftk_path, "/usr/local/bin/pdftk")
+
+    case System.cmd(pdftk_path, [pdf_path, "dump_data_fields"]) do
+      {output, 0} ->
+        fields = parse_pdftk_fields(output)
+        {:ok, fields}
+
+      {error, exit_code} ->
+        {:error, "pdftk failed with exit code #{exit_code}: #{error}"}
+    end
+  rescue
+    e in ErlangError ->
+      {:error, "pdftk command failed: #{inspect(e)}"}
+  end
+
+  # Parse pdftk dump_data_fields output into a map
+  defp parse_pdftk_fields(output) do
+    output
+    |> String.split("---")
+    |> Enum.reduce(%{}, fn field_block, acc ->
+      lines = String.split(field_block, "\n", trim: true)
+      field_name = extract_field_value(lines, "FieldName:")
+      field_value = extract_field_value(lines, "FieldValue:")
+
+      if field_name do
+        Map.put(acc, field_name, field_value || "")
+      else
+        acc
+      end
+    end)
+  end
+
+  defp extract_field_value(lines, prefix) do
+    lines
+    |> Enum.find(&String.starts_with?(&1, prefix))
+    |> case do
+      nil -> nil
+      line -> String.trim_leading(line, prefix) |> String.trim()
+    end
+  end
+
+  # Check if PDF has required fields
+  defp has_required_fields?(fields) do
+    Map.has_key?(fields, "Name")
+  end
+
+  # Build character from PDF fields
+  defp build_character_from_fields(fields, campaign, user) do
+    base_name =
+      get_pdf_field_value(fields, "Name") || get_pdf_field_value(fields, "Archetype") ||
+        "Unnamed Character"
+
+    # Generate unique name if the base name already exists
+    unique_name = ShotElixir.Characters.generate_unique_name(base_name, campaign.id)
+
+    character_attrs = %{
+      name: unique_name,
+      campaign_id: campaign.id,
+      user_id: user.id,
+      action_values: action_values_from_pdf_fields(fields),
+      wealth: get_pdf_field_value(fields, "Wealth"),
+      skills: get_skills_from_pdf_fields(fields),
+      description: get_description_from_pdf_fields(fields),
+      active: true,
+      impairments: 0
+    }
+
+    # Get associated data
+    weapons = get_weapons_from_pdf_fields(fields, campaign)
+    schticks = get_schticks_from_pdf_fields(fields, campaign)
+
+    # Find juncture if specified
+    character_attrs =
+      case get_pdf_field_value(fields, "Juncture") do
+        nil ->
+          character_attrs
+
+        "" ->
+          character_attrs
+
+        juncture_name ->
+          case ShotElixir.Junctures.get_juncture_by_name(campaign.id, juncture_name) do
+            nil -> character_attrs
+            juncture -> Map.put(character_attrs, :juncture_id, juncture.id)
+          end
+      end
+
+    {:ok, character_attrs, weapons, schticks}
+  end
+
+  defp get_pdf_field_value(fields, field_name) do
+    case Map.get(fields, field_name) do
+      "" -> nil
+      value -> value
+    end
+  end
+
+  defp action_values_from_pdf_fields(fields) do
+    main_attack = get_pdf_field_value(fields, "Attack Type") || "Unarmed"
+
+    base_values = %{
+      "MainAttack" => main_attack,
+      main_attack => get_pdf_field_value(fields, "Attack"),
+      "Defense" => get_pdf_field_value(fields, "Defense"),
+      "Toughness" => get_pdf_field_value(fields, "Toughness"),
+      "FortuneType" => get_pdf_field_value(fields, "Fortune Type"),
+      "Max Fortune" => get_pdf_field_value(fields, "Fortune"),
+      "Fortune" => get_pdf_field_value(fields, "Fortune"),
+      "Speed" => get_pdf_field_value(fields, "Speed"),
+      "SecondaryAttack" => nil,
+      "Type" => "PC",
+      "Archetype" => get_pdf_field_value(fields, "Archetype")
+    }
+
+    # Merge secondary attack if present
+    case get_secondary_attack_from_pdf_fields(fields) do
+      nil -> base_values
+      secondary -> Map.merge(base_values, secondary)
+    end
+  end
+
+  defp get_secondary_attack_from_pdf_fields(fields) do
+    skills_text = get_pdf_field_value(fields, "Skills") || ""
+
+    skills_text
+    |> String.split(~r/\r\n?/)
+    |> Enum.find_value(fn line ->
+      if String.contains?(line, "Backup Attack") do
+        # Try colon format: "Backup Attack: [Type]: [Value]"
+        case Regex.run(~r/\s*Backup Attack\s*:\s*(.+?)\s*:\s*(\d+)\s*$/, line) do
+          [_, skill_name, skill_value] ->
+            %{
+              "SecondaryAttack" => String.trim(skill_name),
+              String.trim(skill_name) => String.to_integer(skill_value)
+            }
+
+          nil ->
+            # Try space format: "Backup Attack: [Type] [Value]"
+            case Regex.run(~r/\s*Backup Attack\s*:\s*(.+?)\s+(\d+)\s*$/, line) do
+              [_, skill_name, skill_value] ->
+                %{
+                  "SecondaryAttack" => String.trim(skill_name),
+                  String.trim(skill_name) => String.to_integer(skill_value)
+                }
+
+              nil ->
+                nil
+            end
+        end
+      end
+    end)
+  end
+
+  defp get_skills_from_pdf_fields(fields) do
+    skills_text = get_pdf_field_value(fields, "Skills") || ""
+
+    skills_text
+    |> String.split(~r/\r\n?/)
+    |> Enum.reject(&String.contains?(&1, "Backup Attack"))
+    |> Enum.reduce(%{}, fn line, acc ->
+      # Match both formats: "Skill Name: Value" and "Skill Name Value"
+      case Regex.run(~r/^\s*(.+?)\s*:\s*(\d+)\s*$/, line) ||
+             Regex.run(~r/^\s*(.+?)\s+(\d+)\s*$/, line) do
+        [_, skill_name, skill_value] ->
+          Map.put(acc, String.trim(skill_name), String.to_integer(skill_value))
+
+        nil ->
+          acc
+      end
+    end)
+  end
+
+  defp get_description_from_pdf_fields(fields) do
+    %{
+      "Melodramatic Hook" => get_pdf_field_value(fields, "Melodramatic Hook") || "",
+      "Background" => get_pdf_field_value(fields, "Story") || ""
+    }
+  end
+
+  defp get_weapons_from_pdf_fields(fields, campaign) do
+    1..5
+    |> Enum.map(&get_weapon_from_pdf(fields, &1, campaign))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq_by(& &1.id)
+  end
+
+  defp get_weapon_from_pdf(fields, index, campaign) do
+    name = get_pdf_field_value(fields, "Weapon #{index} Name")
+
+    if name && name != "" && name != "Unarmed" do
+      damage = parse_integer(get_pdf_field_value(fields, "Weapon #{index} Damage"))
+      concealment = get_pdf_field_value(fields, "Weapon #{index} Concealment") || ""
+      reload_value = get_pdf_field_value(fields, "Weapon #{index} Reload") || ""
+
+      # Find or create weapon
+      case ShotElixir.Weapons.get_weapon_by_name(campaign.id, name) do
+        nil ->
+          {:ok, weapon} =
+            ShotElixir.Weapons.create_weapon(%{
+              name: name,
+              campaign_id: campaign.id,
+              damage: damage,
+              concealment: concealment,
+              reload_value: reload_value,
+              description: "",
+              kachunk: "",
+              juncture: ""
+            })
+
+          weapon
+
+        weapon ->
+          weapon
+      end
+    end
+  end
+
+  defp get_schticks_from_pdf_fields(fields, campaign) do
+    1..10
+    |> Enum.map(&get_schtick_from_pdf(fields, &1, campaign))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq_by(& &1.id)
+  end
+
+  defp get_schtick_from_pdf(fields, index, campaign) do
+    name = get_pdf_field_value(fields, "Schtick #{index} Title")
+
+    if name && name != "" do
+      # Only find existing schticks, don't create new ones
+      ShotElixir.Schticks.get_schtick_by_name(campaign.id, name)
+    end
+  end
+
+  defp parse_integer(nil), do: nil
+  defp parse_integer(""), do: nil
+  defp parse_integer(value) when is_integer(value), do: value
+
+  defp parse_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> nil
+    end
+  end
 end
