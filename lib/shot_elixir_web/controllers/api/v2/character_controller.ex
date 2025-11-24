@@ -239,7 +239,12 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
             case ShotElixir.Services.PdfService.character_to_pdf(character) do
               {:ok, temp_path} ->
                 filename =
-                  "#{character.name |> String.downcase() |> String.replace(" ", "_")}_character_sheet.pdf"
+                  character.name
+                  |> String.replace(~r/[^\w\s-]/, "")
+                  |> String.downcase()
+                  |> String.replace(~r/\s+/, "_")
+                  |> String.slice(0..100)
+                  |> Kernel.<>("_character_sheet.pdf")
 
                 try do
                   conn

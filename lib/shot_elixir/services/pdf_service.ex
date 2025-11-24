@@ -70,15 +70,15 @@ defmodule ShotElixir.Services.PdfService do
   Converts character data to PDF field format matching Rails implementation.
   """
   def character_attributes_for_pdf(%Character{} = character) do
-    main_attack = character.action_values["MainAttack"]
-    secondary_attack = character.action_values["SecondaryAttack"]
+    main_attack = get_in(character.action_values, ["MainAttack"]) || "Unarmed"
+    secondary_attack = get_in(character.action_values, ["SecondaryAttack"])
 
     schticks = character.schticks |> Enum.take(10)
     weapons = character.weapons |> Enum.take(4)
 
     # Format skills
     skills =
-      character.skills
+      (character.skills || %{})
       |> Enum.filter(fn {_name, value} -> value > 0 end)
       |> Enum.map(fn {name, value} -> "#{name}: #{value}" end)
       |> Enum.join("\n")
@@ -153,8 +153,8 @@ defmodule ShotElixir.Services.PdfService do
       "Quote" => "",
       "Juncture" => "",
       "Wealth" => "",
-      "Story" => strip_html(character.description["Background"]),
-      "Melodramatic Hook" => strip_html(character.description["Melodramatic Hook"]),
+      "Story" => strip_html(get_in(character.description, ["Background"])),
+      "Melodramatic Hook" => strip_html(get_in(character.description, ["Melodramatic Hook"])),
       "Important GMCs" => "",
       "Credits" => ""
     }
