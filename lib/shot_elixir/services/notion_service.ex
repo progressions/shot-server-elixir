@@ -110,26 +110,28 @@ defmodule ShotElixir.Services.NotionService do
 
   @doc """
   Find or create a character from Notion page data.
+  TODO: Implement Characters.get_character_by_name_and_campaign/2
   """
-  def find_or_create_character_from_notion(page, campaign_id) do
-    name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
-
-    character =
-      case Characters.get_character_by_name_and_campaign(name, campaign_id) do
-        nil ->
-          {:ok, char} =
-            Characters.create_character(%{
-              name: name,
-              campaign_id: campaign_id
-            })
-
-          char
-
-        char ->
-          char
-      end
-
-    update_character_from_notion(character)
+  def find_or_create_character_from_notion(_page, _campaign_id) do
+    {:error, :not_implemented}
+    # name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
+    #
+    # character =
+    #   case Characters.get_character_by_name_and_campaign(name, campaign_id) do
+    #     nil ->
+    #       {:ok, char} =
+    #         Characters.create_character(%{
+    #           name: name,
+    #           campaign_id: campaign_id
+    #         })
+    #
+    #       char
+    #
+    #     char ->
+    #       char
+    #   end
+    #
+    # update_character_from_notion(character)
   end
 
   @doc """
