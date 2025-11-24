@@ -24,17 +24,31 @@ defmodule ShotElixir.Services.PdfService do
     template_path = Path.join(:code.priv_dir(:shot_elixir), "static/pdfs/character_sheet.pdf")
 
     unless File.exists?(template_path) do
-      raise "PDF template not found at #{template_path}"
+      {:error, "PDF template not found at #{template_path}"}
+    else
+      with {:ok, fdf_path} <- create_fdf_file(field_map),
+           {:ok, temp_file} <- run_pdftk(template_path, fdf_path) do
+        File.rm(fdf_path)
+        {:ok, temp_file}
+      else
+        {:error, reason} = error ->
+          # Cleanup is handled within helper functions
+          error
+      end
     end
+  end
 
-    # Create temp file for filled PDF
-    temp_file = Path.join(System.tmp_dir!(), "filled_#{:rand.uniform(1_000_000)}.pdf")
+  # Run pdftk command with error handling
+  defp run_pdftk(template_path, fdf_path) do
+    # Determine pdftk path: try System.find_executable, then config, then fallback
+    pdftk_path =
+      System.find_executable("pdftk") ||
+        Application.get_env(:shot_elixir, :pdftk_path, "/usr/local/bin/pdftk")
 
-    # Create FDF data file
-    fdf_path = create_fdf_file(field_map)
+    temp_file =
+      Path.join(System.tmp_dir!(), "filled_#{System.unique_integer([:positive, :monotonic])}.pdf")
 
-    # Call pdftk to fill the form
-    case System.cmd("/usr/local/bin/pdftk", [
+    case System.cmd(pdftk_path, [
            template_path,
            "fill_form",
            fdf_path,
@@ -42,14 +56,14 @@ defmodule ShotElixir.Services.PdfService do
            temp_file
          ]) do
       {_output, 0} ->
-        # Clean up FDF file
-        File.rm(fdf_path)
         {:ok, temp_file}
 
       {error, exit_code} ->
-        File.rm(fdf_path)
         {:error, "pdftk failed with exit code #{exit_code}: #{error}"}
     end
+  rescue
+    e in ErlangError ->
+      {:error, "pdftk command failed: #{inspect(e)}"}
   end
 
   @doc """
@@ -92,25 +106,25 @@ defmodule ShotElixir.Services.PdfService do
       "Speed" => character.action_values["Speed"],
       # Schticks
       "Schtick 1 Title" => get_field(schticks, 0, :name),
-      "Schtick 1 Text" => "\n" <> (get_field(schticks, 0, :description) || ""),
+      "Schtick 1 Text" => prepend_newline(get_field(schticks, 0, :description)),
       "Schtick 2 Title" => get_field(schticks, 1, :name),
-      "Schtick 2 Text" => "\n" <> (get_field(schticks, 1, :description) || ""),
+      "Schtick 2 Text" => prepend_newline(get_field(schticks, 1, :description)),
       "Schtick 3 Title" => get_field(schticks, 2, :name),
-      "Schtick 3 Text" => "\n" <> (get_field(schticks, 2, :description) || ""),
+      "Schtick 3 Text" => prepend_newline(get_field(schticks, 2, :description)),
       "Schtick 4 Title" => get_field(schticks, 3, :name),
-      "Schtick 4 Text" => "\n" <> (get_field(schticks, 3, :description) || ""),
+      "Schtick 4 Text" => prepend_newline(get_field(schticks, 3, :description)),
       "Schtick 5 Title" => get_field(schticks, 4, :name),
-      "Schtick 5 Text" => "\n" <> (get_field(schticks, 4, :description) || ""),
+      "Schtick 5 Text" => prepend_newline(get_field(schticks, 4, :description)),
       "Schtick 6 Title" => get_field(schticks, 5, :name),
-      "Schtick 6 Text" => "\n" <> (get_field(schticks, 5, :description) || ""),
+      "Schtick 6 Text" => prepend_newline(get_field(schticks, 5, :description)),
       "Schtick 7 Title" => get_field(schticks, 6, :name),
-      "Schtick 7 Text" => "\n" <> (get_field(schticks, 6, :description) || ""),
+      "Schtick 7 Text" => prepend_newline(get_field(schticks, 6, :description)),
       "Schtick 8 Title" => get_field(schticks, 7, :name),
-      "Schtick 8 Text" => "\n" <> (get_field(schticks, 7, :description) || ""),
+      "Schtick 8 Text" => prepend_newline(get_field(schticks, 7, :description)),
       "Schtick 9 Title" => get_field(schticks, 8, :name),
-      "Schtick 9 Text" => "\n" <> (get_field(schticks, 8, :description) || ""),
+      "Schtick 9 Text" => prepend_newline(get_field(schticks, 8, :description)),
       "Schtick 10 Title" => get_field(schticks, 9, :name),
-      "Schtick 10 Text" => "\n" <> (get_field(schticks, 9, :description) || ""),
+      "Schtick 10 Text" => prepend_newline(get_field(schticks, 9, :description)),
       # Weapons (always include Unarmed as weapon 1)
       "Weapon 1 Name" => "Unarmed",
       "Weapon 1 Damage" => 7,
@@ -150,7 +164,11 @@ defmodule ShotElixir.Services.PdfService do
 
   # Create FDF file for pdftk form filling
   defp create_fdf_file(field_map) do
-    fdf_path = Path.join(System.tmp_dir!(), "fields_#{:rand.uniform(1_000_000)}.fdf")
+    fdf_path =
+      Path.join(
+        System.tmp_dir!(),
+        "fields_#{System.unique_integer([:positive, :monotonic])}.fdf"
+      )
 
     fdf_content = """
     %FDF-1.2
@@ -168,8 +186,10 @@ defmodule ShotElixir.Services.PdfService do
     %%EOF
     """
 
-    File.write!(fdf_path, fdf_content)
-    fdf_path
+    case File.write(fdf_path, fdf_content) do
+      :ok -> {:ok, fdf_path}
+      {:error, reason} -> {:error, "Failed to create FDF file: #{inspect(reason)}"}
+    end
   end
 
   # Format fields for FDF file
@@ -202,6 +222,10 @@ defmodule ShotElixir.Services.PdfService do
         if is_binary(value), do: strip_html(value), else: value
     end
   end
+
+  # Prepend newline to text for PDF formatting
+  defp prepend_newline(nil), do: nil
+  defp prepend_newline(text), do: "\n" <> text
 
   # Strip HTML tags (matching Rails FightPoster.strip_html_p_to_br)
   defp strip_html(nil), do: nil

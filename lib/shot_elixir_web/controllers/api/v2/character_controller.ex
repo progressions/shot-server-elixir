@@ -241,15 +241,18 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
                 filename =
                   "#{character.name |> String.downcase() |> String.replace(" ", "_")}_character_sheet.pdf"
 
-                conn
-                |> put_resp_content_type("application/pdf")
-                |> put_resp_header("content-disposition", "attachment; filename=\"#{filename}\"")
-                |> send_file(200, temp_path)
-                |> then(fn conn ->
-                  # Clean up temp file after sending
-                  File.rm(temp_path)
+                try do
                   conn
-                end)
+                  |> put_resp_content_type("application/pdf")
+                  |> put_resp_header(
+                    "content-disposition",
+                    "attachment; filename=\"#{filename}\""
+                  )
+                  |> send_file(200, temp_path)
+                after
+                  # Always clean up temp file, even if send_file fails
+                  File.rm(temp_path)
+                end
 
               {:error, reason} ->
                 conn
