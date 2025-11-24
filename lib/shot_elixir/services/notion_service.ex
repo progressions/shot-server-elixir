@@ -16,35 +16,34 @@ defmodule ShotElixir.Services.NotionService do
 
   @doc """
   Main sync function - creates or updates character in Notion.
-  Only runs in production environment.
+  Environment check performed at worker level.
   """
   def sync_character(%Character{} = character) do
-    # Only sync in production
-    if Application.get_env(:shot_elixir, :env) != :prod do
-      {:ok, :skipped_non_production}
-    else
-      character = Repo.preload(character, :faction)
+    character = Repo.preload(character, :faction)
 
-      result =
-        if character.notion_page_id do
-          update_notion_from_character(character)
-        else
-          create_notion_from_character(character)
-        end
-
-      case result do
-        {:ok, _} ->
-          Characters.update_character(character, %{
-            last_synced_to_notion_at: DateTime.utc_now()
-          })
-
-        {:error, _reason} ->
-          # Silent failure matching Rails behavior
-          {:ok, :failed_silently}
+    result =
+      if character.notion_page_id do
+        update_notion_from_character(character)
+      else
+        create_notion_from_character(character)
       end
+
+    case result do
+      {:ok, _} ->
+        Characters.update_character(character, %{
+          last_synced_to_notion_at: DateTime.utc_now()
+        })
+
+      {:error, reason} ->
+        require Logger
+        Logger.error("Failed to sync character to Notion: #{inspect(reason)}")
+        {:error, reason}
     end
   rescue
-    _ -> {:ok, :failed_silently}
+    error ->
+      require Logger
+      Logger.error("Exception syncing character to Notion: #{inspect(error)}")
+      {:error, error}
   end
 
   @doc """
@@ -75,7 +74,10 @@ defmodule ShotElixir.Services.NotionService do
 
     {:ok, page}
   rescue
-    error -> {:error, error}
+    error ->
+      require Logger
+      Logger.error("Failed to create Notion page: #{inspect(error)}")
+      {:error, error}
   end
 
   @doc """
@@ -105,7 +107,10 @@ defmodule ShotElixir.Services.NotionService do
 
     {:ok, page}
   rescue
-    error -> {:error, error}
+    error ->
+      require Logger
+      Logger.error("Failed to update Notion page: #{inspect(error)}")
+      {:error, error}
   end
 
   @doc """
@@ -138,7 +143,10 @@ defmodule ShotElixir.Services.NotionService do
 
     {:ok, character}
   rescue
-    error -> {:error, error}
+    error ->
+      require Logger
+      Logger.error("Failed to find or create character from Notion: #{inspect(error)}")
+      {:error, error}
   end
 
   @doc """
@@ -155,11 +163,20 @@ defmodule ShotElixir.Services.NotionService do
 
     Characters.update_character(character, attributes)
   rescue
-    error -> {:error, error}
+    error ->
+      require Logger
+      Logger.error("Failed to update character from Notion: #{inspect(error)}")
+      {:error, error}
   end
 
   @doc """
   Search for Notion pages by name.
+
+  ## Parameters
+    * `name` - The name to search for
+
+  ## Returns
+    * List of matching Notion pages
   """
   def find_page_by_name(name) do
     response =
@@ -170,6 +187,12 @@ defmodule ShotElixir.Services.NotionService do
 
   @doc """
   Find faction in Notion by name.
+
+  ## Parameters
+    * `name` - The faction name to search for
+
+  ## Returns
+    * List of matching faction pages (empty list if not found)
   """
   def find_faction_by_name(name) do
     filter = %{
@@ -187,6 +210,12 @@ defmodule ShotElixir.Services.NotionService do
 
   @doc """
   Find image block in Notion page.
+
+  ## Parameters
+    * `page` - Notion page with "id" field
+
+  ## Returns
+    * Image block if found, nil otherwise
   """
   def find_image_block(page) do
     response = NotionClient.get_block_children(page["id"])
@@ -214,7 +243,10 @@ defmodule ShotElixir.Services.NotionService do
 
     NotionClient.append_block_children(character.notion_page_id, [child])
   rescue
-    _ -> nil
+    error ->
+      require Logger
+      Logger.warning("Failed to add image to Notion: #{inspect(error)}")
+      nil
   end
 
   @doc """

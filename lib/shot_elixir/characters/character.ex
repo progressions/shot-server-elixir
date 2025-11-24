@@ -220,12 +220,12 @@ defmodule ShotElixir.Characters.Character do
 
   defp tags_for_notion(character) do
     av = character.action_values || @default_action_values
-    tags = []
+    character_type = av["Type"]
 
-    tags = if av["Type"] != "PC", do: [%{"name" => "NPC"} | tags], else: tags
-    tags = if av["Type"], do: [%{"name" => av["Type"]} | tags], else: tags
+    tags = [%{"name" => character_type}]
+    tags = if character_type != "PC", do: [%{"name" => "NPC"} | tags], else: tags
 
-    Enum.filter(tags, & &1)
+    tags
   end
 
   defp maybe_add_select(properties, _key, nil), do: properties

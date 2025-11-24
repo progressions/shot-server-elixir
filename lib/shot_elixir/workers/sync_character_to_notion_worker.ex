@@ -14,9 +14,13 @@ defmodule ShotElixir.Workers.SyncCharacterToNotionWorker do
     # Only run in production
     if Application.get_env(:shot_elixir, :env) == :prod do
       character = Characters.get_character!(character_id)
-      NotionService.sync_character(character)
-    end
 
-    :ok
+      case NotionService.sync_character(character) do
+        {:ok, _} -> :ok
+        {:error, reason} -> {:error, reason}
+      end
+    else
+      :ok
+    end
   end
 end
