@@ -31,7 +31,7 @@ defmodule ShotElixir.Services.PdfService do
         File.rm(fdf_path)
         {:ok, temp_file}
       else
-        {:error, reason} = error ->
+        {:error, _reason} = error ->
           # Cleanup is handled within helper functions
           error
       end
