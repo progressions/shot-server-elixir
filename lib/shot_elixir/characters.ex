@@ -309,6 +309,20 @@ defmodule ShotElixir.Characters do
     |> ImageLoader.load_image_url("Character")
   end
 
+  @doc """
+  Find or create a character by name and campaign_id.
+  Used by Notion sync to ensure characters exist before updating from Notion.
+  """
+  def find_or_create_by_name_and_campaign(name, campaign_id) do
+    case Repo.get_by(Character, name: name, campaign_id: campaign_id) do
+      nil ->
+        create_character(%{name: name, campaign_id: campaign_id})
+
+      character ->
+        {:ok, character}
+    end
+  end
+
   def create_character(attrs \\ %{}) do
     Multi.new()
     |> Multi.insert(:character, Character.changeset(%Character{}, attrs))

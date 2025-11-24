@@ -157,4 +157,197 @@ defmodule ShotElixir.Characters.Character do
     merged_description = Map.merge(@default_description, description)
     put_change(changeset, :description, merged_description)
   end
+
+  # Notion Integration Functions
+
+  @doc """
+  Convert character to Notion property format for creating/updating Notion pages.
+  """
+  def as_notion(%__MODULE__{} = character) do
+    av = character.action_values || @default_action_values
+    desc = character.description || %{}
+
+    base_properties = %{
+      "Name" => %{"title" => [%{"text" => %{"content" => character.name}}]},
+      "Enemy Type" => %{"select" => %{"name" => av["Type"] || "PC"}},
+      "Wounds" => %{"number" => av["Wounds"]},
+      "Defense" => %{"number" => av["Defense"]},
+      "Toughness" => %{"number" => av["Toughness"]},
+      "Speed" => %{"number" => av["Speed"]},
+      "Fortune" => %{"number" => av["Max Fortune"]},
+      "Guns" => %{"number" => av["Guns"]},
+      "Martial Arts" => %{"number" => av["Martial Arts"]},
+      "Sorcery" => %{"number" => av["Sorcery"]},
+      "Mutant" => %{"number" => av["Mutant"]},
+      "Scroungetech" => %{"number" => av["Scroungetech"]},
+      "Creature" => %{"number" => av["Creature"]},
+      "Damage" => %{"rich_text" => [%{"text" => %{"content" => to_string(av["Damage"] || "")}}]},
+      "Inactive" => %{"checkbox" => !character.active},
+      "Tags" => %{"multi_select" => tags_for_notion(character)},
+      "Age" => %{"rich_text" => [%{"text" => %{"content" => to_string(desc["Age"] || "")}}]},
+      "Nicknames" => %{
+        "rich_text" => [%{"text" => %{"content" => to_string(desc["Nicknames"] || "")}}]
+      },
+      "Height" => %{"rich_text" => [%{"text" => %{"content" => to_string(desc["Height"] || "")}}]},
+      "Weight" => %{"rich_text" => [%{"text" => %{"content" => to_string(desc["Weight"] || "")}}]},
+      "Hair Color" => %{
+        "rich_text" => [%{"text" => %{"content" => to_string(desc["Hair Color"] || "")}}]
+      },
+      "Eye Color" => %{
+        "rich_text" => [%{"text" => %{"content" => to_string(desc["Eye Color"] || "")}}]
+      },
+      "Style of Dress" => %{
+        "rich_text" => [%{"text" => %{"content" => to_string(desc["Style of Dress"] || "")}}]
+      },
+      "Melodramatic Hook" => %{
+        "rich_text" => [
+          %{"text" => %{"content" => strip_html(desc["Melodramatic Hook"] || "")}}
+        ]
+      },
+      "Description" => %{
+        "rich_text" => [%{"text" => %{"content" => strip_html(desc["Appearance"] || "")}}]
+      }
+    }
+
+    # Add optional select fields
+    base_properties
+    |> maybe_add_select("MainAttack", av["MainAttack"])
+    |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
+    |> maybe_add_select("FortuneType", av["FortuneType"])
+    |> maybe_add_archetype(av["Archetype"])
+    |> maybe_add_chi_war_link(character)
+  end
+
+  defp tags_for_notion(character) do
+    av = character.action_values || @default_action_values
+    character_type = av["Type"]
+
+    tags = [%{"name" => character_type}]
+    tags = if character_type != "PC", do: [%{"name" => "NPC"} | tags], else: tags
+
+    tags
+  end
+
+  defp maybe_add_select(properties, _key, nil), do: properties
+  defp maybe_add_select(properties, _key, ""), do: properties
+
+  defp maybe_add_select(properties, key, value) do
+    Map.put(properties, key, %{"select" => %{"name" => value}})
+  end
+
+  defp maybe_add_archetype(properties, nil), do: properties
+  defp maybe_add_archetype(properties, ""), do: properties
+
+  defp maybe_add_archetype(properties, archetype) do
+    Map.put(properties, "Type", %{
+      "rich_text" => [%{"text" => %{"content" => archetype}}]
+    })
+  end
+
+  defp maybe_add_chi_war_link(properties, character) do
+    if Application.get_env(:shot_elixir, :env) == :prod do
+      url = "https://chiwar.net/characters/#{character.id}"
+      Map.put(properties, "Chi War Link", %{"url" => url})
+    else
+      properties
+    end
+  end
+
+  defp strip_html(text) when is_binary(text) do
+    text
+    |> String.replace(~r/<p>/, "")
+    |> String.replace(~r/<\/p>/, "\n")
+    |> String.replace(~r/<br\s*\/?>/, "\n")
+    |> String.replace(~r/<[^>]+>/, "")
+    |> String.trim()
+  end
+
+  defp strip_html(_), do: ""
+
+  @doc """
+  Extract character attributes from Notion page properties.
+  Merges Notion data with existing character data, preserving local values > 7.
+  """
+  def attributes_from_notion(character, page) do
+    props = page["properties"]
+
+    av = %{
+      "Archetype" => get_rich_text(props, "Type"),
+      "Type" => get_select(props, "Enemy Type"),
+      "MainAttack" => get_select(props, "MainAttack"),
+      "SecondaryAttack" => get_select(props, "SecondaryAttack"),
+      "FortuneType" => get_select(props, "FortuneType"),
+      "Wounds" => av_or_new(character, "Wounds", get_number(props, "Wounds")),
+      "Defense" => av_or_new(character, "Defense", get_number(props, "Defense")),
+      "Toughness" => av_or_new(character, "Toughness", get_number(props, "Toughness")),
+      "Speed" => av_or_new(character, "Speed", get_number(props, "Speed")),
+      "Guns" => av_or_new(character, "Guns", get_number(props, "Guns")),
+      "Martial Arts" => av_or_new(character, "Martial Arts", get_number(props, "Martial Arts")),
+      "Sorcery" => av_or_new(character, "Sorcery", get_number(props, "Sorcery")),
+      "Creature" => av_or_new(character, "Creature", get_number(props, "Creature")),
+      "Scroungetech" => av_or_new(character, "Scroungetech", get_number(props, "Scroungetech")),
+      "Mutant" => av_or_new(character, "Mutant", get_number(props, "Mutant"))
+    }
+
+    description = %{
+      "Age" => get_rich_text(props, "Age"),
+      "Height" => get_rich_text(props, "Height"),
+      "Weight" => get_rich_text(props, "Weight"),
+      "Eye Color" => get_rich_text(props, "Eye Color"),
+      "Hair Color" => get_rich_text(props, "Hair Color"),
+      "Appearance" => get_rich_text(props, "Description"),
+      "Style of Dress" => get_rich_text(props, "Style of Dress"),
+      "Melodramatic Hook" => get_rich_text(props, "Melodramatic Hook")
+    }
+
+    %{
+      notion_page_id: page["id"],
+      name: get_title(props, "Name"),
+      action_values: Map.merge(character.action_values || @default_action_values, av),
+      description: Map.merge(character.description || %{}, description)
+    }
+  end
+
+  defp av_or_new(_character, _key, nil), do: nil
+
+  defp av_or_new(character, key, new_value) do
+    current = (character.action_values || @default_action_values)[key]
+
+    cond do
+      is_integer(current) and current > 7 -> current
+      true -> new_value
+    end
+  end
+
+  defp get_title(props, key) do
+    props
+    |> Map.get(key, %{})
+    |> Map.get("title", [])
+    |> List.first()
+    |> case do
+      nil -> nil
+      item -> get_in(item, ["plain_text"])
+    end
+  end
+
+  defp get_select(props, key) do
+    props
+    |> Map.get(key, %{})
+    |> Map.get("select", %{})
+    |> Map.get("name")
+  end
+
+  defp get_number(props, key) do
+    props
+    |> Map.get(key, %{})
+    |> Map.get("number")
+  end
+
+  defp get_rich_text(props, key) do
+    props
+    |> Map.get(key, %{})
+    |> Map.get("rich_text", [])
+    |> Enum.map(& &1["plain_text"])
+    |> Enum.join("")
+  end
 end
