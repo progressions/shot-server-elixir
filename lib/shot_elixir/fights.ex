@@ -38,18 +38,22 @@ defmodule ShotElixir.Fights do
 
     offset = (page - 1) * per_page
 
-    # Normalize UUID parameters so string ids don't break binary comparisons
+    # Normalize UUID parameters for joins (character_id, vehicle_id, user_id)
+    # Don't normalize "id" - Ecto handles string UUIDs in direct comparisons
     params =
       params
-      |> normalize_uuid_param("id")
       |> normalize_uuid_param("character_id")
       |> normalize_uuid_param("vehicle_id")
       |> normalize_uuid_param("user_id")
 
     # Base query with visibility filtering
+    # show_hidden controls whether to include inactive fights
     query =
-      from f in Fight,
-        where: f.campaign_id == ^campaign_id and f.active == true
+      if params["show_hidden"] == "true" || params["show_hidden"] == true do
+        from f in Fight, where: f.campaign_id == ^campaign_id
+      else
+        from f in Fight, where: f.campaign_id == ^campaign_id and f.active == true
+      end
 
     # Apply basic filters
     query =
@@ -63,8 +67,9 @@ defmodule ShotElixir.Fights do
       if params["ids"] do
         ids = parse_ids(params["ids"])
 
+        # Rails behavior: empty ids param returns NO results (empty array)
         case Enum.reject(ids, &is_nil/1) do
-          [] -> query
+          [] -> from f in query, where: false
           normalized_ids -> from f in query, where: f.id in ^normalized_ids
         end
       else
@@ -180,19 +185,6 @@ defmodule ShotElixir.Fights do
     # Apply sorting AFTER getting the count
     query = apply_sorting(query, params)
 
-    # Get seasons for filtering UI - separate query to avoid DISTINCT/ORDER BY issues
-    seasons_query =
-      from f in Fight,
-        where: f.campaign_id == ^campaign_id and f.active == true,
-        select: f.season,
-        distinct: true
-
-    seasons =
-      seasons_query
-      |> Repo.all()
-      |> Enum.reject(&is_nil/1)
-      |> Enum.uniq()
-
     # Apply pagination
     fights =
       query
@@ -200,6 +192,15 @@ defmodule ShotElixir.Fights do
       |> offset(^offset)
       |> Repo.all()
       |> Repo.preload([:characters, :vehicles])
+
+    # Get seasons - only from actual results to match Rails behavior
+    # When filter returns no results, seasons should be empty
+    seasons =
+      fights
+      |> Enum.map(& &1.season)
+      |> Enum.reject(&is_nil/1)
+      |> Enum.uniq()
+      |> Enum.sort()
 
     # Load image URLs for all fights efficiently
     fights_with_images = ImageLoader.load_image_urls(fights, "Fight")
@@ -223,10 +224,11 @@ defmodule ShotElixir.Fights do
     |> String.split(",")
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
-    |> Enum.map(&normalize_uuid/1)
+
+    # Don't normalize - Ecto handles string UUIDs in IN queries
   end
 
-  defp parse_ids(ids_param) when is_list(ids_param), do: Enum.map(ids_param, &normalize_uuid/1)
+  defp parse_ids(ids_param) when is_list(ids_param), do: ids_param
   defp parse_ids(_), do: []
 
   defp normalize_uuid_param(params, key) do

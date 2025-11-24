@@ -650,16 +650,509 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
     end
   end
 
-  # TODO: Add comprehensive filtering, sorting, and advanced features tests
-  # These would include:
-  # - Search filtering
-  # - Season/session filtering
-  # - Character/vehicle/user involvement filtering
-  # - Multiple sort fields
-  # - Status filtering (Unstarted/Started/Ended)
-  # - ID-based filtering
-  # - Pagination and metadata
-  # - Autocomplete endpoint
-  # - Image handling
-  # These features may need to be implemented in the controller first
+  describe "advanced filtering and sorting" do
+    setup %{gamemaster: gm, campaign: campaign, character: character, vehicle: vehicle} do
+      # Create additional fights for filtering/sorting tests
+      {:ok, airport_battle} =
+        Fights.create_fight(%{
+          name: "Airport Battle",
+          description: "A fight at the airport.",
+          campaign_id: campaign.id,
+          season: 1,
+          session: 3
+        })
+
+      {:ok, inactive_fight} =
+        Fights.create_fight(%{
+          name: "Inactive Fight",
+          description: "This fight is inactive.",
+          campaign_id: campaign.id,
+          active: false,
+          season: 3,
+          session: 1
+        })
+
+      %{airport_battle: airport_battle, inactive_fight: inactive_fight}
+    end
+
+    test "filters by search term", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{search: "Battle"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 1
+      assert List.first(response["fights"])["name"] == "Airport Battle"
+    end
+
+    test "filters by season", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, _brawl} =
+        Fights.create_fight(%{
+          name: "Season 1 Fight",
+          campaign_id: campaign.id,
+          season: 1,
+          session: 1
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{season: "1"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) >= 1
+      assert Enum.all?(response["fights"], fn f -> f["season"] == 1 end)
+    end
+
+    test "filters by session", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{session: "3"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 1
+      assert List.first(response["fights"])["session"] == 3
+    end
+
+    test "filters by __NONE__ season", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, _} =
+        Fights.create_fight(%{
+          name: "No Season Fight",
+          campaign_id: campaign.id,
+          season: nil,
+          session: 1
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{season: "__NONE__"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 1
+      assert List.first(response["fights"])["name"] == "No Season Fight"
+      assert List.first(response["fights"])["season"] == nil
+    end
+
+    test "filters by __NONE__ session", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, _} =
+        Fights.create_fight(%{
+          name: "No Session Fight",
+          campaign_id: campaign.id,
+          season: 1,
+          session: nil
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{session: "__NONE__"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) >= 1
+      assert Enum.any?(response["fights"], fn f -> f["name"] == "No Session Fight" end)
+      assert Enum.all?(response["fights"], fn f -> f["session"] == nil end)
+    end
+
+    test "filters unstarted fights (status=Unstarted)", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, started_fight} =
+        Fights.create_fight(%{
+          name: "Started Fight",
+          campaign_id: campaign.id,
+          started_at: DateTime.utc_now()
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{status: "Unstarted"})
+      response = json_response(conn, 200)
+
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      refute "Started Fight" in fight_names
+      assert Enum.all?(response["fights"], fn f -> f["started_at"] == nil end)
+    end
+
+    test "filters started fights (status=Started)", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, started_fight} =
+        Fights.create_fight(%{
+          name: "In Progress Fight",
+          campaign_id: campaign.id,
+          started_at: DateTime.utc_now()
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{status: "Started"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) >= 1
+
+      assert Enum.all?(response["fights"], fn f ->
+               f["started_at"] != nil and f["ended_at"] == nil
+             end)
+    end
+
+    test "filters ended fights (status=Ended)", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, ended_fight} =
+        Fights.create_fight(%{
+          name: "Ended Fight",
+          campaign_id: campaign.id,
+          started_at: DateTime.utc_now() |> DateTime.add(-2, :hour),
+          ended_at: DateTime.utc_now() |> DateTime.add(-1, :hour)
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{status: "Ended"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) >= 1
+
+      assert Enum.all?(response["fights"], fn f ->
+               f["started_at"] != nil and f["ended_at"] != nil
+             end)
+    end
+
+    test "filters by character involvement", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign,
+      character: character
+    } do
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Character Fight",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _shot} = Fights.create_shot(%{fight_id: fight.id, character_id: character.id})
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{character_id: character.id})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) >= 1
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      assert "Character Fight" in fight_names
+    end
+
+    test "filters by vehicle involvement", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign,
+      vehicle: vehicle
+    } do
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Vehicle Fight",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _shot} = Fights.create_shot(%{fight_id: fight.id, vehicle_id: vehicle.id})
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{vehicle_id: vehicle.id})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) >= 1
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      assert "Vehicle Fight" in fight_names
+    end
+
+    test "filters by user involvement", %{
+      conn: conn,
+      gamemaster: gm,
+      player: player,
+      campaign: campaign,
+      character: character
+    } do
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Player Fight",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _shot} = Fights.create_shot(%{fight_id: fight.id, character_id: character.id})
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{user_id: player.id})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) >= 1
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      assert "Player Fight" in fight_names
+    end
+
+    test "shows hidden fights when show_hidden=true", %{
+      conn: conn,
+      gamemaster: gm,
+      inactive_fight: inactive_fight
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{show_hidden: "true"})
+      response = json_response(conn, 200)
+
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      assert "Inactive Fight" in fight_names
+    end
+
+    test "hides inactive fights by default", %{
+      conn: conn,
+      gamemaster: gm,
+      inactive_fight: inactive_fight
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{})
+      response = json_response(conn, 200)
+
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      refute "Inactive Fight" in fight_names
+    end
+
+    test "returns empty array when ids is empty string", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{ids: ""})
+      response = json_response(conn, 200)
+
+      assert response["fights"] == []
+      assert response["seasons"] == []
+      assert response["meta"]["total_count"] == 0
+    end
+
+    test "filters by comma-separated ids", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, fight1} =
+        Fights.create_fight(%{name: "Fight 1", campaign_id: campaign.id, season: 1, session: 1})
+
+      {:ok, fight2} =
+        Fights.create_fight(%{name: "Fight 2", campaign_id: campaign.id, season: 2, session: 2})
+
+      ids = "#{fight1.id},#{fight2.id}"
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{ids: ids})
+      response = json_response(conn, 200)
+
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      assert "Fight 1" in fight_names
+      assert "Fight 2" in fight_names
+      assert length(response["fights"]) == 2
+    end
+
+    test "collects seasons in response", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, _} =
+        Fights.create_fight(%{name: "S1 Fight", campaign_id: campaign.id, season: 1, session: 1})
+
+      {:ok, _} =
+        Fights.create_fight(%{name: "S2 Fight", campaign_id: campaign.id, season: 2, session: 1})
+
+      {:ok, _} =
+        Fights.create_fight(%{name: "S3 Fight", campaign_id: campaign.id, season: 3, session: 1})
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{})
+      response = json_response(conn, 200)
+
+      assert 1 in response["seasons"]
+      assert 2 in response["seasons"]
+      assert 3 in response["seasons"]
+    end
+  end
+
+  describe "sorting" do
+    setup %{gamemaster: gm, campaign: campaign} do
+      {:ok, fight_a} =
+        Fights.create_fight(%{
+          name: "Alpha Fight",
+          campaign_id: campaign.id,
+          season: 1,
+          session: 1
+        })
+
+      {:ok, fight_b} =
+        Fights.create_fight(%{
+          name: "Beta Fight",
+          campaign_id: campaign.id,
+          season: 2,
+          session: 2
+        })
+
+      {:ok, fight_c} =
+        Fights.create_fight(%{
+          name: "Gamma Fight",
+          campaign_id: campaign.id,
+          season: 1,
+          session: 3
+        })
+
+      %{fight_a: fight_a, fight_b: fight_b, fight_c: fight_c}
+    end
+
+    test "sorts by name ascending", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{sort: "name", order: "ASC"})
+      response = json_response(conn, 200)
+
+      names = Enum.map(response["fights"], & &1["name"])
+      assert names == Enum.sort(names)
+    end
+
+    test "sorts by name descending", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{sort: "name", order: "DESC"})
+      response = json_response(conn, 200)
+
+      names = Enum.map(response["fights"], & &1["name"])
+      assert names == Enum.sort(names, :desc)
+    end
+
+    test "sorts by created_at ascending", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{sort: "created_at", order: "ASC"})
+      response = json_response(conn, 200)
+
+      timestamps = Enum.map(response["fights"], & &1["created_at"])
+      assert timestamps == Enum.sort(timestamps)
+    end
+
+    test "sorts by season ascending", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{sort: "season", order: "ASC"})
+      response = json_response(conn, 200)
+
+      seasons = Enum.map(response["fights"], & &1["season"])
+      assert seasons == Enum.sort(seasons)
+    end
+
+    test "sorts by session descending", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{sort: "session", order: "DESC"})
+      response = json_response(conn, 200)
+
+      sessions = Enum.map(response["fights"], & &1["session"])
+      assert sessions == Enum.sort(sessions, :desc)
+    end
+  end
+
+  describe "pagination" do
+    setup %{gamemaster: gm, campaign: campaign} do
+      # Create 25 fights for pagination testing
+      fights =
+        Enum.map(1..25, fn i ->
+          {:ok, fight} =
+            Fights.create_fight(%{
+              name: "Fight #{String.pad_leading(to_string(i), 2, "0")}",
+              campaign_id: campaign.id
+            })
+
+          fight
+        end)
+
+      %{fights: fights}
+    end
+
+    test "returns default page size of 15", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 15
+      assert response["meta"]["per_page"] == 15
+      assert response["meta"]["current_page"] == 1
+      assert response["meta"]["total_pages"] == 2
+      assert response["meta"]["total_count"] == 25
+    end
+
+    test "returns custom page size", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{per_page: "10"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 10
+      assert response["meta"]["per_page"] == 10
+      assert response["meta"]["total_pages"] == 3
+    end
+
+    test "returns second page", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{page: "2", per_page: "10"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 10
+      assert response["meta"]["current_page"] == 2
+    end
+
+    test "returns last page with remaining items", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{page: "3", per_page: "10"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 5
+      assert response["meta"]["current_page"] == 3
+      assert response["meta"]["total_count"] == 25
+    end
+  end
+
+  describe "autocomplete mode" do
+    setup %{gamemaster: gm, campaign: campaign, character: character} do
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Test Fight",
+          description: "A detailed fight",
+          campaign_id: campaign.id,
+          season: 1,
+          session: 1
+        })
+
+      {:ok, _shot} = Fights.create_shot(%{fight_id: fight.id, character_id: character.id})
+      fight = Fights.get_fight_with_shots(fight.id)
+
+      %{autocomplete_fight: fight}
+    end
+
+    test "returns minimal fields when autocomplete=true", %{
+      conn: conn,
+      gamemaster: gm,
+      autocomplete_fight: fight
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{autocomplete: "true", id: fight.id})
+      response = json_response(conn, 200)
+
+      fight_data = List.first(response["fights"])
+      assert Map.keys(fight_data) == ["entity_class", "id", "name"]
+      assert fight_data["id"] == fight.id
+      assert fight_data["name"] == "Test Fight"
+      assert fight_data["entity_class"] == "Fight"
+    end
+
+    test "returns full fields when autocomplete is not set", %{
+      conn: conn,
+      gamemaster: gm,
+      autocomplete_fight: fight
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{id: fight.id})
+      response = json_response(conn, 200)
+
+      fight_data = List.first(response["fights"])
+      assert Map.has_key?(fight_data, "description")
+      assert Map.has_key?(fight_data, "season")
+      assert Map.has_key?(fight_data, "session")
+      assert Map.has_key?(fight_data, "characters")
+      assert fight_data["description"] == "A detailed fight"
+    end
+
+    test "supports all filtering with autocomplete mode", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+
+      conn =
+        get(conn, ~p"/api/v2/fights", %{
+          autocomplete: "true",
+          search: "Test",
+          sort: "name",
+          order: "ASC"
+        })
+
+      response = json_response(conn, 200)
+      fight_data = List.first(response["fights"])
+
+      assert Enum.sort(Map.keys(fight_data)) == ["entity_class", "id", "name"]
+    end
+  end
 end
