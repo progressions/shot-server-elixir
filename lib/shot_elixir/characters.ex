@@ -464,7 +464,9 @@ defmodule ShotElixir.Characters do
     base_name = Regex.replace(~r/ \(\d+\)$/, trimmed_name, "")
 
     # Check if the base name exists
-    case Repo.exists?(from c in Character, where: c.campaign_id == ^campaign_id and c.name == ^base_name) do
+    case Repo.exists?(
+           from c in Character, where: c.campaign_id == ^campaign_id and c.name == ^base_name
+         ) do
       false ->
         base_name
 
@@ -477,7 +479,9 @@ defmodule ShotElixir.Characters do
   defp find_next_available_name(base_name, campaign_id, counter) do
     new_name = "#{base_name} (#{counter})"
 
-    case Repo.exists?(from c in Character, where: c.campaign_id == ^campaign_id and c.name == ^new_name) do
+    case Repo.exists?(
+           from c in Character, where: c.campaign_id == ^campaign_id and c.name == ^new_name
+         ) do
       false -> new_name
       true -> find_next_available_name(base_name, campaign_id, counter + 1)
     end

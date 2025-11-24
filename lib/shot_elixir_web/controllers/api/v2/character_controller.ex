@@ -295,6 +295,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
                   # Associate weapons with character
                   if Enum.any?(weapons) do
                     now = DateTime.utc_now()
+
                     weapon_records =
                       Enum.map(weapons, fn weapon ->
                         %{
@@ -315,6 +316,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
                   # Associate schticks with character
                   if Enum.any?(schticks) do
                     now = DateTime.utc_now()
+
                     schtick_records =
                       Enum.map(schticks, fn schtick ->
                         %{
