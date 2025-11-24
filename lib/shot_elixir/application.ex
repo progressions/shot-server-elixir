@@ -23,6 +23,10 @@ defmodule ShotElixir.Application do
       {Cachex, name: :image_cache},
       # Finch HTTP client for Swoosh email delivery
       {Finch, name: Swoosh.Finch},
+      # Discord bot consumer
+      ShotElixir.Discord.Consumer,
+      # Discord current fight Agent
+      ShotElixir.Discord.CurrentFight,
       # Start a worker by calling: ShotElixir.Worker.start_link(arg)
       # {ShotElixir.Worker, arg},
       # Start to serve requests, typically the last entry
