@@ -110,28 +110,35 @@ defmodule ShotElixir.Services.NotionService do
 
   @doc """
   Find or create a character from Notion page data.
-  TODO: Implement Characters.get_character_by_name_and_campaign/2
   """
-  def find_or_create_character_from_notion(_page, _campaign_id) do
-    {:error, :not_implemented}
-    # name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
-    #
-    # character =
-    #   case Characters.get_character_by_name_and_campaign(name, campaign_id) do
-    #     nil ->
-    #       {:ok, char} =
-    #         Characters.create_character(%{
-    #           name: name,
-    #           campaign_id: campaign_id
-    #         })
-    #
-    #       char
-    #
-    #     char ->
-    #       char
-    #   end
-    #
-    # update_character_from_notion(character)
+  def find_or_create_character_from_notion(page, campaign_id) do
+    name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
+
+    {:ok, character} = Characters.find_or_create_by_name_and_campaign(name, campaign_id)
+
+    character = Repo.preload(character, :faction)
+    attributes = Character.attributes_from_notion(character, page)
+
+    {:ok, character} =
+      Characters.update_character(character, Map.put(attributes, :notion_page_id, page["id"]))
+
+    description = get_description(page)
+
+    merged_description =
+      Map.merge(
+        description,
+        character.description || %{},
+        fn _k, v1, v2 -> if v2 == "" or is_nil(v2), do: v1, else: v2 end
+      )
+
+    {:ok, character} = Characters.update_character(character, %{description: merged_description})
+
+    # Add image if not already present
+    add_image(page, character)
+
+    {:ok, character}
+  rescue
+    error -> {:error, error}
   end
 
   @doc """
