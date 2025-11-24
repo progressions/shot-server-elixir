@@ -143,10 +143,22 @@ end
 | invitation | direct | `%{invitations: [...]}` |
 | user | direct | N/A |
 | encounter | direct | N/A |
-| campaign | `%{campaign: ...}` | `%{campaigns: [...], meta: ...}` |
-| fight | `%{fight: ...}` | `%{fights: [...], meta: ...}` |
+| campaign | direct | `%{campaigns: [...], meta: ...}` |
+| fight | direct | `%{fights: [...], meta: ...}` |
 
-**Note:** Campaign and Fight are exceptions that DO wrap show.json - this matches their Rails behavior.
+### Composite Responses (Multiple Objects)
+
+When returning multiple distinct objects, wrap each in its key:
+
+```elixir
+# set_current returns both campaign and user - wrap both
+def render("set_current.json", %{campaign: campaign, user: user}) do
+  %{
+    campaign: render_campaign_detail(campaign),
+    user: render_user_full(user)
+  }
+end
+```
 
 ### Test Assertions
 
