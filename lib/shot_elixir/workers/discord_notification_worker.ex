@@ -13,44 +13,49 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
 
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"fight_id" => fight_id}}) do
-    fight = Fights.get_fight!(fight_id)
+    case Fights.get_fight(fight_id) do
+      nil ->
+        Logger.info("DISCORD: Fight #{fight_id} not found, skipping notification")
+        {:ok, :not_found}
 
-    # Check if fight has Discord info
-    unless fight.server_id && fight.channel_id do
-      Logger.info("DISCORD: Fight #{fight_id} has no Discord info, skipping notification")
-      {:ok, :skipped}
-    else
-      # Generate fight content
-      content = FightPoster.shots(fight_id)
-      {message_content, embed} = build_message_params(content)
-
-      # Try to edit existing message or send new one
-      result =
-        if fight.fight_message_id do
-          case Message.edit(fight.channel_id, fight.fight_message_id,
-                 content: message_content,
-                 embeds: [embed]
-               ) do
-            {:ok, _message} ->
-              Logger.info(
-                "DISCORD: Updated message #{fight.fight_message_id} for fight #{fight_id}"
-              )
-
-              :ok
-
-            {:error, %{status_code: 404}} ->
-              # Message not found, send new one
-              send_new_message(fight, message_content, embed)
-
-            {:error, reason} ->
-              Logger.error("DISCORD: Failed to edit message: #{inspect(reason)}")
-              send_new_message(fight, message_content, embed)
-          end
+      fight ->
+        # Check if fight has Discord info
+        unless fight.server_id && fight.channel_id do
+          Logger.info("DISCORD: Fight #{fight_id} has no Discord info, skipping notification")
+          {:ok, :skipped}
         else
-          send_new_message(fight, message_content, embed)
-        end
+          # Generate fight content
+          content = FightPoster.shots(fight_id)
+          {message_content, embed} = build_message_params(content)
 
-      result
+          # Try to edit existing message or send new one
+          result =
+            if fight.fight_message_id do
+              case Message.edit(fight.channel_id, fight.fight_message_id,
+                     content: message_content,
+                     embeds: [embed]
+                   ) do
+                {:ok, _message} ->
+                  Logger.info(
+                    "DISCORD: Updated message #{fight.fight_message_id} for fight #{fight_id}"
+                  )
+
+                  {:ok, :updated}
+
+                {:error, %{status_code: 404}} ->
+                  # Message not found, send new one
+                  send_new_message(fight, message_content, embed)
+
+                {:error, reason} ->
+                  Logger.error("DISCORD: Failed to edit message: #{inspect(reason)}")
+                  send_new_message(fight, message_content, embed)
+              end
+            else
+              send_new_message(fight, message_content, embed)
+            end
+
+          result
+        end
     end
   end
 
@@ -58,14 +63,18 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
     case Message.create(fight.channel_id, content: message_content, embeds: [embed]) do
       {:ok, message} ->
         # Update fight with new message ID
-        Fights.update_fight(fight, %{fight_message_id: to_string(message.id)})
-        Logger.info("DISCORD: Sent new message #{message.id} for fight #{fight.id}")
-        :ok
+        case Fights.update_fight(fight, %{fight_message_id: to_string(message.id)}) do
+          {:ok, _fight} ->
+            Logger.info("DISCORD: Sent new message #{message.id} for fight #{fight.id}")
+            {:ok, :created}
+
+          {:error, changeset} ->
+            Logger.error("DISCORD: Failed to update fight: #{inspect(changeset)}")
+            {:error, :update_failed}
+        end
 
       {:error, reason} ->
         Logger.error("DISCORD: Failed to send message: #{inspect(reason)}")
-        # Clear fight_message_id on failure
-        Fights.update_fight(fight, %{fight_message_id: nil})
         {:error, reason}
     end
   end

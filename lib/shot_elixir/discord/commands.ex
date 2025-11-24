@@ -12,6 +12,45 @@ defmodule ShotElixir.Discord.Commands do
   require Logger
 
   @doc """
+  Handles autocomplete for the /start command's name parameter.
+  """
+  def handle_autocomplete(interaction) do
+    server_id = interaction.guild_id
+
+    # Get the user's current input for the fight name
+    focused_option =
+      interaction.data.options
+      |> Enum.find(&Map.get(&1, :focused, false))
+
+    input_value = if focused_option, do: focused_option.value || "", else: ""
+
+    # Get campaign for this server
+    campaign = get_campaign(server_id)
+
+    choices =
+      if campaign do
+        # Get active fights for this campaign
+        Fights.list_fights(campaign.id)
+        |> Enum.filter(& &1.active)
+        |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(input_value)))
+        |> Enum.take(25)
+        # Discord allows max 25 choices
+        |> Enum.map(&%{name: &1.name, value: &1.name})
+      else
+        []
+      end
+
+    # Respond with autocomplete choices
+    Api.create_interaction_response(interaction, %{
+      type: 8,
+      # APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
+      data: %{
+        choices: choices
+      }
+    })
+  end
+
+  @doc """
   Handles the /start command to start a fight in Discord.
   """
   def handle_start(interaction) do
@@ -19,42 +58,55 @@ defmodule ShotElixir.Discord.Commands do
     server_id = interaction.guild_id
     fight_name = get_option(interaction, "name")
 
-    unless channel_id do
-      respond(interaction, "Error: Discord channel ID is missing.", ephemeral: true)
-      :ok
-    end
+    cond do
+      is_nil(channel_id) ->
+        respond(interaction, "Error: Discord channel ID is missing.", ephemeral: true)
 
-    case get_campaign(server_id) do
-      nil ->
-        respond(interaction, "No campaign found for this server.", ephemeral: true)
-
-      campaign ->
-        fight =
-          Fights.list_fights(campaign.id)
-          |> Enum.find(&(&1.name == fight_name && &1.active))
-
-        case fight do
+      true ->
+        case get_campaign(server_id) do
           nil ->
-            respond(interaction, "Couldn't find that fight!")
+            respond(interaction, "No campaign found for this server.", ephemeral: true)
 
-          fight ->
-            # Update fight with Discord info
-            {:ok, fight} =
-              Fights.update_fight(fight, %{
-                server_id: server_id,
-                channel_id: channel_id,
-                fight_message_id: nil
-              })
+          campaign ->
+            fight =
+              Fights.list_fights(campaign.id)
+              |> Enum.find(&(&1.name == fight_name && &1.active))
 
-            # Set as current fight
-            CurrentFight.set(server_id, fight.id)
+            case fight do
+              nil ->
+                respond(interaction, "Couldn't find that fight!")
 
-            # Enqueue notification job
-            %{fight_id: fight.id}
-            |> DiscordNotificationWorker.new()
-            |> Oban.insert()
+              fight ->
+                # Update fight with Discord info
+                case Fights.update_fight(fight, %{
+                       server_id: to_string(server_id),
+                       channel_id: to_string(channel_id),
+                       fight_message_id: nil
+                     }) do
+                  {:ok, fight} ->
+                    # Set as current fight
+                    CurrentFight.set(server_id, fight.id)
 
-            respond(interaction, "Starting fight: #{fight.name}")
+                    # Enqueue notification job
+                    case %{fight_id: fight.id}
+                         |> DiscordNotificationWorker.new()
+                         |> Oban.insert() do
+                      {:ok, _job} ->
+                        respond(interaction, "Starting fight: #{fight.name}")
+
+                      {:error, reason} ->
+                        Logger.error(
+                          "DISCORD: Failed to enqueue notification job: #{inspect(reason)}"
+                        )
+
+                        respond(interaction, "Failed to start fight notification")
+                    end
+
+                  {:error, changeset} ->
+                    Logger.error("DISCORD: Failed to update fight: #{inspect(changeset)}")
+                    respond(interaction, "Failed to update fight")
+                end
+            end
         end
     end
   end
@@ -66,43 +118,48 @@ defmodule ShotElixir.Discord.Commands do
     channel_id = interaction.channel_id
     server_id = interaction.guild_id
 
-    unless channel_id do
-      respond(interaction, "Error: Discord channel ID is missing.", ephemeral: true)
-      :ok
-    end
+    cond do
+      is_nil(channel_id) ->
+        respond(interaction, "Error: Discord channel ID is missing.", ephemeral: true)
 
-    case CurrentFight.get(server_id) do
-      nil ->
-        respond(interaction, "There is no current fight.")
-
-      fight_id ->
-        case Fights.get_fight(fight_id) do
+      true ->
+        case CurrentFight.get(server_id) do
           nil ->
-            respond(interaction, "Fight not found.")
+            respond(interaction, "There is no current fight.")
 
-          fight ->
-            # Clear Discord fields
-            {:ok, _fight} =
-              Fights.update_fight(fight, %{
-                server_id: nil,
-                channel_id: nil,
-                fight_message_id: nil
-              })
+          fight_id ->
+            case Fights.get_fight(fight_id) do
+              nil ->
+                respond(interaction, "Fight not found.")
 
-            # Clear current fight
-            CurrentFight.set(server_id, nil)
+              fight ->
+                # Clear Discord fields
+                case Fights.update_fight(fight, %{
+                       server_id: nil,
+                       channel_id: nil,
+                       fight_message_id: nil
+                     }) do
+                  {:ok, _fight} ->
+                    # Clear current fight
+                    CurrentFight.set(server_id, nil)
 
-            respond(interaction, "Stopping fight: #{fight.name}")
+                    respond(interaction, "Stopping fight: #{fight.name}")
 
-            # If there's a message to edit, do it in the background
-            if fight.fight_message_id && fight.channel_id do
-              Task.start(fn ->
-                Message.edit(
-                  fight.channel_id,
-                  fight.fight_message_id,
-                  content: "Fight stopped: #{fight.name}"
-                )
-              end)
+                    # If there's a message to edit, do it in the background
+                    if fight.fight_message_id && fight.channel_id do
+                      Task.start(fn ->
+                        Message.edit(
+                          fight.channel_id,
+                          fight.fight_message_id,
+                          content: "Fight stopped: #{fight.name}"
+                        )
+                      end)
+                    end
+
+                  {:error, changeset} ->
+                    Logger.error("DISCORD: Failed to update fight: #{inspect(changeset)}")
+                    respond(interaction, "Failed to stop fight")
+                end
             end
         end
     end
@@ -126,7 +183,7 @@ defmodule ShotElixir.Discord.Commands do
 
     messages = [
       "Rolling swerve#{if username, do: " for #{username}", else: ""}",
-      DiceRoller.discord_format(swerve, username)
+      DiceRoller.discord_format(swerve)
     ]
 
     respond(interaction, Enum.join(messages, "\n"))
@@ -147,12 +204,11 @@ defmodule ShotElixir.Discord.Commands do
            Enum.flat_map(swerves, fn swerve ->
              rolled_at =
                if swerve.rolled_at do
-                 swerve.rolled_at
-                 |> DateTime.from_naive!("Etc/UTC")
-                 |> Calendar.strftime("%Y-%m-%d %l:%M %p")
+                 # rolled_at is already a DateTime, no need to convert
+                 Calendar.strftime(swerve.rolled_at, "%Y-%m-%d %l:%M %p")
                end
 
-             message = DiceRoller.discord_format(swerve, username)
+             message = DiceRoller.discord_format(swerve)
              [if(rolled_at, do: "Rolled on #{rolled_at}", else: nil), message]
            end))
         |> Enum.reject(&is_nil/1)
