@@ -255,8 +255,12 @@ defmodule ShotElixir.Services.PdfService do
   # Safely get field from list element
   defp get_field(list, index, field) do
     case Enum.at(list, index) do
-      nil -> nil
-      item -> strip_html(Map.get(item, field))
+      nil ->
+        nil
+
+      item ->
+        value = Map.get(item, field)
+        if is_binary(value), do: strip_html(value), else: value
     end
   end
 
