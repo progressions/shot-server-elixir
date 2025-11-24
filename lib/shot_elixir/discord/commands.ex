@@ -3,6 +3,7 @@ defmodule ShotElixir.Discord.Commands do
   Handles Discord slash command interactions.
   """
   alias Nostrum.Api
+  alias Nostrum.Api.Message
   alias ShotElixir.{Fights, Campaigns}
   alias ShotElixir.Discord.CurrentFight
   alias ShotElixir.Workers.DiscordNotificationWorker
@@ -96,7 +97,7 @@ defmodule ShotElixir.Discord.Commands do
             # If there's a message to edit, do it in the background
             if fight.fight_message_id && fight.channel_id do
               Task.start(fn ->
-                Api.edit_message(
+                Message.edit(
                   fight.channel_id,
                   fight.fight_message_id,
                   content: "Fight stopped: #{fight.name}"

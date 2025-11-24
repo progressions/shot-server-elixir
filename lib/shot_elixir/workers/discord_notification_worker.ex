@@ -5,9 +5,9 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
   """
   use Oban.Worker, queue: :discord, max_attempts: 3
 
-  alias Nostrum.Api
-  alias ShotElixir.{Fights, Repo}
-  alias ShotElixir.Discord.{FightPoster, CurrentFight}
+  alias Nostrum.Api.Message
+  alias ShotElixir.Fights
+  alias ShotElixir.Discord.FightPoster
 
   require Logger
 
@@ -27,7 +27,7 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
       # Try to edit existing message or send new one
       result =
         if fight.fight_message_id do
-          case Api.edit_message(fight.channel_id, fight.fight_message_id,
+          case Message.edit(fight.channel_id, fight.fight_message_id,
                  content: message_content,
                  embeds: [embed]
                ) do
@@ -55,7 +55,7 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
   end
 
   defp send_new_message(fight, message_content, embed) do
-    case Api.create_message(fight.channel_id, content: message_content, embeds: [embed]) do
+    case Message.create(fight.channel_id, content: message_content, embeds: [embed]) do
       {:ok, message} ->
         # Update fight with new message ID
         Fights.update_fight(fight, %{fight_message_id: to_string(message.id)})

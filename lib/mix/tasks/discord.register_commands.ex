@@ -9,7 +9,7 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
   """
   use Mix.Task
 
-  alias Nostrum.Api
+  alias Nostrum.Api.ApplicationCommand
 
   @shortdoc "Register Discord slash commands"
 
@@ -56,7 +56,7 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
       }
     ]
 
-    case Api.bulk_overwrite_global_application_commands(commands) do
+    case ApplicationCommand.bulk_overwrite_global_commands(commands) do
       {:ok, registered_commands} ->
         IO.puts("Successfully registered #{length(registered_commands)} commands:")
 

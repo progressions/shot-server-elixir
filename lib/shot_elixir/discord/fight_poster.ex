@@ -4,11 +4,9 @@ defmodule ShotElixir.Discord.FightPoster do
   Similar to Rails FightPoster service.
   """
   alias ShotElixir.{Fights, Repo}
-  alias ShotElixir.Fights.{Fight, Shot}
+  alias ShotElixir.Fights.Shot
   alias ShotElixir.Characters.Character
   alias ShotElixir.Vehicles.Vehicle
-
-  import Ecto.Query
 
   @doc """
   Generates markdown representation of a fight for Discord display.
