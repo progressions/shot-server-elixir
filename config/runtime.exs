@@ -23,12 +23,10 @@ if discord_token = System.get_env("DISCORD_TOKEN") do
   config :nostrum, token: discord_token
 end
 
-# Notion API configuration - loaded from environment variables
+# Notion API configuration - token loaded from environment variables
 # Must be set AFTER dotenvy loads .env above
-config :shot_elixir, :notion,
-  token: System.get_env("NOTION_TOKEN"),
-  database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
-  factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5"
+# Note: database_id and factions_database_id are defined in config.exs
+config :shot_elixir, :notion, token: System.get_env("NOTION_TOKEN")
 
 # ## Using releases
 #
