@@ -40,32 +40,39 @@ defmodule ShotElixir.Schticks.Schtick do
       :prerequisite_id
     ])
     |> validate_required([:name, :campaign_id])
-    |> validate_inclusion(:category, categories())
-    |> validate_inclusion(:path, paths())
     |> foreign_key_constraint(:prerequisite_id)
     |> unique_constraint([:category, :name, :campaign_id],
       name: :index_schticks_on_category_name_and_campaign
     )
   end
 
+  @doc """
+  Standard categories used in Feng Shui 2.
+  Note: The database accepts any category string (like Rails), so this is
+  informational only. Categories are typically titleized (e.g., "Guns", "Martial Arts").
+  """
   def categories do
     [
-      "fu",
-      "guns",
-      "driving",
-      "scroungetech",
-      "sorcery",
-      "creature",
-      "foe",
-      "transformed",
-      "magic",
-      "genome",
-      "awesoming_up"
+      "Guns",
+      "Martial Arts",
+      "Driving",
+      "Sorcery",
+      "Creature",
+      "Transformed Animal",
+      "Gene Freak",
+      "Cyborg",
+      "Foe"
     ]
   end
 
+  @doc """
+  Standard paths used in Feng Shui 2.
+  Note: The database accepts any path string. "Core" is a special path that
+  applies to all archetypes.
+  """
   def paths do
     [
+      "Core",
       "Path of the Warrior",
       "Path of the Bandit",
       "Path of the Driver",

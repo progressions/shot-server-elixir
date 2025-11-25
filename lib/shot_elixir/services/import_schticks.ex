@@ -2,7 +2,39 @@ defmodule ShotElixir.Services.ImportSchticks do
   @moduledoc """
   Service for importing schticks from YAML data.
   Mirrors the Rails ImportSchticks service.
+
+  ## Expected YAML Format
+
+  The YAML should be a list of category objects, each containing paths with schticks:
+
+  ```yaml
+  - name: "Guns"                    # Category name (will be titleized)
+    archetypes: ["Gunslinger"]      # List of archetypes this category applies to
+    paths:
+      - name: "Core"                # Path name (will be titleized, "Core" is special)
+        schticks:
+          - name: "Lightning Reload"
+            description: "Reload as a 0-shot action"
+          - name: "Both Guns Blazing I"
+            description: "Fire two guns at once"
+          - name: "Both Guns Blazing II"
+            description: "Improved dual wielding"
+            # prerequisite auto-detected from roman numeral
+          - name: "Special Move"
+            prerequisite: "Lightning Reload"  # Explicit prerequisite
+  ```
+
+  ## Notes
+
+  - Category names are titleized (e.g., "guns" -> "Guns", "martial arts" -> "Martial Arts")
+  - Path names are titleized; "Core" is a special path that gets a distinct color
+  - Prerequisites can be explicit or auto-detected from roman numeral sequences
+    (e.g., "Skill II" automatically gets "Skill I" as prerequisite)
+  - Explicit prerequisites may contain periods that are removed for lookup
+    (e.g., "Skill.I" becomes "SkillI" for matching)
   """
+
+  require Logger
 
   alias ShotElixir.Repo
   alias ShotElixir.Schticks.Schtick
@@ -10,6 +42,7 @@ defmodule ShotElixir.Services.ImportSchticks do
 
   @roman_numerals ["I", "II", "III", "IV", "V"]
 
+  # Colors matching Rails Schtick::COLORS
   @colors %{
     "Guns" => "#b71c1c",
     "Martial Arts" => "#4a148c",
@@ -31,8 +64,8 @@ defmodule ShotElixir.Services.ImportSchticks do
     - campaign: The campaign to import schticks into
 
   ## Returns
-    - {:ok, count} on success with number of schticks imported
-    - {:error, reason} on failure
+    - `{:ok, %{successful: count, failed: count}}` - Import results with counts
+    - `{:error, reason}` - If all imports failed or invalid data format
   """
   def call(data, campaign) when is_list(data) do
     results =
@@ -41,7 +74,15 @@ defmodule ShotElixir.Services.ImportSchticks do
       end)
 
     successful = Enum.count(results, fn result -> match?({:ok, _}, result) end)
-    {:ok, successful}
+    failed = Enum.count(results, fn result -> match?({:error, _}, result) end)
+
+    cond do
+      successful == 0 and failed > 0 ->
+        {:error, "All #{failed} imports failed"}
+
+      true ->
+        {:ok, %{successful: successful, failed: failed}}
+    end
   end
 
   def call(_, _), do: {:error, "Invalid data format - expected a list"}
@@ -103,7 +144,6 @@ defmodule ShotElixir.Services.ImportSchticks do
     |> Repo.insert_or_update()
   rescue
     e ->
-      require Logger
       Logger.warning("Failed to import schtick #{attributes["name"]}: #{inspect(e)}")
       {:error, e}
   end
@@ -129,6 +169,10 @@ defmodule ShotElixir.Services.ImportSchticks do
   defp get_prerequisite_name(attributes) do
     cond do
       # Explicit prerequisite specified
+      # Note: Some YAML data may include periods as formatting artifacts
+      # (e.g., "Skill.II" instead of "Skill II"). We remove periods to normalize
+      # the name for lookup. If prerequisite names legitimately contain periods,
+      # this may cause issues.
       attributes["prerequisite"] ->
         attributes["prerequisite"]
         |> String.replace(".", "")

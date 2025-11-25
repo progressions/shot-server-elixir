@@ -82,7 +82,7 @@ defmodule ShotElixir.MixProject do
       {:nostrum, "~> 0.10", runtime: Mix.env() != :test},
 
       # YAML parsing for schtick import
-      {:yaml_elixir, "~> 2.9"}
+      {:yaml_elixir, "~> 2.12"}
     ]
   end
 
