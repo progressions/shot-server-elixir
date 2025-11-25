@@ -79,7 +79,7 @@ defmodule ShotElixir.MixProject do
       {:oban, "~> 2.17"},
 
       # Discord bot integration
-      {:nostrum, "~> 0.10"}
+      {:nostrum, "~> 0.10", runtime: Mix.env() != :test}
     ]
   end
 

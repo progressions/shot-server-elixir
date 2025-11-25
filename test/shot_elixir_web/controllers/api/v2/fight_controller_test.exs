@@ -193,11 +193,11 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = get(conn, ~p"/api/v2/fights/#{fight.id}")
       response = json_response(conn, 200)
 
-      assert response["fight"]["id"] == fight.id
-      assert response["fight"]["name"] == fight.name
-      assert response["fight"]["description"] == fight.description
-      assert response["fight"]["season"] == fight.season
-      assert response["fight"]["session"] == fight.session
+      assert response["id"] == fight.id
+      assert response["name"] == fight.name
+      assert response["description"] == fight.description
+      assert response["season"] == fight.season
+      assert response["session"] == fight.session
     end
 
     test "returns 404 when fight not found", %{conn: conn, gamemaster: gm} do
@@ -212,7 +212,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = get(conn, ~p"/api/v2/fights/#{fight.id}")
       response = json_response(conn, 200)
 
-      assert response["fight"]["id"] == fight.id
+      assert response["id"] == fight.id
     end
 
     test "requires authentication", %{conn: conn, fight: fight} do
@@ -227,11 +227,11 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = post(conn, ~p"/api/v2/fights", fight: @create_attrs)
       response = json_response(conn, 201)
 
-      assert response["fight"]["name"] == @create_attrs.name
-      assert response["fight"]["description"] == @create_attrs.description
-      assert response["fight"]["season"] == @create_attrs.season
-      assert response["fight"]["session"] == @create_attrs.session
-      assert response["fight"]["active"] == true
+      assert response["name"] == @create_attrs.name
+      assert response["description"] == @create_attrs.description
+      assert response["season"] == @create_attrs.season
+      assert response["session"] == @create_attrs.session
+      assert response["active"] == true
     end
 
     test "creates fight with character and vehicle associations", %{
@@ -250,7 +250,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = post(conn, ~p"/api/v2/fights", fight: fight_attrs)
       response = json_response(conn, 201)
 
-      assert response["fight"]["name"] == @create_attrs.name
+      assert response["name"] == @create_attrs.name
       # Note: Association IDs might be handled differently in the current implementation
     end
 
@@ -261,8 +261,8 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = post(conn, ~p"/api/v2/fights", fight: json_attrs)
       response = json_response(conn, 201)
 
-      assert response["fight"]["name"] == @create_attrs.name
-      assert response["fight"]["description"] == @create_attrs.description
+      assert response["name"] == @create_attrs.name
+      assert response["description"] == @create_attrs.description
     end
 
     test "renders errors when data is invalid", %{conn: conn, gamemaster: gm} do
@@ -300,11 +300,11 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: @update_attrs)
       response = json_response(conn, 200)
 
-      assert response["fight"]["id"] == fight.id
-      assert response["fight"]["name"] == @update_attrs.name
-      assert response["fight"]["description"] == @update_attrs.description
-      assert response["fight"]["season"] == @update_attrs.season
-      assert response["fight"]["session"] == @update_attrs.session
+      assert response["id"] == fight.id
+      assert response["name"] == @update_attrs.name
+      assert response["description"] == @update_attrs.description
+      assert response["season"] == @update_attrs.season
+      assert response["session"] == @update_attrs.session
     end
 
     test "updates fight with character and vehicle associations", %{
@@ -324,7 +324,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: update_attrs)
       response = json_response(conn, 200)
 
-      assert response["fight"]["name"] == @update_attrs.name
+      assert response["name"] == @update_attrs.name
     end
 
     test "handles JSON string parameters", %{conn: conn, gamemaster: gm, fight: fight} do
@@ -334,8 +334,8 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: json_attrs)
       response = json_response(conn, 200)
 
-      assert response["fight"]["name"] == @update_attrs.name
-      assert response["fight"]["description"] == @update_attrs.description
+      assert response["name"] == @update_attrs.name
+      assert response["description"] == @update_attrs.description
     end
 
     test "updates active status", %{conn: conn, gamemaster: gm, fight: fight} do
@@ -343,7 +343,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: %{active: false})
       response = json_response(conn, 200)
 
-      assert response["fight"]["active"] == false
+      assert response["active"] == false
     end
 
     test "renders errors when data is invalid", %{conn: conn, gamemaster: gm, fight: fight} do
@@ -429,8 +429,8 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = patch(conn, ~p"/api/v2/fights/#{fight.id}/touch")
       response = json_response(conn, 200)
 
-      assert response["fight"]["id"] == fight.id
-      assert response["fight"]["name"] == fight.name
+      assert response["id"] == fight.id
+      assert response["name"] == fight.name
     end
 
     test "returns 404 when fight not found", %{conn: conn, gamemaster: gm} do
@@ -469,7 +469,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = patch(conn, ~p"/api/v2/fights/#{fight.id}/end_fight")
       response = json_response(conn, 200)
 
-      assert response["fight"]["id"] == fight.id
+      assert response["id"] == fight.id
       # ended_at should be set (implementation dependent)
     end
 
@@ -636,7 +636,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = patch(conn, ~p"/api/v2/fights/#{other_fight.id}", fight: %{name: "Admin Updated"})
       response = json_response(conn, 200)
 
-      assert response["fight"]["name"] == "Admin Updated"
+      assert response["name"] == "Admin Updated"
     end
 
     test "gamemaster cannot manage fights in other campaigns", %{
@@ -1115,7 +1115,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       response = json_response(conn, 200)
 
       fight_data = List.first(response["fights"])
-      assert Map.keys(fight_data) == ["entity_class", "id", "name"]
+      assert Map.keys(fight_data) == ["entity_class", "id", "image_url", "name"]
       assert fight_data["id"] == fight.id
       assert fight_data["name"] == "Test Fight"
       assert fight_data["entity_class"] == "Fight"
@@ -1152,7 +1152,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       response = json_response(conn, 200)
       fight_data = List.first(response["fights"])
 
-      assert Enum.sort(Map.keys(fight_data)) == ["entity_class", "id", "name"]
+      assert Enum.sort(Map.keys(fight_data)) == ["entity_class", "id", "image_url", "name"]
     end
   end
 end

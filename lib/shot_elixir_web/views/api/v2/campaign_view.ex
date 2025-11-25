@@ -7,15 +7,11 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
   end
 
   def render("show.json", %{campaign: campaign}) do
-    %{
-      campaign: render_campaign_detail(campaign)
-    }
+    render_campaign_detail(campaign)
   end
 
   def render("current.json", %{campaign: campaign}) do
-    %{
-      campaign: render_campaign_detail(campaign)
-    }
+    render_campaign_detail(campaign)
   end
 
   def render("set_current.json", %{campaign: campaign, user: user}) do

@@ -106,6 +106,80 @@ Phoenix schemas map directly to Rails Active Record models:
 - Same associations and validations
 - Compatible JSON serialization
 
+## API Response Format Rules
+
+**CRITICAL: Do NOT wrap single-resource responses in a root key.**
+
+The API follows Rails Active Model Serializers conventions where single resources are returned **directly without a wrapper key**.
+
+### show.json Response Format
+
+**CORRECT - Return data directly:**
+```elixir
+def render("show.json", %{character: character}) do
+  render_character_full(character)  # Returns %{id: ..., name: ..., ...}
+end
+```
+
+**WRONG - Do NOT wrap in a key:**
+```elixir
+def render("show.json", %{character: character}) do
+  %{character: render_character_full(character)}  # WRONG!
+end
+```
+
+### Current View Patterns
+
+| Resource | show.json | index.json |
+|----------|-----------|------------|
+| character | direct | `%{characters: [...], meta: ...}` |
+| vehicle | direct | `%{vehicles: [...], meta: ...}` |
+| weapon | direct | `%{weapons: [...], meta: ...}` |
+| schtick | direct | `%{schticks: [...], meta: ...}` |
+| site | direct | `%{sites: [...], meta: ...}` |
+| party | direct | `%{parties: [...], meta: ...}` |
+| faction | direct | `%{factions: [...], meta: ...}` |
+| juncture | direct | `%{junctures: [...], meta: ...}` |
+| invitation | direct | `%{invitations: [...]}` |
+| user | direct | N/A |
+| encounter | direct | N/A |
+| campaign | direct | `%{campaigns: [...], meta: ...}` |
+| fight | direct | `%{fights: [...], meta: ...}` |
+
+### Composite Responses (Multiple Objects)
+
+When returning multiple distinct objects, wrap each in its key:
+
+```elixir
+# set_current returns both campaign and user - wrap both
+def render("set_current.json", %{campaign: campaign, user: user}) do
+  %{
+    campaign: render_campaign_detail(campaign),
+    user: render_user_full(user)
+  }
+end
+```
+
+### Test Assertions
+
+When testing show/create/update endpoints, access response fields directly:
+
+```elixir
+# CORRECT
+response = json_response(conn, 200)
+assert response["id"] == character.id
+assert response["name"] == "Test Character"
+
+# WRONG - character is not wrapped
+assert response["character"]["id"] == character.id
+```
+
+For index endpoints, use the plural key:
+```elixir
+response = json_response(conn, 200)
+assert length(response["characters"]) == 2
+```
+
 ## Authentication
 
 Guardian JWT tokens compatible with Devise JWT:

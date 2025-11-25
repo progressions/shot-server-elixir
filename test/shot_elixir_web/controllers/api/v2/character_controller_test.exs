@@ -171,8 +171,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = get(conn, ~p"/api/v2/characters/#{character.id}")
       response = json_response(conn, 200)
 
-      assert response["character"]["id"] == character.id
-      assert response["character"]["name"] == "Test Character"
+      assert response["id"] == character.id
+      assert response["name"] == "Test Character"
     end
 
     test "returns forbidden when user has no campaign access", %{conn: conn, character: character} do
@@ -203,9 +203,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = post(conn, ~p"/api/v2/characters", character: @create_attrs)
       response = json_response(conn, 201)
 
-      assert response["character"]["name"] == "Test Character"
-      assert response["character"]["action_values"]["Type"] == "PC"
-      assert response["character"]["user_id"] == gm.id
+      assert response["name"] == "Test Character"
+      assert response["action_values"]["Type"] == "PC"
+      assert response["user_id"] == gm.id
     end
 
     test "broadcasts character creation via WebSocket", %{
@@ -218,8 +218,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       response = json_response(conn, 201)
 
       # Verify character was created
-      assert response["character"]["id"]
-      assert response["character"]["name"] == "Test Character"
+      assert response["id"]
+      assert response["name"] == "Test Character"
       # TODO: Add proper WebSocket testing once Phoenix Channel test infrastructure is complete
     end
 
@@ -266,9 +266,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = patch(conn, ~p"/api/v2/characters/#{character.id}", character: @update_attrs)
       response = json_response(conn, 200)
 
-      assert response["character"]["id"] == character.id
-      assert response["character"]["name"] == "Updated Character"
-      assert response["character"]["active"] == false
+      assert response["id"] == character.id
+      assert response["name"] == "Updated Character"
+      assert response["active"] == false
     end
 
     test "broadcasts character update via WebSocket", %{
@@ -282,7 +282,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       response = json_response(conn, 200)
 
       # Verify update was successful
-      assert response["character"]["name"] == "Updated Character"
+      assert response["name"] == "Updated Character"
       # TODO: Add proper WebSocket testing once Phoenix Channel test infrastructure is complete
     end
 
@@ -303,7 +303,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = patch(conn, ~p"/api/v2/characters/#{player_character.id}", character: @update_attrs)
       response = json_response(conn, 200)
 
-      assert response["character"]["name"] == "Updated Character"
+      assert response["name"] == "Updated Character"
     end
 
     test "non-owner non-gm cannot update", %{conn: conn, player: player, character: character} do
@@ -398,9 +398,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = post(conn, ~p"/api/v2/characters/#{character.id}/duplicate")
       response = json_response(conn, 201)
 
-      assert response["character"]["name"] == "Original Character (Copy)"
-      assert response["character"]["action_values"]["Type"] == "PC"
-      assert response["character"]["user_id"] == gm.id
+      assert response["name"] == "Original Character (1)"
+      assert response["action_values"]["Type"] == "PC"
+      assert response["user_id"] == gm.id
     end
 
     test "returns forbidden when user has no access", %{conn: conn, character: character} do
@@ -508,8 +508,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       response = json_response(conn, 200)
 
       # Character should have empty arrays for associations that aren't loaded
-      assert response["character"]["schticks"] == []
-      assert response["character"]["weapons"] == []
+      assert response["schticks"] == []
+      assert response["weapons"] == []
     end
 
     test "renders basic character data correctly", %{
@@ -521,7 +521,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = get(conn, ~p"/api/v2/characters/#{character.id}")
       response = json_response(conn, 200)
 
-      char = response["character"]
+      char = response
       assert char["id"] == character.id
       assert char["name"] == character.name
       assert char["action_values"]["Type"] == "PC"
@@ -561,9 +561,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = patch(conn, ~p"/api/v2/characters/#{character.id}", character: wound_attrs)
       response = json_response(conn, 200)
 
-      assert response["character"]["action_values"]["Body"] == -15
-      assert "Impaired" in response["character"]["action_values"]["Impairments"]
-      assert "Seriously Wounded" in response["character"]["action_values"]["Impairments"]
+      assert response["action_values"]["Body"] == -15
+      assert "Impaired" in response["action_values"]["Impairments"]
+      assert "Seriously Wounded" in response["action_values"]["Impairments"]
     end
 
     test "tracks multiple wound states", %{conn: conn, gamemaster: gm, character: character} do
@@ -580,8 +580,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = patch(conn, ~p"/api/v2/characters/#{character.id}", character: wound_attrs)
       response = json_response(conn, 200)
 
-      assert response["character"]["action_values"]["Body"] == -30
-      assert length(response["character"]["action_values"]["Impairments"]) == 3
+      assert response["action_values"]["Body"] == -30
+      assert length(response["action_values"]["Impairments"]) == 3
     end
   end
 
@@ -627,7 +627,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
 
       response = json_response(conn, 200)
 
-      assert response["character"]["user_id"] == another_player.id
+      assert response["user_id"] == another_player.id
     end
 
     test "player can reassign character ownership within campaign", %{
@@ -645,7 +645,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
 
       response = json_response(conn, 200)
       # Character ownership can be reassigned to another campaign member
-      assert response["character"]["user_id"] == another_player.id
+      assert response["user_id"] == another_player.id
     end
 
     test "ownership can be assigned to non-campaign-members", %{
@@ -669,7 +669,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
 
       response = json_response(conn, 200)
       # Character ownership can be assigned to any user (current behavior)
-      assert response["character"]["user_id"] == non_member.id
+      assert response["user_id"] == non_member.id
     end
   end
 
@@ -685,7 +685,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
   #     # Create first character
   #     conn1 = post(conn, ~p"/api/v2/characters", character: %{name: "Guard", action_values: %{"Type" => "Mook"}})
   #     response1 = json_response(conn1, 201)
-  #     assert response1["character"]["name"] == "Guard"
+  #     assert response1["name"] == "Guard"
 
   #     # Create second character with same name
   #     conn2 = post(conn, ~p"/api/v2/characters", character: %{name: "Guard", action_values: %{"Type" => "Mook"}})
@@ -712,7 +712,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
   #     # New character should use next available number
   #     conn = post(conn, ~p"/api/v2/characters", character: %{name: "Thug", action_values: %{"Type" => "Mook"}})
   #     response = json_response(conn, 201)
-  #     assert response["character"]["name"] == "Thug 5"
+  #     assert response["name"] == "Thug 5"
   #   end
   # end
 
@@ -781,7 +781,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = get(conn, ~p"/api/v2/characters/#{other_character.id}")
       response = json_response(conn, 200)
 
-      assert response["character"]["id"] == other_character.id
+      assert response["id"] == other_character.id
     end
 
     test "gamemaster cannot access characters from other campaigns", %{
@@ -817,7 +817,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
         )
 
       response1 = json_response(conn1, 200)
-      assert response1["character"]["name"] == "Updated PC"
+      assert response1["name"] == "Updated PC"
 
       # Cannot update GM's character
       conn2 = patch(conn, ~p"/api/v2/characters/#{gm_character.id}", character: %{name: "Hacked"})

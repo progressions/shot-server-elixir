@@ -28,9 +28,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
   end
 
   def render("show.json", %{fight: fight}) do
-    %{
-      fight: render_fight_detailed(fight)
-    }
+    render_fight_detailed(fight)
   end
 
   def render("error.json", %{errors: errors}) do

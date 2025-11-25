@@ -133,9 +133,9 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
       response = json_response(conn, 200)
 
-      assert response["campaign"]["id"] == campaign.id
-      assert response["campaign"]["name"] == campaign.name
-      assert response["campaign"]["description"] == campaign.description
+      assert response["id"] == campaign.id
+      assert response["name"] == campaign.name
+      assert response["description"] == campaign.description
     end
 
     test "returns campaign when user is member", %{conn: conn, player: player, campaign: campaign} do
@@ -145,7 +145,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
       response = json_response(conn, 200)
 
-      assert response["campaign"]["id"] == campaign.id
+      assert response["id"] == campaign.id
     end
 
     test "returns forbidden when user has no access", %{
@@ -172,10 +172,10 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       conn = post(conn, ~p"/api/v2/campaigns", campaign: @create_attrs)
       response = json_response(conn, 201)
 
-      assert response["campaign"]["name"] == "Test Campaign"
-      assert response["campaign"]["description"] == "A test campaign for testing"
-      assert response["campaign"]["active"] == true
-      assert response["campaign"]["user_id"] == gm.id
+      assert response["name"] == "Test Campaign"
+      assert response["description"] == "A test campaign for testing"
+      assert response["active"] == true
+      assert response["user_id"] == gm.id
     end
 
     test "renders errors when data is invalid", %{conn: conn, gamemaster: gm} do
@@ -219,10 +219,10 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       conn = patch(conn, ~p"/api/v2/campaigns/#{campaign.id}", campaign: @update_attrs)
       response = json_response(conn, 200)
 
-      assert response["campaign"]["id"] == campaign.id
-      assert response["campaign"]["name"] == "Updated Campaign"
-      assert response["campaign"]["description"] == "Updated description"
-      assert response["campaign"]["active"] == false
+      assert response["id"] == campaign.id
+      assert response["name"] == "Updated Campaign"
+      assert response["description"] == "Updated description"
+      assert response["active"] == false
     end
 
     test "returns forbidden when user is not owner", %{
@@ -313,6 +313,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       conn = patch(conn, ~p"/api/v2/campaigns/#{campaign.id}/set")
       response = json_response(conn, 200)
 
+      # Composite response with campaign and user
       assert response["campaign"]["id"] == campaign.id
       assert response["user"]["current_campaign_id"] == campaign.id
 
@@ -367,6 +368,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       conn = post(conn, ~p"/api/v2/campaigns/current", %{campaign_id: campaign.id})
       response = json_response(conn, 200)
 
+      # set_current returns composite response with campaign and user
       assert response["campaign"]["id"] == campaign.id
       assert response["user"]["current_campaign_id"] == campaign.id
     end
