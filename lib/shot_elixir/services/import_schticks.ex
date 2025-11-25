@@ -114,10 +114,15 @@ defmodule ShotElixir.Services.ImportSchticks do
       end
 
     # Determine path name and color
-    path_name = if path["name"], do: titleize(path["name"]), else: nil
+    path_name =
+      case path["name"] do
+        "Core" -> nil
+        name when is_binary(name) -> titleize(name)
+        _ -> nil
+      end
 
     color =
-      if path_name == "Core" do
+      if path["name"] == "Core" do
         @colors["Core"]
       else
         @colors[category_name] || @colors["Core"]
