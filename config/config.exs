@@ -97,8 +97,9 @@ config :nostrum,
   gateway_intents: [:guilds, :guild_messages, :message_content]
 
 # Notion API configuration
+# Note: token is loaded at runtime from .env via runtime.exs
+# to ensure Dotenvy has loaded the .env file first
 config :shot_elixir, :notion,
-  token: System.get_env("NOTION_TOKEN"),
   database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
   factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5"
 
