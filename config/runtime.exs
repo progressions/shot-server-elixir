@@ -7,6 +7,19 @@ import Config
 # any compile-time configuration in here, as it won't be applied.
 # The block below contains prod specific runtime configuration.
 
+# Load .env file in dev/test environments
+if config_env() in [:dev, :test] do
+  if Code.ensure_loaded?(Dotenvy) do
+    Dotenvy.source!([".env", System.get_env()])
+  end
+end
+
+# Discord bot configuration - loaded from environment variables
+# Must be set AFTER dotenvy loads .env above
+if discord_token = System.get_env("DISCORD_TOKEN") do
+  config :nostrum, token: discord_token
+end
+
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server
@@ -18,11 +31,6 @@ import Config
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
   config :shot_elixir, ShotElixirWeb.Endpoint, server: true
-end
-
-# Discord bot configuration - loaded from environment variables
-if discord_token = System.get_env("DISCORD_TOKEN") do
-  config :nostrum, token: discord_token
 end
 
 if config_env() == :prod do
