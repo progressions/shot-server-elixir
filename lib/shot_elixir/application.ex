@@ -76,6 +76,7 @@ defmodule ShotElixir.Application do
   end
 
   defp valid_discord_token?(_), do: false
+
   defp valid_base64?(str) when is_binary(str) do
     case Base.decode64(str) do
       {:ok, _} -> true
