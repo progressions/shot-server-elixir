@@ -79,7 +79,10 @@ defmodule ShotElixir.MixProject do
       {:oban, "~> 2.17"},
 
       # Discord bot integration
-      {:nostrum, "~> 0.10", runtime: Mix.env() != :test}
+      {:nostrum, "~> 0.10", runtime: Mix.env() != :test},
+
+      # YAML parsing for schtick import
+      {:yaml_elixir, "~> 2.9"}
     ]
   end
 

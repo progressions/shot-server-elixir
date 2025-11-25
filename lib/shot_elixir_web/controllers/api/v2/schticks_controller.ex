@@ -315,7 +315,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
   end
 
   # POST /api/v2/schticks/import
-  def import(conn, _params) do
+  def import(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
 
     case get_current_campaign(current_user) do
@@ -324,11 +324,40 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
         |> put_status(:unprocessable_entity)
         |> json(%{error: "No active campaign selected"})
 
-      _campaign ->
-        # TODO: Implement YAML import functionality when needed
-        conn
-        |> put_status(:not_implemented)
-        |> json(%{error: "Import functionality not yet implemented"})
+      campaign ->
+        # Get YAML from params
+        yaml_content =
+          case params do
+            %{"schtick" => %{"yaml" => yaml}} -> yaml
+            %{"yaml" => yaml} -> yaml
+            _ -> nil
+          end
+
+        if yaml_content do
+          case YamlElixir.read_from_string(yaml_content) do
+            {:ok, data} ->
+              case ShotElixir.Services.ImportSchticks.call(data, campaign) do
+                {:ok, count} ->
+                  conn
+                  |> put_status(:ok)
+                  |> json(%{message: "Successfully imported #{count} schticks"})
+
+                {:error, reason} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Import failed: #{inspect(reason)}"})
+              end
+
+            {:error, reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Invalid YAML format: #{inspect(reason)}"})
+          end
+        else
+          conn
+          |> put_status(:bad_request)
+          |> json(%{error: "YAML content is required"})
+        end
     end
   end
 
