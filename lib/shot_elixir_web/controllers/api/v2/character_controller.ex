@@ -224,7 +224,11 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user) do
-      # TODO: Implement Notion sync
+      # Queue Notion sync
+      %{"character_id" => character.id}
+      |> SyncCharacterToNotionWorker.new()
+      |> Oban.insert()
+
       conn
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
       |> render("sync.json", character: character, status: "queued")
