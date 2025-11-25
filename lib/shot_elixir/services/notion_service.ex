@@ -4,6 +4,8 @@ defmodule ShotElixir.Services.NotionService do
   Handles character synchronization with Notion database.
   """
 
+  require Logger
+
   alias ShotElixir.Services.NotionClient
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
@@ -35,13 +37,11 @@ defmodule ShotElixir.Services.NotionService do
         })
 
       {:error, reason} ->
-        require Logger
         Logger.error("Failed to sync character to Notion: #{inspect(reason)}")
         {:error, reason}
     end
   rescue
     error ->
-      require Logger
       Logger.error("Exception syncing character to Notion: #{inspect(error)}")
       {:error, error}
   end
@@ -75,7 +75,6 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, page}
   rescue
     error ->
-      require Logger
       Logger.error("Failed to create Notion page: #{inspect(error)}")
       {:error, error}
   end
@@ -108,7 +107,6 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, page}
   rescue
     error ->
-      require Logger
       Logger.error("Failed to update Notion page: #{inspect(error)}")
       {:error, error}
   end
@@ -144,7 +142,6 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, character}
   rescue
     error ->
-      require Logger
       Logger.error("Failed to find or create character from Notion: #{inspect(error)}")
       {:error, error}
   end
@@ -164,7 +161,6 @@ defmodule ShotElixir.Services.NotionService do
     Characters.update_character(character, attributes)
   rescue
     error ->
-      require Logger
       Logger.error("Failed to update character from Notion: #{inspect(error)}")
       {:error, error}
   end
@@ -244,20 +240,170 @@ defmodule ShotElixir.Services.NotionService do
     NotionClient.append_block_children(character.notion_page_id, [child])
   rescue
     error ->
-      require Logger
       Logger.warning("Failed to add image to Notion: #{inspect(error)}")
       nil
   end
 
   @doc """
   Add image from Notion to character.
-  Note: This is a placeholder - actual image upload would require
-  downloading from Notion URL and uploading to ImageKit/S3.
+  Downloads image from Notion and uploads to ImageKit, then attaches to character.
+
+  Returns `{:ok, result}` on success (including when skipped), `{:error, reason}` on failure.
+
+  Note: Notion file URLs (type "file") expire after approximately 1 hour.
+  This function should be called immediately after extracting the URL from Notion,
+  not in a delayed or asynchronous context.
   """
-  def add_image(_page, _character) do
-    # TODO: Implement image download and upload if needed
-    # For now, skip this as it requires integration with Arc/ImageKit
-    nil
+  def add_image(page, %Character{} = character) do
+    # Check if character already has an image via ActiveStorage
+    existing_image_url = ShotElixir.ActiveStorage.get_image_url("Character", character.id)
+
+    if existing_image_url do
+      {:ok, :skipped_existing_image}
+    else
+      case find_image_block(page) do
+        nil ->
+          {:ok, :no_image_block}
+
+        image_block ->
+          {image_url, is_notion_file} = extract_image_url_with_type(image_block)
+
+          if image_url do
+            # Warn about Notion file URL expiration
+            if is_notion_file do
+              Logger.warning(
+                "Notion file URL detected for character #{character.id}. " <>
+                  "Download must be immediate as these URLs expire after ~1 hour."
+              )
+            end
+
+            download_and_attach_image(image_url, character)
+          else
+            {:ok, :no_image_url}
+          end
+      end
+    end
+  end
+
+  # Returns {url, is_notion_file} tuple
+  defp extract_image_url_with_type(%{"type" => "image", "image" => image_data}) do
+    case image_data do
+      %{"type" => "external", "external" => %{"url" => url}} -> {url, false}
+      %{"type" => "file", "file" => %{"url" => url}} -> {url, true}
+      _ -> {nil, false}
+    end
+  end
+
+  defp extract_image_url_with_type(_), do: {nil, false}
+
+  defp download_and_attach_image(url, %Character{} = character) do
+    # Create a unique temp file path using erlang unique integer (more robust than rand)
+    unique_id = :erlang.unique_integer([:positive])
+    temp_path = Path.join(System.tmp_dir!(), "notion_image_#{character.id}_#{unique_id}")
+
+    try do
+      # First, try to create the temp file to catch permission/disk errors early
+      case File.open(temp_path, [:write, :binary]) do
+        {:ok, file} ->
+          File.close(file)
+          # File created successfully, now download into it
+          do_download_and_attach(url, temp_path, character)
+
+        {:error, reason} ->
+          Logger.error("Failed to create temp file #{temp_path}: #{inspect(reason)}")
+          {:error, {:temp_file_creation_failed, reason}}
+      end
+    after
+      # Clean up temp files properly
+      cleanup_temp_files(temp_path)
+    end
+  rescue
+    error ->
+      Logger.error("Exception downloading Notion image: #{inspect(error)}")
+      {:error, error}
+  end
+
+  defp do_download_and_attach(url, temp_path, character) do
+    # Download the image to memory first (safer than streaming to disk for partial file handling)
+    case Req.get(url) do
+      {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
+        # Write to temp file
+        case File.write(temp_path, body) do
+          :ok ->
+            # Determine file extension from URL or default to jpg
+            extension = url |> URI.parse() |> Map.get(:path, "") |> Path.extname()
+            extension = if extension == "", do: ".jpg", else: extension
+
+            # Rename temp file with proper extension
+            final_path = temp_path <> extension
+
+            case File.rename(temp_path, final_path) do
+              :ok ->
+                # Store final_path for cleanup (using process dictionary as simple tracker)
+                Process.put(:notion_final_path, final_path)
+
+                upload_and_attach(final_path, extension, character)
+
+              {:error, reason} ->
+                Logger.error("Failed to rename temp file: #{inspect(reason)}")
+                {:error, {:rename_failed, reason}}
+            end
+
+          {:error, reason} ->
+            Logger.error("Failed to write downloaded image to temp file: #{inspect(reason)}")
+            {:error, {:write_failed, reason}}
+        end
+
+      {:ok, %{status: 200, body: body}} when byte_size(body) == 0 ->
+        Logger.warning("Downloaded image is empty (0 bytes)")
+        {:error, :empty_download}
+
+      {:ok, %{status: status}} ->
+        Logger.warning("Failed to download Notion image, status: #{status}")
+        {:error, {:download_failed, status}}
+
+      {:error, reason} ->
+        Logger.error("Failed to download Notion image: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp upload_and_attach(final_path, extension, character) do
+    # Upload to ImageKit
+    case ShotElixir.Services.ImagekitService.upload_file(final_path, %{
+           folder: "/chi-war-#{Mix.env()}/characters",
+           file_name: "#{character.id}#{extension}"
+         }) do
+      {:ok, upload_result} ->
+        # Attach to character via ActiveStorage
+        case ShotElixir.ActiveStorage.attach_image("Character", character.id, upload_result) do
+          {:ok, _attachment} ->
+            Logger.info("Successfully attached Notion image to character #{character.id}")
+            {:ok, upload_result}
+
+          {:error, reason} ->
+            Logger.error("Failed to attach image to character: #{inspect(reason)}")
+            {:error, reason}
+        end
+
+      {:error, reason} ->
+        Logger.error("Failed to upload Notion image to ImageKit: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp cleanup_temp_files(temp_path) do
+    # Clean up the original temp path
+    File.rm(temp_path)
+
+    # Clean up the final path if it was set
+    case Process.get(:notion_final_path) do
+      nil -> :ok
+      final_path -> File.rm(final_path)
+    end
+
+    # Clear process dictionary
+    Process.delete(:notion_final_path)
   end
 
   @doc """
