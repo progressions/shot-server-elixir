@@ -251,13 +251,99 @@ defmodule ShotElixir.Services.NotionService do
 
   @doc """
   Add image from Notion to character.
-  Note: This is a placeholder - actual image upload would require
-  downloading from Notion URL and uploading to ImageKit/S3.
+  Downloads image from Notion and uploads to ImageKit, then attaches to character.
   """
-  def add_image(_page, _character) do
-    # TODO: Implement image download and upload if needed
-    # For now, skip this as it requires integration with Arc/ImageKit
-    nil
+  def add_image(page, %Character{} = character) do
+    # Skip if character already has an image
+    if character.image_url do
+      nil
+    else
+      case find_image_block(page) do
+        nil ->
+          nil
+
+        image_block ->
+          image_url = extract_image_url(image_block)
+
+          if image_url do
+            download_and_attach_image(image_url, character)
+          end
+      end
+    end
+  end
+
+  defp extract_image_url(%{"type" => "image", "image" => image_data}) do
+    case image_data do
+      %{"type" => "external", "external" => %{"url" => url}} -> url
+      %{"type" => "file", "file" => %{"url" => url}} -> url
+      _ -> nil
+    end
+  end
+
+  defp extract_image_url(_), do: nil
+
+  defp download_and_attach_image(url, %Character{} = character) do
+    require Logger
+
+    # Create a temp file for the download
+    temp_path =
+      System.tmp_dir!() |> Path.join("notion_image_#{character.id}_#{:rand.uniform(100_000)}")
+
+    try do
+      # Download the image
+      case Req.get(url, into: File.stream!(temp_path)) do
+        {:ok, %{status: 200}} ->
+          # Determine file extension from URL or default to jpg
+          extension = url |> URI.parse() |> Map.get(:path, "") |> Path.extname()
+          extension = if extension == "", do: ".jpg", else: extension
+
+          # Rename temp file with proper extension
+          final_path = temp_path <> extension
+          File.rename!(temp_path, final_path)
+
+          # Upload to ImageKit
+          case ShotElixir.Services.ImagekitService.upload_file(final_path, %{
+                 folder: "/chi-war-#{Mix.env()}/characters",
+                 file_name: "#{character.id}#{extension}"
+               }) do
+            {:ok, upload_result} ->
+              # Attach to character via ActiveStorage
+              case ShotElixir.ActiveStorage.attach_image("Character", character.id, upload_result) do
+                {:ok, _attachment} ->
+                  Logger.info("Successfully attached Notion image to character #{character.id}")
+                  {:ok, upload_result}
+
+                {:error, reason} ->
+                  Logger.error("Failed to attach image to character: #{inspect(reason)}")
+                  {:error, reason}
+              end
+
+            {:error, reason} ->
+              Logger.error("Failed to upload Notion image to ImageKit: #{inspect(reason)}")
+              {:error, reason}
+          end
+
+        {:ok, %{status: status}} ->
+          Logger.warning("Failed to download Notion image, status: #{status}")
+          {:error, "Download failed with status #{status}"}
+
+        {:error, reason} ->
+          Logger.error("Failed to download Notion image: #{inspect(reason)}")
+          {:error, reason}
+      end
+    after
+      # Clean up temp files
+      File.rm(temp_path)
+      File.rm(temp_path <> ".jpg")
+      File.rm(temp_path <> ".png")
+      File.rm(temp_path <> ".gif")
+      File.rm(temp_path <> ".webp")
+    end
+  rescue
+    error ->
+      require Logger
+      Logger.error("Exception downloading Notion image: #{inspect(error)}")
+      {:error, error}
   end
 
   @doc """
