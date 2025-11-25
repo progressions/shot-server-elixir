@@ -8,7 +8,7 @@ defmodule ShotElixir.Services.ImportSchticks do
   The YAML should be a list of category objects, each containing paths with schticks:
 
   ```yaml
-  - name: "Guns"                    # Category name (will be titleized)
+  - name: "Guns"                    # Category name (will be normalized)
     archetypes: ["Gunslinger"]      # List of archetypes this category applies to
     paths:
       - name: "Core"                # Path name (will be titleized, "Core" is special)
@@ -26,7 +26,8 @@ defmodule ShotElixir.Services.ImportSchticks do
 
   ## Notes
 
-  - Category names are titleized (e.g., "guns" -> "Guns", "martial arts" -> "Martial Arts")
+  - Category names are normalized to match schema values (e.g., "guns" -> "Guns",
+    "fu" -> "Martial Arts", "MARTIAL ARTS" -> "Martial Arts")
   - Path names are titleized; "Core" is a special path that gets a distinct color
   - Prerequisites can be explicit or auto-detected from roman numeral sequences
     (e.g., "Skill II" automatically gets "Skill I" as prerequisite)
@@ -104,7 +105,7 @@ defmodule ShotElixir.Services.ImportSchticks do
   end
 
   defp parse_attributes(attributes, category, path, campaign) do
-    category_name = titleize(category["name"])
+    category_name = normalize_category(category["name"])
 
     # Find or create the schtick
     schtick =
@@ -161,7 +162,7 @@ defmodule ShotElixir.Services.ImportSchticks do
   end
 
   defp find_prerequisite(attributes, category, _path, campaign) do
-    category_name = titleize(category["name"])
+    category_name = normalize_category(category["name"])
     prereq_name = get_prerequisite_name(attributes)
 
     if prereq_name do
@@ -223,5 +224,24 @@ defmodule ShotElixir.Services.ImportSchticks do
     |> String.split(" ")
     |> Enum.map(&String.capitalize/1)
     |> Enum.join(" ")
+  end
+
+  # Normalize category names from YAML to match expected schema values.
+  # YAML may contain various formats: lowercase, uppercase, or mixed case.
+  # This function normalizes to the titleized format expected by the schema.
+  # Common aliases like "fu" or "ma" are mapped to "Martial Arts".
+  # Regular names are titleized: "guns" -> "Guns", "MARTIAL ARTS" -> "Martial Arts".
+  defp normalize_category(nil), do: nil
+
+  defp normalize_category(name) when is_binary(name) do
+    # Check for common aliases first, then fall back to titleizing
+    downcased = String.downcase(name)
+
+    case downcased do
+      "fu" -> "Martial Arts"
+      "ma" -> "Martial Arts"
+      "martial_arts" -> "Martial Arts"
+      _ -> titleize(name)
+    end
   end
 end
