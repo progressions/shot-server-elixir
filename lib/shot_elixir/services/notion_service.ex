@@ -254,8 +254,10 @@ defmodule ShotElixir.Services.NotionService do
   Downloads image from Notion and uploads to ImageKit, then attaches to character.
   """
   def add_image(page, %Character{} = character) do
-    # Skip if character already has an image
-    if character.image_url do
+    # Check if character already has an image via ActiveStorage
+    existing_image_url = ShotElixir.ActiveStorage.get_image_url("Character", character.id)
+
+    if existing_image_url do
       nil
     else
       case find_image_block(page) do
