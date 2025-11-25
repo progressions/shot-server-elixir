@@ -42,9 +42,14 @@ defmodule ShotElixir.Application do
     :ok
   end
 
-  # Discord children are only started if a token is configured
+  # Discord children are only started if a valid token is configured
   defp discord_children do
-    if Application.get_env(:nostrum, :token) do
+    token = Application.get_env(:nostrum, :token)
+
+    if valid_discord_token?(token) do
+      # Start Nostrum application manually since runtime: false in mix.exs
+      {:ok, _} = Application.ensure_all_started(:nostrum)
+
       [
         # Discord bot consumer
         ShotElixir.Discord.Consumer,
@@ -55,4 +60,18 @@ defmodule ShotElixir.Application do
       []
     end
   end
+
+  # Check if token looks like a valid Discord bot token (3 base64 segments)
+  defp valid_discord_token?(nil), do: false
+  defp valid_discord_token?(""), do: false
+  defp valid_discord_token?("placeholder"), do: false
+
+  defp valid_discord_token?(token) when is_binary(token) do
+    case String.split(token, ".") do
+      [_id, _timestamp, _hmac] -> true
+      _ -> false
+    end
+  end
+
+  defp valid_discord_token?(_), do: false
 end
