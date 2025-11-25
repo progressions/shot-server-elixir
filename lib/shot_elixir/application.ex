@@ -67,11 +67,19 @@ defmodule ShotElixir.Application do
   defp valid_discord_token?("placeholder"), do: false
 
   defp valid_discord_token?(token) when is_binary(token) do
-    case String.split(token, ".") do
-      [_id, _timestamp, _hmac] -> true
+    with [id, ts, hmac] <- String.split(token, "."),
+         true <- valid_base64?(id) and valid_base64?(ts) and valid_base64?(hmac) do
+      true
+    else
       _ -> false
     end
   end
 
   defp valid_discord_token?(_), do: false
+  defp valid_base64?(str) when is_binary(str) do
+    case Base.decode64(str) do
+      {:ok, _} -> true
+      :error -> false
+    end
+  end
 end
