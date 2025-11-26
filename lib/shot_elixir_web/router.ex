@@ -115,6 +115,9 @@ defmodule ShotElixirWeb.Router do
         post "/assign_driver", ShotController, :assign_driver
         delete "/remove_driver", ShotController, :remove_driver
       end
+
+      resources "/character_effects", CharacterEffectController,
+        only: [:index, :create, :update, :delete]
     end
 
     # Weapons with custom routes
