@@ -34,7 +34,7 @@ mix precommit
 mix format
 
 # Check compilation warnings
-mix compile --warnings-as-errors
+mix compile --warning-as-errors
 ```
 
 ## Code Patterns
