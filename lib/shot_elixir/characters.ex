@@ -7,6 +7,8 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Repo
   alias ShotElixir.Characters.Character
   alias ShotElixir.Fights.Shot
+  alias ShotElixir.Parties.Membership
+  alias ShotElixir.Sites.Attunement
   alias ShotElixir.ImageLoader
   alias Ecto.Multi
   use ShotElixir.Models.Broadcastable
@@ -50,11 +52,62 @@ defmodule ShotElixir.Characters do
     # Apply visibility filtering
     query = apply_visibility_filter(query, params)
 
+    # Apply single id filter if present
+    query =
+      if params["id"] && params["id"] != "" do
+        from c in query, where: c.id == ^params["id"]
+      else
+        query
+      end
+
     # Apply ids filter if present
     query =
       if params["ids"] do
         ids = parse_ids(params["ids"])
         from c in query, where: c.id in ^ids
+      else
+        query
+      end
+
+    # Apply user_id filter if present
+    query =
+      if params["user_id"] && params["user_id"] != "" do
+        from c in query, where: c.user_id == ^params["user_id"]
+      else
+        query
+      end
+
+    # Apply juncture_id filter if present
+    # Special case: "__NONE__" means juncture_id IS NULL
+    query =
+      if params["juncture_id"] && params["juncture_id"] != "" do
+        if params["juncture_id"] == "__NONE__" do
+          from c in query, where: is_nil(c.juncture_id)
+        else
+          from c in query, where: c.juncture_id == ^params["juncture_id"]
+        end
+      else
+        query
+      end
+
+    # Apply party_id filter if present (joins memberships table)
+    query =
+      if params["party_id"] && params["party_id"] != "" do
+        from c in query,
+          join: m in Membership,
+          on: m.character_id == c.id,
+          where: m.party_id == ^params["party_id"]
+      else
+        query
+      end
+
+    # Apply site_id filter if present (joins attunements table)
+    query =
+      if params["site_id"] && params["site_id"] != "" do
+        from c in query,
+          join: a in Attunement,
+          on: a.character_id == c.id,
+          where: a.site_id == ^params["site_id"]
       else
         query
       end
@@ -161,10 +214,15 @@ defmodule ShotElixir.Characters do
       |> Enum.uniq()
       |> Enum.sort()
 
-    # Return characters with pagination metadata and archetypes
+    # Get factions used by these characters (like Rails does)
+    faction_ids = Enum.map(characters, & &1.faction_id)
+    factions = ShotElixir.Factions.get_factions_by_ids(faction_ids)
+
+    # Return characters with pagination metadata, archetypes, and factions
     %{
       characters: characters_with_images,
       archetypes: archetypes,
+      factions: factions,
       meta: %{
         current_page: page,
         per_page: per_page,
@@ -251,6 +309,9 @@ defmodule ShotElixir.Characters do
   defp parse_ids(_), do: []
 
   defp apply_sorting(query, params) do
+    alias ShotElixir.Factions.Faction
+    alias ShotElixir.Junctures.Juncture
+
     sort = params["sort"] || "created_at"
     order = if String.upcase(params["order"] || "") == "ASC", do: :asc, else: :desc
 
@@ -272,6 +333,32 @@ defmodule ShotElixir.Characters do
       "name" ->
         order_by(query, [c], [
           {^order, fragment("LOWER(?)", c.name)},
+          {:asc, c.id}
+        ])
+
+      "faction" ->
+        # Join with factions table to sort by faction name
+        # Characters without factions will appear last in ASC, first in DESC
+        null_sort = if order == :asc, do: "zzz", else: ""
+
+        query
+        |> join(:left, [c], f in Faction, on: c.faction_id == f.id, as: :faction)
+        |> order_by([c, faction: f], [
+          {^order, fragment("LOWER(COALESCE(?, ?))", f.name, ^null_sort)},
+          {:asc, fragment("LOWER(?)", c.name)},
+          {:asc, c.id}
+        ])
+
+      "juncture" ->
+        # Join with junctures table to sort by juncture name
+        # Characters without junctures will appear last in ASC, first in DESC
+        null_sort = if order == :asc, do: "zzz", else: ""
+
+        query
+        |> join(:left, [c], j in Juncture, on: c.juncture_id == j.id, as: :juncture)
+        |> order_by([c, juncture: j], [
+          {^order, fragment("LOWER(COALESCE(?, ?))", j.name, ^null_sort)},
+          {:asc, fragment("LOWER(?)", c.name)},
           {:asc, c.id}
         ])
 
