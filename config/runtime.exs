@@ -94,6 +94,7 @@ if config_env() == :prod do
     ],
     secret_key_base: secret_key_base,
     check_origin: [
+      "https://chiwar.net",
       "https://shot-client-phoenix.fly.dev",
       "https://shot-client-next.fly.dev"
     ]
