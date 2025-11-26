@@ -91,6 +91,7 @@ defmodule ShotElixir.Characters do
       end
 
     # Apply party_id filter if present (joins memberships table)
+    # A party can potentially have multiple copies of a character.
     query =
       if params["party_id"] && params["party_id"] != "" do
         from c in query,
@@ -102,6 +103,7 @@ defmodule ShotElixir.Characters do
       end
 
     # Apply site_id filter if present (joins attunements table)
+    # A site could potentially have multiple copies of a character.
     query =
       if params["site_id"] && params["site_id"] != "" do
         from c in query,
