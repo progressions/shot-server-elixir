@@ -163,4 +163,4 @@ assert length(response["characters"]) == 2
 2. Don't nest multiple modules in the same file
 3. Don't use map access syntax on structs
 4. Phoenix router `scope` blocks include an optional alias prefix
-5. `Phoenix.View` is deprecated - don't use it
+5. `Phoenix.View` is not included by default in Phoenix 1.7+ projects, but may still be used where needed (e.g., for email templates). It is actively used in this codebase.
