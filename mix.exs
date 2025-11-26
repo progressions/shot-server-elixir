@@ -78,8 +78,14 @@ defmodule ShotElixir.MixProject do
       # Background jobs for email delivery
       {:oban, "~> 2.17"},
 
-      # Discord bot integration
-      {:nostrum, "~> 0.10", runtime: Mix.env() != :test}
+      # Discord bot integration (runtime: false to control startup via application.ex)
+      {:nostrum, "~> 0.10", runtime: false},
+
+      # YAML parsing for schtick import
+      {:yaml_elixir, "~> 2.12"},
+
+      # Load .env files automatically in dev
+      {:dotenvy, "~> 0.8", only: [:dev, :test]}
     ]
   end
 

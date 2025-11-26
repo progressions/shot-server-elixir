@@ -91,13 +91,15 @@ config :shot_elixir, Oban,
 
 # Discord configuration
 # Token can be set via DISCORD_BOT_TOKEN env var or overridden in dev.exs/prod.exs
+# Note: If no token is set, Nostrum won't start (see application.ex)
 config :nostrum,
-  token: System.get_env("DISCORD_BOT_TOKEN") || "",
+  token: System.get_env("DISCORD_BOT_TOKEN") || "placeholder",
   gateway_intents: [:guilds, :guild_messages, :message_content]
 
 # Notion API configuration
+# Note: token is loaded at runtime from .env via runtime.exs
+# to ensure Dotenvy has loaded the .env file first
 config :shot_elixir, :notion,
-  token: System.get_env("NOTION_TOKEN"),
   database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
   factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5"
 

@@ -83,6 +83,9 @@ defmodule ShotElixirWeb.Router do
 
     post "/campaigns/current", CampaignController, :set_current
 
+    # Notion integration
+    get "/notion/characters", NotionController, :characters
+
     # Characters
     get "/characters/names", CharacterController, :autocomplete
     post "/characters/pdf", CharacterController, :import

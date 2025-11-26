@@ -20,23 +20,14 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> put_status(:bad_request)
       |> json(%{error: "No current campaign set"})
     else
-      characters = Characters.list_campaign_characters(campaign_id, params, current_user)
-
-      # Extract archetypes dynamically like Rails does
-      archetypes =
-        characters.characters
-        |> Enum.map(fn c -> get_in(c.action_values, ["Archetype"]) end)
-        |> Enum.reject(&is_nil/1)
-        |> Enum.reject(&(&1 == ""))
-        |> Enum.uniq()
-        |> Enum.sort()
+      result = Characters.list_campaign_characters(campaign_id, params, current_user)
 
       Logger.debug(fn ->
         %{
           message: "Characters#index",
           params: params,
           campaign_id: campaign_id,
-          returned: length(characters.characters)
+          returned: length(result.characters)
         }
         |> Jason.encode!()
       end)
@@ -44,9 +35,10 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       conn
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
       |> render("index.json",
-        characters: characters.characters,
-        meta: characters.meta,
-        archetypes: archetypes
+        characters: result.characters,
+        meta: result.meta,
+        archetypes: result.archetypes,
+        factions: result.factions
       )
     end
   end

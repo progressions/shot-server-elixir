@@ -315,7 +315,10 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
   end
 
   # POST /api/v2/schticks/import
-  def import(conn, _params) do
+  # Maximum YAML size: 1MB (protection against DoS via large payloads)
+  @max_yaml_size 1_000_000
+
+  def import(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
 
     case get_current_campaign(current_user) do
@@ -324,11 +327,64 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
         |> put_status(:unprocessable_entity)
         |> json(%{error: "No active campaign selected"})
 
-      _campaign ->
-        # TODO: Implement YAML import functionality when needed
+      campaign ->
+        # Get YAML from params
+        yaml_content =
+          case params do
+            %{"schtick" => %{"yaml" => yaml}} -> yaml
+            %{"yaml" => yaml} -> yaml
+            _ -> nil
+          end
+
+        cond do
+          is_nil(yaml_content) ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "YAML content is required"})
+
+          byte_size(yaml_content) > @max_yaml_size ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "YAML content too large (max 1MB)"})
+
+          true ->
+            parse_and_import_yaml(conn, yaml_content, campaign)
+        end
+    end
+  end
+
+  defp parse_and_import_yaml(conn, yaml_content, campaign) do
+    case YamlElixir.read_from_string(yaml_content) do
+      {:ok, data} ->
+        case ShotElixir.Services.ImportSchticks.call(data, campaign) do
+          {:ok, %{successful: successful, failed: 0}} ->
+            conn
+            |> put_status(:ok)
+            |> json(%{
+              message: "Successfully imported #{successful} schticks",
+              successful: successful,
+              failed: 0
+            })
+
+          {:ok, %{successful: successful, failed: failed}} ->
+            conn
+            |> put_status(:ok)
+            |> json(%{
+              message: "Imported #{successful} schticks with #{failed} failures",
+              successful: successful,
+              failed: failed
+            })
+
+          {:error, reason} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Import failed: #{reason}"})
+        end
+
+      {:error, reason} ->
         conn
-        |> put_status(:not_implemented)
-        |> json(%{error: "Import functionality not yet implemented"})
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Invalid YAML format: #{inspect(reason)}"})
     end
   end
 
