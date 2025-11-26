@@ -115,7 +115,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           if Enum.empty?(effects) do
             acc
           else
-            Map.put(acc, shot.character_id, effects)
+            # Use Map.update to concatenate effects from multiple shots
+            Map.update(acc, shot.character_id, effects, fn existing -> existing ++ effects end)
           end
         end)
     end
@@ -139,7 +140,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           if Enum.empty?(effects) do
             acc
           else
-            Map.put(acc, shot.vehicle_id, effects)
+            # Use Map.update to concatenate effects from multiple shots
+            Map.update(acc, shot.vehicle_id, effects, fn existing -> existing ++ effects end)
           end
         end)
     end
