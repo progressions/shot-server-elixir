@@ -44,6 +44,17 @@ Implements Rails API V2 endpoints under `/api/v2/`:
 - JWT token authentication
 - Identical request/response formats to Rails
 
+### View Modules (IMPORTANT)
+This project uses `*View` modules for JSON rendering, NOT `*JSON` modules.
+
+- Views are located in `lib/shot_elixir_web/views/api/v2/`
+- Module naming: `ShotElixirWeb.Api.V2.CharacterView` (NOT `CharacterJSON`)
+- Controllers must use `put_view/2` to connect to their view module:
+  ```elixir
+  conn = put_view(conn, ShotElixirWeb.Api.V2.CharacterView)
+  ```
+- Do NOT create `*_json.ex` files - they are not used in this project
+
 ## Development Commands
 
 ```bash

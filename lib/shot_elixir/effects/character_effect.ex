@@ -31,7 +31,7 @@ defmodule ShotElixir.Effects.CharacterEffect do
       :vehicle_id,
       :shot_id
     ])
-    |> validate_required([:name, :shot_id])
+    |> validate_required([:shot_id])
     |> validate_at_least_one_present([:character_id, :vehicle_id])
   end
 

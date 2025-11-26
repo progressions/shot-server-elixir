@@ -12,6 +12,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterEffectController do
 
   # POST /api/v2/fights/:fight_id/character_effects
   def create(conn, %{"fight_id" => fight_id, "character_effect" => effect_params}) do
+    conn = put_view(conn, ShotElixirWeb.Api.V2.CharacterEffectView)
     current_user = Guardian.Plug.current_resource(conn)
 
     with %{} = fight <- Fights.get_fight(fight_id),
@@ -61,6 +62,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterEffectController do
 
   # PATCH/PUT /api/v2/fights/:fight_id/character_effects/:id
   def update(conn, %{"fight_id" => fight_id, "id" => id, "character_effect" => effect_params}) do
+    conn = put_view(conn, ShotElixirWeb.Api.V2.CharacterEffectView)
     current_user = Guardian.Plug.current_resource(conn)
 
     with %{} = fight <- Fights.get_fight(fight_id),
@@ -141,6 +143,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterEffectController do
 
   # GET /api/v2/fights/:fight_id/character_effects
   def index(conn, %{"fight_id" => fight_id}) do
+    conn = put_view(conn, ShotElixirWeb.Api.V2.CharacterEffectView)
     current_user = Guardian.Plug.current_resource(conn)
 
     with %{} = fight <- Fights.get_fight(fight_id),

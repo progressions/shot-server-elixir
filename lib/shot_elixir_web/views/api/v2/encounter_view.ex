@@ -30,7 +30,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       character_ids: get_character_ids(fight),
       vehicle_ids: get_vehicle_ids(fight),
       action_id: fight.action_id,
-      shots: render_shots(fight)
+      shots: render_shots(fight),
+      character_effects: get_character_effects_map(fight),
+      vehicle_effects: get_vehicle_effects_map(fight)
     }
   end
 
@@ -92,6 +94,56 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         |> Enum.filter(& &1.vehicle_id)
         |> Enum.map(& &1.vehicle_id)
         |> Enum.uniq()
+    end
+  end
+
+  # Build a map of character_id => [effects] for the top-level encounter response
+  defp get_character_effects_map(fight) do
+    case Map.get(fight, :shots) do
+      %Ecto.Association.NotLoaded{} ->
+        %{}
+
+      nil ->
+        %{}
+
+      shots ->
+        shots
+        |> Enum.filter(& &1.character_id)
+        |> Enum.reduce(%{}, fn shot, acc ->
+          effects = render_effects(shot)
+
+          if Enum.empty?(effects) do
+            acc
+          else
+            # Use Map.update to concatenate effects from multiple shots
+            Map.update(acc, shot.character_id, effects, fn existing -> existing ++ effects end)
+          end
+        end)
+    end
+  end
+
+  # Build a map of vehicle_id => [effects] for the top-level encounter response
+  defp get_vehicle_effects_map(fight) do
+    case Map.get(fight, :shots) do
+      %Ecto.Association.NotLoaded{} ->
+        %{}
+
+      nil ->
+        %{}
+
+      shots ->
+        shots
+        |> Enum.filter(& &1.vehicle_id)
+        |> Enum.reduce(%{}, fn shot, acc ->
+          effects = render_effects(shot)
+
+          if Enum.empty?(effects) do
+            acc
+          else
+            # Use Map.update to concatenate effects from multiple shots
+            Map.update(acc, shot.vehicle_id, effects, fn existing -> existing ++ effects end)
+          end
+        end)
     end
   end
 
