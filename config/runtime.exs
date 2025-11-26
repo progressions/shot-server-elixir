@@ -26,11 +26,13 @@ end
 # Notion API configuration - token loaded from environment variables
 # Must be set AFTER dotenvy loads .env above
 # Note: database_id and factions_database_id are defined in config.exs
-# We must include the compile-time values to avoid compile_env validation errors
-config :shot_elixir, :notion,
-  database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
-  factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
-  token: System.get_env("NOTION_TOKEN")
+# No longer using compile_env, so runtime config can differ
+if notion_token = System.get_env("NOTION_TOKEN") do
+  config :shot_elixir, :notion,
+    database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
+    factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
+    token: notion_token
+end
 
 # ## Using releases
 #
