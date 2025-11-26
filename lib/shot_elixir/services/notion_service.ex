@@ -11,10 +11,16 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Characters.Character
   alias ShotElixir.Repo
 
-  @database_id Application.compile_env(:shot_elixir, :notion)[:database_id] ||
-                 "f6fa27ac-19cd-4b17-b218-55acc6d077be"
-  @factions_database_id Application.compile_env(:shot_elixir, :notion)[:factions_database_id] ||
-                          "0ae94bfa1a754c8fbda28ea50afa5fd5"
+  # Use runtime config to allow token to be added at runtime without validation errors
+  defp database_id do
+    Application.get_env(:shot_elixir, :notion)[:database_id] ||
+      "f6fa27ac-19cd-4b17-b218-55acc6d077be"
+  end
+
+  defp factions_database_id do
+    Application.get_env(:shot_elixir, :notion)[:factions_database_id] ||
+      "0ae94bfa1a754c8fbda28ea50afa5fd5"
+  end
 
   @doc """
   Main sync function - creates or updates character in Notion.
@@ -61,7 +67,7 @@ defmodule ShotElixir.Services.NotionService do
 
     page =
       NotionClient.create_page(%{
-        "parent" => %{"database_id" => @database_id},
+        "parent" => %{"database_id" => database_id()},
         "properties" => properties
       })
 
@@ -200,7 +206,7 @@ defmodule ShotElixir.Services.NotionService do
       ]
     }
 
-    response = NotionClient.database_query(@factions_database_id, %{"filter" => filter})
+    response = NotionClient.database_query(factions_database_id(), %{"filter" => filter})
     response["results"]
   end
 
