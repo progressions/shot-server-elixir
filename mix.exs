@@ -85,7 +85,10 @@ defmodule ShotElixir.MixProject do
       {:yaml_elixir, "~> 2.12"},
 
       # Load .env files automatically in dev
-      {:dotenvy, "~> 0.8", only: [:dev, :test]}
+      {:dotenvy, "~> 0.8", only: [:dev, :test]},
+
+      # Tidewave MCP server for AI coding assistance
+      {:tidewave, "~> 0.5", only: :dev}
     ]
   end
 
