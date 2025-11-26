@@ -52,6 +52,7 @@ defmodule ShotElixirWeb.Endpoint do
     origin: [
       "http://localhost:3001",
       "http://localhost:3000",
+      "https://chiwar.net",
       "https://shot-client-phoenix.fly.dev",
       "https://shot-client-next.fly.dev"
     ],
