@@ -12,11 +12,17 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     "Melodramatic Hook" => ""
   }
 
-  def render("index.json", %{characters: characters, meta: meta, archetypes: archetypes}) do
+  def render("index.json", %{
+        characters: characters,
+        meta: meta,
+        archetypes: archetypes,
+        factions: factions
+      }) do
     %{
       characters: Enum.map(characters, &render_character_index/1),
       meta: meta,
-      archetypes: archetypes
+      archetypes: archetypes,
+      factions: Enum.map(factions, &render_faction_lite_map/1)
     }
   end
 
@@ -239,6 +245,15 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     %{
       id: faction.id,
       name: faction.name,
+      entity_class: "Faction"
+    }
+  end
+
+  # Render faction from map (returned by get_factions_by_ids)
+  defp render_faction_lite_map(%{id: id, name: name}) do
+    %{
+      id: id,
+      name: name,
       entity_class: "Faction"
     }
   end

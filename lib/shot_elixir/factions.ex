@@ -18,6 +18,26 @@ defmodule ShotElixir.Factions do
     Repo.all(query)
   end
 
+  @doc """
+  Get factions by a list of IDs, ordered by name (case-insensitive).
+  Returns only id and name fields like Rails FactionLiteSerializer.
+  """
+  def get_factions_by_ids(faction_ids) when is_list(faction_ids) do
+    # Filter out nils and empty values
+    ids = faction_ids |> Enum.reject(&is_nil/1) |> Enum.uniq()
+
+    if Enum.empty?(ids) do
+      []
+    else
+      from(f in Faction,
+        where: f.id in ^ids,
+        select: %{id: f.id, name: f.name},
+        order_by: [asc: fragment("LOWER(?)", f.name)]
+      )
+      |> Repo.all()
+    end
+  end
+
   def list_campaign_factions(campaign_id, params \\ %{}, _current_user \\ nil) do
     # Get pagination parameters - handle both string and integer params
     per_page =
