@@ -114,11 +114,6 @@ changeset[:field]
 Ecto.Changeset.get_field(changeset, :field)
 ```
 
-### Phoenix 1.8 LiveView
-
-- Begin templates with `<Layouts.app flash={@flash} ...>`
-- Use `<.icon name="hero-x-mark" class="w-5 h-5"/>` for icons
-- Use `<.input>` component for form inputs
 
 ### Ecto Guidelines
 
