@@ -403,6 +403,19 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerFilteringTest do
       refute "Thug" in names
     end
 
+    test "filters by single id", %{
+      conn: conn,
+      gamemaster: gm,
+      brick: brick
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters", id: brick.id)
+      response = json_response(conn, 200)
+
+      assert length(response["characters"]) == 1
+      assert hd(response["characters"])["name"] == "Brick Manly"
+    end
+
     test "filters by comma-separated ids", %{
       conn: conn,
       gamemaster: gm,
@@ -515,6 +528,87 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerFilteringTest do
       # Everyday Hero comes before Sorcerer alphabetically
       brick_idx = Enum.find_index(names, &(&1 == "Brick Manly"))
       serena_idx = Enum.find_index(names, &(&1 == "Serena"))
+      assert brick_idx < serena_idx
+    end
+
+    test "sorts by faction ascending", %{
+      conn: conn,
+      gamemaster: gm,
+      dragons: dragons,
+      ascended: ascended
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters", sort: "faction", order: "asc")
+      response = json_response(conn, 200)
+
+      # Characters sorted by faction name alphabetically
+      # "The Ascended" comes before "The Dragons" alphabetically
+      faction_ids = Enum.map(response["characters"], & &1["faction_id"])
+      first_faction_idx = Enum.find_index(faction_ids, &(&1 == ascended.id))
+      dragons_faction_idx = Enum.find_index(faction_ids, &(&1 == dragons.id))
+
+      # Ascended characters should appear before Dragons characters
+      assert first_faction_idx < dragons_faction_idx
+    end
+
+    test "sorts by faction descending", %{
+      conn: conn,
+      gamemaster: gm,
+      dragons: dragons,
+      ascended: ascended
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters", sort: "faction", order: "desc")
+      response = json_response(conn, 200)
+
+      # Characters sorted by faction name descending
+      # "The Dragons" comes before "The Ascended" in descending order
+      faction_ids = Enum.map(response["characters"], & &1["faction_id"])
+      dragons_faction_idx = Enum.find_index(faction_ids, &(&1 == dragons.id))
+      ascended_faction_idx = Enum.find_index(faction_ids, &(&1 == ascended.id))
+
+      # Dragons characters should appear before Ascended characters
+      assert dragons_faction_idx < ascended_faction_idx
+    end
+
+    test "sorts by juncture ascending", %{
+      conn: conn,
+      gamemaster: gm,
+      brick: brick,
+      serena: serena
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters", sort: "juncture", order: "asc")
+      response = json_response(conn, 200)
+
+      # Characters sorted by juncture name alphabetically
+      # Serena has "Ancient" juncture, Brick has "Modern" juncture
+      # "Ancient" comes before "Modern" alphabetically
+      names = Enum.map(response["characters"], & &1["name"])
+      serena_idx = Enum.find_index(names, &(&1 == serena.name))
+      brick_idx = Enum.find_index(names, &(&1 == brick.name))
+
+      # Serena (Ancient) should appear before Brick (Modern)
+      assert serena_idx < brick_idx
+    end
+
+    test "sorts by juncture descending", %{
+      conn: conn,
+      gamemaster: gm,
+      brick: brick,
+      serena: serena
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters", sort: "juncture", order: "desc")
+      response = json_response(conn, 200)
+
+      # Characters sorted by juncture name descending
+      # "Modern" comes before "Ancient" in descending order
+      names = Enum.map(response["characters"], & &1["name"])
+      brick_idx = Enum.find_index(names, &(&1 == brick.name))
+      serena_idx = Enum.find_index(names, &(&1 == serena.name))
+
+      # Brick (Modern) should appear before Serena (Ancient)
       assert brick_idx < serena_idx
     end
 
