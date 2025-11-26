@@ -2,6 +2,10 @@
 
 This Phoenix API replicates the Rails shot-server API endpoints using the same PostgreSQL database.
 
+## Git Workflow
+
+**Never commit directly to main/master.** Always create a feature branch and make a pull request. Wait for CI to pass before merging.
+
 ## Project Overview
 
 This is a Phoenix 1.8 API application that provides identical endpoints to the Rails shot-server, sharing the same database (shot_counter_local). It's designed to be a drop-in replacement for the Rails API with full compatibility.
