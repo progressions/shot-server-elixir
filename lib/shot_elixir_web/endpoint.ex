@@ -38,16 +38,13 @@ defmodule ShotElixirWeb.Endpoint do
     gzip: not code_reloading?,
     only: ShotElixirWeb.static_paths()
 
-  # Tidewave MCP server for AI coding assistance (dev only)
-  if Code.ensure_loaded?(Tidewave) do
-    plug Tidewave
-  end
-
   # Code reloading can be explicitly enabled under the
   # :code_reloader configuration of your endpoint.
   if code_reloading? do
     plug Phoenix.CodeReloader
     plug Phoenix.Ecto.CheckRepoStatus, otp_app: :shot_elixir
+    # Tidewave MCP server for AI coding assistance (dev only)
+    plug Tidewave
   end
 
   # CORS configuration
