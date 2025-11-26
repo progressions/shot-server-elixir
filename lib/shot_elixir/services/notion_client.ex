@@ -8,7 +8,11 @@ defmodule ShotElixir.Services.NotionClient do
   @base_url "https://api.notion.com/v1"
 
   def client do
-    token = Application.get_env(:shot_elixir, :notion)[:token]
+    # Read token directly from environment at runtime since Dotenvy
+    # loads .env after config is compiled
+    token =
+      System.get_env("NOTION_TOKEN") ||
+        Application.get_env(:shot_elixir, :notion)[:token]
 
     unless token do
       raise "NOTION_TOKEN environment variable is not set"

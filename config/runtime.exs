@@ -11,6 +11,9 @@ import Config
 if config_env() in [:dev, :test] do
   if Code.ensure_loaded?(Dotenvy) do
     Dotenvy.source!([".env", System.get_env()])
+    |> Enum.each(fn {key, value} ->
+      System.put_env(key, value)
+    end)
   end
 end
 
@@ -19,6 +22,11 @@ end
 if discord_token = System.get_env("DISCORD_TOKEN") do
   config :nostrum, token: discord_token
 end
+
+# Notion API configuration - token loaded from environment variables
+# Must be set AFTER dotenvy loads .env above
+# Note: database_id and factions_database_id are defined in config.exs
+config :shot_elixir, :notion, token: System.get_env("NOTION_TOKEN")
 
 # ## Using releases
 #
