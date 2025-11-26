@@ -43,6 +43,8 @@ defmodule ShotElixirWeb.Endpoint do
   if code_reloading? do
     plug Phoenix.CodeReloader
     plug Phoenix.Ecto.CheckRepoStatus, otp_app: :shot_elixir
+    # Tidewave MCP server for AI coding assistance (dev only)
+    plug Tidewave
   end
 
   # CORS configuration
