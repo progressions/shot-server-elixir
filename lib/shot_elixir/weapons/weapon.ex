@@ -42,6 +42,5 @@ defmodule ShotElixir.Weapons.Weapon do
     |> validate_number(:damage, greater_than_or_equal_to: 0)
     |> validate_number(:concealment, greater_than_or_equal_to: 0, less_than_or_equal_to: 5)
     |> validate_number(:mook_bonus, greater_than_or_equal_to: 0)
-    |> validate_inclusion(:category, ["guns", "melee", "heavy", "improvised", "explosive"])
   end
 end

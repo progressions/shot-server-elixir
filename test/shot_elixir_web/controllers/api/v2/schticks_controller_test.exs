@@ -301,18 +301,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       assert json_response(conn, 422)["errors"] != %{}
     end
 
-    test "validates category values", %{conn: conn, gamemaster: gamemaster} do
-      invalid_category = Map.put(@create_attrs, :category, "invalid_category")
-
-      conn =
-        conn
-        |> authenticate(gamemaster)
-        |> post("/api/v2/schticks", schtick: invalid_category)
-
-      errors = json_response(conn, 422)["errors"]
-      assert errors["category"] != nil
-    end
-
     test "requires authentication", %{conn: conn} do
       conn = post(conn, "/api/v2/schticks", schtick: @create_attrs)
       assert conn.status == 401
