@@ -80,12 +80,14 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       gamemaster: gamemaster,
       campaign: campaign
     } do
-      # Create some schticks
+      # Create some schticks with different categories
       {:ok, _schtick1} =
         Schticks.create_schtick(
           Map.merge(@create_attrs, %{
             campaign_id: campaign.id,
-            name: "Schtick 1"
+            name: "Schtick 1",
+            category: "fu",
+            path: "Path of the Warrior"
           })
         )
 
@@ -94,7 +96,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
           Map.merge(@create_attrs, %{
             campaign_id: campaign.id,
             name: "Schtick 2",
-            category: "guns"
+            category: "guns",
+            path: "Path of the Gun"
           })
         )
 
@@ -103,11 +106,19 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
         |> authenticate(gamemaster)
         |> get("/api/v2/schticks")
 
-      assert json_response(conn, 200)["schticks"]
-      schticks = json_response(conn, 200)["schticks"]
+      response = json_response(conn, 200)
+      schticks = response["schticks"]
       assert length(schticks) == 2
       assert Enum.any?(schticks, fn s -> s["name"] == "Schtick 1" end)
       assert Enum.any?(schticks, fn s -> s["name"] == "Schtick 2" end)
+
+      # Verify categories and paths arrays are included
+      assert is_list(response["categories"])
+      assert is_list(response["paths"])
+      assert "fu" in response["categories"]
+      assert "guns" in response["categories"]
+      assert "Path of the Warrior" in response["paths"]
+      assert "Path of the Gun" in response["paths"]
     end
 
     test "filters schticks by category", %{conn: conn, gamemaster: gamemaster, campaign: campaign} do
