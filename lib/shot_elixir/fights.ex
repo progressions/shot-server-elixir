@@ -644,7 +644,7 @@ defmodule ShotElixir.Fights do
   Acts a shot, moving it down the initiative track.
   """
   def act_shot(%Shot{} = shot, shot_cost) do
-    new_shot = max(shot.shot - shot_cost, 0)
+    new_shot = shot.shot - shot_cost
     update_shot(shot, %{shot: new_shot, acted: true})
   end
 

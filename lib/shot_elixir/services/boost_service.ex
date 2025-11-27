@@ -38,7 +38,7 @@ defmodule ShotElixir.Services.BoostService do
         end
 
         # Deduct shots
-        new_shot = max((booster_shot.shot || 0) - @boost_cost, 0)
+        new_shot = (booster_shot.shot || 0) - @boost_cost
 
         case Fights.update_shot(booster_shot, %{shot: new_shot}) do
           {:ok, _} -> :ok

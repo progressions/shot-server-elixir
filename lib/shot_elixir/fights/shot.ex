@@ -42,7 +42,6 @@ defmodule ShotElixir.Fights.Shot do
       :driving_id
     ])
     |> validate_required([:fight_id])
-    |> validate_number(:shot, greater_than_or_equal_to: 0)
     |> validate_number(:count, greater_than_or_equal_to: 0)
     |> validate_number(:impairments, greater_than_or_equal_to: 0)
     |> validate_actor_presence()
