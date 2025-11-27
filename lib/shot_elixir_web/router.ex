@@ -95,6 +95,8 @@ defmodule ShotElixirWeb.Router do
       post "/duplicate", CharacterController, :duplicate
       get "/pdf", CharacterController, :pdf
       resources "/advancements", AdvancementController
+      resources "/weapons", CharacterWeaponController, only: [:index, :create, :delete]
+      resources "/schticks", CharacterSchtickController, only: [:index, :create, :delete]
     end
 
     # Vehicles
