@@ -187,7 +187,9 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       id: character.id,
       name: character.name,
       character_type: get_in(character.action_values, ["Type"]) || "PC",
-      user_id: character.user_id
+      user_id: character.user_id,
+      image_url: get_image_url(character),
+      entity_class: "Character"
     }
   end
 
