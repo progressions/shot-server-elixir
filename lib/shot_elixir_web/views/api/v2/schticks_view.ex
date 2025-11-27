@@ -1,8 +1,20 @@
 defmodule ShotElixirWeb.Api.V2.SchticksView do
+  def render("index.json", %{schticks: schticks, meta: meta, categories: categories, paths: paths}) do
+    %{
+      schticks: Enum.map(schticks, &render_schtick/1),
+      meta: meta,
+      categories: categories,
+      paths: paths
+    }
+  end
+
+  # Fallback for when categories/paths not provided (e.g., character schticks)
   def render("index.json", %{schticks: schticks, meta: meta}) do
     %{
       schticks: Enum.map(schticks, &render_schtick/1),
-      meta: meta
+      meta: meta,
+      categories: [],
+      paths: []
     }
   end
 
