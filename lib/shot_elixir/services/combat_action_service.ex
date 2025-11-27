@@ -57,6 +57,9 @@ defmodule ShotElixir.Services.CombatActionService do
 
       shot ->
         if shot.fight_id == fight.id do
+          # Preload character to check type for wounds routing
+          shot = Repo.preload(shot, :character)
+
           with :ok <- maybe_create_event(fight, update) do
             apply_shot_updates(shot, update)
           end
@@ -131,35 +134,51 @@ defmodule ShotElixir.Services.CombatActionService do
   end
 
   # Build map of shot-level updates
-  defp build_shot_updates(_shot, update) do
-    %{}
-    |> maybe_add("shot", update["shot"])
-    |> maybe_add("impairments", update["impairments"])
-    |> maybe_add("count", update["count"])
-  end
+  defp build_shot_updates(shot, update) do
+    base_updates =
+      %{}
+      |> maybe_add("shot", update["shot"])
+      |> maybe_add("impairments", update["impairments"])
+      |> maybe_add("count", update["count"])
 
-  # Build map of character-level updates (for PCs/named NPCs)
-  defp build_character_updates(shot, update) do
+    # For NPCs (non-PCs), wounds go to shots.count, not character.action_values
     character = shot.character || %{}
 
-    # Only update character wounds if this is a PC or named NPC
-    # Mooks use count on the shot instead
-    if update["wounds"] && !is_mook?(character) do
-      current_wounds = get_current_wounds(character)
-      new_wounds = current_wounds + update["wounds"]
-
-      %{"action_values" => %{"Wounds" => new_wounds}}
+    if update["wounds"] && !is_pc?(character) do
+      current_count = shot.count || 0
+      new_count = current_count + update["wounds"]
+      Map.put(base_updates, "count", new_count)
     else
-      %{}
+      base_updates
     end
   end
 
-  # Helper to check if character is a mook
-  defp is_mook?(%Character{action_values: action_values}) when is_map(action_values) do
-    action_values["Type"] == "Mook"
+  # Build map of character-level updates (for PCs only)
+  defp build_character_updates(shot, update) do
+    character = shot.character || %{}
+
+    cond do
+      # If action_values is sent directly, pass it through (for PCs)
+      update["action_values"] && is_pc?(character) ->
+        %{"action_values" => update["action_values"]}
+
+      # If wounds is sent separately, build the action_values (for PCs)
+      update["wounds"] && is_pc?(character) ->
+        current_wounds = get_current_wounds(character)
+        new_wounds = current_wounds + update["wounds"]
+        %{"action_values" => %{"Wounds" => new_wounds}}
+
+      true ->
+        %{}
+    end
   end
 
-  defp is_mook?(_), do: false
+  # Helper to check if character is a PC
+  defp is_pc?(%Character{action_values: action_values}) when is_map(action_values) do
+    action_values["Type"] == "PC"
+  end
+
+  defp is_pc?(_), do: false
 
   # Helper to get current wounds from character
   defp get_current_wounds(%Character{action_values: action_values}) when is_map(action_values) do

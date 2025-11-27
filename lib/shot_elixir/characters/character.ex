@@ -119,6 +119,7 @@ defmodule ShotElixir.Characters.Character do
     |> validate_number(:impairments, greater_than_or_equal_to: 0)
     |> validate_character_type()
     |> unique_constraint([:name, :campaign_id])
+    |> merge_partial_action_values()
     |> ensure_default_values()
   end
 
@@ -137,6 +138,20 @@ defmodule ShotElixir.Characters.Character do
       changeset
     else
       add_error(changeset, :action_values, "invalid character type")
+    end
+  end
+
+  # Merges partial action_values updates with existing values.
+  # This allows updating just Wounds without wiping out Type, Creature, etc.
+  defp merge_partial_action_values(changeset) do
+    incoming_values = get_change(changeset, :action_values)
+
+    if is_nil(incoming_values) do
+      changeset
+    else
+      existing_values = changeset.data.action_values || %{}
+      merged_values = Map.merge(existing_values, incoming_values)
+      put_change(changeset, :action_values, merged_values)
     end
   end
 
