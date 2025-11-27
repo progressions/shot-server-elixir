@@ -484,11 +484,12 @@ defmodule ShotElixir.Services.CampaignSeederService do
        ) do
     # Find matching schticks in target campaign by name and link them
     if source.schticks && length(source.schticks) > 0 do
-      source_schtick_names = Enum.map(source.schticks, & &1.name)
+      source_schtick_keys = Enum.map(source.schticks, fn s -> {s.name, s.category} end)
 
       target_schticks =
         from(s in Schtick,
-          where: s.campaign_id == ^target_campaign.id and s.name in ^source_schtick_names
+          where: s.campaign_id == ^target_campaign.id and
+            fragment("(?, ?) IN ?", s.name, s.category, ^source_schtick_keys)
         )
         |> Repo.all()
 
