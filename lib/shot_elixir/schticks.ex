@@ -40,13 +40,7 @@ defmodule ShotElixir.Schticks do
         query
       end
 
-    query =
-      if params["ids"] do
-        ids = parse_ids(params["ids"])
-        from s in query, where: s.id in ^ids
-      else
-        query
-      end
+    query = apply_ids_filter(query, params["ids"], Map.has_key?(params, "ids"))
 
     query =
       if params["search"] do
@@ -108,13 +102,7 @@ defmodule ShotElixir.Schticks do
         count_query
       end
 
-    count_query =
-      if params["ids"] do
-        ids = parse_ids(params["ids"])
-        from s in count_query, where: s.id in ^ids
-      else
-        count_query
-      end
+    count_query = apply_ids_filter(count_query, params["ids"], Map.has_key?(params, "ids"))
 
     count_query =
       if params["search"] do
@@ -247,6 +235,24 @@ defmodule ShotElixir.Schticks do
   defp apply_visibility_filter(query, _params) do
     # Always show only active schticks
     from s in query, where: s.active == true
+  end
+
+  # If ids param not present at all, don't filter
+  defp apply_ids_filter(query, _ids, false), do: query
+  # If ids param present but nil or empty list, return no results
+  defp apply_ids_filter(query, nil, true), do: from(s in query, where: false)
+  defp apply_ids_filter(query, [], true), do: from(s in query, where: false)
+  # If ids param present with values, filter to those IDs
+  defp apply_ids_filter(query, ids, true) when is_list(ids) do
+    from(s in query, where: s.id in ^ids)
+  end
+
+  defp apply_ids_filter(query, ids, true) when is_binary(ids) do
+    parsed = parse_ids(ids)
+
+    if parsed == [],
+      do: from(s in query, where: false),
+      else: from(s in query, where: s.id in ^parsed)
   end
 
   defp parse_ids(ids_param) when is_binary(ids_param) do

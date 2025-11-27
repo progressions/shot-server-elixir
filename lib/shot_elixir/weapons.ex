@@ -64,8 +64,19 @@ defmodule ShotElixir.Weapons do
 
   defp apply_filters(query, filters) do
     query
+    |> filter_by_ids(filters["ids"], Map.has_key?(filters, "ids"))
     |> filter_by_category(filters["category"])
     |> filter_by_juncture(filters["juncture"])
+  end
+
+  # If ids param not present at all, don't filter
+  defp filter_by_ids(query, _ids, false), do: query
+  # If ids param present but nil or empty list, return no results
+  defp filter_by_ids(query, nil, true), do: from(w in query, where: false)
+  defp filter_by_ids(query, [], true), do: from(w in query, where: false)
+  # If ids param present with values, filter to those IDs
+  defp filter_by_ids(query, ids, true) when is_list(ids) do
+    from(w in query, where: w.id in ^ids)
   end
 
   defp filter_by_category(query, nil), do: query

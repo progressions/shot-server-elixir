@@ -60,14 +60,8 @@ defmodule ShotElixir.Characters do
         query
       end
 
-    # Apply ids filter if present
-    query =
-      if params["ids"] do
-        ids = parse_ids(params["ids"])
-        from c in query, where: c.id in ^ids
-      else
-        query
-      end
+    # Apply ids filter if present (handles empty ids to return no results)
+    query = apply_ids_filter(query, params["ids"], Map.has_key?(params, "ids"))
 
     # Apply user_id filter if present
     query =
@@ -300,6 +294,24 @@ defmodule ShotElixir.Characters do
     end
   end
 
+  # If ids param not present at all, don't filter
+  defp apply_ids_filter(query, _ids, false), do: query
+  # If ids param present but nil or empty list, return no results
+  defp apply_ids_filter(query, nil, true), do: from(c in query, where: false)
+  defp apply_ids_filter(query, [], true), do: from(c in query, where: false)
+  # If ids param present with values, filter to those IDs
+  defp apply_ids_filter(query, ids, true) when is_list(ids) do
+    from(c in query, where: c.id in ^ids)
+  end
+
+  defp apply_ids_filter(query, ids, true) when is_binary(ids) do
+    parsed = parse_ids(ids)
+
+    if parsed == [],
+      do: from(c in query, where: false),
+      else: from(c in query, where: c.id in ^parsed)
+  end
+
   defp parse_ids(ids_param) when is_binary(ids_param) do
     ids_param
     |> String.split(",")
@@ -388,14 +400,20 @@ defmodule ShotElixir.Characters do
 
   def get_character!(id) do
     Repo.get!(Character, id)
-    |> Repo.preload([:image_positions])
+    |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
     |> ImageLoader.load_image_url("Character")
   end
 
   def get_character(id) do
-    Repo.get(Character, id)
-    |> Repo.preload([:image_positions])
-    |> ImageLoader.load_image_url("Character")
+    case Repo.get(Character, id) do
+      nil ->
+        nil
+
+      character ->
+        character
+        |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
+        |> ImageLoader.load_image_url("Character")
+    end
   end
 
   @doc """
@@ -436,8 +454,30 @@ defmodule ShotElixir.Characters do
   end
 
   def update_character(%Character{} = character, attrs) do
+    # Extract association IDs from attrs (they're not part of the schema)
+    {weapon_ids, attrs} =
+      Map.pop(attrs, "weapon_ids", Map.pop(attrs, :weapon_ids, nil) |> elem(0))
+
+    {schtick_ids, attrs} =
+      Map.pop(attrs, "schtick_ids", Map.pop(attrs, :schtick_ids, nil) |> elem(0))
+
+    {party_ids, attrs} = Map.pop(attrs, "party_ids", Map.pop(attrs, :party_ids, nil) |> elem(0))
+    {site_ids, attrs} = Map.pop(attrs, "site_ids", Map.pop(attrs, :site_ids, nil) |> elem(0))
+
     Multi.new()
     |> Multi.update(:character, Character.changeset(character, attrs))
+    |> Multi.run(:sync_weapons, fn _repo, %{character: updated_character} ->
+      sync_character_weapons(updated_character.id, weapon_ids)
+    end)
+    |> Multi.run(:sync_schticks, fn _repo, %{character: updated_character} ->
+      sync_character_schticks(updated_character.id, schtick_ids)
+    end)
+    |> Multi.run(:sync_parties, fn _repo, %{character: updated_character} ->
+      sync_character_parties(updated_character.id, party_ids)
+    end)
+    |> Multi.run(:sync_sites, fn _repo, %{character: updated_character} ->
+      sync_character_sites(updated_character.id, site_ids)
+    end)
     |> Multi.run(:broadcast, fn _repo, %{character: character} ->
       # Preload associations before broadcasting
       character_with_associations =
@@ -450,7 +490,156 @@ defmodule ShotElixir.Characters do
     |> case do
       {:ok, %{character: character}} -> {:ok, character}
       {:error, :character, changeset, _} -> {:error, changeset}
+      {:error, _step, reason, _changes} -> {:error, reason}
     end
+  end
+
+  # Sync character weapons - handles adding/removing weapons via weapon_ids
+  defp sync_character_weapons(_character_id, nil), do: {:ok, :skipped}
+
+  defp sync_character_weapons(character_id, weapon_ids) when is_list(weapon_ids) do
+    alias ShotElixir.Weapons.Carry
+
+    # Get current weapon_ids for this character
+    current_weapon_ids =
+      from(c in Carry, where: c.character_id == ^character_id, select: c.weapon_id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    # Normalize incoming weapon_ids to strings
+    new_weapon_ids = Enum.map(weapon_ids, &to_string/1)
+
+    # Find weapons to add and remove
+    to_add = new_weapon_ids -- current_weapon_ids
+    to_remove = current_weapon_ids -- new_weapon_ids
+
+    # Remove weapons that are no longer in the list
+    if Enum.any?(to_remove) do
+      from(c in Carry,
+        where: c.character_id == ^character_id and c.weapon_id in ^to_remove
+      )
+      |> Repo.delete_all()
+    end
+
+    # Add new weapons
+    Enum.each(to_add, fn weapon_id ->
+      %Carry{}
+      |> Ecto.Changeset.change(%{character_id: character_id, weapon_id: weapon_id})
+      |> Repo.insert(on_conflict: :nothing)
+    end)
+
+    {:ok, :synced}
+  end
+
+  # Sync character schticks - handles adding/removing schticks via schtick_ids
+  defp sync_character_schticks(_character_id, nil), do: {:ok, :skipped}
+
+  defp sync_character_schticks(character_id, schtick_ids) when is_list(schtick_ids) do
+    alias ShotElixir.Schticks.CharacterSchtick
+
+    # Get current schtick_ids for this character
+    current_schtick_ids =
+      from(cs in CharacterSchtick, where: cs.character_id == ^character_id, select: cs.schtick_id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    # Normalize incoming schtick_ids to strings
+    new_schtick_ids = Enum.map(schtick_ids, &to_string/1)
+
+    # Find schticks to add and remove
+    to_add = new_schtick_ids -- current_schtick_ids
+    to_remove = current_schtick_ids -- new_schtick_ids
+
+    # Remove schticks that are no longer in the list
+    if Enum.any?(to_remove) do
+      from(cs in CharacterSchtick,
+        where: cs.character_id == ^character_id and cs.schtick_id in ^to_remove
+      )
+      |> Repo.delete_all()
+    end
+
+    # Add new schticks
+    Enum.each(to_add, fn schtick_id ->
+      %CharacterSchtick{}
+      |> Ecto.Changeset.change(%{character_id: character_id, schtick_id: schtick_id})
+      |> Repo.insert(on_conflict: :nothing)
+    end)
+
+    {:ok, :synced}
+  end
+
+  # Sync character parties - handles adding/removing parties via party_ids
+  defp sync_character_parties(_character_id, nil), do: {:ok, :skipped}
+
+  defp sync_character_parties(character_id, party_ids) when is_list(party_ids) do
+    alias ShotElixir.Parties.Membership
+
+    # Get current party_ids for this character
+    current_party_ids =
+      from(m in Membership, where: m.character_id == ^character_id, select: m.party_id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    # Normalize incoming party_ids to strings
+    new_party_ids = Enum.map(party_ids, &to_string/1)
+
+    # Find parties to add and remove
+    to_add = new_party_ids -- current_party_ids
+    to_remove = current_party_ids -- new_party_ids
+
+    # Remove memberships that are no longer in the list
+    if Enum.any?(to_remove) do
+      from(m in Membership,
+        where: m.character_id == ^character_id and m.party_id in ^to_remove
+      )
+      |> Repo.delete_all()
+    end
+
+    # Add new memberships
+    Enum.each(to_add, fn party_id ->
+      %Membership{}
+      |> Ecto.Changeset.change(%{character_id: character_id, party_id: party_id})
+      |> Repo.insert(on_conflict: :nothing)
+    end)
+
+    {:ok, :synced}
+  end
+
+  # Sync character sites - handles adding/removing sites via site_ids
+  defp sync_character_sites(_character_id, nil), do: {:ok, :skipped}
+
+  defp sync_character_sites(character_id, site_ids) when is_list(site_ids) do
+    alias ShotElixir.Sites.Attunement
+
+    # Get current site_ids for this character
+    current_site_ids =
+      from(a in Attunement, where: a.character_id == ^character_id, select: a.site_id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    # Normalize incoming site_ids to strings
+    new_site_ids = Enum.map(site_ids, &to_string/1)
+
+    # Find sites to add and remove
+    to_add = new_site_ids -- current_site_ids
+    to_remove = current_site_ids -- new_site_ids
+
+    # Remove attunements that are no longer in the list
+    if Enum.any?(to_remove) do
+      from(a in Attunement,
+        where: a.character_id == ^character_id and a.site_id in ^to_remove
+      )
+      |> Repo.delete_all()
+    end
+
+    # Add new attunements
+    Enum.each(to_add, fn site_id ->
+      %Attunement{}
+      |> Ecto.Changeset.change(%{character_id: character_id, site_id: site_id})
+      |> Repo.insert(on_conflict: :nothing)
+    end)
+
+    {:ok, :synced}
   end
 
   def delete_character(%Character{} = character) do
