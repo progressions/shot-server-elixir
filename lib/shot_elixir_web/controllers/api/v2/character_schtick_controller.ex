@@ -8,6 +8,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterSchtickController do
   alias ShotElixir.Repo
 
   import Ecto.Query
+  import ShotElixirWeb.CharacterAuthorization
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -110,32 +111,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterSchtickController do
     case Repo.get_by(CharacterSchtick, character_id: character_id, schtick_id: schtick_id) do
       nil -> {:error, :not_found}
       character_schtick -> Repo.delete(character_schtick)
-    end
-  end
-
-  defp authorize_character_access(character, user) do
-    campaign = ShotElixir.Campaigns.get_campaign(character.campaign_id)
-
-    cond do
-      campaign.user_id == user.id -> :ok
-      user.admin -> :ok
-      user.gamemaster && ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> :ok
-      ShotElixir.Campaigns.is_member?(campaign.id, user.id) && character.user_id == user.id -> :ok
-      ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> :ok
-      true -> {:error, :not_found}
-    end
-  end
-
-  defp authorize_character_edit(character, user) do
-    campaign = ShotElixir.Campaigns.get_campaign(character.campaign_id)
-
-    cond do
-      campaign.user_id == user.id -> :ok
-      user.admin -> :ok
-      user.gamemaster && ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> :ok
-      character.user_id == user.id && ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> :ok
-      ShotElixir.Campaigns.is_member?(campaign.id, user.id) -> {:error, :forbidden}
-      true -> {:error, :not_found}
     end
   end
 end

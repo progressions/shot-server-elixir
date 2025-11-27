@@ -405,9 +405,15 @@ defmodule ShotElixir.Characters do
   end
 
   def get_character(id) do
-    Repo.get(Character, id)
-    |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
-    |> ImageLoader.load_image_url("Character")
+    case Repo.get(Character, id) do
+      nil ->
+        nil
+
+      character ->
+        character
+        |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
+        |> ImageLoader.load_image_url("Character")
+    end
   end
 
   @doc """
@@ -448,13 +454,6 @@ defmodule ShotElixir.Characters do
   end
 
   def update_character(%Character{} = character, attrs) do
-    require Logger
-    Logger.debug("update_character called with attrs keys: #{inspect(Map.keys(attrs))}")
-
-    Logger.debug(
-      "party_ids in attrs: #{inspect(Map.get(attrs, "party_ids", Map.get(attrs, :party_ids, "NOT FOUND")))}"
-    )
-
     # Extract association IDs from attrs (they're not part of the schema)
     {weapon_ids, attrs} =
       Map.pop(attrs, "weapon_ids", Map.pop(attrs, :weapon_ids, nil) |> elem(0))
@@ -464,8 +463,6 @@ defmodule ShotElixir.Characters do
 
     {party_ids, attrs} = Map.pop(attrs, "party_ids", Map.pop(attrs, :party_ids, nil) |> elem(0))
     {site_ids, attrs} = Map.pop(attrs, "site_ids", Map.pop(attrs, :site_ids, nil) |> elem(0))
-
-    Logger.debug("Extracted party_ids: #{inspect(party_ids)}")
 
     Multi.new()
     |> Multi.update(:character, Character.changeset(character, attrs))
