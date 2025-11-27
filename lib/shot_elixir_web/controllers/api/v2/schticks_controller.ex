@@ -19,10 +19,17 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
 
       campaign ->
         result = Schticks.list_campaign_schticks(campaign.id, params, current_user)
+        categories_result = Schticks.get_categories(campaign.id, params)
+        paths_result = Schticks.get_paths(campaign.id, params)
 
         conn
         |> put_view(ShotElixirWeb.Api.V2.SchticksView)
-        |> render("index.json", schticks: result.schticks, meta: result.meta)
+        |> render("index.json",
+          schticks: result.schticks,
+          meta: result.meta,
+          categories: categories_result.general ++ categories_result.core,
+          paths: paths_result.paths
+        )
     end
   end
 
