@@ -16,7 +16,10 @@ defmodule ShotElixirWeb.Api.V2.AdvancementController do
          %{} = _campaign <- Campaigns.get_campaign(character.campaign_id),
          :ok <- authorize_character_access(character, current_user) do
       advancements = Characters.list_advancements(character_id)
-      render(conn, "index.json", advancements: advancements)
+
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.AdvancementView)
+      |> render("index.json", advancements: advancements)
     else
       nil ->
         conn
@@ -56,6 +59,7 @@ defmodule ShotElixirWeb.Api.V2.AdvancementController do
 
       conn
       |> put_status(:created)
+      |> put_view(ShotElixirWeb.Api.V2.AdvancementView)
       |> render("show.json", advancement: advancement)
     else
       nil ->
@@ -89,7 +93,9 @@ defmodule ShotElixirWeb.Api.V2.AdvancementController do
          :ok <- authorize_character_access(character, current_user),
          %Advancement{} = advancement <- Characters.get_advancement(id),
          :ok <- validate_advancement_belongs_to_character(advancement, character) do
-      render(conn, "show.json", advancement: advancement)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.AdvancementView)
+      |> render("show.json", advancement: advancement)
     else
       nil ->
         conn
@@ -139,7 +145,9 @@ defmodule ShotElixirWeb.Api.V2.AdvancementController do
         }
       )
 
-      render(conn, "show.json", advancement: updated_advancement)
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.AdvancementView)
+      |> render("show.json", advancement: updated_advancement)
     else
       nil ->
         conn
