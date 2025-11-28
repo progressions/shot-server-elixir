@@ -244,7 +244,6 @@ defmodule ShotElixir.Services.CampaignSeederService do
             Map.put(acc, schtick.id, %{
               source: schtick,
               target: new_schtick,
-              new_schtick: new_schtick,
               original_prerequisite_id: schtick.prerequisite_id
             })
 
