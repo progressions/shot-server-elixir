@@ -49,7 +49,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       # Render characters for this shot
       characters =
         character_shots
-        |> Enum.map(&render_encounter_character/1)
+        |> Enum.map(&render_encounter_character(&1, fight))
         |> Enum.sort_by(&character_sort_key/1)
 
       # Render vehicles for this shot
@@ -187,7 +187,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
 
   defp translate_errors(errors), do: errors
 
-  defp render_encounter_character(shot) do
+  defp render_encounter_character(shot, fight) do
     character = shot.character
 
     # Handle case where character association might not be loaded
@@ -208,6 +208,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           current_shot: shot.shot,
           location: shot.location,
           driving_id: shot.driving_id,
+          driving: nil,
           status: [],
           image_url: nil,
           faction: nil,
@@ -226,6 +227,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
             _ -> %{}
           end
 
+        # Find the driving vehicle if character has a driving_id
+        driving_vehicle = get_driving_vehicle(shot.driving_id, fight)
+
         %{
           id: character.id,
           name: character.name,
@@ -240,12 +244,44 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           current_shot: shot.shot,
           location: shot.location,
           driving_id: shot.driving_id,
+          driving: driving_vehicle,
           status: character.status,
           image_url: get_image_url(character),
           faction: render_faction_if_loaded(character),
           weapon_ids: get_weapon_ids(character),
           schtick_ids: get_schtick_ids(character),
           effects: render_effects(shot)
+        }
+    end
+  end
+
+  # Find the vehicle that the character is driving based on driving_id (which is a shot_id)
+  defp get_driving_vehicle(nil, _fight), do: nil
+
+  defp get_driving_vehicle(driving_id, fight) do
+    # driving_id is the shot_id of the vehicle shot
+    vehicle_shot =
+      fight.shots
+      |> Enum.find(fn s -> s.id == driving_id && s.vehicle_id end)
+
+    case vehicle_shot do
+      nil ->
+        nil
+
+      shot ->
+        vehicle = shot.vehicle
+
+        %{
+          id: vehicle.id,
+          name: vehicle.name,
+          entity_class: "Vehicle",
+          action_values: vehicle.action_values,
+          shot_id: shot.id,
+          current_shot: shot.shot,
+          location: shot.location,
+          driver_id: shot.driver_id,
+          was_rammed_or_damaged: shot.was_rammed_or_damaged,
+          image_url: get_image_url(vehicle)
         }
     end
   end
