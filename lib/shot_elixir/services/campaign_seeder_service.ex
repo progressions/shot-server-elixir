@@ -209,8 +209,12 @@ defmodule ShotElixir.Services.CampaignSeederService do
         {:ok, job} ->
           Logger.debug("[CampaignSeederService] Queued image copy job for #{type}:#{target.id}")
           {:ok, job}
+
         {:error, changeset} ->
-          Logger.error("[CampaignSeederService] Failed to queue image copy job for #{type}:#{target.id} - #{inspect(changeset.errors)}")
+          Logger.error(
+            "[CampaignSeederService] Failed to queue image copy job for #{type}:#{target.id} - #{inspect(changeset.errors)}"
+          )
+
           {:error, changeset}
       end
 

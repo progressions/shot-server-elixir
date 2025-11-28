@@ -102,11 +102,14 @@ defmodule ShotElixir.Services.ImageKitImporter do
     case download_image(source_url) do
       {:ok, temp_file} ->
         try do
-          with {:ok, upload_result} <- upload_to_imagekit(temp_file, attachable_type, attachable_id),
-               {:ok, attachment} <- ActiveStorage.attach_image(attachable_type, attachable_id, upload_result) do
+          with {:ok, upload_result} <-
+                 upload_to_imagekit(temp_file, attachable_type, attachable_id),
+               {:ok, attachment} <-
+                 ActiveStorage.attach_image(attachable_type, attachable_id, upload_result) do
             Logger.info(
               "[ImageKitImporter] Successfully imported image for #{attachable_type}:#{attachable_id}"
             )
+
             {:ok, attachment}
           else
             {:error, reason} = error ->
@@ -116,6 +119,7 @@ defmodule ShotElixir.Services.ImageKitImporter do
         after
           File.rm(temp_file)
         end
+
       error ->
         error
     end
@@ -214,4 +218,5 @@ defmodule ShotElixir.Services.ImageKitImporter do
       env when is_atom(env) -> to_string(env)
       env when is_binary(env) -> env
     end
+  end
 end
