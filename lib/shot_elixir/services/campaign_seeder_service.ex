@@ -601,15 +601,25 @@ defmodule ShotElixir.Services.CampaignSeederService do
     # Find matching schticks in target campaign by name AND category and link them
     # (unique constraint is on [:category, :name, :campaign_id])
     if source.schticks && length(source.schticks) > 0 do
-      source_schtick_keys = Enum.map(source.schticks, fn s -> {s.name, s.category} end)
+      # Build a dynamic OR query for efficient database-level filtering
+      # instead of fetching all schticks and filtering in memory
+      conditions =
+        Enum.reduce(source.schticks, nil, fn schtick, acc ->
+          condition =
+            dynamic(
+              [s],
+              s.name == ^schtick.name and s.category == ^schtick.category
+            )
 
-      # Filter in Elixir since PostgreSQL tuple IN syntax is complex
+          if acc, do: dynamic([s], ^acc or ^condition), else: condition
+        end)
+
       target_schticks =
         from(s in Schtick,
-          where: s.campaign_id == ^target_campaign.id
+          where: s.campaign_id == ^target_campaign.id,
+          where: ^conditions
         )
         |> Repo.all()
-        |> Enum.filter(fn s -> {s.name, s.category} in source_schtick_keys end)
 
       # Create character_schtick associations
       Enum.each(target_schticks, fn schtick ->
