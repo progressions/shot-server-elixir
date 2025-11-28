@@ -257,9 +257,19 @@ defmodule ShotElixir.Campaigns do
 
         # Queue campaign seeding job (unless this is the master template)
         unless campaign.is_master_template do
-          %{"campaign_id" => campaign.id}
-          |> ShotElixir.Workers.CampaignSeederWorker.new()
-          |> Oban.insert()
+          case %{"campaign_id" => campaign.id}
+               |> ShotElixir.Workers.CampaignSeederWorker.new()
+               |> Oban.insert() do
+            {:ok, _job} ->
+              :ok
+
+            {:error, reason} ->
+              require Logger
+
+              Logger.error(
+                "[Campaigns] Failed to queue seeding job for campaign #{campaign.id}: #{inspect(reason)}"
+              )
+          end
         end
 
         {:ok, campaign}

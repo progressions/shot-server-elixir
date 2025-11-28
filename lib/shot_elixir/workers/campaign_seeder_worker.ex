@@ -24,7 +24,8 @@ defmodule ShotElixir.Workers.CampaignSeederWorker do
     case Repo.get(Campaign, campaign_id) do
       nil ->
         Logger.error("[CampaignSeederWorker] Campaign #{campaign_id} not found")
-        {:error, :campaign_not_found}
+        # Non-retryable: campaign doesn't exist
+        {:discard, :campaign_not_found}
 
       campaign ->
         case CampaignSeederService.seed_campaign(campaign) do
@@ -36,6 +37,14 @@ defmodule ShotElixir.Workers.CampaignSeederWorker do
             # Broadcast campaign reload after seeding is complete
             broadcast_campaign_reload(seeded_campaign)
             :ok
+
+          {:error, :no_master_template} ->
+            Logger.error(
+              "[CampaignSeederWorker] No master template found for campaign #{campaign_id}"
+            )
+
+            # Non-retryable: no master template configured
+            {:discard, :no_master_template}
 
           {:error, reason} ->
             Logger.error(

@@ -93,12 +93,14 @@ defmodule ShotElixir.Services.CampaignSeederService do
       # 4. Junctures (references factions)
       Logger.info("[CampaignSeederService] Starting juncture duplication...")
 
-      {:ok, _juncture_mapping} =
+      {:ok, juncture_mapping} =
         duplicate_junctures(source_campaign, target_campaign, faction_mapping)
 
       # 5. Characters (template characters, references schticks/weapons/factions/junctures)
       Logger.info("[CampaignSeederService] Starting character duplication...")
-      {:ok, _character_count} = duplicate_characters(source_campaign, target_campaign)
+
+      {:ok, _character_count} =
+        duplicate_characters(source_campaign, target_campaign, faction_mapping, juncture_mapping)
 
       # 6. Link schtick prerequisites (now that all schticks exist in target)
       Logger.info("[CampaignSeederService] Linking schtick prerequisites...")
@@ -407,7 +409,12 @@ defmodule ShotElixir.Services.CampaignSeederService do
   end
 
   @doc false
-  def duplicate_characters(%Campaign{} = source, %Campaign{} = target) do
+  def duplicate_characters(
+        %Campaign{} = source,
+        %Campaign{} = target,
+        faction_mapping,
+        juncture_mapping
+      ) do
     # Only duplicate template characters
     characters =
       from(c in Character,
@@ -425,7 +432,14 @@ defmodule ShotElixir.Services.CampaignSeederService do
           {:ok, new_character} ->
             Logger.debug("[CampaignSeederService] Duplicated character: #{new_character.name}")
             # Apply associations (schticks, weapons, faction, juncture)
-            apply_character_associations(character, new_character, target)
+            apply_character_associations(
+              character,
+              new_character,
+              target,
+              faction_mapping,
+              juncture_mapping
+            )
+
             acc + 1
 
           {:error, changeset} ->
@@ -480,16 +494,20 @@ defmodule ShotElixir.Services.CampaignSeederService do
   defp apply_character_associations(
          %Character{} = source,
          %Character{} = target_character,
-         %Campaign{} = target_campaign
+         %Campaign{} = target_campaign,
+         faction_mapping,
+         juncture_mapping
        ) do
-    # Find matching schticks in target campaign by name and link them
+    # Find matching schticks in target campaign by name AND category and link them
+    # (unique constraint is on [:category, :name, :campaign_id])
     if source.schticks && length(source.schticks) > 0 do
       source_schtick_keys = Enum.map(source.schticks, fn s -> {s.name, s.category} end)
 
       target_schticks =
         from(s in Schtick,
-          where: s.campaign_id == ^target_campaign.id and
-            fragment("(?, ?) IN ?", s.name, s.category, ^source_schtick_keys)
+          where:
+            s.campaign_id == ^target_campaign.id and
+              fragment("(?, ?) IN ?", s.name, s.category, ^source_schtick_keys)
         )
         |> Repo.all()
 
@@ -529,35 +547,29 @@ defmodule ShotElixir.Services.CampaignSeederService do
       end)
     end
 
-    # Find matching faction by name and set faction_id
+    # Use faction_mapping to look up target faction (avoids N+1 query)
     if source.faction_id do
-      source_faction = Repo.get(Faction, source.faction_id)
+      case Map.get(faction_mapping, source.faction_id) do
+        nil ->
+          :ok
 
-      if source_faction do
-        target_faction =
-          Repo.get_by(Faction, campaign_id: target_campaign.id, name: source_faction.name)
-
-        if target_faction do
+        target_faction ->
           target_character
           |> Ecto.Changeset.change(faction_id: target_faction.id)
           |> Repo.update()
-        end
       end
     end
 
-    # Find matching juncture by name and set juncture_id
+    # Use juncture_mapping to look up target juncture (avoids N+1 query)
     if source.juncture_id do
-      source_juncture = Repo.get(Juncture, source.juncture_id)
+      case Map.get(juncture_mapping, source.juncture_id) do
+        nil ->
+          :ok
 
-      if source_juncture do
-        target_juncture =
-          Repo.get_by(Juncture, campaign_id: target_campaign.id, name: source_juncture.name)
-
-        if target_juncture do
+        target_juncture ->
           target_character
           |> Ecto.Changeset.change(juncture_id: target_juncture.id)
           |> Repo.update()
-        end
       end
     end
   end
