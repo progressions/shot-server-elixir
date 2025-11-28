@@ -22,7 +22,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Characters.Character
   alias ShotElixir.ImagePositions.ImagePosition
-  alias ShotElixir.Services.ImageKitImporter
+  alias ShotElixir.Workers.ImageCopyWorker
 
   import Ecto.Query
 
@@ -163,37 +163,50 @@ defmodule ShotElixir.Services.CampaignSeederService do
     end
   end
 
-  # Copy images for all entity types outside the transaction
+  # Queue image copy jobs for all entity types
   defp copy_all_images(mappings) do
-    # Copy campaign image
-    copy_entity_image(mappings.source_campaign, mappings.campaign)
+    # Queue campaign image copy
+    queue_image_copy_job(mappings.source_campaign, mappings.campaign, "Campaign")
 
-    # Copy schtick images
+    # Queue schtick image copies
     Enum.each(mappings.schtick_mapping, fn {_old_id, %{source: source, target: target}} ->
-      copy_entity_image(source, target)
+      queue_image_copy_job(source, target, "Schtick")
     end)
 
-    # Copy weapon images
+    # Queue weapon image copies
     Enum.each(mappings.weapon_mapping, fn {_old_id, %{source: source, target: target}} ->
-      copy_entity_image(source, target)
+      queue_image_copy_job(source, target, "Weapon")
     end)
 
-    # Copy faction images
+    # Queue faction image copies
     Enum.each(mappings.faction_mapping, fn {_old_id, %{source: source, target: target}} ->
-      copy_entity_image(source, target)
+      queue_image_copy_job(source, target, "Faction")
     end)
 
-    # Copy juncture images
+    # Queue juncture image copies
     Enum.each(mappings.juncture_mapping, fn {_old_id, %{source: source, target: target}} ->
-      copy_entity_image(source, target)
+      queue_image_copy_job(source, target, "Juncture")
     end)
 
-    # Copy character images
+    # Queue character image copies
     Enum.each(mappings.character_mapping, fn {_old_id, %{source: source, target: target}} ->
-      copy_entity_image(source, target)
+      queue_image_copy_job(source, target, "Character")
     end)
 
     :ok
+  end
+
+  defp queue_image_copy_job(source, target, type) do
+    %{
+      "source_type" => type,
+      "source_id" => source.id,
+      "target_type" => type,
+      "target_id" => target.id
+    }
+    |> ImageCopyWorker.new()
+    |> Oban.insert()
+
+    Logger.debug("[CampaignSeederService] Queued image copy job for #{type}:#{target.id}")
   end
 
   # Private functions
@@ -686,29 +699,6 @@ defmodule ShotElixir.Services.CampaignSeederService do
     Logger.debug(
       "[CampaignSeederService] Copied #{length(source_positions)} image positions for #{positionable_type} #{target.id}"
     )
-  end
-
-  @doc """
-  Copies an image from source entity to target entity using ImageKitImporter.
-  Logs any errors but does not fail the overall duplication process.
-  """
-  def copy_entity_image(source, target) do
-    case ImageKitImporter.copy_image(source, target) do
-      {:ok, _attachment} ->
-        Logger.debug("[CampaignSeederService] Copied image for #{target.__struct__} #{target.id}")
-        :ok
-
-      {:error, :no_image} ->
-        # Source has no image, that's fine
-        :ok
-
-      {:error, reason} ->
-        Logger.warning(
-          "[CampaignSeederService] Failed to copy image for #{target.__struct__} #{target.id}: #{inspect(reason)}"
-        )
-
-        :ok
-    end
   end
 
   @doc """
