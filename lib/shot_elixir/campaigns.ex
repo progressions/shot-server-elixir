@@ -250,10 +250,28 @@ defmodule ShotElixir.Campaigns do
       |> Repo.insert()
       |> broadcast_result(:insert)
 
-    # Track onboarding milestone
+    # Track onboarding milestone and queue seeding job
     case result do
       {:ok, campaign} ->
         ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(campaign)
+
+        # Queue campaign seeding job (unless this is the master template)
+        unless campaign.is_master_template do
+          case %{"campaign_id" => campaign.id}
+               |> ShotElixir.Workers.CampaignSeederWorker.new()
+               |> Oban.insert() do
+            {:ok, _job} ->
+              :ok
+
+            {:error, reason} ->
+              require Logger
+
+              Logger.error(
+                "[Campaigns] Failed to queue seeding job for campaign #{campaign.id}: #{inspect(reason)}"
+              )
+          end
+        end
+
         {:ok, campaign}
 
       error ->
