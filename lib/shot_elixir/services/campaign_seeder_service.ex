@@ -71,58 +71,129 @@ defmodule ShotElixir.Services.CampaignSeederService do
   @doc """
   Copies all content from source campaign to target campaign.
   This is the main workhorse function that coordinates all duplication.
+
+  Image copying is done AFTER the database transaction completes to avoid
+  holding database connections open during HTTP requests to ImageKit.
   """
   def copy_campaign_content(%Campaign{} = source_campaign, %Campaign{} = target_campaign) do
     Logger.info(
       "[CampaignSeederService] Copying content from #{source_campaign.name} to #{target_campaign.name}"
     )
 
-    Repo.transaction(fn ->
-      # Copy in order: dependencies first
-      # 1. Schticks (needed by characters)
-      Logger.info("[CampaignSeederService] Starting schtick duplication...")
-      {:ok, schtick_mapping} = duplicate_schticks(source_campaign, target_campaign)
+    # Phase 1: Database operations in a transaction
+    transaction_result =
+      Repo.transaction(fn ->
+        # Copy in order: dependencies first
+        # 1. Schticks (needed by characters)
+        Logger.info("[CampaignSeederService] Starting schtick duplication...")
+        {:ok, schtick_mapping} = duplicate_schticks(source_campaign, target_campaign)
 
-      # 2. Weapons (needed by characters)
-      Logger.info("[CampaignSeederService] Starting weapon duplication...")
-      {:ok, _weapon_mapping} = duplicate_weapons(source_campaign, target_campaign)
+        # 2. Weapons (needed by characters)
+        Logger.info("[CampaignSeederService] Starting weapon duplication...")
+        {:ok, weapon_mapping} = duplicate_weapons(source_campaign, target_campaign)
 
-      # 3. Factions (needed by junctures and characters)
-      Logger.info("[CampaignSeederService] Starting faction duplication...")
-      {:ok, faction_mapping} = duplicate_factions(source_campaign, target_campaign)
+        # 3. Factions (needed by junctures and characters)
+        Logger.info("[CampaignSeederService] Starting faction duplication...")
+        {:ok, faction_mapping} = duplicate_factions(source_campaign, target_campaign)
 
-      # 4. Junctures (references factions)
-      Logger.info("[CampaignSeederService] Starting juncture duplication...")
+        # 4. Junctures (references factions)
+        Logger.info("[CampaignSeederService] Starting juncture duplication...")
 
-      {:ok, juncture_mapping} =
-        duplicate_junctures(source_campaign, target_campaign, faction_mapping)
+        {:ok, juncture_mapping} =
+          duplicate_junctures(source_campaign, target_campaign, faction_mapping)
 
-      # 5. Characters (template characters, references schticks/weapons/factions/junctures)
-      Logger.info("[CampaignSeederService] Starting character duplication...")
+        # 5. Characters (template characters, references schticks/weapons/factions/junctures)
+        Logger.info("[CampaignSeederService] Starting character duplication...")
 
-      {:ok, _character_count} =
-        duplicate_characters(source_campaign, target_campaign, faction_mapping, juncture_mapping)
+        {:ok, character_mapping} =
+          duplicate_characters(
+            source_campaign,
+            target_campaign,
+            faction_mapping,
+            juncture_mapping
+          )
 
-      # 6. Link schtick prerequisites (now that all schticks exist in target)
-      Logger.info("[CampaignSeederService] Linking schtick prerequisites...")
-      link_schtick_prerequisites(schtick_mapping)
+        # 6. Link schtick prerequisites (now that all schticks exist in target)
+        Logger.info("[CampaignSeederService] Linking schtick prerequisites...")
+        link_schtick_prerequisites(schtick_mapping)
 
-      # 7. Copy campaign image positions
-      Logger.info("[CampaignSeederService] Copying image positions...")
-      copy_image_positions(source_campaign, target_campaign, "Campaign")
+        # 7. Copy campaign image positions
+        Logger.info("[CampaignSeederService] Copying image positions...")
+        copy_image_positions(source_campaign, target_campaign, "Campaign")
 
-      # 8. Mark campaign as seeded
-      {:ok, updated_campaign} =
-        target_campaign
-        |> Ecto.Changeset.change(
-          seeded_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+        # 8. Mark campaign as seeded
+        {:ok, updated_campaign} =
+          target_campaign
+          |> Ecto.Changeset.change(
+            seeded_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+          )
+          |> Repo.update()
+
+        Logger.info(
+          "[CampaignSeederService] Database seeding complete for #{target_campaign.name}"
         )
-        |> Repo.update()
 
-      Logger.info("[CampaignSeederService] Successfully seeded campaign #{target_campaign.name}")
+        # Return all mappings for image copying
+        %{
+          campaign: updated_campaign,
+          source_campaign: source_campaign,
+          schtick_mapping: schtick_mapping,
+          weapon_mapping: weapon_mapping,
+          faction_mapping: faction_mapping,
+          juncture_mapping: juncture_mapping,
+          character_mapping: character_mapping
+        }
+      end)
 
-      updated_campaign
+    # Phase 2: Copy images OUTSIDE the transaction to avoid DB connection timeouts
+    case transaction_result do
+      {:ok, mappings} ->
+        Logger.info("[CampaignSeederService] Starting image copying (outside transaction)...")
+        copy_all_images(mappings)
+
+        Logger.info(
+          "[CampaignSeederService] Successfully seeded campaign #{target_campaign.name}"
+        )
+
+        {:ok, mappings.campaign}
+
+      {:error, reason} = error ->
+        Logger.error("[CampaignSeederService] Transaction failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  # Copy images for all entity types outside the transaction
+  defp copy_all_images(mappings) do
+    # Copy campaign image
+    copy_entity_image(mappings.source_campaign, mappings.campaign)
+
+    # Copy schtick images
+    Enum.each(mappings.schtick_mapping, fn {_old_id, %{source: source, target: target}} ->
+      copy_entity_image(source, target)
     end)
+
+    # Copy weapon images
+    Enum.each(mappings.weapon_mapping, fn {_old_id, %{source: source, target: target}} ->
+      copy_entity_image(source, target)
+    end)
+
+    # Copy faction images
+    Enum.each(mappings.faction_mapping, fn {_old_id, %{source: source, target: target}} ->
+      copy_entity_image(source, target)
+    end)
+
+    # Copy juncture images
+    Enum.each(mappings.juncture_mapping, fn {_old_id, %{source: source, target: target}} ->
+      copy_entity_image(source, target)
+    end)
+
+    # Copy character images
+    Enum.each(mappings.character_mapping, fn {_old_id, %{source: source, target: target}} ->
+      copy_entity_image(source, target)
+    end)
+
+    :ok
   end
 
   # Private functions
@@ -142,14 +213,16 @@ defmodule ShotElixir.Services.CampaignSeederService do
 
     Logger.info("[CampaignSeederService] Duplicating #{length(schticks)} schticks")
 
-    # We need to track old_id -> new_schtick for prerequisite linking
+    # We need to track old_id -> new_schtick for prerequisite linking and image copying
     mapping =
       Enum.reduce(schticks, %{}, fn schtick, acc ->
         case duplicate_schtick(schtick, target) do
           {:ok, new_schtick} ->
             Logger.debug("[CampaignSeederService] Duplicated schtick: #{new_schtick.name}")
-            # Store mapping with original prerequisite_id for later linking
+            # Store mapping with source, target, and original prerequisite_id
             Map.put(acc, schtick.id, %{
+              source: schtick,
+              target: new_schtick,
               new_schtick: new_schtick,
               original_prerequisite_id: schtick.prerequisite_id
             })
@@ -187,11 +260,10 @@ defmodule ShotElixir.Services.CampaignSeederService do
       |> Schtick.changeset(attrs)
       |> Repo.insert()
 
-    # Copy image positions and image after insert
+    # Copy image positions after insert (images copied outside transaction)
     case result do
       {:ok, new_schtick} ->
         copy_image_positions(schtick, new_schtick, "Schtick")
-        copy_entity_image(schtick, new_schtick)
         {:ok, new_schtick}
 
       error ->
@@ -202,7 +274,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
   defp link_schtick_prerequisites(schtick_mapping) do
     # Build a map of old_id -> new_id for looking up prerequisites
     old_to_new_id =
-      Enum.reduce(schtick_mapping, %{}, fn {old_id, %{new_schtick: new_schtick}}, acc ->
+      Enum.reduce(schtick_mapping, %{}, fn {old_id, %{target: new_schtick}}, acc ->
         Map.put(acc, old_id, new_schtick.id)
       end)
 
@@ -244,7 +316,8 @@ defmodule ShotElixir.Services.CampaignSeederService do
         case duplicate_weapon(weapon, target) do
           {:ok, new_weapon} ->
             Logger.debug("[CampaignSeederService] Duplicated weapon: #{new_weapon.name}")
-            Map.put(acc, weapon.id, new_weapon)
+            # Store mapping with source and target for deferred image copying
+            Map.put(acc, weapon.id, %{source: weapon, target: new_weapon})
 
           {:error, changeset} ->
             Logger.error(
@@ -283,7 +356,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_weapon} ->
         copy_image_positions(weapon, new_weapon, "Weapon")
-        copy_entity_image(weapon, new_weapon)
+        # Image copying deferred to outside transaction
         {:ok, new_weapon}
 
       error ->
@@ -307,7 +380,8 @@ defmodule ShotElixir.Services.CampaignSeederService do
         case duplicate_faction(faction, target) do
           {:ok, new_faction} ->
             Logger.debug("[CampaignSeederService] Duplicated faction: #{new_faction.name}")
-            Map.put(acc, faction.id, new_faction)
+            # Store mapping with source and target for deferred image copying
+            Map.put(acc, faction.id, %{source: faction, target: new_faction})
 
           {:error, changeset} ->
             Logger.error(
@@ -339,7 +413,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_faction} ->
         copy_image_positions(faction, new_faction, "Faction")
-        copy_entity_image(faction, new_faction)
+        # Image copying deferred to outside transaction
         {:ok, new_faction}
 
       error ->
@@ -363,7 +437,8 @@ defmodule ShotElixir.Services.CampaignSeederService do
         case duplicate_juncture(juncture, target, faction_mapping) do
           {:ok, new_juncture} ->
             Logger.debug("[CampaignSeederService] Duplicated juncture: #{new_juncture.name}")
-            Map.put(acc, juncture.id, new_juncture)
+            # Store mapping with source and target for deferred image copying
+            Map.put(acc, juncture.id, %{source: juncture, target: new_juncture})
 
           {:error, changeset} ->
             Logger.error(
@@ -381,11 +456,12 @@ defmodule ShotElixir.Services.CampaignSeederService do
     unique_name = generate_unique_name(juncture.name, target.id, Juncture, :name)
 
     # Map the faction_id to the new faction in the target campaign
+    # faction_mapping now has %{source: ..., target: ...} structure
     new_faction_id =
       if juncture.faction_id do
         case Map.get(faction_mapping, juncture.faction_id) do
           nil -> nil
-          new_faction -> new_faction.id
+          %{target: new_faction} -> new_faction.id
         end
       end
 
@@ -405,7 +481,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_juncture} ->
         copy_image_positions(juncture, new_juncture, "Juncture")
-        copy_entity_image(juncture, new_juncture)
+        # Image copying deferred to outside transaction
         {:ok, new_juncture}
 
       error ->
@@ -431,8 +507,8 @@ defmodule ShotElixir.Services.CampaignSeederService do
 
     Logger.info("[CampaignSeederService] Duplicating #{length(characters)} template characters")
 
-    count =
-      Enum.reduce(characters, 0, fn character, acc ->
+    mapping =
+      Enum.reduce(characters, %{}, fn character, acc ->
         case duplicate_character(character, target) do
           {:ok, new_character} ->
             Logger.debug("[CampaignSeederService] Duplicated character: #{new_character.name}")
@@ -445,7 +521,8 @@ defmodule ShotElixir.Services.CampaignSeederService do
               juncture_mapping
             )
 
-            acc + 1
+            # Store mapping with source and target for deferred image copying
+            Map.put(acc, character.id, %{source: character, target: new_character})
 
           {:error, changeset} ->
             Logger.error(
@@ -456,7 +533,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
         end
       end)
 
-    {:ok, count}
+    {:ok, mapping}
   end
 
   defp duplicate_character(%Character{} = character, %Campaign{} = target) do
@@ -489,7 +566,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_character} ->
         copy_image_positions(character, new_character, "Character")
-        copy_entity_image(character, new_character)
+        # Image copying deferred to outside transaction
         {:ok, new_character}
 
       error ->
@@ -554,12 +631,13 @@ defmodule ShotElixir.Services.CampaignSeederService do
     end
 
     # Use faction_mapping to look up target faction (avoids N+1 query)
+    # faction_mapping now has %{source: ..., target: ...} structure
     if source.faction_id do
       case Map.get(faction_mapping, source.faction_id) do
         nil ->
           :ok
 
-        target_faction ->
+        %{target: target_faction} ->
           target_character
           |> Ecto.Changeset.change(faction_id: target_faction.id)
           |> Repo.update()
@@ -567,12 +645,13 @@ defmodule ShotElixir.Services.CampaignSeederService do
     end
 
     # Use juncture_mapping to look up target juncture (avoids N+1 query)
+    # juncture_mapping now has %{source: ..., target: ...} structure
     if source.juncture_id do
       case Map.get(juncture_mapping, source.juncture_id) do
         nil ->
           :ok
 
-        target_juncture ->
+        %{target: target_juncture} ->
           target_character
           |> Ecto.Changeset.change(juncture_id: target_juncture.id)
           |> Repo.update()
