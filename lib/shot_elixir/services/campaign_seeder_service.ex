@@ -204,17 +204,15 @@ defmodule ShotElixir.Services.CampaignSeederService do
       "target_id" => target.id
     }
 
-    result =
-      case ImageCopyWorker.new(job_args) |> Oban.insert() do
-        {:ok, job} ->
-          Logger.debug("[CampaignSeederService] Queued image copy job for #{type}:#{target.id}")
-          {:ok, job}
-        {:error, changeset} ->
-          Logger.error("[CampaignSeederService] Failed to queue image copy job for #{type}:#{target.id} - #{inspect(changeset.errors)}")
-          {:error, changeset}
-      end
+    case ImageCopyWorker.new(job_args) |> Oban.insert() do
+      {:ok, _job} ->
+        Logger.debug("[CampaignSeederService] Queued image copy job for #{type}:#{target.id}")
 
-    result
+      {:error, changeset} ->
+        Logger.error(
+          "[CampaignSeederService] Failed to queue image copy job for #{type}:#{target.id} - #{inspect(changeset.errors)}"
+        )
+    end
   end
 
   # Private functions
