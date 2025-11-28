@@ -99,21 +99,24 @@ defmodule ShotElixir.Services.ImageKitImporter do
       "[ImageKitImporter] Importing image for #{attachable_type}:#{attachable_id} from #{source_url}"
     )
 
-    with {:ok, temp_file} <- download_image(source_url),
-         {:ok, upload_result} <- upload_to_imagekit(temp_file, attachable_type, attachable_id),
-         {:ok, attachment} <-
-           ActiveStorage.attach_image(attachable_type, attachable_id, upload_result) do
-      # Clean up temp file
-      File.rm(temp_file)
-
-      Logger.info(
-        "[ImageKitImporter] Successfully imported image for #{attachable_type}:#{attachable_id}"
-      )
-
-      {:ok, attachment}
-    else
-      {:error, reason} = error ->
-        Logger.error("[ImageKitImporter] Failed to import image: #{inspect(reason)}")
+    case download_image(source_url) do
+      {:ok, temp_file} ->
+        try do
+          with {:ok, upload_result} <- upload_to_imagekit(temp_file, attachable_type, attachable_id),
+               {:ok, attachment} <- ActiveStorage.attach_image(attachable_type, attachable_id, upload_result) do
+            Logger.info(
+              "[ImageKitImporter] Successfully imported image for #{attachable_type}:#{attachable_id}"
+            )
+            {:ok, attachment}
+          else
+            {:error, reason} = error ->
+              Logger.error("[ImageKitImporter] Failed to import image: #{inspect(reason)}")
+              error
+          end
+        after
+          File.rm(temp_file)
+        end
+      error ->
         error
     end
   end
