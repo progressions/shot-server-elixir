@@ -22,6 +22,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Characters.Character
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Services.ImageKitImporter
 
   import Ecto.Query
 
@@ -186,10 +187,11 @@ defmodule ShotElixir.Services.CampaignSeederService do
       |> Schtick.changeset(attrs)
       |> Repo.insert()
 
-    # Copy image positions after insert
+    # Copy image positions and image after insert
     case result do
       {:ok, new_schtick} ->
         copy_image_positions(schtick, new_schtick, "Schtick")
+        copy_entity_image(schtick, new_schtick)
         {:ok, new_schtick}
 
       error ->
@@ -281,6 +283,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_weapon} ->
         copy_image_positions(weapon, new_weapon, "Weapon")
+        copy_entity_image(weapon, new_weapon)
         {:ok, new_weapon}
 
       error ->
@@ -336,6 +339,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_faction} ->
         copy_image_positions(faction, new_faction, "Faction")
+        copy_entity_image(faction, new_faction)
         {:ok, new_faction}
 
       error ->
@@ -401,6 +405,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_juncture} ->
         copy_image_positions(juncture, new_juncture, "Juncture")
+        copy_entity_image(juncture, new_juncture)
         {:ok, new_juncture}
 
       error ->
@@ -484,6 +489,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     case result do
       {:ok, new_character} ->
         copy_image_positions(character, new_character, "Character")
+        copy_entity_image(character, new_character)
         {:ok, new_character}
 
       error ->
@@ -503,13 +509,13 @@ defmodule ShotElixir.Services.CampaignSeederService do
     if source.schticks && length(source.schticks) > 0 do
       source_schtick_keys = Enum.map(source.schticks, fn s -> {s.name, s.category} end)
 
+      # Filter in Elixir since PostgreSQL tuple IN syntax is complex
       target_schticks =
         from(s in Schtick,
-          where:
-            s.campaign_id == ^target_campaign.id and
-              fragment("(?, ?) IN ?", s.name, s.category, ^source_schtick_keys)
+          where: s.campaign_id == ^target_campaign.id
         )
         |> Repo.all()
+        |> Enum.filter(fn s -> {s.name, s.category} in source_schtick_keys end)
 
       # Create character_schtick associations
       Enum.each(target_schticks, fn schtick ->
@@ -601,6 +607,29 @@ defmodule ShotElixir.Services.CampaignSeederService do
     Logger.debug(
       "[CampaignSeederService] Copied #{length(source_positions)} image positions for #{positionable_type} #{target.id}"
     )
+  end
+
+  @doc """
+  Copies an image from source entity to target entity using ImageKitImporter.
+  Logs any errors but does not fail the overall duplication process.
+  """
+  def copy_entity_image(source, target) do
+    case ImageKitImporter.copy_image(source, target) do
+      {:ok, _attachment} ->
+        Logger.debug("[CampaignSeederService] Copied image for #{target.__struct__} #{target.id}")
+        :ok
+
+      {:error, :no_image} ->
+        # Source has no image, that's fine
+        :ok
+
+      {:error, reason} ->
+        Logger.warning(
+          "[CampaignSeederService] Failed to copy image for #{target.__struct__} #{target.id}: #{inspect(reason)}"
+        )
+
+        :ok
+    end
   end
 
   @doc """
