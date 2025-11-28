@@ -21,6 +21,8 @@ defmodule ShotElixir.Services.CombatActionService do
     - wounds: Wounds to add (optional)
     - impairments: New impairment count (optional)
     - count: New mook count (optional)
+    - add_status: List of status strings to add (optional)
+    - remove_status: List of status strings to remove (optional)
     - event: Combat event details (optional)
 
   ## Returns
@@ -153,25 +155,66 @@ defmodule ShotElixir.Services.CombatActionService do
     end
   end
 
-  # Build map of character-level updates (for PCs only)
+  # Build map of character-level updates
   defp build_character_updates(shot, update) do
     character = shot.character || %{}
 
-    cond do
-      # If action_values is sent directly, pass it through (for PCs)
-      update["action_values"] && is_pc?(character) ->
-        %{"action_values" => update["action_values"]}
+    base_updates =
+      cond do
+        # If action_values is sent directly, pass it through (for PCs)
+        update["action_values"] && is_pc?(character) ->
+          %{"action_values" => update["action_values"]}
 
-      # If wounds is sent separately, build the action_values (for PCs)
-      update["wounds"] && is_pc?(character) ->
-        current_wounds = get_current_wounds(character)
-        new_wounds = current_wounds + update["wounds"]
-        %{"action_values" => %{"Wounds" => new_wounds}}
+        # If wounds is sent separately, build the action_values (for PCs)
+        update["wounds"] && is_pc?(character) ->
+          current_wounds = get_current_wounds(character)
+          new_wounds = current_wounds + update["wounds"]
+          %{"action_values" => %{"Wounds" => new_wounds}}
 
-      true ->
-        %{}
+        true ->
+          %{}
+      end
+
+    # Handle status additions and removals
+    base_updates
+    |> maybe_add_status_updates(character, update)
+  end
+
+  # Handle add_status and remove_status updates
+  defp maybe_add_status_updates(updates, character, update) do
+    current_status = get_current_status(character)
+
+    # Add new statuses
+    status_after_add =
+      case update["add_status"] do
+        statuses when is_list(statuses) and length(statuses) > 0 ->
+          Enum.uniq(current_status ++ statuses)
+
+        _ ->
+          current_status
+      end
+
+    # Remove statuses
+    final_status =
+      case update["remove_status"] do
+        statuses when is_list(statuses) and length(statuses) > 0 ->
+          Enum.reject(status_after_add, &(&1 in statuses))
+
+        _ ->
+          status_after_add
+      end
+
+    # Only add status update if it changed
+    if final_status != current_status do
+      Map.put(updates, "status", final_status)
+    else
+      updates
     end
   end
+
+  # Helper to get current status from character
+  defp get_current_status(%Character{status: status}) when is_list(status), do: status
+  defp get_current_status(_), do: []
 
   # Helper to check if character is a PC
   defp is_pc?(%Character{action_values: action_values}) when is_map(action_values) do
