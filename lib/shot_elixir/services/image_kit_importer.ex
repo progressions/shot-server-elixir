@@ -210,7 +210,7 @@ defmodule ShotElixir.Services.ImageKitImporter do
 
   defp environment do
     case Application.get_env(:shot_elixir, :environment) do
-      nil -> raise "[ImageKitImporter] :environment not set in :shot_elixir config. Please set :environment in your config files."
+      nil -> Mix.env() |> to_string()
       env when is_atom(env) -> to_string(env)
       env when is_binary(env) -> env
     end
