@@ -206,7 +206,9 @@ defmodule ShotElixir.Services.ImageKitImporter do
   defp pluralize_entity_type(type), do: "#{type}s"
 
   defp environment do
-    Application.get_env(:shot_elixir, :environment) ||
-      Mix.env() |> to_string()
-  end
+    case Application.get_env(:shot_elixir, :environment) do
+      nil -> raise "[ImageKitImporter] :environment not set in :shot_elixir config. Please set :environment in your config files."
+      env when is_atom(env) -> to_string(env)
+      env when is_binary(env) -> env
+    end
 end
