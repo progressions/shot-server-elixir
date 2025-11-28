@@ -7,6 +7,8 @@ defmodule ShotElixirWeb.Api.V2.OnboardingController do
 
   action_fallback ShotElixirWeb.FallbackController
 
+  plug :put_view, ShotElixirWeb.Api.V2.OnboardingView
+
   # POST /api/v2/onboarding/dismiss_congratulations
   # Marks when a user dismisses congratulations message
   def dismiss_congratulations(conn, _params) do
