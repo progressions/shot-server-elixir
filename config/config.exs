@@ -85,7 +85,8 @@ config :shot_elixir, Oban,
     emails: 20,
     high_priority: 5,
     notion: 3,
-    discord: 10
+    discord: 10,
+    images: 5
   ],
   plugins: [Oban.Plugins.Pruner]
 
