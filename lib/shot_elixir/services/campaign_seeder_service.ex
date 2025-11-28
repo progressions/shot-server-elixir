@@ -253,10 +253,9 @@ defmodule ShotElixir.Services.CampaignSeederService do
   end
 
   defp duplicate_schtick(%Schtick{} = schtick, %Campaign{} = target) do
-    unique_name = generate_unique_name(schtick.name, target.id, Schtick, :name)
-
+    # Schtick names don't need to be unique - copy as-is
     attrs = %{
-      name: unique_name,
+      name: schtick.name,
       description: schtick.description,
       category: schtick.category,
       path: schtick.path,
