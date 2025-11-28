@@ -204,12 +204,17 @@ defmodule ShotElixir.Services.CampaignSeederService do
       "target_id" => target.id
     }
 
-    case ImageCopyWorker.new(job_args) |> Oban.insert() do
-      {:ok, _job} ->
-        Logger.debug("[CampaignSeederService] Queued image copy job for #{type}:#{target.id}")
-      {:error, changeset} ->
-        Logger.error("[CampaignSeederService] Failed to queue image copy job for #{type}:#{target.id} - #{inspect(changeset.errors)}")
-    end
+    result =
+      case ImageCopyWorker.new(job_args) |> Oban.insert() do
+        {:ok, job} ->
+          Logger.debug("[CampaignSeederService] Queued image copy job for #{type}:#{target.id}")
+          {:ok, job}
+        {:error, changeset} ->
+          Logger.error("[CampaignSeederService] Failed to queue image copy job for #{type}:#{target.id} - #{inspect(changeset.errors)}")
+          {:error, changeset}
+      end
+
+    result
   end
 
   # Private functions
@@ -239,7 +244,6 @@ defmodule ShotElixir.Services.CampaignSeederService do
             Map.put(acc, schtick.id, %{
               source: schtick,
               target: new_schtick,
-              new_schtick: new_schtick,
               original_prerequisite_id: schtick.prerequisite_id
             })
 
