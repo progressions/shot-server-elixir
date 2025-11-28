@@ -605,7 +605,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
     if source.schticks && length(source.schticks) > 0 do
       # Build a dynamic OR query for efficient database-level filtering
       # instead of fetching all schticks and filtering in memory
-      target_schticks =
+      conditions =
         Enum.reduce(source.schticks, nil, fn schtick, acc ->
           condition =
             dynamic(
@@ -615,17 +615,13 @@ defmodule ShotElixir.Services.CampaignSeederService do
 
           if acc, do: dynamic([s], ^acc or ^condition), else: condition
         end)
-        |> case do
-          nil ->
-            []
 
-          conditions ->
-            from(s in Schtick,
-              where: s.campaign_id == ^target_campaign.id,
-              where: ^conditions
-            )
-            |> Repo.all()
-        end
+      target_schticks =
+        from(s in Schtick,
+          where: s.campaign_id == ^target_campaign.id,
+          where: ^conditions
+        )
+        |> Repo.all()
 
       # Create character_schtick associations
       Enum.each(target_schticks, fn schtick ->
