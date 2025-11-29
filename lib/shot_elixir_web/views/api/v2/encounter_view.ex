@@ -290,7 +290,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
   end
 
   defp render_encounter_vehicle(shot, fight) do
-    build_vehicle_map(shot.vehicle, shot, fight)
+    case shot.vehicle do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      vehicle -> build_vehicle_map(vehicle, shot, fight)
+    end
   end
 
   # Shared helper to build vehicle map structure
