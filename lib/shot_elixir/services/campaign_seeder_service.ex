@@ -298,18 +298,18 @@ defmodule ShotElixir.Services.CampaignSeederService do
     # Now update each schtick that had a prerequisite
     Enum.each(schtick_mapping, fn {_old_id,
                                    %{
-                                     new_schtick: new_schtick,
+                                     target: target_schtick,
                                      original_prerequisite_id: prereq_id
                                    }} ->
       if prereq_id do
         case Map.get(old_to_new_id, prereq_id) do
           nil ->
             Logger.warning(
-              "[CampaignSeederService] Could not find new prerequisite for schtick #{new_schtick.name}"
+              "[CampaignSeederService] Could not find new prerequisite for schtick #{target_schtick.name}"
             )
 
           new_prereq_id ->
-            new_schtick
+            target_schtick
             |> Ecto.Changeset.change(prerequisite_id: new_prereq_id)
             |> Repo.update()
         end

@@ -46,6 +46,39 @@ defmodule ShotElixir.Chases do
     update_relationship(relationship, %{active: false})
   end
 
+  @doc """
+  Gets or creates a chase relationship between a pursuer and evader in a fight.
+  """
+  def get_or_create_relationship(fight_id, pursuer_id, evader_id) do
+    case get_relationship_by_vehicles(fight_id, pursuer_id, evader_id) do
+      nil ->
+        %ChaseRelationship{}
+        |> ChaseRelationship.changeset(%{
+          "fight_id" => fight_id,
+          "pursuer_id" => pursuer_id,
+          "evader_id" => evader_id,
+          "position" => "far"
+        })
+        |> Repo.insert()
+
+      relationship ->
+        {:ok, relationship}
+    end
+  end
+
+  @doc """
+  Gets a chase relationship by pursuer and evader vehicle IDs.
+  """
+  def get_relationship_by_vehicles(fight_id, pursuer_id, evader_id) do
+    ChaseRelationship
+    |> where(
+      [cr],
+      cr.fight_id == ^fight_id and cr.pursuer_id == ^pursuer_id and cr.evader_id == ^evader_id and
+        cr.active == true
+    )
+    |> Repo.one()
+  end
+
   defp maybe_preload_related(nil), do: nil
 
   defp maybe_preload_related(relationship) do
