@@ -8,7 +8,7 @@ defmodule ShotElixir.Services.ChaseActionService do
   alias ShotElixir.{Repo, Fights, Vehicles, Chases}
   alias ShotElixir.Fights.{Fight, Shot}
 
-  # These damage types should be additive (add to existing value, not replace)
+  # These chase metrics should be additive (add to existing value, not replace)
   @additive_fields ["Chase Points", "Condition Points"]
 
   def apply_chase_action(%Fight{} = fight, vehicle_updates) do
@@ -107,7 +107,14 @@ defmodule ShotElixir.Services.ChaseActionService do
   end
 
   defp parse_integer(value) when is_integer(value), do: value
-  defp parse_integer(value) when is_binary(value), do: String.to_integer(value)
+
+  defp parse_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> 0
+    end
+  end
+
   defp parse_integer(_), do: 0
 
   # Update the chase relationship position between two vehicles
@@ -118,38 +125,47 @@ defmodule ShotElixir.Services.ChaseActionService do
     role = update["role"] || "pursuer"
 
     if position && target_vehicle_id do
-      Logger.info(
-        "Updating chase position: vehicle #{vehicle.id} -> #{target_vehicle_id}, position: #{position}, role: #{role}"
-      )
+      # Validate target vehicle exists and belongs to the same campaign
+      target_vehicle = Vehicles.get_vehicle(target_vehicle_id)
 
-      # Determine pursuer/evader based on role
-      {pursuer_id, evader_id} =
-        if role == "evader" do
-          {target_vehicle_id, vehicle.id}
-        else
-          {vehicle.id, target_vehicle_id}
-        end
+      if target_vehicle && target_vehicle.campaign_id == fight.campaign_id do
+        Logger.info(
+          "Updating chase position: vehicle #{vehicle.id} -> #{target_vehicle_id}, position: #{position}, role: #{role}"
+        )
 
-      # Find or create the chase relationship
-      case Chases.get_or_create_relationship(fight.id, pursuer_id, evader_id) do
-        {:ok, relationship} ->
-          # Update the position
-          case Chases.update_relationship(relationship, %{position: position}) do
-            {:ok, updated_rel} ->
-              Logger.info(
-                "Updated chase relationship #{updated_rel.id} position to #{updated_rel.position}"
-              )
-
-              :ok
-
-            {:error, reason} ->
-              Logger.error("Failed to update chase relationship position: #{inspect(reason)}")
-              {:error, reason}
+        # Determine pursuer/evader based on role
+        {pursuer_id, evader_id} =
+          if role == "evader" do
+            {target_vehicle_id, vehicle.id}
+          else
+            {vehicle.id, target_vehicle_id}
           end
 
-        {:error, reason} ->
-          Logger.error("Failed to get/create chase relationship: #{inspect(reason)}")
-          {:error, reason}
+        # Find or create the chase relationship
+        case Chases.get_or_create_relationship(fight.id, pursuer_id, evader_id) do
+          {:ok, relationship} ->
+            # Update the position
+            case Chases.update_relationship(relationship, %{position: position}) do
+              {:ok, updated_rel} ->
+                Logger.info(
+                  "Updated chase relationship #{updated_rel.id} position to #{updated_rel.position}"
+                )
+
+                :ok
+
+              {:error, reason} ->
+                Logger.error("Failed to update chase relationship position: #{inspect(reason)}")
+                {:error, reason}
+            end
+
+          {:error, reason} ->
+            Logger.error("Failed to get/create chase relationship: #{inspect(reason)}")
+            {:error, reason}
+        end
+      else
+        Logger.warning("Target vehicle #{target_vehicle_id} not found or not in fight's campaign")
+
+        :ok
       end
     else
       :ok
