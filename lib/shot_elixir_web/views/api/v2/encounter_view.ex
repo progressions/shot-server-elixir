@@ -52,10 +52,18 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         |> Enum.map(&render_encounter_character(&1, fight))
         |> Enum.sort_by(&character_sort_key/1)
 
-      # Render vehicles for this shot (exclude vehicles with drivers - they appear with the driver)
+      # Get all vehicle shot IDs that are being driven by characters
+      driven_vehicle_shot_ids =
+        fight.shots
+        |> Enum.filter(& &1.character_id)
+        |> Enum.map(& &1.driving_id)
+        |> Enum.reject(&is_nil/1)
+        |> MapSet.new()
+
+      # Render vehicles for this shot (exclude vehicles being driven - they appear with the driver)
       vehicles =
         vehicle_shots
-        |> Enum.filter(fn shot -> is_nil(shot.driver_id) end)
+        |> Enum.filter(fn shot -> not MapSet.member?(driven_vehicle_shot_ids, shot.id) end)
         |> Enum.map(&render_encounter_vehicle(&1, fight))
 
       %{
