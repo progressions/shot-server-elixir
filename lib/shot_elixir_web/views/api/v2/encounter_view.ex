@@ -282,34 +282,19 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
 
         # Handle case where vehicle association might not be loaded
         case vehicle do
-          %Ecto.Association.NotLoaded{} ->
-            nil
-
-          nil ->
-            nil
-
-          vehicle ->
-            %{
-              id: vehicle.id,
-              name: vehicle.name,
-              entity_class: "Vehicle",
-              action_values: vehicle.action_values,
-              shot_id: shot.id,
-              current_shot: shot.shot,
-              location: shot.location,
-              driver_id: shot.driver_id,
-              was_rammed_or_damaged: shot.was_rammed_or_damaged,
-              image_url: get_image_url(vehicle),
-              chase_relationships: get_chase_relationships_for_vehicle(fight, vehicle.id),
-              effects: render_effects(shot)
-            }
+          %Ecto.Association.NotLoaded{} -> nil
+          nil -> nil
+          vehicle -> build_vehicle_map(vehicle, shot, fight)
         end
     end
   end
 
   defp render_encounter_vehicle(shot, fight) do
-    vehicle = shot.vehicle
+    build_vehicle_map(shot.vehicle, shot, fight)
+  end
 
+  # Shared helper to build vehicle map structure
+  defp build_vehicle_map(vehicle, shot, fight) do
     %{
       id: vehicle.id,
       name: vehicle.name,
