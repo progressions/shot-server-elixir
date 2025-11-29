@@ -52,9 +52,18 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         |> Enum.map(&render_encounter_character(&1, fight))
         |> Enum.sort_by(&character_sort_key/1)
 
-      # Render vehicles for this shot
+      # Get all vehicle shot IDs that are being driven by characters
+      driven_vehicle_shot_ids =
+        fight.shots
+        |> Enum.filter(& &1.character_id)
+        |> Enum.map(& &1.driving_id)
+        |> Enum.reject(&is_nil/1)
+        |> MapSet.new()
+
+      # Render vehicles for this shot (exclude vehicles being driven - they appear with the driver)
       vehicles =
         vehicle_shots
+        |> Enum.filter(fn shot -> not MapSet.member?(driven_vehicle_shot_ids, shot.id) end)
         |> Enum.map(&render_encounter_vehicle(&1, fight))
 
       %{
@@ -273,34 +282,23 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
 
         # Handle case where vehicle association might not be loaded
         case vehicle do
-          %Ecto.Association.NotLoaded{} ->
-            nil
-
-          nil ->
-            nil
-
-          vehicle ->
-            %{
-              id: vehicle.id,
-              name: vehicle.name,
-              entity_class: "Vehicle",
-              action_values: vehicle.action_values,
-              shot_id: shot.id,
-              current_shot: shot.shot,
-              location: shot.location,
-              driver_id: shot.driver_id,
-              was_rammed_or_damaged: shot.was_rammed_or_damaged,
-              image_url: get_image_url(vehicle),
-              chase_relationships: get_chase_relationships_for_vehicle(fight, vehicle.id),
-              effects: render_effects(shot)
-            }
+          %Ecto.Association.NotLoaded{} -> nil
+          nil -> nil
+          vehicle -> build_vehicle_map(vehicle, shot, fight)
         end
     end
   end
 
   defp render_encounter_vehicle(shot, fight) do
-    vehicle = shot.vehicle
+    case shot.vehicle do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      vehicle -> build_vehicle_map(vehicle, shot, fight)
+    end
+  end
 
+  # Shared helper to build vehicle map structure
+  defp build_vehicle_map(vehicle, shot, fight) do
     %{
       id: vehicle.id,
       name: vehicle.name,
