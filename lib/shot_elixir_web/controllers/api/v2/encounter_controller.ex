@@ -69,9 +69,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
     end
   end
 
-  # POST /api/v2/encounters/:id/act
+  # PATCH /api/v2/encounters/:encounter_id/act
   # Handles character/vehicle actions with shot costs and fight events
-  def act(conn, %{"id" => fight_id} = params) do
+  def act(conn, %{"encounter_id" => fight_id} = params) do
     current_user = Guardian.Plug.current_resource(conn)
 
     if current_user.current_campaign_id do
@@ -91,6 +91,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
 
               shot ->
                 if shot.fight_id == fight.id do
+                  # Preload character and vehicle associations
+                  shot = ShotElixir.Repo.preload(shot, [:character, :vehicle])
+
                   # Default shot count
                   shot_cost = params["shots"] || 3
                   entity = shot.character || shot.vehicle
