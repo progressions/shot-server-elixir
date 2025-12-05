@@ -223,7 +223,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           faction: nil,
           weapon_ids: [],
           schtick_ids: [],
-          effects: []
+          effects: [],
+          user_id: nil
         }
 
       character ->
@@ -259,7 +260,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           faction: render_faction_if_loaded(character),
           weapon_ids: get_weapon_ids(character),
           schtick_ids: get_schtick_ids(character),
-          effects: render_effects(shot)
+          effects: render_effects(shot),
+          user_id: character.user_id
         }
     end
   end
