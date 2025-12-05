@@ -1,0 +1,24 @@
+Your Chi War Login Code
+=======================
+
+Hi <%= @user.first_name || "there" %>,
+
+Use the code below to log in to your Chi War account:
+
+    <%= @otp_code %>
+
+This code expires in 10 minutes.
+
+---
+
+Or click this link to log in automatically:
+<%= @magic_link_url %>
+
+---
+
+Didn't request this code?
+If you didn't try to log in, you can safely ignore this email. Your account is secure.
+
+---
+Chi War Campaign Manager
+This email was sent to <%= @user.email %>

@@ -100,6 +100,17 @@ defmodule ShotElixir.Workers.EmailWorker do
     UserEmail.removed_from_campaign(user, campaign)
   end
 
+  # Build OTP login email
+  defp build_email(%{
+         "type" => "otp_login",
+         "user_id" => user_id,
+         "otp_code" => otp_code,
+         "magic_token" => magic_token
+       }) do
+    user = Repo.get!(ShotElixir.Accounts.User, user_id)
+    UserEmail.otp_login(user, otp_code, magic_token)
+  end
+
   # Build admin error notification email
   defp build_email(%{
          "type" => "admin_error",

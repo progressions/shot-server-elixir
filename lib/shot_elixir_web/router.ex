@@ -43,6 +43,11 @@ defmodule ShotElixirWeb.Router do
     get "/confirmation", ConfirmationsController, :create
     post "/password", PasswordsController, :create
     patch "/password", PasswordsController, :update
+
+    # OTP Passwordless Login
+    post "/otp/request", OtpController, :request
+    post "/otp/verify", OtpController, :verify
+    get "/otp/magic/:token", OtpController, :magic_link
   end
 
   # Authenticated endpoints

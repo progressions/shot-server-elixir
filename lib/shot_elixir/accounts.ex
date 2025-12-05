@@ -505,4 +505,118 @@ defmodule ShotElixir.Accounts do
     )
     |> Repo.update()
   end
+
+  # OTP Passwordless Login Functions
+  @otp_expiry_minutes 10
+
+  @doc """
+  Generates a 6-digit OTP code and magic link token for passwordless login.
+  Both are stored in reset_password_token as "code|magic_token".
+  Returns {:ok, user, otp_code, magic_token} on success.
+  """
+  def generate_otp_code(%User{} = user) do
+    # Generate 6-digit code (padded with zeros)
+    otp_code =
+      :rand.uniform(999_999)
+      |> Integer.to_string()
+      |> String.pad_leading(6, "0")
+
+    # Generate cryptographically secure magic link token
+    magic_token = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+
+    # Store both in reset_password_token field
+    case user
+         |> Ecto.Changeset.change(
+           reset_password_token: "#{otp_code}|#{magic_token}",
+           reset_password_sent_at: NaiveDateTime.utc_now()
+         )
+         |> Repo.update() do
+      {:ok, updated_user} ->
+        {:ok, updated_user, otp_code, magic_token}
+
+      {:error, changeset} ->
+        {:error, changeset}
+    end
+  end
+
+  @doc """
+  Verifies an OTP code for the given email.
+  Returns {:ok, user} if valid, {:error, reason} otherwise.
+  """
+  def verify_otp_code(email, code) when is_binary(email) and is_binary(code) do
+    case get_user_by_email(email) do
+      nil ->
+        {:error, :invalid_code}
+
+      user ->
+        verify_otp_for_user(user, code)
+    end
+  end
+
+  defp verify_otp_for_user(user, code) do
+    case user.reset_password_token do
+      nil ->
+        {:error, :invalid_code}
+
+      token_data ->
+        case String.split(token_data, "|") do
+          [stored_code, _magic_token] ->
+            cond do
+              otp_expired?(user.reset_password_sent_at) ->
+                {:error, :expired}
+
+              stored_code != code ->
+                {:error, :invalid_code}
+
+              true ->
+                {:ok, user}
+            end
+
+          _ ->
+            {:error, :invalid_code}
+        end
+    end
+  end
+
+  @doc """
+  Verifies a magic link token.
+  Returns {:ok, user} if valid, {:error, reason} otherwise.
+  """
+  def verify_magic_token(token) when is_binary(token) do
+    # Find user by matching the magic token portion
+    query =
+      from u in User,
+        where: fragment("split_part(?, '|', 2) = ?", u.reset_password_token, ^token)
+
+    case Repo.one(query) do
+      nil ->
+        {:error, :invalid_token}
+
+      user ->
+        if otp_expired?(user.reset_password_sent_at) do
+          {:error, :expired}
+        else
+          {:ok, user}
+        end
+    end
+  end
+
+  @doc """
+  Clears the OTP code after successful verification.
+  """
+  def clear_otp_code(%User{} = user) do
+    user
+    |> Ecto.Changeset.change(
+      reset_password_token: nil,
+      reset_password_sent_at: nil
+    )
+    |> Repo.update()
+  end
+
+  defp otp_expired?(nil), do: true
+
+  defp otp_expired?(sent_at) do
+    expires_at = NaiveDateTime.add(sent_at, @otp_expiry_minutes * 60, :second)
+    NaiveDateTime.compare(NaiveDateTime.utc_now(), expires_at) == :gt
+  end
 end
