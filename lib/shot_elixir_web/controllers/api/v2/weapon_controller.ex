@@ -293,7 +293,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
       concealment: weapon.concealment,
       reload_value: weapon.reload_value,
       mook_bonus: weapon.mook_bonus,
-      kachunk: weapon.kachunk
+      kachunk: weapon.kachunk,
+      entity_class: "Weapon"
     }
   end
 
