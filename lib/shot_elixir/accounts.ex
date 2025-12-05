@@ -515,9 +515,11 @@ defmodule ShotElixir.Accounts do
   Returns {:ok, user, otp_code, magic_token} on success.
   """
   def generate_otp_code(%User{} = user) do
-    # Generate 6-digit code (padded with zeros)
+    # Generate cryptographically secure 6-digit code
     otp_code =
-      :rand.uniform(999_999)
+      :crypto.strong_rand_bytes(4)
+      |> :binary.decode_unsigned()
+      |> rem(1_000_000)
       |> Integer.to_string()
       |> String.pad_leading(6, "0")
 
@@ -565,7 +567,8 @@ defmodule ShotElixir.Accounts do
               otp_expired?(user.reset_password_sent_at) ->
                 {:error, :expired}
 
-              stored_code != code ->
+              # Use constant-time comparison to prevent timing attacks
+              not Plug.Crypto.secure_compare(stored_code, code) ->
                 {:error, :invalid_code}
 
               true ->

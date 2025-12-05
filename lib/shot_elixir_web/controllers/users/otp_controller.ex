@@ -6,7 +6,8 @@ defmodule ShotElixirWeb.Users.OtpController do
   use ShotElixirWeb, :controller
 
   alias ShotElixir.Accounts
-  alias ShotElixir.Guardian
+  alias ShotElixir.RateLimiter
+  alias ShotElixirWeb.AuthHelpers
 
   @doc """
   POST /users/otp/request
@@ -16,35 +17,49 @@ defmodule ShotElixirWeb.Users.OtpController do
   def request(conn, %{"email" => email}) when is_binary(email) do
     # Normalize email
     email = String.downcase(String.trim(email))
+    ip_address = AuthHelpers.get_client_ip(conn)
 
-    case Accounts.get_user_by_email(email) do
-      nil ->
-        # Don't reveal whether user exists
+    # Check rate limits before processing
+    case RateLimiter.check_otp_request_rate_limit(ip_address, email) do
+      {:error, :rate_limit_exceeded} ->
         conn
-        |> put_status(:ok)
-        |> json(%{message: "If your email is in our system, you will receive a login code"})
+        |> put_status(:too_many_requests)
+        |> json(%{error: "Too many requests. Please try again later."})
 
-      user ->
-        case Accounts.generate_otp_code(user) do
-          {:ok, _user, otp_code, magic_token} ->
-            # Queue email with OTP code and magic link
-            %{
-              "type" => "otp_login",
-              "user_id" => user.id,
-              "otp_code" => otp_code,
-              "magic_token" => magic_token
-            }
-            |> ShotElixir.Workers.EmailWorker.new()
-            |> Oban.insert()
-
+      :ok ->
+        case Accounts.get_user_by_email(email) do
+          nil ->
+            # Don't reveal whether user exists
             conn
             |> put_status(:ok)
             |> json(%{message: "If your email is in our system, you will receive a login code"})
 
-          {:error, _changeset} ->
-            conn
-            |> put_status(:ok)
-            |> json(%{message: "If your email is in our system, you will receive a login code"})
+          user ->
+            case Accounts.generate_otp_code(user) do
+              {:ok, _user, otp_code, magic_token} ->
+                # Queue email with OTP code and magic link
+                %{
+                  "type" => "otp_login",
+                  "user_id" => user.id,
+                  "otp_code" => otp_code,
+                  "magic_token" => magic_token
+                }
+                |> ShotElixir.Workers.EmailWorker.new()
+                |> Oban.insert()
+
+                conn
+                |> put_status(:ok)
+                |> json(%{
+                  message: "If your email is in our system, you will receive a login code"
+                })
+
+              {:error, _changeset} ->
+                conn
+                |> put_status(:ok)
+                |> json(%{
+                  message: "If your email is in our system, you will receive a login code"
+                })
+            end
         end
     end
   end
@@ -63,30 +78,52 @@ defmodule ShotElixirWeb.Users.OtpController do
       when is_binary(email) and is_binary(code) do
     email = String.downcase(String.trim(email))
     code = String.trim(code)
+    ip_address = AuthHelpers.get_client_ip(conn)
 
-    case Accounts.verify_otp_code(email, code) do
-      {:ok, user} ->
-        # Clear the OTP code after successful use
-        Accounts.clear_otp_code(user)
-
-        # Generate JWT token (same pattern as sessions controller)
-        {token, user_json} = generate_auth_response(user)
-
+    # Check rate limits before processing
+    case RateLimiter.check_otp_verify_rate_limit(ip_address, email) do
+      {:error, :rate_limit_exceeded} ->
         conn
-        |> put_resp_header("authorization", "Bearer #{token}")
-        |> put_resp_header("access-control-expose-headers", "Authorization")
-        |> put_status(:ok)
-        |> json(%{user: user_json, token: token})
+        |> put_status(:too_many_requests)
+        |> json(%{error: "Too many verification attempts. Please try again later."})
 
-      {:error, :expired} ->
-        conn
-        |> put_status(:gone)
-        |> json(%{error: "Code has expired. Please request a new one."})
+      :ok ->
+        case Accounts.verify_otp_code(email, code) do
+          {:ok, user} ->
+            # Clear the OTP code and failed attempts after successful use
+            Accounts.clear_otp_code(user)
+            RateLimiter.clear_otp_failed_attempts(email)
 
-      {:error, :invalid_code} ->
-        conn
-        |> put_status(:unauthorized)
-        |> json(%{error: "Invalid code. Please check and try again."})
+            # Generate JWT token using shared helper
+            {token, user_json} = AuthHelpers.generate_auth_response(user)
+
+            conn
+            |> put_resp_header("authorization", "Bearer #{token}")
+            |> put_resp_header("access-control-expose-headers", "Authorization")
+            |> put_status(:ok)
+            |> json(%{user: user_json, token: token})
+
+          {:error, reason} when reason in [:expired, :invalid_code] ->
+            # Track failed attempt after failed verification
+            case RateLimiter.track_otp_failed_attempt(email) do
+              {:error, :max_attempts_exceeded} ->
+                # Invalidate the OTP after too many failed attempts
+                case Accounts.get_user_by_email(email) do
+                  nil -> :ok
+                  user -> Accounts.clear_otp_code(user)
+                end
+
+                conn
+                |> put_status(:too_many_requests)
+                |> json(%{error: "Too many failed attempts. Please request a new code."})
+
+              :ok ->
+                # Return uniform error to prevent email enumeration via timing/response differences
+                conn
+                |> put_status(:unauthorized)
+                |> json(%{error: "Invalid or expired code. Please check and try again."})
+            end
+        end
     end
   end
 
@@ -106,8 +143,8 @@ defmodule ShotElixirWeb.Users.OtpController do
         # Clear the OTP code after successful use
         Accounts.clear_otp_code(user)
 
-        # Generate JWT token
-        {jwt_token, user_json} = generate_auth_response(user)
+        # Generate JWT token using shared helper
+        {jwt_token, user_json} = AuthHelpers.generate_auth_response(user)
 
         conn
         |> put_resp_header("authorization", "Bearer #{jwt_token}")
@@ -131,78 +168,5 @@ defmodule ShotElixirWeb.Users.OtpController do
     conn
     |> put_status(:bad_request)
     |> json(%{error: "Token is required"})
-  end
-
-  # Private helpers - match sessions_controller.ex pattern
-
-  defp generate_auth_response(user) do
-    jti = claims_jti(user)
-    image_url = get_image_url(user)
-    now = System.system_time(:second)
-
-    jwt_payload = %{
-      "jti" => jti,
-      "user" => %{
-        "email" => user.email,
-        "admin" => user.admin,
-        "first_name" => user.first_name,
-        "last_name" => user.last_name,
-        "gamemaster" => user.gamemaster,
-        "current_campaign" => user.current_campaign_id,
-        "created_at" => format_datetime_rails(user.created_at),
-        "updated_at" => format_datetime_rails(user.updated_at),
-        "image_url" => image_url
-      },
-      "sub" => user.id,
-      "scp" => "user",
-      "aud" => nil,
-      "iat" => now,
-      # 7 days expiry like Rails
-      "exp" => now + 7 * 24 * 60 * 60
-    }
-
-    {:ok, token, _claims} = Guardian.encode_and_sign(user, jwt_payload)
-
-    user_json = %{
-      id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      email: user.email,
-      created_at: NaiveDateTime.to_iso8601(user.created_at),
-      updated_at: NaiveDateTime.to_iso8601(user.updated_at),
-      avatar_url: nil,
-      admin: user.admin,
-      gamemaster: user.gamemaster,
-      current_campaign_id: user.current_campaign_id,
-      name: user.name,
-      active: user.active,
-      pending_invitation_id: nil
-    }
-
-    {token, user_json}
-  end
-
-  defp claims_jti(user) do
-    case user.email do
-      "progressions@gmail.com" -> "db9f2e51-6146-4166-9e74-7adbaf1a7209"
-      _ -> Ecto.UUID.generate()
-    end
-  end
-
-  defp get_image_url(user) do
-    case user.email do
-      "progressions@gmail.com" ->
-        "https://ik.imagekit.io/nvqgwnjgv/chi-war-development/DALL_E_2023-10-24_14.26.08_-_Illustration_of_Hang_Choi__a_Hong_Kong_butcher_with_a_fierce_gaze__set_against_a_solid_black_background._His_apron_is_covered_in_red_jelly__and_he_fir_cYKKk5iHY.png"
-
-      _ ->
-        Map.get(user, :image_url)
-    end
-  end
-
-  defp format_datetime_rails(datetime) do
-    datetime
-    |> NaiveDateTime.to_string()
-    |> String.replace("T", " ")
-    |> Kernel.<>(" UTC")
   end
 end
