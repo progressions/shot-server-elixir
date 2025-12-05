@@ -7,8 +7,9 @@ defmodule ShotElixir.Application do
 
   @impl true
   def start(_type, _args) do
-    # Initialize ETS table for rate limiting
+    # Initialize ETS tables for rate limiting
     ShotElixir.Invitations.init_rate_limiting()
+    ShotElixir.RateLimiter.init()
 
     children =
       [

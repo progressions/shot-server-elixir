@@ -232,4 +232,122 @@ defmodule ShotElixir.AccountsTest do
       end)
     end)
   end
+
+  describe "OTP passwordless login" do
+    test "generate_otp_code/1 generates a 6-digit code and magic token" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      {:ok, updated_user, otp_code, magic_token} = Accounts.generate_otp_code(user)
+
+      # OTP code should be 6 digits
+      assert String.length(otp_code) == 6
+      assert String.match?(otp_code, ~r/^\d{6}$/)
+
+      # Magic token should be a base64 encoded string
+      assert is_binary(magic_token)
+      assert String.length(magic_token) > 0
+
+      # User should have token data stored
+      assert updated_user.reset_password_token != nil
+      assert updated_user.reset_password_sent_at != nil
+
+      # Token should contain both OTP and magic token
+      assert String.contains?(updated_user.reset_password_token, "|")
+    end
+
+    test "generate_otp_code/1 generates cryptographically secure codes" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      # Generate multiple codes and verify they're different (statistically)
+      codes =
+        for _ <- 1..10 do
+          {:ok, _user, otp_code, _magic_token} = Accounts.generate_otp_code(user)
+          otp_code
+        end
+
+      unique_codes = Enum.uniq(codes)
+      # With 10 codes, we should have at least 5 unique ones (extremely likely with CSPRNG)
+      assert length(unique_codes) >= 5
+    end
+
+    test "verify_otp_code/2 with valid code returns user" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      {:ok, _updated_user, otp_code, _magic_token} = Accounts.generate_otp_code(user)
+
+      assert {:ok, verified_user} = Accounts.verify_otp_code(user.email, otp_code)
+      assert verified_user.id == user.id
+    end
+
+    test "verify_otp_code/2 with invalid code returns error" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      {:ok, _updated_user, _otp_code, _magic_token} = Accounts.generate_otp_code(user)
+
+      assert {:error, :invalid_code} = Accounts.verify_otp_code(user.email, "000000")
+    end
+
+    test "verify_otp_code/2 with non-existent email returns error" do
+      assert {:error, :invalid_code} =
+               Accounts.verify_otp_code("nonexistent@example.com", "123456")
+    end
+
+    test "verify_otp_code/2 with expired code returns error" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      {:ok, updated_user, otp_code, _magic_token} = Accounts.generate_otp_code(user)
+
+      # Set sent_at to be expired (more than 10 minutes ago)
+      expired_time = NaiveDateTime.add(NaiveDateTime.utc_now(), -11 * 60, :second)
+
+      updated_user
+      |> Ecto.Changeset.change(reset_password_sent_at: expired_time)
+      |> ShotElixir.Repo.update!()
+
+      assert {:error, :expired} = Accounts.verify_otp_code(user.email, otp_code)
+    end
+
+    test "verify_otp_code/2 with no OTP set returns error" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      assert {:error, :invalid_code} = Accounts.verify_otp_code(user.email, "123456")
+    end
+
+    test "verify_magic_token/1 with valid token returns user" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      {:ok, _updated_user, _otp_code, magic_token} = Accounts.generate_otp_code(user)
+
+      assert {:ok, verified_user} = Accounts.verify_magic_token(magic_token)
+      assert verified_user.id == user.id
+    end
+
+    test "verify_magic_token/1 with invalid token returns error" do
+      assert {:error, :invalid_token} = Accounts.verify_magic_token("invalid_token")
+    end
+
+    test "verify_magic_token/1 with expired token returns error" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      {:ok, updated_user, _otp_code, magic_token} = Accounts.generate_otp_code(user)
+
+      # Set sent_at to be expired
+      expired_time = NaiveDateTime.add(NaiveDateTime.utc_now(), -11 * 60, :second)
+
+      updated_user
+      |> Ecto.Changeset.change(reset_password_sent_at: expired_time)
+      |> ShotElixir.Repo.update!()
+
+      assert {:error, :expired} = Accounts.verify_magic_token(magic_token)
+    end
+
+    test "clear_otp_code/1 clears the OTP data" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      {:ok, updated_user, _otp_code, _magic_token} = Accounts.generate_otp_code(user)
+
+      # Verify OTP data exists
+      assert updated_user.reset_password_token != nil
+      assert updated_user.reset_password_sent_at != nil
+
+      # Clear the OTP
+      {:ok, cleared_user} = Accounts.clear_otp_code(updated_user)
+
+      assert cleared_user.reset_password_token == nil
+      assert cleared_user.reset_password_sent_at == nil
+    end
+  end
 end

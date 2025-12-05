@@ -148,6 +148,35 @@ defmodule ShotElixir.Emails.UserEmail do
     )
   end
 
+  @doc """
+  OTP login email with 6-digit code and magic link.
+  Sent when user requests passwordless login.
+  """
+  def otp_login(user, otp_code, magic_token) do
+    magic_link_url = "#{build_root_url()}/login/otp?token=#{magic_token}"
+
+    new()
+    |> to({user.first_name || user.email, user.email})
+    |> from({@from_name, @from_email})
+    |> subject("Your Chi War login code: #{otp_code}")
+    |> header("X-Auto-Response-Suppress", "OOF")
+    |> header("X-Mailer", "Chi War Mailer")
+    |> html_body(
+      render_template("otp_login.html", %{
+        user: user,
+        otp_code: otp_code,
+        magic_link_url: magic_link_url
+      })
+    )
+    |> text_body(
+      render_template("otp_login.text", %{
+        user: user,
+        otp_code: otp_code,
+        magic_link_url: magic_link_url
+      })
+    )
+  end
+
   # Private helpers
 
   defp build_root_url do
