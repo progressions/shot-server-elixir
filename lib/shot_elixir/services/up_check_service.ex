@@ -25,18 +25,19 @@ defmodule ShotElixir.Services.UpCheckService do
         {:error, reason} -> Repo.rollback(reason)
       end
 
-      # Apply logic
-      if params["success"] do
-        character_id = params["character_id"]
-        character = Characters.get_character(character_id)
+      # Apply logic based on success/failure
+      character_id = params["character_id"]
+      character = Characters.get_character(character_id)
 
-        if character do
+      if character do
+        current_status = character.status || []
+
+        if params["success"] do
+          # Success: remove up_check_required status
           action_values = character.action_values || %{}
           wounds = Map.get(action_values, "Wounds", 0)
           impairments = character.impairments || 0
 
-          # Remove up_check_required status on successful up check
-          current_status = character.status || []
           new_status = Enum.reject(current_status, &(&1 == "up_check_required"))
 
           updates =
@@ -56,8 +57,28 @@ defmodule ShotElixir.Services.UpCheckService do
             end
 
           case Characters.update_character(character, updates) do
-            {:ok, _} -> :ok
-            {:error, reason} -> Repo.rollback(reason)
+            {:ok, _} ->
+              Logger.info("✅ UP CHECK SUCCESS: #{character.name} stays in the fight")
+              :ok
+
+            {:error, reason} ->
+              Repo.rollback(reason)
+          end
+        else
+          # Failure: remove up_check_required and add out_of_fight
+          new_status =
+            current_status
+            |> Enum.reject(&(&1 == "up_check_required"))
+            |> Enum.concat(["out_of_fight"])
+            |> Enum.uniq()
+
+          case Characters.update_character(character, %{"status" => new_status}) do
+            {:ok, _} ->
+              Logger.info("❌ UP CHECK FAILED: #{character.name} is out of the fight")
+              :ok
+
+            {:error, reason} ->
+              Repo.rollback(reason)
           end
         end
       end
