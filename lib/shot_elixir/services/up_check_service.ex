@@ -35,25 +35,29 @@ defmodule ShotElixir.Services.UpCheckService do
           wounds = Map.get(action_values, "Wounds", 0)
           impairments = character.impairments || 0
 
+          # Remove up_check_required status on successful up check
+          current_status = character.status || []
+          new_status = Enum.reject(current_status, &(&1 == "up_check_required"))
+
           updates =
             cond do
               wounds > 0 ->
                 %{
-                  "action_values" => Map.put(action_values, "Wounds", wounds - 1)
+                  "action_values" => Map.put(action_values, "Wounds", wounds - 1),
+                  "status" => new_status
                 }
 
               impairments > 0 ->
-                %{"impairments" => impairments - 1}
+                %{"impairments" => impairments - 1, "status" => new_status}
 
               true ->
-                %{}
+                # Even if no wounds/impairments to reduce, still clear the status
+                %{"status" => new_status}
             end
 
-          if map_size(updates) > 0 do
-            case Characters.update_character(character, updates) do
-              {:ok, _} -> :ok
-              {:error, reason} -> Repo.rollback(reason)
-            end
+          case Characters.update_character(character, updates) do
+            {:ok, _} -> :ok
+            {:error, reason} -> Repo.rollback(reason)
           end
         end
       end
