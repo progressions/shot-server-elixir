@@ -178,7 +178,89 @@ defmodule ShotElixir.Services.CombatActionService do
     # Handle status additions and removals
     base_updates
     |> maybe_add_status_updates(character, update)
+    |> maybe_add_up_check_status(character, update, shot)
   end
+
+  # Check if wounds crossed the up_check threshold and add up_check_required status
+  defp maybe_add_up_check_status(updates, character, update, shot) do
+    char_type = get_character_type(character)
+    threshold = get_wound_threshold(char_type)
+
+    # Skip if no threshold for this character type
+    if threshold == nil do
+      updates
+    else
+      # For Boss/Uber-Boss, wounds are stored in shot.count, not character.action_values
+      old_wounds =
+        case char_type do
+          t when t in ["Boss", "Uber-Boss"] -> shot.count || 0
+          _ -> get_current_wounds(character)
+        end
+
+      # Calculate new wounds after this update
+      new_wounds =
+        cond do
+          # PC with direct action_values["Wounds"] update
+          is_pc?(character) && update["action_values"] &&
+              Map.has_key?(update["action_values"], "Wounds") ->
+            update["action_values"]["Wounds"]
+
+          # PC with incremental wounds update
+          is_pc?(character) && update["wounds"] ->
+            old_wounds + update["wounds"]
+
+          # Boss/Uber-Boss with direct count update
+          char_type in ["Boss", "Uber-Boss"] && update["count"] != nil ->
+            update["count"]
+
+          # Boss/Uber-Boss with incremental wounds update
+          char_type in ["Boss", "Uber-Boss"] && update["wounds"] ->
+            old_wounds + update["wounds"]
+
+          true ->
+            old_wounds
+        end
+
+      current_status = get_current_status(character)
+      has_up_check = "up_check_required" in current_status
+
+      # Enforce up_check_required status based on wound threshold
+      cond do
+        # At or above threshold - ensure up_check_required is present (for PC, Boss, Uber-Boss)
+        new_wounds >= threshold && !has_up_check && char_type in ["PC", "Boss", "Uber-Boss"] ->
+          Logger.info(
+            "⚠️ #{character.name} is at or above wound threshold (#{old_wounds} -> #{new_wounds}), enforcing Up Check"
+          )
+
+          new_status = Enum.uniq((updates["status"] || current_status) ++ ["up_check_required"])
+          Map.put(updates, "status", new_status)
+
+        # Healed below threshold - remove up_check_required
+        new_wounds < threshold && has_up_check ->
+          new_status =
+            Enum.reject(updates["status"] || current_status, &(&1 == "up_check_required"))
+
+          Map.put(updates, "status", new_status)
+
+        true ->
+          updates
+      end
+    end
+  end
+
+  # Get wound threshold based on character type
+  defp get_wound_threshold("Uber-Boss"), do: 50
+  defp get_wound_threshold("Boss"), do: 50
+  defp get_wound_threshold("PC"), do: 35
+  # Allies and Featured Foes go straight to out_of_fight, no Up Check
+  defp get_wound_threshold(_), do: nil
+
+  # Get character type from action_values
+  defp get_character_type(%Character{action_values: action_values}) when is_map(action_values) do
+    action_values["Type"]
+  end
+
+  defp get_character_type(_), do: nil
 
   # Handle add_status and remove_status updates
   defp maybe_add_status_updates(updates, character, update) do
