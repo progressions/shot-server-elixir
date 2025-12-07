@@ -582,6 +582,17 @@ defmodule ShotElixir.Fights do
     end
   end
 
+  @doc """
+  Lists all fight events for a given fight, ordered chronologically.
+  """
+  def list_fight_events(fight_id) do
+    from(fe in FightEvent,
+      where: fe.fight_id == ^fight_id,
+      order_by: [asc: fe.created_at]
+    )
+    |> Repo.all()
+  end
+
   # Shot management
   def create_shot(attrs \\ %{}) do
     %Shot{}

@@ -15,13 +15,16 @@ defmodule ShotElixir.Services.ChaseActionService do
     Logger.info("Applying chase action for fight #{fight.id}")
 
     Repo.transaction(fn ->
-      # Record the event
+      # Enrich updates with vehicle names for the event details
+      enriched_updates = enrich_vehicle_updates(vehicle_updates)
+
+      # Record the event with enriched details
       case Fights.create_fight_event(
              %{
                "fight_id" => fight.id,
                "event_type" => "chase_action",
-               "description" => "Chase action performed with #{length(vehicle_updates)} updates",
-               "details" => %{"updates_count" => length(vehicle_updates)}
+               "description" => "Chase action",
+               "details" => %{"vehicle_updates" => enriched_updates}
              },
              broadcast: false
            ) do
@@ -39,6 +42,17 @@ defmodule ShotElixir.Services.ChaseActionService do
       {:ok, fight} -> Fights.touch_fight(fight)
       error -> error
     end
+  end
+
+  # Enrich vehicle updates with vehicle names for event details
+  defp enrich_vehicle_updates(vehicle_updates) do
+    Enum.map(vehicle_updates, fn update ->
+      vehicle_id = update["vehicle_id"] || update["id"]
+      vehicle = if vehicle_id, do: Vehicles.get_vehicle(vehicle_id), else: nil
+      vehicle_name = if vehicle, do: vehicle.name, else: "Vehicle"
+
+      Map.put(update, "vehicle_name", vehicle_name)
+    end)
   end
 
   defp apply_updates(fight, vehicle_updates) do
