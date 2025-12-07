@@ -200,9 +200,20 @@ defmodule ShotElixir.Services.CombatActionService do
       # Calculate new wounds after this update
       new_wounds =
         cond do
+          # PC with direct action_values["Wounds"] update
+          is_pc?(character) && update["action_values"] &&
+              Map.has_key?(update["action_values"], "Wounds") ->
+            update["action_values"]["Wounds"]
+
+          # PC with incremental wounds update
           is_pc?(character) && update["wounds"] ->
             old_wounds + update["wounds"]
 
+          # Boss/Uber-Boss with direct count update
+          char_type in ["Boss", "Uber-Boss"] && update["count"] != nil ->
+            update["count"]
+
+          # Boss/Uber-Boss with incremental wounds update
           char_type in ["Boss", "Uber-Boss"] && update["wounds"] ->
             old_wounds + update["wounds"]
 
