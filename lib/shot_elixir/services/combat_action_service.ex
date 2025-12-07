@@ -190,18 +190,21 @@ defmodule ShotElixir.Services.CombatActionService do
     if threshold == nil do
       updates
     else
-      old_wounds = get_current_wounds(character)
+      # For Boss/Uber-Boss, wounds are stored in shot.count, not character.action_values
+      old_wounds =
+        case char_type do
+          t when t in ["Boss", "Uber-Boss"] -> shot.count || 0
+          _ -> get_current_wounds(character)
+        end
 
-      # For PCs, wounds come from update; for NPCs (Boss/Uber-Boss), wounds go to shot.count
+      # Calculate new wounds after this update
       new_wounds =
         cond do
           is_pc?(character) && update["wounds"] ->
             old_wounds + update["wounds"]
 
           char_type in ["Boss", "Uber-Boss"] && update["wounds"] ->
-            # For Boss/Uber-Boss, wounds go to shot.count
-            current_count = shot.count || 0
-            current_count + update["wounds"]
+            old_wounds + update["wounds"]
 
           true ->
             old_wounds
@@ -210,13 +213,12 @@ defmodule ShotElixir.Services.CombatActionService do
       current_status = get_current_status(character)
       has_up_check = "up_check_required" in current_status
 
-      # Check if crossing threshold from below to at/above
+      # Enforce up_check_required status based on wound threshold
       cond do
-        # Crossing threshold upward - add up_check_required (only for PC, Boss, Uber-Boss)
-        old_wounds < threshold && new_wounds >= threshold && !has_up_check &&
-            char_type in ["PC", "Boss", "Uber-Boss"] ->
+        # At or above threshold - ensure up_check_required is present (for PC, Boss, Uber-Boss)
+        new_wounds >= threshold && !has_up_check && char_type in ["PC", "Boss", "Uber-Boss"] ->
           Logger.info(
-            "⚠️ #{character.name} crossed wound threshold (#{old_wounds} -> #{new_wounds}), triggering Up Check"
+            "⚠️ #{character.name} is at or above wound threshold (#{old_wounds} -> #{new_wounds}), enforcing Up Check"
           )
 
           new_status = Enum.uniq((updates["status"] || current_status) ++ ["up_check_required"])
