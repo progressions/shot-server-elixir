@@ -390,6 +390,21 @@ defmodule ShotElixir.Vehicles do
     |> ImageLoader.load_image_url("Vehicle")
   end
 
+  @doc """
+  Gets multiple vehicles by their IDs in a single query.
+  Returns a list of vehicles (without image URLs for efficiency).
+  """
+  def list_vehicles_by_ids(ids) when is_list(ids) do
+    ids = Enum.reject(ids, &is_nil/1)
+
+    if ids == [] do
+      []
+    else
+      from(v in Vehicle, where: v.id in ^ids)
+      |> Repo.all()
+    end
+  end
+
   def get_vehicle_with_preloads(id) do
     Vehicle
     |> Repo.get(id)

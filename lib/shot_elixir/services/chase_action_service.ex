@@ -45,11 +45,27 @@ defmodule ShotElixir.Services.ChaseActionService do
   end
 
   # Enrich vehicle updates with vehicle names for event details
+  # Fetches all vehicles in a single query to avoid N+1 query issues
   defp enrich_vehicle_updates(vehicle_updates) do
+    # Collect all vehicle IDs
+    vehicle_ids =
+      vehicle_updates
+      |> Enum.map(fn update -> update["vehicle_id"] || update["id"] end)
+      |> Enum.reject(&is_nil/1)
+
+    # Fetch all vehicles in a single query
+    vehicles = Vehicles.list_vehicles_by_ids(vehicle_ids)
+    vehicles_map = Map.new(vehicles, fn v -> {v.id, v} end)
+
+    # Enrich each update with the vehicle name
     Enum.map(vehicle_updates, fn update ->
       vehicle_id = update["vehicle_id"] || update["id"]
-      vehicle = if vehicle_id, do: Vehicles.get_vehicle(vehicle_id), else: nil
-      vehicle_name = if vehicle, do: vehicle.name, else: "Vehicle"
+
+      vehicle_name =
+        case Map.get(vehicles_map, vehicle_id) do
+          nil -> "Vehicle"
+          vehicle -> vehicle.name
+        end
 
       Map.put(update, "vehicle_name", vehicle_name)
     end)
