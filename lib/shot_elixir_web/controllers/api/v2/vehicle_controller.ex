@@ -24,7 +24,13 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-      |> render("index.json", vehicles: vehicles_data.vehicles, meta: vehicles_data.meta)
+      |> render("index.json",
+        vehicles: vehicles_data.vehicles,
+        meta: vehicles_data.meta,
+        factions: vehicles_data.factions,
+        archetypes: vehicles_data.archetypes,
+        types: vehicles_data.types
+      )
     end
   end
 

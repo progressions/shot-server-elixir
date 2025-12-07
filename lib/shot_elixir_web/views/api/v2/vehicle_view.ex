@@ -1,6 +1,23 @@
 defmodule ShotElixirWeb.Api.V2.VehicleView do
   alias ShotElixir.JsonSanitizer
 
+  def render("index.json", %{
+        vehicles: vehicles,
+        meta: meta,
+        factions: factions,
+        archetypes: archetypes,
+        types: types
+      }) do
+    %{
+      vehicles: Enum.map(vehicles, &render_vehicle/1),
+      meta: meta,
+      factions: factions,
+      archetypes: archetypes,
+      types: types
+    }
+    |> JsonSanitizer.sanitize()
+  end
+
   def render("index.json", %{vehicles: vehicles, meta: meta}) do
     %{
       vehicles: Enum.map(vehicles, &render_vehicle/1),

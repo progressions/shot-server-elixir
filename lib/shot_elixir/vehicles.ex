@@ -257,7 +257,9 @@ defmodule ShotElixir.Vehicles do
 
     total_count = Repo.aggregate(count_query, :count, :id)
 
-    # Get factions for filtering UI
+    # Get factions for filtering UI (respecting show_hidden parameter)
+    show_hidden = params["show_hidden"] == "true"
+
     factions_query =
       from v in Vehicle,
         where: v.campaign_id == ^campaign_id and not is_nil(v.faction_id),
@@ -267,14 +269,32 @@ defmodule ShotElixir.Vehicles do
         distinct: true,
         order_by: fragment("LOWER(?)", f.name)
 
+    factions_query =
+      if show_hidden do
+        factions_query
+      else
+        from v in factions_query, where: v.active == true
+      end
+
     factions =
       factions_query
       |> Repo.all()
       |> Enum.map(fn faction -> %{id: faction.id, name: faction.name} end)
 
-    # Get archetypes and types
-    vehicles_for_meta =
-      Repo.all(from v in Vehicle, where: v.campaign_id == ^campaign_id, select: v.action_values)
+    # Get archetypes and types (respecting show_hidden parameter)
+    vehicles_for_meta_query =
+      from v in Vehicle,
+        where: v.campaign_id == ^campaign_id,
+        select: v.action_values
+
+    vehicles_for_meta_query =
+      if show_hidden do
+        vehicles_for_meta_query
+      else
+        from v in vehicles_for_meta_query, where: v.active == true
+      end
+
+    vehicles_for_meta = Repo.all(vehicles_for_meta_query)
 
     archetypes =
       vehicles_for_meta
