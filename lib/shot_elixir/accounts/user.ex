@@ -3,6 +3,7 @@ defmodule ShotElixir.Accounts.User do
   import Ecto.Changeset
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Accounts.WebauthnCredential
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -38,6 +39,7 @@ defmodule ShotElixir.Accounts.User do
     has_many :player_campaigns, through: [:campaign_memberships, :campaign]
     has_many :invitations, ShotElixir.Invitations.Invitation
     has_one :onboarding_progress, ShotElixir.Onboarding.Progress
+    has_many :webauthn_credentials, WebauthnCredential
 
     has_many :image_positions, ImagePosition,
       foreign_key: :positionable_id,

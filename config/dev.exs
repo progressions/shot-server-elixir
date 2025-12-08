@@ -85,3 +85,8 @@ config :shot_elixir, :mailer_url_options,
   port: 3001
 
 # Discord bot credentials are loaded from runtime.exs using environment variables
+
+# WebAuthn/Passkey configuration for development
+# Use localhost for local development
+config :shot_elixir, :webauthn_origin, "http://localhost:3001"
+config :shot_elixir, :webauthn_rp_id, "localhost"

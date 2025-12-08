@@ -88,7 +88,10 @@ defmodule ShotElixir.MixProject do
       {:dotenvy, "~> 0.8", only: [:dev, :test]},
 
       # Tidewave MCP server for AI coding assistance
-      {:tidewave, "~> 0.5", only: :dev}
+      {:tidewave, "~> 0.5", only: :dev},
+
+      # WebAuthn/Passkey authentication
+      {:wax_, "~> 0.7.0"}
     ]
   end
 

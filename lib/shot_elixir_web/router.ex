@@ -64,6 +64,10 @@ defmodule ShotElixirWeb.Router do
     # User registration (public)
     post "/users", UserController, :create
     post "/users/register", UserController, :register
+
+    # WebAuthn/Passkey authentication (public endpoints)
+    post "/webauthn/authenticate/options", WebauthnController, :authentication_options
+    post "/webauthn/authenticate/verify", WebauthnController, :verify_authentication
   end
 
   # API V2 endpoints - Authenticated
@@ -200,6 +204,13 @@ defmodule ShotElixirWeb.Router do
       patch "/dismiss_congratulations", OnboardingController, :dismiss_congratulations
       patch "/", OnboardingController, :update
     end
+
+    # WebAuthn/Passkey management (authenticated endpoints)
+    post "/webauthn/register/options", WebauthnController, :registration_options
+    post "/webauthn/register/verify", WebauthnController, :verify_registration
+    get "/webauthn/credentials", WebauthnController, :list_credentials
+    delete "/webauthn/credentials/:id", WebauthnController, :delete_credential
+    patch "/webauthn/credentials/:id", WebauthnController, :update_credential
   end
 
   # Email preview in development
