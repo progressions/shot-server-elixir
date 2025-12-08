@@ -59,6 +59,9 @@ defmodule ShotElixir.Services.WebAuthnService do
        timeout: 120_000,
        attestation: "none",
        excludeCredentials: exclude_credentials,
+       # authenticatorAttachment: "platform" restricts to built-in authenticators
+       # (Touch ID, Face ID, Windows Hello). This is intentional for Chi War to
+       # provide a simpler user experience. Remove this line to allow security keys.
        authenticatorSelection: %{
          authenticatorAttachment: "platform",
          requireResidentKey: false,
@@ -78,13 +81,15 @@ defmodule ShotElixir.Services.WebAuthnService do
     - client_data_json: Base64url encoded client data JSON from browser
     - challenge_id: ID of the stored challenge
     - name: User-provided name for the passkey
+    - transports: Optional list of transport types (e.g., ["internal", "hybrid"])
   """
   def verify_registration(
         %User{} = user,
         attestation_object_b64,
         client_data_json_b64,
         challenge_id,
-        name
+        name,
+        transports \\ []
       ) do
     with {:ok, challenge} <- get_and_validate_challenge(challenge_id, "registration", user.id),
          {:ok, attestation_object} <- decode_base64url(attestation_object_b64),
@@ -98,11 +103,12 @@ defmodule ShotElixir.Services.WebAuthnService do
       # Mark challenge as used
       mark_challenge_used(challenge)
 
-      # Store the credential
+      # Store the credential with transport information
       create_credential(user, %{
         credential_id: attested_data.credential_id,
         public_key: :erlang.term_to_binary(attested_data.credential_public_key),
         sign_count: authenticator_data.sign_count,
+        transports: transports,
         name: name,
         backed_up: authenticator_data.flag_credential_backed_up,
         backup_eligible: authenticator_data.flag_backup_eligible
@@ -131,12 +137,16 @@ defmodule ShotElixir.Services.WebAuthnService do
 
   @doc """
   Generates authentication options for a specific user.
+
+  Returns fake options if the user has no passkeys to prevent user enumeration.
   """
   def generate_authentication_options_for_user(%User{} = user) do
     credentials = get_user_credentials(user.id)
 
     if Enum.empty?(credentials) do
-      {:error, :no_passkeys_registered}
+      # Return fake options to prevent user enumeration
+      # (user exists but has no passkeys should look same as user doesn't exist)
+      generate_empty_authentication_options()
     else
       allow_credentials =
         Enum.map(credentials, fn cred ->

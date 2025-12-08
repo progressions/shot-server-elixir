@@ -87,6 +87,10 @@ config :shot_elixir, :mailer_url_options,
 # Discord bot credentials are loaded from runtime.exs using environment variables
 
 # WebAuthn/Passkey configuration for development
-# Use localhost for local development
+# NOTE:
+# - WebAuthn allows HTTP only for localhost, so passkeys will only work when
+#   accessing the app via localhost:3001, NOT via a network IP (e.g., 192.168.1.x)
+# - Passkeys created in development will NOT work in production, as the rp_id
+#   and origin differ (localhost vs chiwar.net)
 config :shot_elixir, :webauthn_origin, "http://localhost:3001"
 config :shot_elixir, :webauthn_rp_id, "localhost"

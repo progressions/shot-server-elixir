@@ -24,11 +24,18 @@ defmodule ShotElixirWeb.Api.V2.WebauthnController do
   """
   def registration_options(conn, _params) do
     user = Guardian.Plug.current_resource(conn)
-    {:ok, options} = WebAuthnService.generate_registration_options(user)
 
-    conn
-    |> put_status(:ok)
-    |> json(options)
+    case WebAuthnService.generate_registration_options(user) do
+      {:ok, options} ->
+        conn
+        |> put_status(:ok)
+        |> json(options)
+
+      {:error, reason} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: format_error(reason)})
+    end
   end
 
   @doc """
@@ -41,9 +48,11 @@ defmodule ShotElixirWeb.Api.V2.WebauthnController do
   - clientDataJSON: Base64url encoded client data JSON
   - challengeId: ID of the stored challenge
   - name: User-provided name for the passkey
+  - transports: Optional list of transport types (e.g., ["internal", "hybrid"])
   """
   def verify_registration(conn, params) do
     user = Guardian.Plug.current_resource(conn)
+    transports = Map.get(params, "transports", [])
 
     with {:ok, attestation_object} <- get_required_param(params, "attestationObject"),
          {:ok, client_data_json} <- get_required_param(params, "clientDataJSON"),
@@ -55,7 +64,8 @@ defmodule ShotElixirWeb.Api.V2.WebauthnController do
              attestation_object,
              client_data_json,
              challenge_id,
-             name
+             name,
+             transports
            ) do
       conn
       |> put_status(:created)
@@ -83,22 +93,13 @@ defmodule ShotElixirWeb.Api.V2.WebauthnController do
   - email: The user's email address
   """
   def authentication_options(conn, %{"email" => email}) do
-    case WebAuthnService.generate_authentication_options(email) do
-      {:ok, options} ->
-        conn
-        |> put_status(:ok)
-        |> json(options)
+    # Always returns {:ok, options} to prevent user enumeration
+    # (same response whether user exists, doesn't exist, or has no passkeys)
+    {:ok, options} = WebAuthnService.generate_authentication_options(email)
 
-      {:error, :no_passkeys_registered} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: "No passkeys registered for this account"})
-
-      {:error, reason} ->
-        conn
-        |> put_status(:bad_request)
-        |> json(%{error: format_error(reason)})
-    end
+    conn
+    |> put_status(:ok)
+    |> json(options)
   end
 
   def authentication_options(conn, _params) do
