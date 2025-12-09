@@ -5,7 +5,7 @@ defmodule ShotElixir.Discord.Commands do
   alias Nostrum.Api
   alias Nostrum.Api.Message
   alias ShotElixir.{Fights, Campaigns}
-  alias ShotElixir.Discord.CurrentFight
+  alias ShotElixir.Discord.{CurrentFight, CurrentCampaign}
   alias ShotElixir.Workers.DiscordNotificationWorker
   alias ShotElixir.Services.DiceRoller
 
@@ -226,6 +226,115 @@ defmodule ShotElixir.Discord.Commands do
     respond(interaction, "Cleared swerves for #{username}")
   end
 
+  @doc """
+  Handles the /list command to list available fights.
+  """
+  def handle_list(interaction) do
+    server_id = interaction.guild_id
+
+    case get_campaign(server_id) do
+      nil ->
+        respond(interaction, "No campaign found for this server.", ephemeral: true)
+
+      campaign ->
+        fights =
+          Fights.list_fights(campaign.id)
+          |> Enum.filter(& &1.active)
+
+        if Enum.empty?(fights) do
+          respond(interaction, "No active fights in #{campaign.name}.")
+        else
+          fight_list =
+            fights
+            |> Enum.map(fn fight -> "• #{fight.name}" end)
+            |> Enum.join("\n")
+
+          respond(interaction, "**Active fights in #{campaign.name}:**\n#{fight_list}")
+        end
+    end
+  end
+
+  @doc """
+  Handles the /campaigns command to list all campaigns.
+  """
+  def handle_campaigns(interaction) do
+    server_id = interaction.guild_id
+    campaigns = Campaigns.list_campaigns()
+
+    if Enum.empty?(campaigns) do
+      respond(interaction, "No campaigns available.")
+    else
+      current_campaign = get_campaign(server_id)
+
+      campaign_list =
+        campaigns
+        |> Enum.map(fn campaign ->
+          marker = if current_campaign && current_campaign.id == campaign.id, do: " ✓", else: ""
+          "• #{campaign.name}#{marker}"
+        end)
+        |> Enum.join("\n")
+
+      respond(
+        interaction,
+        "**Available campaigns:**\n#{campaign_list}\n\nUse `/campaign <name>` to set the active campaign."
+      )
+    end
+  end
+
+  @doc """
+  Handles the /campaign command to set the current campaign for a server.
+  """
+  def handle_campaign(interaction) do
+    server_id = interaction.guild_id
+    campaign_name = get_option(interaction, "name")
+
+    if is_nil(campaign_name) || campaign_name == "" do
+      respond(interaction, "Please provide a campaign name.", ephemeral: true)
+    else
+      campaigns = Campaigns.list_campaigns()
+
+      campaign =
+        Enum.find(campaigns, &(String.downcase(&1.name) == String.downcase(campaign_name)))
+
+      case campaign do
+        nil ->
+          respond(interaction, "Couldn't find campaign \"#{campaign_name}\".", ephemeral: true)
+
+        campaign ->
+          CurrentCampaign.set(server_id, campaign.id)
+          respond(interaction, "Current campaign set to **#{campaign.name}**.")
+      end
+    end
+  end
+
+  @doc """
+  Handles autocomplete for the /campaign command's name parameter.
+  """
+  def handle_campaign_autocomplete(interaction) do
+    # Get the user's current input for the campaign name
+    focused_option =
+      interaction.data.options
+      |> Enum.find(&Map.get(&1, :focused, false))
+
+    input_value = if focused_option, do: focused_option.value || "", else: ""
+
+    choices =
+      Campaigns.list_campaigns()
+      |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(input_value)))
+      |> Enum.take(25)
+      # Discord allows max 25 choices
+      |> Enum.map(&%{name: &1.name, value: &1.name})
+
+    # Respond with autocomplete choices
+    Api.create_interaction_response(interaction, %{
+      type: 8,
+      # APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
+      data: %{
+        choices: choices
+      }
+    })
+  end
+
   # Private helpers
 
   defp get_option(interaction, name) do
@@ -237,12 +346,18 @@ defmodule ShotElixir.Discord.Commands do
     end
   end
 
-  defp get_campaign(_server_id) do
-    # In Rails, this uses CurrentCampaign.get(server_id: server_id)
-    # For now, we'll get the first active campaign - you may need to implement
-    # an Agent-based CurrentCampaign service similar to CurrentFight
-    Campaigns.list_campaigns()
-    |> Enum.find(& &1.active)
+  defp get_campaign(server_id) do
+    # Use the CurrentCampaign agent to get the campaign for this server
+    # Falls back to the first active campaign if none is set
+    case CurrentCampaign.get(server_id) do
+      nil ->
+        # Fallback: get the first active campaign
+        Campaigns.list_campaigns()
+        |> Enum.find(& &1.active)
+
+      campaign ->
+        campaign
+    end
   end
 
   defp respond(interaction, content, opts \\ []) do

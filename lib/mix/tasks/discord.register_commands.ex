@@ -17,7 +17,20 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
   def run(_args) do
     Mix.Task.run("app.start")
 
-    IO.puts("Registering Discord slash commands...")
+    IO.puts("Waiting for Discord connection...")
+    # Give Nostrum time to connect and populate the cache
+    Process.sleep(5000)
+
+    # Get the application ID from the connected bot
+    me = Nostrum.Cache.Me.get()
+
+    if is_nil(me) do
+      IO.puts("Error: Could not get bot info. Make sure DISCORD_TOKEN is set correctly.")
+      System.halt(1)
+    end
+
+    app_id = me.id
+    IO.puts("Registering Discord slash commands for application #{app_id}...")
 
     commands = [
       %{
@@ -39,6 +52,28 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
         description: "Stop the current fight"
       },
       %{
+        name: "list",
+        description: "List available fights"
+      },
+      %{
+        name: "campaigns",
+        description: "List all campaigns"
+      },
+      %{
+        name: "campaign",
+        description: "Set the current campaign for this server",
+        options: [
+          %{
+            type: 3,
+            # STRING type
+            name: "name",
+            description: "Campaign name",
+            required: true,
+            autocomplete: true
+          }
+        ]
+      },
+      %{
         name: "roll",
         description: "Roll a die"
       },
@@ -56,7 +91,7 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
       }
     ]
 
-    case ApplicationCommand.bulk_overwrite_global_commands(commands) do
+    case ApplicationCommand.bulk_overwrite_global_commands(app_id, commands) do
       {:ok, registered_commands} ->
         IO.puts("Successfully registered #{length(registered_commands)} commands:")
 
