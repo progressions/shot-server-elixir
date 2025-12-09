@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Users.ConfirmationsControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.Accounts
 
   setup do

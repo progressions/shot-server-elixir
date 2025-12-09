@@ -1,5 +1,5 @@
 defmodule ShotElixir.CampaignsTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
   alias ShotElixir.Campaigns
   alias ShotElixir.Campaigns.{Campaign, CampaignMembership}
   alias ShotElixir.Accounts

@@ -1,5 +1,5 @@
 defmodule ShotElixir.AccountsTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Accounts
   alias ShotElixir.Accounts.User

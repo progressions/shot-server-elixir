@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.HealthControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
 
   describe "GET /health" do
     test "returns ok status", %{conn: conn} do

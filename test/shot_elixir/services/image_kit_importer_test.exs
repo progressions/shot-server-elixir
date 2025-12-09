@@ -1,5 +1,5 @@
 defmodule ShotElixir.Services.ImageKitImporterTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Services.ImageKitImporter
   alias ShotElixir.Accounts

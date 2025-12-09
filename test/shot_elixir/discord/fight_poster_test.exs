@@ -5,7 +5,7 @@ defmodule ShotElixir.Discord.FightPosterTest do
   The expected output strings include trailing spaces after character names
   to match the Rails FightPoster output exactly.
   """
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Discord.FightPoster
   alias ShotElixir.{Accounts, Campaigns, Characters, Vehicles, Fights}

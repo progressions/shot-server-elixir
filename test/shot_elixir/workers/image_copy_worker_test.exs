@@ -1,5 +1,5 @@
 defmodule ShotElixir.Workers.ImageCopyWorkerTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Workers.ImageCopyWorker
   alias ShotElixir.Accounts

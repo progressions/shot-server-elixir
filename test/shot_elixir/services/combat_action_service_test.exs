@@ -1,5 +1,5 @@
 defmodule ShotElixir.Services.CombatActionServiceTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Services.CombatActionService
   alias ShotElixir.Characters

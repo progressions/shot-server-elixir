@@ -1,5 +1,5 @@
 defmodule ShotElixir.Services.CampaignSeederServiceTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Services.CampaignSeederService
   alias ShotElixir.Campaigns

@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.{Campaigns, Parties, Factions, Junctures, Characters, Vehicles, Accounts}
   alias ShotElixir.Guardian
 

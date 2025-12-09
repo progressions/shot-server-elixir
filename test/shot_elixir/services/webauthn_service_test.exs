@@ -1,5 +1,5 @@
 defmodule ShotElixir.Services.WebAuthnServiceTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Services.WebAuthnService
   alias ShotElixir.Accounts
