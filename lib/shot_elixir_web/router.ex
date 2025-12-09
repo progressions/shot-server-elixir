@@ -106,6 +106,7 @@ defmodule ShotElixirWeb.Router do
       post "/sync", CharacterController, :sync
       post "/duplicate", CharacterController, :duplicate
       get "/pdf", CharacterController, :pdf
+      delete "/image", CharacterController, :remove_image
       resources "/advancements", AdvancementController
       resources "/weapons", CharacterWeaponController, only: [:index, :create, :delete]
       resources "/schticks", CharacterSchtickController, only: [:index, :create, :delete]

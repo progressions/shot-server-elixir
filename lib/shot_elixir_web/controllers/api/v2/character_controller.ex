@@ -388,6 +388,33 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
+  def remove_image(conn, %{"character_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Character{} = character <- Characters.get_character(id),
+         :ok <- authorize_character_edit(character, current_user) do
+      # Remove image from ActiveStorage
+      case ShotElixir.ActiveStorage.delete_image("Character", character.id) do
+        {:ok, _} ->
+          # Reload character to get fresh data after image removal
+          updated_character = Characters.get_character(character.id)
+
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("show.json", character: updated_character)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("error.json", changeset: changeset)
+      end
+    else
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   # Authorization helpers
   defp authorize_character_access(character, user) do
     campaign_id = character.campaign_id
