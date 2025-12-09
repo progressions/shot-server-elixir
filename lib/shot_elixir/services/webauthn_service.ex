@@ -35,41 +35,45 @@ defmodule ShotElixir.Services.WebAuthnService do
     challenge = Wax.new_registration_challenge(wax_options())
 
     # Store challenge in database
-    {:ok, stored_challenge} = store_challenge(user.id, challenge.bytes, "registration")
+    case store_challenge(user.id, challenge.bytes, "registration") do
+      {:ok, stored_challenge} ->
+        # Return WebAuthn options for the browser
+        {:ok,
+         %{
+           challenge: Base.url_encode64(challenge.bytes, padding: false),
+           rp: %{
+             name: @rp_name,
+             id: rp_id()
+           },
+           user: %{
+             id: Base.url_encode64(user.id, padding: false),
+             name: user.email,
+             displayName: user.name || user.email
+           },
+           pubKeyCredParams: [
+             %{alg: -7, type: "public-key"},
+             # ES256
+             %{alg: -257, type: "public-key"}
+             # RS256
+           ],
+           timeout: 120_000,
+           attestation: "none",
+           excludeCredentials: exclude_credentials,
+           # authenticatorAttachment: "platform" restricts to built-in authenticators
+           # (Touch ID, Face ID, Windows Hello). This is intentional for Chi War to
+           # provide a simpler user experience. Remove this line to allow security keys.
+           authenticatorSelection: %{
+             authenticatorAttachment: "platform",
+             requireResidentKey: false,
+             residentKey: "preferred",
+             userVerification: "preferred"
+           },
+           challenge_id: stored_challenge.id
+         }}
 
-    # Return WebAuthn options for the browser
-    {:ok,
-     %{
-       challenge: Base.url_encode64(challenge.bytes, padding: false),
-       rp: %{
-         name: @rp_name,
-         id: rp_id()
-       },
-       user: %{
-         id: Base.url_encode64(user.id, padding: false),
-         name: user.email,
-         displayName: user.name || user.email
-       },
-       pubKeyCredParams: [
-         %{alg: -7, type: "public-key"},
-         # ES256
-         %{alg: -257, type: "public-key"}
-         # RS256
-       ],
-       timeout: 120_000,
-       attestation: "none",
-       excludeCredentials: exclude_credentials,
-       # authenticatorAttachment: "platform" restricts to built-in authenticators
-       # (Touch ID, Face ID, Windows Hello). This is intentional for Chi War to
-       # provide a simpler user experience. Remove this line to allow security keys.
-       authenticatorSelection: %{
-         authenticatorAttachment: "platform",
-         requireResidentKey: false,
-         residentKey: "preferred",
-         userVerification: "preferred"
-       },
-       challenge_id: stored_challenge.id
-     }}
+      {:error, _changeset} ->
+        {:error, :challenge_storage_failed}
+    end
   end
 
   @doc """
