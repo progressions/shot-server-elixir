@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.Campaigns
   alias ShotElixir.Accounts
   alias ShotElixir.Guardian

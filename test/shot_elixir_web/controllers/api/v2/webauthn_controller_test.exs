@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.WebauthnControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
 
   alias ShotElixir.Accounts
   alias ShotElixir.Accounts.WebauthnCredential

@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.{Campaigns, Sites, Factions, Junctures, Characters, Accounts}
   alias ShotElixir.Guardian
 

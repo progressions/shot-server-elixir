@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.CampaignChannelTest do
-  use ShotElixirWeb.ChannelCase
+  use ShotElixirWeb.ChannelCase, async: true
   import ShotElixir.Factory
 
   alias ShotElixirWeb.CampaignChannel

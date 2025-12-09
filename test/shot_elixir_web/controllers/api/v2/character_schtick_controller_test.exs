@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.CharacterSchtickControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
 
   alias ShotElixir.{Characters, Campaigns, Accounts, Schticks}
   alias ShotElixir.Guardian

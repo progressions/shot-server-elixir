@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.FightChannelTest do
-  use ShotElixirWeb.ChannelCase
+  use ShotElixirWeb.ChannelCase, async: true
   import ShotElixir.Factory
 
   alias ShotElixirWeb.{FightChannel, Presence}

@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.Vehicles
   alias ShotElixir.Accounts
   alias ShotElixir.Campaigns

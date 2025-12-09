@@ -15,8 +15,8 @@ jobs:
       # Cache dependencies
       - restore_cache:
           keys:
-            - v2-mix-cache-{{ checksum "mix.lock" }}
-            - v2-mix-cache
+            - v3-mix-cache-{{ checksum "mix.lock" }}
+            - v3-mix-cache
 
       # Install Hex and Rebar
       - run:
@@ -35,7 +35,7 @@ jobs:
           paths:
             - deps
             - _build
-          key: v2-mix-cache-{{ checksum "mix.lock" }}
+          key: v3-mix-cache-{{ checksum "mix.lock" }}
 
       # Run formatting check
       - run:
@@ -43,6 +43,7 @@ jobs:
           command: mix format --check-formatted
 
   test:
+    parallelism: 4
     docker:
       - image: cimg/elixir:1.16
         environment:
@@ -64,8 +65,9 @@ jobs:
       # Cache dependencies
       - restore_cache:
           keys:
-            - v2-mix-cache-{{ checksum "mix.lock" }}
-            - v2-mix-cache
+            - v3-mix-cache-test-{{ checksum "mix.lock" }}
+            - v3-mix-cache-test
+            - v3-mix-cache
 
       # Install Hex and Rebar
       - run:
@@ -79,17 +81,17 @@ jobs:
           name: Install dependencies
           command: mix deps.get
 
-      # Save cache
-      - save_cache:
-          paths:
-            - deps
-            - _build
-          key: v2-mix-cache-{{ checksum "mix.lock" }}
-
       # Compile application with warnings as errors
       - run:
           name: Compile application
           command: mix compile --warnings-as-errors
+
+      # Save cache after compilation
+      - save_cache:
+          paths:
+            - deps
+            - _build
+          key: v3-mix-cache-test-{{ checksum "mix.lock" }}
 
       # Set up test database with Rails schema
       - run:
@@ -106,13 +108,13 @@ jobs:
           environment:
             PGPASSWORD: ""
 
-      # Run tests
+      # Run tests with partitioning
       - run:
           name: Run tests
           command: |
-            # Wait for PostgreSQL to be ready and run tests
+            # Wait for PostgreSQL to be ready and run tests with partitioning
             for i in {1..3}; do
-              mix test --max-failures 10 && break
+              mix test --partitions 4 --max-failures 10 && break
               echo "Waiting for PostgreSQL or retrying tests..."
               sleep 2
             done

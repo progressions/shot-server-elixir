@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.UserRegistrationTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.Accounts
 
   @create_attrs %{

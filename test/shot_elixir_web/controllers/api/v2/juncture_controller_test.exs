@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.{Campaigns, Junctures, Accounts}
   alias ShotElixir.Guardian
 

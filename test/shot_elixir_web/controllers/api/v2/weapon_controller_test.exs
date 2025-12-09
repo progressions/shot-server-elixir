@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.Weapons
   alias ShotElixir.Accounts
   alias ShotElixir.Campaigns

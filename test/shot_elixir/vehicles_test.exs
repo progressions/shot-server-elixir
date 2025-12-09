@@ -1,5 +1,5 @@
 defmodule ShotElixir.VehiclesTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Vehicles
   alias ShotElixir.Factions

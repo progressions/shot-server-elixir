@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.FightEventControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
 
   alias ShotElixir.{Fights, Campaigns, Accounts}
   alias ShotElixir.Guardian

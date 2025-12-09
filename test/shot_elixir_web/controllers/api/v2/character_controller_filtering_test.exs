@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Api.V2.CharacterControllerFilteringTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
 
   alias ShotElixir.{
     Characters,

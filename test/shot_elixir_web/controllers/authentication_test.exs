@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.AuthenticationTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
   alias ShotElixir.Accounts
   alias ShotElixir.Guardian
 

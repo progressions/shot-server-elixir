@@ -1,5 +1,5 @@
 defmodule ShotElixir.Workers.WebauthnChallengeCleanupWorkerTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Workers.WebauthnChallengeCleanupWorker
   alias ShotElixir.Accounts

@@ -1,5 +1,5 @@
 defmodule ShotElixir.CharactersTest do
-  use ShotElixir.DataCase
+  use ShotElixir.DataCase, async: true
 
   alias ShotElixir.Characters
   alias ShotElixir.Campaigns

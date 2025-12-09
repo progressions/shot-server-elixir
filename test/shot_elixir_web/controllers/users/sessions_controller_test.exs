@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.Users.SessionsControllerTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
 
   alias ShotElixir.Accounts
 
