@@ -70,6 +70,16 @@ defmodule ShotElixir.Services.WebAuthnServiceTest do
       assert exclude.type == "public-key"
       assert exclude.transports == ["internal"]
     end
+
+    test "returns error when challenge storage fails", %{user: user} do
+      # Delete the user to cause a foreign key constraint violation
+      # when trying to store the challenge
+      Repo.delete!(user)
+
+      result = WebAuthnService.generate_registration_options(user)
+
+      assert {:error, :challenge_storage_failed} = result
+    end
   end
 
   describe "generate_authentication_options/1" do
