@@ -44,20 +44,24 @@ defmodule ShotElixir.Application do
   end
 
   # Discord children are only started if a valid token is configured
+  # Nostrum is a normal dependency that auto-starts, but only connects if token is valid
   defp discord_children do
+    require Logger
     token = Application.get_env(:nostrum, :token)
 
     if valid_discord_token?(token) do
-      # Start Nostrum application manually since runtime: false in mix.exs
-      {:ok, _} = Application.ensure_all_started(:nostrum)
+      Logger.info("DISCORD: Valid token found, starting Discord consumer")
 
       [
         # Discord bot consumer
         ShotElixir.Discord.Consumer,
         # Discord current fight Agent
-        ShotElixir.Discord.CurrentFight
+        ShotElixir.Discord.CurrentFight,
+        # Discord current campaign Agent (maps server_id -> campaign_id)
+        ShotElixir.Discord.CurrentCampaign
       ]
     else
+      Logger.info("DISCORD: No valid token configured, skipping Discord bot")
       []
     end
   end
@@ -79,9 +83,17 @@ defmodule ShotElixir.Application do
   defp valid_discord_token?(_), do: false
 
   defp valid_base64?(str) when is_binary(str) do
-    case Base.decode64(str) do
-      {:ok, _} -> true
-      :error -> false
+    # Discord tokens use URL-safe base64 with optional padding
+    case Base.url_decode64(str, padding: false) do
+      {:ok, _} ->
+        true
+
+      :error ->
+        # Fall back to standard base64
+        case Base.decode64(str, padding: false) do
+          {:ok, _} -> true
+          :error -> false
+        end
     end
   end
 end

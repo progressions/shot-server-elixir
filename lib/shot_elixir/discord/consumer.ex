@@ -18,6 +18,9 @@ defmodule ShotElixir.Discord.Consumer do
         case interaction.data.name do
           "start" -> Commands.handle_start(interaction)
           "halt" -> Commands.handle_halt(interaction)
+          "list" -> Commands.handle_list(interaction)
+          "campaigns" -> Commands.handle_campaigns(interaction)
+          "campaign" -> Commands.handle_campaign(interaction)
           "roll" -> Commands.handle_roll(interaction)
           "swerve" -> Commands.handle_swerve(interaction)
           "swerves" -> Commands.handle_swerves(interaction)
@@ -29,6 +32,7 @@ defmodule ShotElixir.Discord.Consumer do
       4 ->
         case interaction.data.name do
           "start" -> Commands.handle_autocomplete(interaction)
+          "campaign" -> Commands.handle_campaign_autocomplete(interaction)
           _ -> :noop
         end
 
@@ -39,8 +43,20 @@ defmodule ShotElixir.Discord.Consumer do
     :ok
   end
 
-  def handle_event({:READY, %{user: user}, _ws_state}) do
+  def handle_event({:READY, %{user: user} = ready_data, _ws_state}) do
     Logger.info("DISCORD: Bot logged in as #{user.username}##{user.discriminator}")
+
+    # Print the invite URL so it's easy to add the bot to a server
+    # Permissions: Send Messages (2048), Embed Links (16384), Read Message History (65536)
+    with %{application: %{id: app_id}} <- ready_data do
+      permissions = 2048 + 16384 + 65536
+
+      invite_url =
+        "https://discord.com/api/oauth2/authorize?client_id=#{app_id}&permissions=#{permissions}&scope=bot%20applications.commands"
+
+      Logger.info("DISCORD: Invite URL: #{invite_url}")
+    end
+
     :ok
   end
 
