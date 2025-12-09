@@ -33,8 +33,8 @@ defmodule ShotElixir.Discord.Commands do
         Fights.list_fights(campaign.id)
         |> Enum.filter(& &1.active)
         |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(input_value)))
-        |> Enum.take(25)
         # Discord allows max 25 choices
+        |> Enum.take(25)
         |> Enum.map(&%{name: &1.name, value: &1.name})
       else
         []
@@ -232,25 +232,29 @@ defmodule ShotElixir.Discord.Commands do
   def handle_list(interaction) do
     server_id = interaction.guild_id
 
-    case get_campaign(server_id) do
-      nil ->
-        respond(interaction, "No campaign found for this server.", ephemeral: true)
+    if is_nil(server_id) do
+      respond(interaction, "This command can only be used in a server.", ephemeral: true)
+    else
+      case get_campaign(server_id) do
+        nil ->
+          respond(interaction, "No campaign found for this server.", ephemeral: true)
 
-      campaign ->
-        fights =
-          Fights.list_fights(campaign.id)
-          |> Enum.filter(& &1.active)
+        campaign ->
+          fights =
+            Fights.list_fights(campaign.id)
+            |> Enum.filter(& &1.active)
 
-        if Enum.empty?(fights) do
-          respond(interaction, "No active fights in #{campaign.name}.")
-        else
-          fight_list =
-            fights
-            |> Enum.map(fn fight -> "• #{fight.name}" end)
-            |> Enum.join("\n")
+          if Enum.empty?(fights) do
+            respond(interaction, "No active fights in #{campaign.name}.")
+          else
+            fight_list =
+              fights
+              |> Enum.map(fn fight -> "• #{fight.name}" end)
+              |> Enum.join("\n")
 
-          respond(interaction, "**Active fights in #{campaign.name}:**\n#{fight_list}")
-        end
+            respond(interaction, "**Active fights in #{campaign.name}:**\n#{fight_list}")
+          end
+      end
     end
   end
 
@@ -259,25 +263,30 @@ defmodule ShotElixir.Discord.Commands do
   """
   def handle_campaigns(interaction) do
     server_id = interaction.guild_id
-    campaigns = Campaigns.list_campaigns()
 
-    if Enum.empty?(campaigns) do
-      respond(interaction, "No campaigns available.")
+    if is_nil(server_id) do
+      respond(interaction, "This command can only be used in a server.", ephemeral: true)
     else
-      current_campaign = get_campaign(server_id)
+      campaigns = Campaigns.list_campaigns()
 
-      campaign_list =
-        campaigns
-        |> Enum.map(fn campaign ->
-          marker = if current_campaign && current_campaign.id == campaign.id, do: " ✓", else: ""
-          "• #{campaign.name}#{marker}"
-        end)
-        |> Enum.join("\n")
+      if Enum.empty?(campaigns) do
+        respond(interaction, "No campaigns available.")
+      else
+        current_campaign = get_campaign(server_id)
 
-      respond(
-        interaction,
-        "**Available campaigns:**\n#{campaign_list}\n\nUse `/campaign <name>` to set the active campaign."
-      )
+        campaign_list =
+          campaigns
+          |> Enum.map(fn campaign ->
+            marker = if current_campaign && current_campaign.id == campaign.id, do: " ✓", else: ""
+            "• #{campaign.name}#{marker}"
+          end)
+          |> Enum.join("\n")
+
+        respond(
+          interaction,
+          "**Available campaigns:**\n#{campaign_list}\n\nUse `/campaign <name>` to set the active campaign."
+        )
+      end
     end
   end
 
@@ -288,22 +297,27 @@ defmodule ShotElixir.Discord.Commands do
     server_id = interaction.guild_id
     campaign_name = get_option(interaction, "name")
 
-    if is_nil(campaign_name) || campaign_name == "" do
-      respond(interaction, "Please provide a campaign name.", ephemeral: true)
-    else
-      campaigns = Campaigns.list_campaigns()
+    cond do
+      is_nil(server_id) ->
+        respond(interaction, "This command can only be used in a server.", ephemeral: true)
 
-      campaign =
-        Enum.find(campaigns, &(String.downcase(&1.name) == String.downcase(campaign_name)))
+      is_nil(campaign_name) || campaign_name == "" ->
+        respond(interaction, "Please provide a campaign name.", ephemeral: true)
 
-      case campaign do
-        nil ->
-          respond(interaction, "Couldn't find campaign \"#{campaign_name}\".", ephemeral: true)
+      true ->
+        campaigns = Campaigns.list_campaigns()
 
-        campaign ->
-          CurrentCampaign.set(server_id, campaign.id)
-          respond(interaction, "Current campaign set to **#{campaign.name}**.")
-      end
+        campaign =
+          Enum.find(campaigns, &(String.downcase(&1.name) == String.downcase(campaign_name)))
+
+        case campaign do
+          nil ->
+            respond(interaction, "Couldn't find campaign \"#{campaign_name}\".", ephemeral: true)
+
+          campaign ->
+            CurrentCampaign.set(server_id, campaign.id)
+            respond(interaction, "Current campaign set to **#{campaign.name}**.")
+        end
     end
   end
 
@@ -321,8 +335,8 @@ defmodule ShotElixir.Discord.Commands do
     choices =
       Campaigns.list_campaigns()
       |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(input_value)))
-      |> Enum.take(25)
       # Discord allows max 25 choices
+      |> Enum.take(25)
       |> Enum.map(&%{name: &1.name, value: &1.name})
 
     # Respond with autocomplete choices

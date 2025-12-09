@@ -26,12 +26,12 @@ defmodule ShotElixir.Discord.CurrentCampaign do
 
   @doc """
   Sets the current campaign for a server.
+  Pass nil as campaign_id to clear the current campaign.
   """
   def set(server_id, campaign_id) when is_integer(server_id) do
-    Agent.update(__MODULE__, &Map.put(&1, server_id, campaign_id))
-  end
-
-  def set(server_id, nil) when is_integer(server_id) do
-    Agent.update(__MODULE__, &Map.delete(&1, server_id))
+    case campaign_id do
+      nil -> Agent.update(__MODULE__, &Map.delete(&1, server_id))
+      _ -> Agent.update(__MODULE__, &Map.put(&1, server_id, campaign_id))
+    end
   end
 end
