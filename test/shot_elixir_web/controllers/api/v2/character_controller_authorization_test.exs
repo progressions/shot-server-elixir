@@ -246,6 +246,133 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerAuthorizationTest do
     end
   end
 
+  describe "remove_image authorization" do
+    setup %{gamemaster: gm, player: player, campaign: campaign} do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Image Test Character",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      {:ok, other_campaign} =
+        Campaigns.create_campaign(%{
+          name: "Other Campaign",
+          description: "Other campaign",
+          user_id: gm.id
+        })
+
+      {:ok, other_character} =
+        Characters.create_character(%{
+          name: "Other Campaign Character",
+          campaign_id: other_campaign.id,
+          user_id: gm.id,
+          action_values: %{"Type" => "NPC"}
+        })
+
+      %{character: character, other_campaign: other_campaign, other_character: other_character}
+    end
+
+    test "character owner can remove image", %{
+      conn: conn,
+      player: player,
+      character: character
+    } do
+      conn = authenticate(conn, player)
+      conn = delete(conn, ~p"/api/v2/characters/#{character.id}/image")
+      response = json_response(conn, 200)
+      assert response["id"] == character.id
+    end
+
+    test "gamemaster in same campaign can remove image", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character
+    } do
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/characters/#{character.id}/image")
+      response = json_response(conn, 200)
+      assert response["id"] == character.id
+    end
+
+    test "gamemaster not in campaign cannot remove image (returns 404)", %{
+      conn: conn,
+      other_character: other_character
+    } do
+      {:ok, other_gm} =
+        Accounts.create_user(%{
+          email: "othergm2@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "GM",
+          gamemaster: true
+        })
+
+      conn = authenticate(conn, other_gm)
+      conn = delete(conn, ~p"/api/v2/characters/#{other_character.id}/image")
+      # Non-member gets 404 (security through obscurity)
+      assert json_response(conn, 404)
+    end
+
+    test "non-owner player cannot remove image (returns 403)", %{
+      conn: conn,
+      campaign: campaign,
+      character: character
+    } do
+      {:ok, other_player} =
+        Accounts.create_user(%{
+          email: "otherplayer@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "Player",
+          gamemaster: false
+        })
+
+      {:ok, other_player_with_campaign} = Accounts.set_current_campaign(other_player, campaign.id)
+      {:ok, _} = Campaigns.add_member(campaign, other_player)
+
+      conn = authenticate(conn, other_player_with_campaign)
+      conn = delete(conn, ~p"/api/v2/characters/#{character.id}/image")
+      # Campaign member who doesn't own the character gets 403
+      assert json_response(conn, 403)
+    end
+
+    test "remove_image returns 404 for non-existent character", %{
+      conn: conn,
+      gamemaster: gm
+    } do
+      fake_id = Ecto.UUID.generate()
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/characters/#{fake_id}/image")
+      assert json_response(conn, 404)
+    end
+
+    test "admin can remove image from any character", %{
+      conn: conn,
+      other_character: other_character,
+      other_campaign: other_campaign
+    } do
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin2@example.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          admin: true,
+          gamemaster: false
+        })
+
+      # Add admin to the other campaign
+      {:ok, _} = Campaigns.add_member(other_campaign, admin)
+
+      conn = authenticate(conn, admin)
+      conn = delete(conn, ~p"/api/v2/characters/#{other_character.id}/image")
+      response = json_response(conn, 200)
+      assert response["id"] == other_character.id
+    end
+  end
+
   defp authenticate(conn, user) do
     {:ok, token, _} = Guardian.encode_and_sign(user)
     put_req_header(conn, "authorization", "Bearer #{token}")

@@ -2,6 +2,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   require Logger
   use ShotElixirWeb, :controller
 
+  alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
   alias ShotElixir.Guardian
@@ -428,10 +429,23 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   defp authorize_character_edit(character, user) do
+    campaign_id = character.campaign_id
+    # Get user's campaigns (includes both owned and membership)
+    user_campaigns = Campaigns.get_user_campaigns(user.id)
+    is_member = Enum.any?(user_campaigns, fn c -> c.id == campaign_id end)
+
+    # For cross-campaign security, return :not_found for non-members, :forbidden for members
     cond do
+      # Character owner can always edit
       character.user_id == user.id -> :ok
-      user.gamemaster -> :ok
-      true -> {:error, :forbidden}
+      # Admin can edit any character
+      user.admin -> :ok
+      # Gamemaster can edit if they're a member of the character's campaign
+      user.gamemaster && is_member -> :ok
+      # Regular member of the campaign gets forbidden (they know character exists but can't edit)
+      is_member -> {:error, :forbidden}
+      # Non-members get not_found (don't reveal character exists)
+      true -> {:error, :not_found}
     end
   end
 end
