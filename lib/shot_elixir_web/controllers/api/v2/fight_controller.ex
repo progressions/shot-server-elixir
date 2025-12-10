@@ -265,7 +265,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   end
 
   # Custom endpoints
-  def remove_image(conn, %{"id" => id}) do
+  def remove_image(conn, %{"fight_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Fight{} = fight <- Fights.get_fight(id),
