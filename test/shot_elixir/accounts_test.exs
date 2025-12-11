@@ -233,6 +233,59 @@ defmodule ShotElixir.AccountsTest do
     end)
   end
 
+  describe "Discord account linking" do
+    test "link_discord/2 links Discord ID to user" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      discord_id = 123_456_789_012_345_678
+
+      assert {:ok, updated_user} = Accounts.link_discord(user, discord_id)
+      assert updated_user.discord_id == discord_id
+    end
+
+    test "link_discord/2 enforces unique constraint" do
+      discord_id = 123_456_789_012_345_679
+
+      {:ok, user1} = Accounts.create_user(@valid_attrs)
+      {:ok, _} = Accounts.link_discord(user1, discord_id)
+
+      {:ok, user2} =
+        Accounts.create_user(%{
+          email: "user2@example.com",
+          password: "password123",
+          first_name: "User",
+          last_name: "Two"
+        })
+
+      assert {:error, changeset} = Accounts.link_discord(user2, discord_id)
+      assert "has already been taken" in changeset_errors(changeset).discord_id
+    end
+
+    test "unlink_discord/1 removes Discord ID from user" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      discord_id = 123_456_789_012_345_680
+
+      {:ok, linked_user} = Accounts.link_discord(user, discord_id)
+      assert linked_user.discord_id == discord_id
+
+      {:ok, unlinked_user} = Accounts.unlink_discord(linked_user)
+      assert unlinked_user.discord_id == nil
+    end
+
+    test "get_user_by_discord_id/1 finds user by Discord ID" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      discord_id = 123_456_789_012_345_681
+
+      {:ok, _} = Accounts.link_discord(user, discord_id)
+
+      found_user = Accounts.get_user_by_discord_id(discord_id)
+      assert found_user.id == user.id
+    end
+
+    test "get_user_by_discord_id/1 returns nil for non-existent Discord ID" do
+      assert nil == Accounts.get_user_by_discord_id(999_999_999_999_999_999)
+    end
+  end
+
   describe "OTP passwordless login" do
     test "generate_otp_code/1 generates a 6-digit code and magic token" do
       {:ok, user} = Accounts.create_user(@valid_attrs)

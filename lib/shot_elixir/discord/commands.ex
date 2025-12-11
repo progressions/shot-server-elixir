@@ -4,8 +4,8 @@ defmodule ShotElixir.Discord.Commands do
   """
   alias Nostrum.Api
   alias Nostrum.Api.Message
-  alias ShotElixir.{Fights, Campaigns, Characters, Parties}
-  alias ShotElixir.Discord.{CurrentFight, CurrentCampaign}
+  alias ShotElixir.{Fights, Campaigns, Characters, Parties, Accounts}
+  alias ShotElixir.Discord.{CurrentFight, CurrentCampaign, LinkCodes}
   alias ShotElixir.Workers.DiscordNotificationWorker
   alias ShotElixir.Services.DiceRoller
 
@@ -470,6 +470,45 @@ defmodule ShotElixir.Discord.Commands do
         choices: choices
       }
     })
+  end
+
+  @doc """
+  Handles the /link command to generate a code for linking Discord to Chi War.
+  """
+  def handle_link(interaction) do
+    discord_id = interaction.user.id
+    discord_username = interaction.user.username
+
+    # Check if this Discord user is already linked
+    case Accounts.get_user_by_discord_id(discord_id) do
+      nil ->
+        # Generate a link code
+        code = LinkCodes.generate(discord_id, discord_username)
+        link_url = "https://chiwar.net/link-discord?code=#{code}"
+
+        respond(
+          interaction,
+          """
+          **Link your Discord account to Chi War**
+
+          **Option 1:** Click this link (requires login):
+          #{link_url}
+
+          **Option 2:** Enter code manually at https://chiwar.net/profile
+          Code: **#{code}**
+
+          Code expires in 5 minutes.
+          """,
+          ephemeral: true
+        )
+
+      user ->
+        respond(
+          interaction,
+          "Your Discord account is already linked to Chi War user **#{user.name}** (#{user.email}).\n\nTo unlink, use the Chi War website.",
+          ephemeral: true
+        )
+    end
   end
 
   # Private helpers

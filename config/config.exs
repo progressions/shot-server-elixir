@@ -88,7 +88,16 @@ config :shot_elixir, Oban,
     discord: 10,
     images: 5
   ],
-  plugins: [Oban.Plugins.Pruner]
+  plugins: [
+    Oban.Plugins.Pruner,
+    {Oban.Plugins.Cron,
+     crontab: [
+       # Clean up expired Discord link codes every 10 minutes
+       {"*/10 * * * *", ShotElixir.Workers.LinkCodeCleanupWorker},
+       # Clean up expired WebAuthn challenges every hour
+       {"0 * * * *", ShotElixir.Workers.WebauthnChallengeCleanupWorker}
+     ]}
+  ]
 
 # Discord configuration
 # Token can be set via DISCORD_BOT_TOKEN env var or overridden in dev.exs/prod.exs
