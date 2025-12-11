@@ -41,3 +41,6 @@ config :shot_elixir, Oban, testing: :inline
 
 # Disable Nostrum Discord bot in test mode
 config :nostrum, :token, nil
+
+# Environment identifier for services like ImageUploader
+config :shot_elixir, :environment, :test
