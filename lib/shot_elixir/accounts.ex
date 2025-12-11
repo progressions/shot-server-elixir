@@ -622,4 +622,36 @@ defmodule ShotElixir.Accounts do
     expires_at = NaiveDateTime.add(sent_at, @otp_expiry_minutes * 60, :second)
     NaiveDateTime.compare(NaiveDateTime.utc_now(), expires_at) == :gt
   end
+
+  # Discord Account Linking Functions
+
+  @doc """
+  Links a Discord account to a Chi War user.
+  Returns {:ok, user} on success, {:error, changeset} on failure.
+  """
+  def link_discord(%User{} = user, discord_id) when is_integer(discord_id) do
+    user
+    |> User.discord_changeset(%{discord_id: discord_id})
+    |> Repo.update()
+  end
+
+  @doc """
+  Unlinks a Discord account from a Chi War user.
+  Returns {:ok, user} on success, {:error, changeset} on failure.
+  """
+  def unlink_discord(%User{} = user) do
+    user
+    |> User.discord_changeset(%{discord_id: nil})
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets a user by their Discord ID.
+  Returns nil if no user is linked to that Discord account.
+  """
+  def get_user_by_discord_id(discord_id) when is_integer(discord_id) do
+    Repo.get_by(User, discord_id: discord_id)
+  end
+
+  def get_user_by_discord_id(_), do: nil
 end

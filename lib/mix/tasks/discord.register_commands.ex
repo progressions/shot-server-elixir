@@ -109,6 +109,10 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
             required: false
           }
         ]
+      },
+      %{
+        name: "link",
+        description: "Generate a code to link your Discord account to Chi War"
       }
     ]
 

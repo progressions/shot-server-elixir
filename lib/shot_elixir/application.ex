@@ -58,7 +58,9 @@ defmodule ShotElixir.Application do
         # Discord current fight Agent
         ShotElixir.Discord.CurrentFight,
         # Discord current campaign Agent (maps server_id -> campaign_id)
-        ShotElixir.Discord.CurrentCampaign
+        ShotElixir.Discord.CurrentCampaign,
+        # Discord link codes Agent (temporary codes for account linking)
+        ShotElixir.Discord.LinkCodes
       ]
     else
       Logger.info("DISCORD: No valid token configured, skipping Discord bot")

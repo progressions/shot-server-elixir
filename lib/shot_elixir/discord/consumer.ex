@@ -26,6 +26,7 @@ defmodule ShotElixir.Discord.Consumer do
           "swerves" -> Commands.handle_swerves(interaction)
           "clear_swerves" -> Commands.handle_clear_swerves(interaction)
           "advance_party" -> Commands.handle_advance_party(interaction)
+          "link" -> Commands.handle_link(interaction)
           _ -> :noop
         end
 

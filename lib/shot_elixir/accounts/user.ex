@@ -28,6 +28,7 @@ defmodule ShotElixir.Accounts.User do
     field :locked_at, :naive_datetime_usec
     field :failed_attempts, :integer, default: 0
     field :unlock_token, :string
+    field :discord_id, :integer
 
     belongs_to :current_campaign, Campaign
     belongs_to :pending_invitation, ShotElixir.Invitations.Invitation
@@ -100,6 +101,15 @@ defmodule ShotElixir.Accounts.User do
     |> validate_required([:password])
     |> validate_length(:password, min: 6, message: "should be at least 6 characters")
     |> hash_password()
+  end
+
+  @doc """
+  Changeset for linking/unlinking Discord account.
+  """
+  def discord_changeset(user, attrs) do
+    user
+    |> cast(attrs, [:discord_id])
+    |> unique_constraint(:discord_id, name: :users_discord_id_index)
   end
 
   defp set_name(changeset) do

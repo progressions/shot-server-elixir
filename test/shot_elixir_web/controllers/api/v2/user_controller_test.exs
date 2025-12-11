@@ -1,7 +1,8 @@
 defmodule ShotElixirWeb.Api.V2.UserControllerTest do
-  use ShotElixirWeb.ConnCase, async: true
+  use ShotElixirWeb.ConnCase, async: false
   alias ShotElixir.Accounts
   alias ShotElixir.Guardian
+  alias ShotElixir.Discord.LinkCodes
 
   @create_attrs %{
     email: "new@example.com",
@@ -364,6 +365,163 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       response = json_response(conn, 200)
 
       assert response["id"] == user.id
+    end
+  end
+
+  describe "link_discord" do
+    setup do
+      # Ensure the LinkCodes agent is running (it may be started by the application)
+      case Process.whereis(LinkCodes) do
+        nil ->
+          {:ok, _pid} = LinkCodes.start_link([])
+
+        _pid ->
+          # Agent is already running, clear its state for a fresh test
+          Agent.update(LinkCodes, fn _state -> %{} end)
+      end
+
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "linktest@example.com",
+          password: "password123",
+          first_name: "Link",
+          last_name: "Test"
+        })
+
+      %{user: user}
+    end
+
+    test "successfully links Discord account with valid code", %{conn: conn, user: user} do
+      discord_id = 123_456_789_012_345_678
+      discord_username = "testuser"
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
+      response = json_response(conn, 200)
+
+      assert response["success"] == true
+      assert response["message"] == "Discord account linked successfully"
+      assert response["discord_username"] == discord_username
+
+      # Verify user was updated in database
+      updated_user = Accounts.get_user(user.id)
+      assert updated_user.discord_id == discord_id
+    end
+
+    test "returns error for invalid code", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: "INVALID"})
+      response = json_response(conn, 422)
+
+      assert response["error"] == "Invalid link code"
+    end
+
+    test "returns error for expired code", %{conn: conn, user: user} do
+      discord_id = 123_456_789_012_345_679
+      discord_username = "expireduser"
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      # Manually expire the code by updating its expiry time
+      Agent.update(LinkCodes, fn state ->
+        Map.update!(state, code, fn data ->
+          %{data | expires_at: DateTime.add(DateTime.utc_now(), -1, :hour)}
+        end)
+      end)
+
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
+      response = json_response(conn, 422)
+
+      assert response["error"] == "Link code has expired"
+    end
+
+    test "returns error when Discord account already linked to another user", %{
+      conn: conn,
+      user: user
+    } do
+      # Create another user with the Discord ID already linked
+      discord_id = 123_456_789_012_345_680
+      discord_username = "alreadylinked"
+
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "otherlinked@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "Linked"
+        })
+
+      {:ok, _} = Accounts.link_discord(other_user, discord_id)
+
+      # Generate a code with the same Discord ID
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
+      response = json_response(conn, 422)
+
+      assert response["error"] == "This Discord account is already linked to another user"
+    end
+
+    test "returns success when user already linked to same Discord account", %{
+      conn: conn,
+      user: user
+    } do
+      discord_id = 123_456_789_012_345_681
+      discord_username = "sameuser"
+
+      # Link the user first
+      {:ok, _} = Accounts.link_discord(user, discord_id)
+
+      # Generate a code with the same Discord ID
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
+      response = json_response(conn, 200)
+
+      assert response["success"] == true
+      assert response["message"] == "Discord account already linked"
+    end
+
+    test "returns error when code parameter is missing", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{})
+      response = json_response(conn, 400)
+
+      assert response["error"] == "Code parameter is required"
+    end
+
+    test "returns unauthorized when not authenticated", %{conn: conn} do
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: "ABCDEF"})
+      assert json_response(conn, 401)["error"] == "Not authenticated"
+    end
+
+    test "code is consumed after successful link and cannot be reused", %{conn: conn, user: user} do
+      discord_id = 123_456_789_012_345_682
+      discord_username = "consumetest"
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
+      assert json_response(conn, 200)["success"] == true
+
+      # Create a new user and try to use the same code
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "tryreuse@example.com",
+          password: "password123",
+          first_name: "Try",
+          last_name: "Reuse"
+        })
+
+      conn2 = build_conn() |> put_req_header("accept", "application/json")
+      conn2 = authenticate(conn2, other_user)
+      conn2 = post(conn2, ~p"/api/v2/users/link_discord", %{code: code})
+      response = json_response(conn2, 422)
+
+      assert response["error"] == "Invalid link code"
     end
   end
 

@@ -4,6 +4,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
   alias ShotElixir.Accounts
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Discord.LinkCodes
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -520,6 +521,68 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           send_resp(conn, :no_content, "")
       end
     end
+  end
+
+  # POST /api/v2/users/link_discord
+  def link_discord(conn, %{"code" => code}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case LinkCodes.validate(code) do
+      {:error, :invalid_code} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Invalid link code"})
+
+      {:error, :expired} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Link code has expired"})
+
+      {:ok, %{discord_id: discord_id, discord_username: discord_username}} ->
+        # Check if Discord ID is already linked to another user
+        case Accounts.get_user_by_discord_id(discord_id) do
+          nil ->
+            # Link the Discord account
+            case Accounts.link_discord(current_user, discord_id) do
+              {:ok, _updated_user} ->
+                # Consume the code so it can't be reused
+                LinkCodes.consume(code)
+
+                conn
+                |> json(%{
+                  success: true,
+                  message: "Discord account linked successfully",
+                  discord_username: discord_username
+                })
+
+              {:error, _changeset} ->
+                conn
+                |> put_status(:unprocessable_entity)
+                |> json(%{error: "Failed to link Discord account"})
+            end
+
+          existing_user ->
+            if existing_user.id == current_user.id do
+              # Already linked to this user
+              conn
+              |> json(%{
+                success: true,
+                message: "Discord account already linked",
+                discord_username: discord_username
+              })
+            else
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "This Discord account is already linked to another user"})
+            end
+        end
+    end
+  end
+
+  def link_discord(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Code parameter is required"})
   end
 
   # DELETE /api/v2/users/:id/remove_image
