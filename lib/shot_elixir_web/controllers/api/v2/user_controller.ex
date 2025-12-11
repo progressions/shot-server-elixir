@@ -97,16 +97,9 @@ defmodule ShotElixirWeb.Api.V2.UserController do
       # Ensure user has onboarding progress
       ShotElixir.Onboarding.ensure_onboarding_progress!(user)
 
-      # Preload associations if needed
-      user =
-        user
-        |> ShotElixir.Repo.preload([
-          :current_campaign,
-          :campaigns,
-          :player_campaigns,
-          :image_positions,
-          :onboarding_progress
-        ])
+      # Preload associations including characters scoped to current campaign
+      user = preload_user_with_characters(user)
+      user = ShotElixir.Repo.preload(user, [:onboarding_progress])
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.UserView)
@@ -134,14 +127,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
                 |> json(%{error: "Not found"})
 
               user ->
-                user =
-                  user
-                  |> ShotElixir.Repo.preload([
-                    :current_campaign,
-                    :campaigns,
-                    :player_campaigns,
-                    :image_positions
-                  ])
+                user = preload_user_with_characters(user)
 
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.UserView)
@@ -155,14 +141,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
         _ ->
           # Accessing own profile - always allowed
-          user =
-            current_user
-            |> ShotElixir.Repo.preload([
-              :current_campaign,
-              :campaigns,
-              :player_campaigns,
-              :image_positions
-            ])
+          user = preload_user_with_characters(current_user)
 
           conn
           |> put_view(ShotElixirWeb.Api.V2.UserView)
@@ -733,5 +712,43 @@ defmodule ShotElixirWeb.Api.V2.UserController do
       created_at: user.created_at,
       updated_at: user.updated_at
     }
+  end
+
+  # Helper function to preload user with characters scoped to current campaign
+  defp preload_user_with_characters(user) do
+    import Ecto.Query
+    require Logger
+
+    Logger.debug("preload_user_with_characters called for user #{user.id}")
+    Logger.debug("current_campaign_id: #{inspect(user.current_campaign_id)}")
+
+    # Base preloads
+    user =
+      user
+      |> ShotElixir.Repo.preload([
+        :current_campaign,
+        :campaigns,
+        :player_campaigns,
+        :image_positions
+      ])
+
+    # Preload characters scoped to current campaign if one is set
+    case user.current_campaign_id do
+      nil ->
+        Logger.debug("No current campaign, returning empty characters")
+        # No current campaign, return empty characters
+        Map.put(user, :characters, [])
+
+      campaign_id ->
+        # Preload characters filtered by current campaign
+        characters_query =
+          from c in ShotElixir.Characters.Character,
+            where: c.user_id == ^user.id and c.campaign_id == ^campaign_id,
+            order_by: [asc: c.name]
+
+        characters = ShotElixir.Repo.all(characters_query)
+        Logger.debug("Found #{length(characters)} characters for campaign #{campaign_id}")
+        Map.put(user, :characters, characters)
+    end
   end
 end

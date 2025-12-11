@@ -88,11 +88,23 @@ defmodule ShotElixirWeb.Api.V2.UserView do
         progress -> render_onboarding_progress(progress)
       end
 
+    # Characters scoped to current campaign (set by controller)
+    characters =
+      case Map.get(user, :characters) do
+        %Ecto.Association.NotLoaded{} -> []
+        nil -> []
+        chars -> Enum.map(chars, &render_character_lite/1)
+      end
+
+    character_ids = Enum.map(characters, & &1.id)
+
     Map.merge(base, %{
       image_positions: image_positions,
       campaigns: campaigns,
       player_campaigns: player_campaigns,
-      onboarding_progress: onboarding_progress
+      onboarding_progress: onboarding_progress,
+      characters: characters,
+      character_ids: character_ids
     })
   end
 
@@ -113,6 +125,17 @@ defmodule ShotElixirWeb.Api.V2.UserView do
       description: campaign.description,
       active: campaign.active,
       entity_class: "Campaign"
+    }
+  end
+
+  defp render_character_lite(character) do
+    %{
+      id: character.id,
+      name: character.name,
+      category: get_in(character.action_values, ["Type"]),
+      active: character.active,
+      image_url: get_image_url(character),
+      entity_class: "Character"
     }
   end
 
