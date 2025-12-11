@@ -127,6 +127,14 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
         description: "Spend Fortune points to add to a roll",
         options: [
           %{
+            type: 3,
+            # STRING type
+            name: "character",
+            description: "Character to spend Fortune for (defaults to most recently used)",
+            required: false,
+            autocomplete: true
+          },
+          %{
             type: 4,
             # INTEGER type
             name: "amount",
