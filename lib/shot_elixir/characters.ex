@@ -64,19 +64,22 @@ defmodule ShotElixir.Characters do
     query = apply_ids_filter(query, params["ids"], Map.has_key?(params, "ids"))
 
     # Apply user_id filter if present
+    # Note: unassigned filter takes precedence over user_id filter to avoid
+    # conflicting conditions (user_id = X AND user_id IS NULL would return zero results)
     query =
-      if params["user_id"] && params["user_id"] != "" do
-        from c in query, where: c.user_id == ^params["user_id"]
-      else
-        query
-      end
+      cond do
+        # If unassigned filter is set to true, filter for characters with no user_id
+        # This takes precedence over any user_id filter
+        params["unassigned"] == "true" || params["unassigned"] == true ->
+          from c in query, where: is_nil(c.user_id)
 
-    # Apply unassigned filter if present (characters with no user_id)
-    query =
-      if params["unassigned"] == "true" || params["unassigned"] == true do
-        from c in query, where: is_nil(c.user_id)
-      else
-        query
+        # Otherwise, apply user_id filter if present
+        params["user_id"] && params["user_id"] != "" ->
+          from c in query, where: c.user_id == ^params["user_id"]
+
+        # No filter applied
+        true ->
+          query
       end
 
     # Apply juncture_id filter if present
