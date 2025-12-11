@@ -47,6 +47,9 @@ if System.get_env("PHX_SERVER") do
   config :shot_elixir, ShotElixirWeb.Endpoint, server: true
 end
 
+# Environment identifier for services like ImageUploader
+config :shot_elixir, :environment, config_env()
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

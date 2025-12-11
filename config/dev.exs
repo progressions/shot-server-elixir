@@ -52,6 +52,9 @@ config :shot_elixir, ShotElixirWeb.Endpoint,
 # Enable dev routes for dashboard and mailbox
 config :shot_elixir, dev_routes: true
 
+# Environment identifier for services like ImageUploader
+config :shot_elixir, :environment, :dev
+
 # Do not include metadata nor timestamps in development logs
 config :logger, :default_formatter, format: "[$level] $message\n"
 
