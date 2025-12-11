@@ -25,6 +25,7 @@ defmodule ShotElixir.Discord.Consumer do
           "swerve" -> Commands.handle_swerve(interaction)
           "swerves" -> Commands.handle_swerves(interaction)
           "clear_swerves" -> Commands.handle_clear_swerves(interaction)
+          "advance_party" -> Commands.handle_advance_party(interaction)
           _ -> :noop
         end
 
@@ -33,6 +34,7 @@ defmodule ShotElixir.Discord.Consumer do
         case interaction.data.name do
           "start" -> Commands.handle_autocomplete(interaction)
           "campaign" -> Commands.handle_campaign_autocomplete(interaction)
+          "advance_party" -> Commands.handle_advance_party_autocomplete(interaction)
           _ -> :noop
         end
 

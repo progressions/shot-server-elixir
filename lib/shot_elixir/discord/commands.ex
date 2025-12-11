@@ -4,7 +4,7 @@ defmodule ShotElixir.Discord.Commands do
   """
   alias Nostrum.Api
   alias Nostrum.Api.Message
-  alias ShotElixir.{Fights, Campaigns}
+  alias ShotElixir.{Fights, Campaigns, Characters, Parties}
   alias ShotElixir.Discord.{CurrentFight, CurrentCampaign}
   alias ShotElixir.Workers.DiscordNotificationWorker
   alias ShotElixir.Services.DiceRoller
@@ -338,6 +338,129 @@ defmodule ShotElixir.Discord.Commands do
       # Discord allows max 25 choices
       |> Enum.take(25)
       |> Enum.map(&%{name: &1.name, value: &1.name})
+
+    # Respond with autocomplete choices
+    Api.create_interaction_response(interaction, %{
+      type: 8,
+      # APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
+      data: %{
+        choices: choices
+      }
+    })
+  end
+
+  @default_party_name "The Dragons"
+
+  @doc """
+  Handles the /advance_party command to add an advancement to all characters in a party.
+  """
+  def handle_advance_party(interaction) do
+    server_id = interaction.guild_id
+    party_name = get_option(interaction, "party") || @default_party_name
+    description = get_option(interaction, "description")
+
+    if is_nil(server_id) do
+      respond(interaction, "This command can only be used in a server.", ephemeral: true)
+    else
+      case get_campaign(server_id) do
+        nil ->
+          respond(interaction, "No campaign found for this server.", ephemeral: true)
+
+        campaign ->
+          # Find the party by name in the current campaign
+          parties = Parties.list_parties(campaign.id)
+
+          party =
+            Enum.find(parties, fn p ->
+              String.downcase(p.name) == String.downcase(party_name)
+            end)
+
+          case party do
+            nil ->
+              respond(interaction, "Couldn't find party \"#{party_name}\" in #{campaign.name}.",
+                ephemeral: true
+              )
+
+            party ->
+              # Get all active characters from the party (exclude vehicles and inactive)
+              characters =
+                party.memberships
+                |> Enum.filter(& &1.character_id)
+                |> Enum.map(& &1.character)
+                |> Enum.reject(&is_nil/1)
+                |> Enum.filter(& &1.active)
+
+              if Enum.empty?(characters) do
+                respond(interaction, "No characters found in party \"#{party.name}\".",
+                  ephemeral: true
+                )
+              else
+                # Create an advancement for each character
+                results =
+                  Enum.map(characters, fn character ->
+                    attrs = if description, do: %{description: description}, else: %{}
+                    {character, Characters.create_advancement(character.id, attrs)}
+                  end)
+
+                # Check for any errors
+                {successes, failures} =
+                  Enum.split_with(results, fn {_char, result} ->
+                    match?({:ok, _}, result)
+                  end)
+
+                success_names =
+                  successes
+                  |> Enum.map(fn {char, _} -> char.name end)
+                  |> Enum.join(", ")
+
+                cond do
+                  Enum.empty?(failures) ->
+                    respond(interaction, "Added advancement to #{success_names}")
+
+                  Enum.empty?(successes) ->
+                    respond(interaction, "Failed to add advancement to all characters.")
+
+                  true ->
+                    failure_count = length(failures)
+
+                    respond(
+                      interaction,
+                      "Added advancement to #{success_names}. Failed for #{failure_count} character(s)."
+                    )
+                end
+              end
+          end
+      end
+    end
+  end
+
+  @doc """
+  Handles autocomplete for the /advance_party command's party parameter.
+  """
+  def handle_advance_party_autocomplete(interaction) do
+    server_id = interaction.guild_id
+
+    # Get the user's current input for the party name
+    focused_option =
+      interaction.data.options
+      |> Enum.find(&Map.get(&1, :focused, false))
+
+    input_value = if focused_option, do: focused_option.value || "", else: ""
+
+    choices =
+      case get_campaign(server_id) do
+        nil ->
+          []
+
+        campaign ->
+          Parties.list_parties(campaign.id)
+          |> Enum.filter(
+            &String.contains?(String.downcase(&1.name), String.downcase(input_value))
+          )
+          # Discord allows max 25 choices
+          |> Enum.take(25)
+          |> Enum.map(&%{name: &1.name, value: &1.name})
+      end
 
     # Respond with autocomplete choices
     Api.create_interaction_response(interaction, %{
