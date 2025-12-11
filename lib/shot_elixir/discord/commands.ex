@@ -484,10 +484,21 @@ defmodule ShotElixir.Discord.Commands do
       nil ->
         # Generate a link code
         code = LinkCodes.generate(discord_id, discord_username)
+        link_url = "https://chiwar.net/link-discord?code=#{code}"
 
         respond(
           interaction,
-          "Your link code is: **#{code}**\n\nEnter this code at https://chiwar.net/profile to link your Discord account.\n\nCode expires in 5 minutes.",
+          """
+          **Link your Discord account to Chi War**
+
+          **Option 1:** Click this link (requires login):
+          #{link_url}
+
+          **Option 2:** Enter code manually at https://chiwar.net/profile
+          Code: **#{code}**
+
+          Code expires in 5 minutes.
+          """,
           ephemeral: true
         )
 
