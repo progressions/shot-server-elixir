@@ -511,6 +511,50 @@ defmodule ShotElixir.Discord.Commands do
     end
   end
 
+  @doc """
+  Handles the /whoami command to show details about the user's linked Chi War account.
+  """
+  def handle_whoami(interaction) do
+    discord_id = interaction.user.id
+
+    case Accounts.get_user_by_discord_id(discord_id) do
+      nil ->
+        respond(
+          interaction,
+          """
+          Your Discord account is not linked to Chi War.
+          Use `/link` to generate a link code.
+          """,
+          ephemeral: true
+        )
+
+      user ->
+        # Load the current campaign if present
+        user = ShotElixir.Repo.preload(user, :current_campaign)
+
+        role = if user.gamemaster, do: "Gamemaster", else: "Player"
+
+        campaign_line =
+          if user.current_campaign do
+            "Current Campaign: #{user.current_campaign.name}"
+          else
+            "Current Campaign: None"
+          end
+
+        respond(
+          interaction,
+          """
+          **Your Chi War Profile**
+          Name: #{user.name}
+          Email: #{user.email}
+          Role: #{role}
+          #{campaign_line}
+          """,
+          ephemeral: true
+        )
+    end
+  end
+
   # Private helpers
 
   defp get_option(interaction, name) do
