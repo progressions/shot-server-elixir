@@ -382,12 +382,13 @@ defmodule ShotElixir.Discord.Commands do
               )
 
             party ->
-              # Get all characters from the party (exclude vehicles)
+              # Get all active characters from the party (exclude vehicles and inactive)
               characters =
                 party.memberships
                 |> Enum.filter(& &1.character_id)
                 |> Enum.map(& &1.character)
                 |> Enum.reject(&is_nil/1)
+                |> Enum.filter(& &1.active)
 
               if Enum.empty?(characters) do
                 respond(interaction, "No characters found in party \"#{party.name}\".",
@@ -412,15 +413,20 @@ defmodule ShotElixir.Discord.Commands do
                   |> Enum.map(fn {char, _} -> char.name end)
                   |> Enum.join(", ")
 
-                if Enum.empty?(failures) do
-                  respond(interaction, "Added advancement to #{success_names}")
-                else
-                  failure_count = length(failures)
+                cond do
+                  Enum.empty?(failures) ->
+                    respond(interaction, "Added advancement to #{success_names}")
 
-                  respond(
-                    interaction,
-                    "Added advancement to #{success_names}. Failed for #{failure_count} character(s)."
-                  )
+                  Enum.empty?(successes) ->
+                    respond(interaction, "Failed to add advancement to all characters.")
+
+                  true ->
+                    failure_count = length(failures)
+
+                    respond(
+                      interaction,
+                      "Added advancement to #{success_names}. Failed for #{failure_count} character(s)."
+                    )
                 end
               end
           end
