@@ -48,6 +48,7 @@ defmodule ShotElixirWeb.Api.V2.UserView do
       name: "#{user.first_name} #{user.last_name}",
       gamemaster: user.gamemaster,
       admin: user.admin,
+      discord_id: user.discord_id,
       entity_class: "User",
       active: user.active,
       created_at: user.created_at,
