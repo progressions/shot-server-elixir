@@ -516,17 +516,21 @@ defmodule ShotElixir.Discord.Commands do
   """
   def handle_whoami(interaction) do
     discord_id = interaction.user.id
+    message = build_whoami_response(discord_id)
+    respond(interaction, message, ephemeral: true)
+  end
 
+  @doc """
+  Builds the response message for the /whoami command.
+  Returns a string with either the user's profile info or a prompt to link.
+  """
+  def build_whoami_response(discord_id) do
     case Accounts.get_user_by_discord_id(discord_id) do
       nil ->
-        respond(
-          interaction,
-          """
-          Your Discord account is not linked to Chi War.
-          Use `/link` to generate a link code.
-          """,
-          ephemeral: true
-        )
+        """
+        Your Discord account is not linked to Chi War.
+        Use `/link` to generate a link code.
+        """
 
       user ->
         # Load the current campaign and characters
@@ -545,10 +549,11 @@ defmodule ShotElixir.Discord.Commands do
         characters =
           if user.current_campaign do
             user.characters
-            |> Enum.filter(
-              &(&1.active && &1.character_type == :pc &&
-                  &1.campaign_id == user.current_campaign_id)
-            )
+            |> Enum.filter(fn char ->
+              char.active &&
+                char.campaign_id == user.current_campaign_id &&
+                Map.get(char.action_values, "Type") == "PC"
+            end)
             |> Enum.sort_by(& &1.name)
           else
             []
@@ -566,19 +571,15 @@ defmodule ShotElixir.Discord.Commands do
             "Characters:\n#{character_list}"
           end
 
-        respond(
-          interaction,
-          """
-          **Your Chi War Profile**
-          Name: #{user.name}
-          Email: #{user.email}
-          Role: #{role}
-          #{campaign_line}
+        """
+        **Your Chi War Profile**
+        Name: #{user.name}
+        Email: #{user.email}
+        Role: #{role}
+        #{campaign_line}
 
-          #{characters_section}
-          """,
-          ephemeral: true
-        )
+        #{characters_section}
+        """
     end
   end
 
