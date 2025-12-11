@@ -117,6 +117,10 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
       %{
         name: "whoami",
         description: "Show details about your linked Chi War account"
+      },
+      %{
+        name: "stats",
+        description: "View your character's stats during the current fight"
       }
     ]
 

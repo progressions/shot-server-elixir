@@ -28,6 +28,7 @@ defmodule ShotElixir.Discord.Consumer do
           "advance_party" -> Commands.handle_advance_party(interaction)
           "link" -> Commands.handle_link(interaction)
           "whoami" -> Commands.handle_whoami(interaction)
+          "stats" -> Commands.handle_stats(interaction)
           _ -> :noop
         end
 
