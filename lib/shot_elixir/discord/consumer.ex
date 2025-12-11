@@ -29,6 +29,7 @@ defmodule ShotElixir.Discord.Consumer do
           "link" -> Commands.handle_link(interaction)
           "whoami" -> Commands.handle_whoami(interaction)
           "stats" -> Commands.handle_stats(interaction)
+          "fortune" -> Commands.handle_fortune(interaction)
           _ -> :noop
         end
 

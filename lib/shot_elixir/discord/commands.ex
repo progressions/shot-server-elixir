@@ -733,6 +733,104 @@ defmodule ShotElixir.Discord.Commands do
     end
   end
 
+  @doc """
+  Handles the /fortune command to spend Fortune points.
+  """
+  def handle_fortune(interaction) do
+    discord_id = interaction.user.id
+    server_id = interaction.guild_id
+
+    if is_nil(server_id) do
+      respond(interaction, "This command can only be used in a server, not in DMs.",
+        ephemeral: true
+      )
+    else
+      amount = get_option(interaction, "amount") || 1
+      message = spend_fortune(discord_id, server_id, amount)
+      respond(interaction, message, ephemeral: false)
+    end
+  end
+
+  defp spend_fortune(discord_id, server_id, amount) do
+    case Accounts.get_user_by_discord_id(discord_id) do
+      nil ->
+        """
+        Your Discord account is not linked to Chi War.
+        Use `/link` to generate a link code.
+        """
+
+      user ->
+        spend_fortune_for_user(user, server_id, amount)
+    end
+  end
+
+  defp spend_fortune_for_user(user, server_id, amount) do
+    case CurrentFight.get(server_id) do
+      nil ->
+        "There is no active fight in this server. Use `/start` to begin a fight."
+
+      fight_id ->
+        spend_fortune_in_fight(user, fight_id, amount)
+    end
+  end
+
+  defp spend_fortune_in_fight(user, fight_id, amount) do
+    case Fights.get_fight_with_shots(fight_id) do
+      nil ->
+        "Fight not found."
+
+      fight ->
+        user_shots = find_user_character_shots(fight, user)
+
+        case user_shots do
+          [] ->
+            "You don't have any characters in the fight \"#{fight.name}\"."
+
+          [shot] ->
+            # Single character - spend fortune directly
+            do_spend_fortune(shot.character, amount)
+
+          _multiple ->
+            # Multiple characters - for now, spend from the first one
+            # Could add character selection later
+            shot = List.first(user_shots)
+            do_spend_fortune(shot.character, amount)
+        end
+    end
+  end
+
+  defp do_spend_fortune(character, amount) do
+    av = character.action_values || %{}
+    current_fortune = av["Fortune"] || 0
+    max_fortune = av["Max Fortune"] || 0
+    fortune_type = av["FortuneType"] || "Fortune"
+
+    cond do
+      current_fortune <= 0 ->
+        "**#{character.name}** has no #{fortune_type} points to spend! (#{current_fortune}/#{max_fortune})"
+
+      amount > current_fortune ->
+        "**#{character.name}** only has #{current_fortune} #{fortune_type} points, but you tried to spend #{amount}."
+
+      true ->
+        # Ensure fortune never goes below 0
+        new_fortune = max(current_fortune - amount, 0)
+        updated_av = Map.put(av, "Fortune", new_fortune)
+
+        case Characters.update_character(character, %{"action_values" => updated_av}) do
+          {:ok, _updated_character} ->
+            """
+            🎲 **#{character.name}** spent **#{amount}** #{fortune_type}!
+            Add **+#{amount}** to your roll.
+            #{fortune_type} remaining: **#{new_fortune}/#{max_fortune}**
+            """
+
+          {:error, _reason} ->
+            "Failed to update #{character.name}'s #{fortune_type} points. Please try again."
+        end
+    end
+  end
+
   # Private helpers
 
   defp get_option(interaction, name) do

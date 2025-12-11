@@ -121,6 +121,21 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
       %{
         name: "stats",
         description: "View your character's stats during the current fight"
+      },
+      %{
+        name: "fortune",
+        description: "Spend Fortune points to add to a roll",
+        options: [
+          %{
+            type: 4,
+            # INTEGER type
+            name: "amount",
+            description: "Number of Fortune points to spend (default: 1)",
+            required: false,
+            min_value: 1,
+            max_value: 10
+          }
+        ]
       }
     ]
 
