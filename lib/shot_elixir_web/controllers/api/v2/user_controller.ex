@@ -585,6 +585,31 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     |> json(%{error: "Code parameter is required"})
   end
 
+  # DELETE /api/v2/users/unlink_discord
+  def unlink_discord(conn, _params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    if current_user.discord_id do
+      case Accounts.unlink_discord(current_user) do
+        {:ok, _updated_user} ->
+          conn
+          |> json(%{
+            success: true,
+            message: "Discord account unlinked successfully"
+          })
+
+        {:error, _changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed to unlink Discord account"})
+      end
+    else
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No Discord account is linked"})
+    end
+  end
+
   # DELETE /api/v2/users/:id/remove_image
   def remove_image(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)

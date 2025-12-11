@@ -498,6 +498,18 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       assert json_response(conn, 401)["error"] == "Not authenticated"
     end
 
+    test "code is case insensitive", %{conn: conn, user: user} do
+      discord_id = 123_456_789_012_345_683
+      discord_username = "casetest"
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: String.downcase(code)})
+      response = json_response(conn, 200)
+
+      assert response["success"] == true
+    end
+
     test "code is consumed after successful link and cannot be reused", %{conn: conn, user: user} do
       discord_id = 123_456_789_012_345_682
       discord_username = "consumetest"
@@ -522,6 +534,58 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       response = json_response(conn2, 422)
 
       assert response["error"] == "Invalid link code"
+    end
+  end
+
+  describe "unlink_discord" do
+    setup do
+      # Ensure the LinkCodes agent is running
+      case Process.whereis(LinkCodes) do
+        nil ->
+          {:ok, _pid} = LinkCodes.start_link([])
+
+        _pid ->
+          Agent.update(LinkCodes, fn _state -> %{} end)
+      end
+
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "unlinktest@example.com",
+          password: "password123",
+          first_name: "Unlink",
+          last_name: "Test"
+        })
+
+      %{user: user}
+    end
+
+    test "successfully unlinks Discord account", %{conn: conn, user: user} do
+      discord_id = 123_456_789_012_345_684
+      {:ok, linked_user} = Accounts.link_discord(user, discord_id)
+
+      conn = authenticate(conn, linked_user)
+      conn = delete(conn, ~p"/api/v2/users/unlink_discord")
+      response = json_response(conn, 200)
+
+      assert response["success"] == true
+      assert response["message"] == "Discord account unlinked successfully"
+
+      # Verify user was updated in database
+      updated_user = Accounts.get_user(user.id)
+      assert updated_user.discord_id == nil
+    end
+
+    test "returns error when no Discord account is linked", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = delete(conn, ~p"/api/v2/users/unlink_discord")
+      response = json_response(conn, 422)
+
+      assert response["error"] == "No Discord account is linked"
+    end
+
+    test "returns unauthorized when not authenticated", %{conn: conn} do
+      conn = delete(conn, ~p"/api/v2/users/unlink_discord")
+      assert json_response(conn, 401)["error"] == "Not authenticated"
     end
   end
 

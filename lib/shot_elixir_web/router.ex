@@ -80,6 +80,7 @@ defmodule ShotElixirWeb.Router do
     get "/users/:id/profile", UserController, :profile
     patch "/users/profile", UserController, :update_profile
     post "/users/link_discord", UserController, :link_discord
+    delete "/users/unlink_discord", UserController, :unlink_discord
     delete "/users/:id/image", UserController, :remove_image
     resources "/users", UserController, except: [:create]
 
