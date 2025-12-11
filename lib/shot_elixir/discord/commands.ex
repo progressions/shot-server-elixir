@@ -521,6 +521,149 @@ defmodule ShotElixir.Discord.Commands do
   end
 
   @doc """
+  Handles the /stats command to show the user's character stats during a fight.
+  """
+  def handle_stats(interaction) do
+    discord_id = interaction.user.id
+    server_id = interaction.guild_id
+    message = build_stats_response(discord_id, server_id)
+    respond(interaction, message, ephemeral: true)
+  end
+
+  @doc """
+  Builds the response message for the /stats command.
+  Returns a string with the user's character stats in the current fight.
+  """
+  def build_stats_response(discord_id, server_id) do
+    case Accounts.get_user_by_discord_id(discord_id) do
+      nil ->
+        """
+        Your Discord account is not linked to Chi War.
+        Use `/link` to generate a link code.
+        """
+
+      user ->
+        build_stats_for_user(user, server_id)
+    end
+  end
+
+  defp build_stats_for_user(user, server_id) do
+    # Get the current fight for this server
+    case CurrentFight.get(server_id) do
+      nil ->
+        "There is no active fight in this server. Use `/start` to begin a fight."
+
+      fight_id ->
+        build_stats_for_fight(user, fight_id)
+    end
+  end
+
+  defp build_stats_for_fight(user, fight_id) do
+    # Get the fight with shots preloaded
+    case Fights.get_fight_with_shots(fight_id) do
+      nil ->
+        "Fight not found."
+
+      fight ->
+        # Find the user's character shots in this fight
+        user_shots = find_user_character_shots(fight, user)
+
+        if Enum.empty?(user_shots) do
+          "You don't have any characters in the fight \"#{fight.name}\"."
+        else
+          format_character_stats(fight, user_shots)
+        end
+    end
+  end
+
+  defp find_user_character_shots(fight, user) do
+    fight.shots
+    |> Enum.filter(fn shot ->
+      shot.character && shot.character.user_id == user.id
+    end)
+  end
+
+  defp format_character_stats(fight, shots) do
+    header = "**Your Characters in #{fight.name}**\n"
+
+    character_sections =
+      shots
+      |> Enum.map(&format_single_character_stats/1)
+      |> Enum.join("\n\n")
+
+    header <> character_sections
+  end
+
+  defp format_single_character_stats(shot) do
+    character = shot.character
+    av = character.action_values || %{}
+
+    # Get key combat stats
+    wounds = av["Wounds"] || 0
+    defense = av["Defense"] || 0
+    toughness = av["Toughness"] || 0
+    speed = av["Speed"] || 0
+    fortune = av["Fortune"] || 0
+    max_fortune = av["Max Fortune"] || 0
+    impairments = shot.impairments || character.impairments || 0
+
+    # Get attack values
+    main_attack = av["MainAttack"] || "Guns"
+    main_attack_value = av[main_attack] || 0
+    secondary_attack = av["SecondaryAttack"]
+
+    secondary_attack_line =
+      if secondary_attack && secondary_attack != "" do
+        secondary_value = av[secondary_attack] || 0
+        "#{secondary_attack}: **#{secondary_value}**"
+      else
+        nil
+      end
+
+    # Get shot position
+    shot_position = shot.shot
+
+    shot_line =
+      if shot_position do
+        "Shot: **#{shot_position}**"
+      else
+        "Shot: _Not set_"
+      end
+
+    # Get active effects (handle unloaded association)
+    effects =
+      case shot.character_effects do
+        %Ecto.Association.NotLoaded{} -> []
+        nil -> []
+        loaded -> loaded
+      end
+
+    effects_line =
+      if Enum.empty?(effects) do
+        nil
+      else
+        effect_names = Enum.map(effects, & &1.name) |> Enum.join(", ")
+        "Effects: #{effect_names}"
+      end
+
+    # Build the character section
+    lines =
+      [
+        "**#{character.name}** (#{av["Type"] || "PC"})",
+        shot_line,
+        "Wounds: **#{wounds}** | Defense: **#{defense}** | Toughness: **#{toughness}**",
+        "#{main_attack}: **#{main_attack_value}**",
+        secondary_attack_line,
+        "Speed: **#{speed}** | Fortune: **#{fortune}/#{max_fortune}**",
+        if(impairments > 0, do: "⚠️ Impairments: **#{impairments}**", else: nil),
+        effects_line
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.join(lines, "\n")
+  end
+
+  @doc """
   Builds the response message for the /whoami command.
   Returns a string with either the user's profile info or a prompt to link.
   """
