@@ -902,11 +902,7 @@ defmodule ShotElixir.Discord.Commands do
 
         case Characters.update_character(character, %{"action_values" => updated_av}) do
           {:ok, _updated_character} ->
-            """
-            🎲 **#{character.name}** spent **#{amount}** #{fortune_type}!
-            Add **+#{amount}** to your roll.
-            #{fortune_type} remaining: **#{new_fortune}/#{max_fortune}**
-            """
+            "🎲 **#{character.name}** spent **#{amount}** #{fortune_type}! #{fortune_type} remaining: **#{new_fortune}/#{max_fortune}**"
 
           {:error, _reason} ->
             "Failed to update #{character.name}'s #{fortune_type} points. Please try again."
@@ -917,11 +913,17 @@ defmodule ShotElixir.Discord.Commands do
   # Private helpers
 
   defp get_option(interaction, name) do
-    interaction.data.options
-    |> Enum.find(&(&1.name == name))
-    |> case do
-      nil -> nil
-      option -> option.value
+    case interaction.data.options do
+      nil ->
+        nil
+
+      options ->
+        options
+        |> Enum.find(&(&1.name == name))
+        |> case do
+          nil -> nil
+          option -> option.value
+        end
     end
   end
 

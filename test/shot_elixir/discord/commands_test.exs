@@ -724,7 +724,6 @@ defmodule ShotElixir.Discord.CommandsTest do
 
       # Check success message
       assert response =~ "**Lucky Hero** spent **2** Fortune!"
-      assert response =~ "Add **+2** to your roll"
       assert response =~ "Fortune remaining: **3/8**"
 
       # Verify the character's fortune was actually updated
@@ -1133,7 +1132,6 @@ defmodule ShotElixir.Discord.CommandsTest do
 
       # Should spend from Second Fighter (most recently updated/created)
       assert response =~ "**Second Fighter** spent **1** Fortune!"
-      assert response =~ "Add **+1** to your roll"
       assert response =~ "Fortune remaining: **6/10**"
 
       # Verify Second Fighter's fortune was updated, First Fighter unchanged
