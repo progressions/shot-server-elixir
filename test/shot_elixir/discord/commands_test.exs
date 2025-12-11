@@ -217,11 +217,8 @@ defmodule ShotElixir.Discord.CommandsTest do
   end
 
   describe "build_stats_response/2" do
-    setup do
-      # Clear any existing current fight state before each test
-      # The CurrentFight agent is already started by the application
-      :ok
-    end
+    # Note: Each test uses unique server_id values to avoid test pollution.
+    # The CurrentFight agent is already started by the application.
 
     test "returns link prompt for unlinked Discord user" do
       discord_id = 111_111_111_111_111_111
@@ -378,8 +375,8 @@ defmodule ShotElixir.Discord.CommandsTest do
       assert response =~ "Speed: **6**"
       assert response =~ "Fortune: **3/8**"
 
-      # Check impairments
-      assert response =~ "Impairments: **1**"
+      # Check impairments (includes warning emoji)
+      assert response =~ "⚠️ Impairments: **1**"
     end
 
     test "shows multiple characters when user has several in fight" do

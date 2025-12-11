@@ -526,8 +526,15 @@ defmodule ShotElixir.Discord.Commands do
   def handle_stats(interaction) do
     discord_id = interaction.user.id
     server_id = interaction.guild_id
-    message = build_stats_response(discord_id, server_id)
-    respond(interaction, message, ephemeral: true)
+
+    if is_nil(server_id) do
+      respond(interaction, "This command can only be used in a server, not in DMs.",
+        ephemeral: true
+      )
+    else
+      message = build_stats_response(discord_id, server_id)
+      respond(interaction, message, ephemeral: true)
+    end
   end
 
   @doc """

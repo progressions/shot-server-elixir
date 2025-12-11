@@ -308,7 +308,7 @@ defmodule ShotElixir.Fights do
   def get_fight_with_shots(id) do
     Fight
     |> Repo.get(id)
-    |> Repo.preload(shots: [:character, :vehicle])
+    |> Repo.preload(shots: [:character, :vehicle, :character_effects])
     |> Repo.preload([:characters, :vehicles])
     |> ImageLoader.load_image_url("Fight")
   end
