@@ -529,8 +529,8 @@ defmodule ShotElixir.Discord.Commands do
         )
 
       user ->
-        # Load the current campaign if present
-        user = ShotElixir.Repo.preload(user, :current_campaign)
+        # Load the current campaign and characters
+        user = ShotElixir.Repo.preload(user, [:current_campaign, :characters])
 
         role = if user.gamemaster, do: "Gamemaster", else: "Player"
 
@@ -541,6 +541,24 @@ defmodule ShotElixir.Discord.Commands do
             "Current Campaign: None"
           end
 
+        # Get active PC characters
+        characters =
+          user.characters
+          |> Enum.filter(&(&1.active && &1.character_type == :pc))
+          |> Enum.sort_by(& &1.name)
+
+        characters_section =
+          if Enum.empty?(characters) do
+            "Characters: None"
+          else
+            character_list =
+              characters
+              |> Enum.map(&"• #{&1.name}")
+              |> Enum.join("\n")
+
+            "Characters:\n#{character_list}"
+          end
+
         respond(
           interaction,
           """
@@ -549,6 +567,8 @@ defmodule ShotElixir.Discord.Commands do
           Email: #{user.email}
           Role: #{role}
           #{campaign_line}
+
+          #{characters_section}
           """,
           ephemeral: true
         )
