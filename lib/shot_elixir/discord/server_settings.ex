@@ -129,12 +129,6 @@ defmodule ShotElixir.Discord.ServerSettings do
 
   # Private helpers
 
-  defp create_setting(attrs) do
-    %ServerSetting{}
-    |> ServerSetting.changeset(attrs)
-    |> Repo.insert()
-  end
-
   defp get_setting_field(server_id, field) do
     query =
       from s in ServerSetting,
