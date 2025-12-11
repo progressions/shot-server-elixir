@@ -541,11 +541,18 @@ defmodule ShotElixir.Discord.Commands do
             "Current Campaign: None"
           end
 
-        # Get active PC characters
+        # Get active PC characters in the current campaign
         characters =
-          user.characters
-          |> Enum.filter(&(&1.active && &1.character_type == :pc))
-          |> Enum.sort_by(& &1.name)
+          if user.current_campaign do
+            user.characters
+            |> Enum.filter(
+              &(&1.active && &1.character_type == :pc &&
+                  &1.campaign_id == user.current_campaign_id)
+            )
+            |> Enum.sort_by(& &1.name)
+          else
+            []
+          end
 
         characters_section =
           if Enum.empty?(characters) do
