@@ -88,6 +88,27 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
       %{
         name: "clear_swerves",
         description: "Clear your swerve history"
+      },
+      %{
+        name: "advance_party",
+        description: "Add an advancement to all characters in a party",
+        options: [
+          %{
+            type: 3,
+            # STRING type
+            name: "party",
+            description: "Party name (defaults to 'The Dragons')",
+            required: false,
+            autocomplete: true
+          },
+          %{
+            type: 3,
+            # STRING type
+            name: "description",
+            description: "Advancement description (optional)",
+            required: false
+          }
+        ]
       }
     ]
 
