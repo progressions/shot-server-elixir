@@ -21,8 +21,19 @@ defmodule ShotElixir.Discord.ServerSettings do
   def get_or_create_settings(server_id) when is_integer(server_id) do
     case Repo.get_by(ServerSetting, server_id: server_id) do
       nil ->
-        {:ok, setting} = create_setting(%{server_id: server_id})
-        setting
+        # Use upsert to handle race conditions - if another process inserts
+        # between our get_by and insert, we'll update instead of crash
+        %ServerSetting{}
+        |> ServerSetting.changeset(%{server_id: server_id})
+        |> Repo.insert(
+          on_conflict: :nothing,
+          conflict_target: :server_id
+        )
+        |> case do
+          {:ok, setting} -> setting
+          # If on_conflict fired, fetch the existing record
+          {:error, _} -> Repo.get_by!(ServerSetting, server_id: server_id)
+        end
 
       setting ->
         setting

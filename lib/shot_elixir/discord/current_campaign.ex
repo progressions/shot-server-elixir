@@ -21,13 +21,31 @@ defmodule ShotElixir.Discord.CurrentCampaign do
   First checks the in-memory cache, then falls back to database.
   """
   def get(server_id) when is_integer(server_id) do
+    # Check cache first (atomic read)
     case Agent.get(__MODULE__, &Map.get(&1, server_id, :not_cached)) do
       :not_cached ->
-        # Load from database and cache
+        # Cache miss - load from database
         campaign = ServerSettings.get_current_campaign(server_id)
         campaign_id = if campaign, do: campaign.id, else: nil
-        Agent.update(__MODULE__, &Map.put(&1, server_id, campaign_id))
-        campaign
+
+        # Update cache atomically - use get_and_update to check if another
+        # process already cached a value while we were loading from DB
+        Agent.get_and_update(__MODULE__, fn state ->
+          case Map.get(state, server_id, :not_cached) do
+            :not_cached ->
+              # Still not cached, use our value
+              {campaign, Map.put(state, server_id, campaign_id)}
+
+            existing_id ->
+              # Another process cached a value, use that instead
+              {existing_id, state}
+          end
+        end)
+        |> case do
+          %ShotElixir.Campaigns.Campaign{} = c -> c
+          nil -> nil
+          cached_id -> Campaigns.get_campaign(cached_id)
+        end
 
       nil ->
         nil
@@ -44,15 +62,18 @@ defmodule ShotElixir.Discord.CurrentCampaign do
 
   Updates both the database (source of truth) and the in-memory cache.
   Pass nil as campaign_id to clear the current campaign.
+  Only updates cache if database update succeeds.
   """
   def set(server_id, campaign_id) when is_integer(server_id) do
     # Update database first (source of truth)
-    ServerSettings.set_current_campaign(server_id, campaign_id)
+    case ServerSettings.set_current_campaign(server_id, campaign_id) do
+      {:ok, _setting} ->
+        # Only update cache if database update succeeded
+        Agent.update(__MODULE__, &Map.put(&1, server_id, campaign_id))
+        :ok
 
-    # Then update cache
-    case campaign_id do
-      nil -> Agent.update(__MODULE__, &Map.put(&1, server_id, nil))
-      _ -> Agent.update(__MODULE__, &Map.put(&1, server_id, campaign_id))
+      {:error, _changeset} = error ->
+        error
     end
   end
 

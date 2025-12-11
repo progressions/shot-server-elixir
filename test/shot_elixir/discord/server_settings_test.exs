@@ -18,10 +18,10 @@ defmodule ShotElixir.Discord.ServerSettingsTest do
     CurrentCampaign.clear_all_cache()
     CurrentFight.clear_all_cache()
 
-    # Create a test user
+    # Create a test user with unique email to avoid conflicts in parallel tests
     {:ok, user} =
       Accounts.create_user(%{
-        email: "discord-settings-test@example.com",
+        email: "discord-settings-test-#{System.unique_integer([:positive])}@example.com",
         password: "password123",
         first_name: "Discord",
         last_name: "Tester"

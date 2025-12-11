@@ -18,18 +18,19 @@ defmodule ShotElixir.Discord.CurrentFight do
   Sets the current fight for a Discord server.
 
   Updates both the database (source of truth) and the in-memory cache.
+  Only updates cache if database update succeeds.
   """
   def set(server_id, fight_id) when is_binary(fight_id) or is_nil(fight_id) do
     # Update database first (source of truth)
-    ServerSettings.set_current_fight(server_id, fight_id)
+    case ServerSettings.set_current_fight(server_id, fight_id) do
+      {:ok, _setting} ->
+        # Only update cache if database update succeeded
+        Agent.update(__MODULE__, &Map.put(&1, server_id, fight_id))
+        :ok
 
-    # Then update cache
-    Agent.update(__MODULE__, fn state ->
-      case fight_id do
-        nil -> Map.put(state, server_id, nil)
-        id -> Map.put(state, server_id, id)
-      end
-    end)
+      {:error, _changeset} = error ->
+        error
+    end
   end
 
   @doc """
@@ -38,12 +39,25 @@ defmodule ShotElixir.Discord.CurrentFight do
   First checks the in-memory cache, then falls back to database.
   """
   def get(server_id) do
+    # Check cache first (atomic read)
     case Agent.get(__MODULE__, &Map.get(&1, server_id, :not_cached)) do
       :not_cached ->
-        # Load from database and cache
+        # Cache miss - load from database
         fight_id = ServerSettings.get_current_fight_id(server_id)
-        Agent.update(__MODULE__, &Map.put(&1, server_id, fight_id))
-        fight_id
+
+        # Update cache atomically - use get_and_update to check if another
+        # process already cached a value while we were loading from DB
+        Agent.get_and_update(__MODULE__, fn state ->
+          case Map.get(state, server_id, :not_cached) do
+            :not_cached ->
+              # Still not cached, use our value
+              {fight_id, Map.put(state, server_id, fight_id)}
+
+            existing_id ->
+              # Another process cached a value, use that instead
+              {existing_id, state}
+          end
+        end)
 
       cached_value ->
         cached_value
