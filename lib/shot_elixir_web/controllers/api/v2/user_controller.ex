@@ -563,7 +563,9 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
           existing_user ->
             if existing_user.id == current_user.id do
-              # Already linked to this user
+              # Already linked to this user - still consume the code for security
+              LinkCodes.consume(code)
+
               conn
               |> json(%{
                 success: true,
