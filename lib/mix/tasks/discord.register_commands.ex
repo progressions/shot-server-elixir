@@ -113,6 +113,10 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
       %{
         name: "link",
         description: "Generate a code to link your Discord account to Chi War"
+      },
+      %{
+        name: "whoami",
+        description: "Show details about your linked Chi War account"
       }
     ]
 

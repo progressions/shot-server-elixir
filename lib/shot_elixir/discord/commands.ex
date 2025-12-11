@@ -511,6 +511,78 @@ defmodule ShotElixir.Discord.Commands do
     end
   end
 
+  @doc """
+  Handles the /whoami command to show details about the user's linked Chi War account.
+  """
+  def handle_whoami(interaction) do
+    discord_id = interaction.user.id
+    message = build_whoami_response(discord_id)
+    respond(interaction, message, ephemeral: true)
+  end
+
+  @doc """
+  Builds the response message for the /whoami command.
+  Returns a string with either the user's profile info or a prompt to link.
+  """
+  def build_whoami_response(discord_id) do
+    case Accounts.get_user_by_discord_id(discord_id) do
+      nil ->
+        """
+        Your Discord account is not linked to Chi War.
+        Use `/link` to generate a link code.
+        """
+
+      user ->
+        # Load the current campaign and characters
+        user = ShotElixir.Repo.preload(user, [:current_campaign, :characters])
+
+        role = if user.gamemaster, do: "Gamemaster", else: "Player"
+
+        campaign_line =
+          if user.current_campaign do
+            "Current Campaign: #{user.current_campaign.name}"
+          else
+            "Current Campaign: None"
+          end
+
+        # Get active PC characters in the current campaign
+        characters =
+          if user.current_campaign do
+            user.characters
+            |> Enum.filter(fn char ->
+              char.active &&
+                char.campaign_id == user.current_campaign_id &&
+                Map.get(char.action_values, "Type") == "PC"
+            end)
+            |> Enum.sort_by(& &1.name)
+          else
+            []
+          end
+
+        characters_section =
+          if Enum.empty?(characters) do
+            "Characters: None"
+          else
+            character_list =
+              characters
+              |> Enum.map(&"• #{&1.name}")
+              |> Enum.join("\n")
+
+            "Characters:\n#{character_list}"
+          end
+
+        """
+        **Your Chi War Profile**
+        Name: #{user.name}
+        Email: #{user.email}
+        Role: #{role}
+        #{campaign_line}
+
+        #{characters_section}
+        """
+    end
+  end
+
   # Private helpers
 
   defp get_option(interaction, name) do
