@@ -535,6 +535,31 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
       assert response["error"] == "Invalid link code"
     end
+
+    test "returns error when user is already linked to a different Discord account", %{
+      conn: conn,
+      user: user
+    } do
+      # First, link user to discord_id_a
+      discord_id_a = 111_111_111_111_111_111
+      {:ok, linked_user} = Accounts.link_discord(user, discord_id_a)
+
+      # Now try to link to a different discord_id_b
+      discord_id_b = 222_222_222_222_222_222
+      discord_username_b = "otheruser"
+      code = LinkCodes.generate(discord_id_b, discord_username_b)
+
+      conn = authenticate(conn, linked_user)
+      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
+      response = json_response(conn, 422)
+
+      assert response["error"] ==
+               "You are already linked to a different Discord account. Please unlink before linking a new one."
+
+      # Verify user still has original discord_id
+      updated_user = Accounts.get_user(user.id)
+      assert updated_user.discord_id == discord_id_a
+    end
   end
 
   describe "unlink_discord" do

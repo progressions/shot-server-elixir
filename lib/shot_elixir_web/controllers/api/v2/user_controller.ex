@@ -527,7 +527,9 @@ defmodule ShotElixirWeb.Api.V2.UserController do
   def link_discord(conn, %{"code" => code}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    case LinkCodes.validate(code) do
+    # Use atomic validate_and_consume to prevent race conditions
+    # The code is consumed regardless of outcome to prevent enumeration attacks
+    case LinkCodes.validate_and_consume(code) do
       {:error, :invalid_code} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -539,44 +541,49 @@ defmodule ShotElixirWeb.Api.V2.UserController do
         |> json(%{error: "Link code has expired"})
 
       {:ok, %{discord_id: discord_id, discord_username: discord_username}} ->
-        # Check if Discord ID is already linked to another user
-        case Accounts.get_user_by_discord_id(discord_id) do
-          nil ->
-            # Link the Discord account
-            case Accounts.link_discord(current_user, discord_id) do
-              {:ok, _updated_user} ->
-                # Consume the code so it can't be reused
-                LinkCodes.consume(code)
+        # Check if current user is already linked to a different Discord account
+        if current_user.discord_id && current_user.discord_id != discord_id do
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{
+            error:
+              "You are already linked to a different Discord account. Please unlink before linking a new one."
+          })
+        else
+          # Check if Discord ID is already linked to another user
+          case Accounts.get_user_by_discord_id(discord_id) do
+            nil ->
+              # Link the Discord account
+              case Accounts.link_discord(current_user, discord_id) do
+                {:ok, _updated_user} ->
+                  conn
+                  |> json(%{
+                    success: true,
+                    message: "Discord account linked successfully",
+                    discord_username: discord_username
+                  })
 
+                {:error, _changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to link Discord account"})
+              end
+
+            existing_user ->
+              if existing_user.id == current_user.id do
+                # Already linked to this user
                 conn
                 |> json(%{
                   success: true,
-                  message: "Discord account linked successfully",
+                  message: "Discord account already linked",
                   discord_username: discord_username
                 })
-
-              {:error, _changeset} ->
+              else
                 conn
                 |> put_status(:unprocessable_entity)
-                |> json(%{error: "Failed to link Discord account"})
-            end
-
-          existing_user ->
-            if existing_user.id == current_user.id do
-              # Already linked to this user - still consume the code for security
-              LinkCodes.consume(code)
-
-              conn
-              |> json(%{
-                success: true,
-                message: "Discord account already linked",
-                discord_username: discord_username
-              })
-            else
-              conn
-              |> put_status(:unprocessable_entity)
-              |> json(%{error: "This Discord account is already linked to another user"})
-            end
+                |> json(%{error: "This Discord account is already linked to another user"})
+              end
+          end
         end
     end
   end

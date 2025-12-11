@@ -18,30 +18,34 @@ defmodule ShotElixir.Discord.LinkCodes do
   @doc """
   Generates a unique link code for a Discord user.
   Returns the code string.
+  Uses atomic get_and_update to prevent race conditions in code generation.
   """
   def generate(discord_id, discord_username) when is_integer(discord_id) do
-    code = generate_unique_code()
     expires_at = DateTime.add(DateTime.utc_now(), @code_expiry_minutes * 60, :second)
 
-    Agent.update(__MODULE__, fn state ->
+    Agent.get_and_update(__MODULE__, fn state ->
       # Remove any existing codes for this Discord user
       state = remove_codes_for_discord_id(state, discord_id)
 
-      # Add the new code
-      Map.put(state, code, %{
-        discord_id: discord_id,
-        discord_username: discord_username,
-        expires_at: expires_at
-      })
-    end)
+      # Generate a unique code atomically within the same operation
+      code = generate_unique_code_atomic(state)
 
-    code
+      # Add the new code
+      new_state =
+        Map.put(state, code, %{
+          discord_id: discord_id,
+          discord_username: discord_username,
+          expires_at: expires_at
+        })
+
+      {code, new_state}
+    end)
   end
 
   @doc """
   Validates a link code and returns the Discord user info if valid.
   Returns {:ok, %{discord_id: id, discord_username: username}} or {:error, reason}.
-  Does NOT consume the code - use consume/1 for that.
+  Does NOT consume the code - use validate_and_consume/1 for atomic validation and consumption.
   """
   def validate(code) when is_binary(code) do
     code = String.upcase(code)
@@ -56,6 +60,32 @@ defmodule ShotElixir.Discord.LinkCodes do
             {:error, :expired}
           else
             {:ok, data}
+          end
+      end
+    end)
+  end
+
+  @doc """
+  Atomically validates and consumes a link code in a single operation.
+  Returns {:ok, %{discord_id: id, discord_username: username}} or {:error, reason}.
+  The code is always consumed if it exists (even if expired) to prevent enumeration attacks.
+  """
+  def validate_and_consume(code) when is_binary(code) do
+    code = String.upcase(code)
+
+    Agent.get_and_update(__MODULE__, fn state ->
+      case Map.get(state, code) do
+        nil ->
+          {{:error, :invalid_code}, state}
+
+        %{expires_at: expires_at} = data ->
+          # Always remove the code (consume it) regardless of validity
+          new_state = Map.delete(state, code)
+
+          if DateTime.compare(DateTime.utc_now(), expires_at) == :gt do
+            {{:error, :expired}, new_state}
+          else
+            {{:ok, data}, new_state}
           end
       end
     end)
@@ -86,12 +116,14 @@ defmodule ShotElixir.Discord.LinkCodes do
 
   # Private functions
 
-  defp generate_unique_code do
+  # Generates a unique code atomically by checking against the current state
+  # This is called within the Agent.get_and_update callback to prevent race conditions
+  defp generate_unique_code_atomic(state) do
     code = generate_code()
 
-    # Ensure uniqueness (very unlikely to collide, but be safe)
-    if Agent.get(__MODULE__, &Map.has_key?(&1, code)) do
-      generate_unique_code()
+    # Ensure uniqueness by checking the state passed in (not via separate Agent.get)
+    if Map.has_key?(state, code) do
+      generate_unique_code_atomic(state)
     else
       code
     end

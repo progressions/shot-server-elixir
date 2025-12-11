@@ -122,6 +122,57 @@ defmodule ShotElixir.Discord.LinkCodesTest do
     end
   end
 
+  describe "validate_and_consume/1" do
+    test "returns ok and consumes valid code atomically" do
+      discord_id = 123_456_789_012_345_678
+      discord_username = "testuser"
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      # First call should succeed and consume
+      assert {:ok, data} = LinkCodes.validate_and_consume(code)
+      assert data.discord_id == discord_id
+      assert data.discord_username == discord_username
+
+      # Second call should fail because code was consumed
+      assert {:error, :invalid_code} = LinkCodes.validate_and_consume(code)
+    end
+
+    test "consumes expired code and returns expired error" do
+      discord_id = 123_456_789_012_345_678
+      discord_username = "testuser"
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      # Manually expire the code
+      Agent.update(LinkCodes, fn state ->
+        Map.update!(state, code, fn data ->
+          %{data | expires_at: DateTime.add(DateTime.utc_now(), -1, :hour)}
+        end)
+      end)
+
+      # Should return expired and consume the code
+      assert {:error, :expired} = LinkCodes.validate_and_consume(code)
+
+      # Code should be gone (not just expired)
+      assert {:error, :invalid_code} = LinkCodes.validate_and_consume(code)
+    end
+
+    test "returns invalid_code for non-existent code" do
+      assert {:error, :invalid_code} = LinkCodes.validate_and_consume("NONEXISTENT")
+    end
+
+    test "is case insensitive" do
+      discord_id = 123_456_789_012_345_678
+      discord_username = "testuser"
+      code = LinkCodes.generate(discord_id, discord_username)
+
+      # Validate and consume with lowercase should work
+      assert {:ok, _data} = LinkCodes.validate_and_consume(String.downcase(code))
+
+      # Code should be consumed
+      assert {:error, :invalid_code} = LinkCodes.validate(code)
+    end
+  end
+
   describe "cleanup_expired/0" do
     test "removes expired codes" do
       discord_id = 123_456_789_012_345_678
