@@ -593,4 +593,978 @@ defmodule ShotElixir.Discord.CommandsTest do
       assert response =~ "Shot: _Not set_"
     end
   end
+
+  describe "build_fortune_response/3" do
+    test "returns link prompt for unlinked Discord user" do
+      discord_id = 600_000_000_000_000_001
+      server_id = 600_000_000_000_000_002
+
+      response = Commands.build_fortune_response(discord_id, server_id, 1)
+
+      assert response =~ "Your Discord account is not linked to Chi War"
+      assert response =~ "Use `/link` to generate a link code"
+    end
+
+    test "returns no active fight message when no fight is set" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-nofight@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "NoFight"
+        })
+
+      discord_id = 600_000_000_000_000_003
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      server_id = 600_000_000_000_000_004
+
+      response = Commands.build_fortune_response(discord_id, server_id, 1)
+
+      assert response =~ "There is no active fight in this server"
+      assert response =~ "Use `/start` to begin a fight"
+    end
+
+    test "returns no characters message when user has no characters in fight" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-nochar@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "NoChar"
+        })
+
+      discord_id = 600_000_000_000_000_005
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fortune No Char Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a fight (but don't add user's character to it)
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Empty Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Set the current fight for the server
+      server_id = 600_000_000_000_000_006
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_fortune_response(discord_id, server_id, 1)
+
+      assert response =~ "You don't have any characters in the fight"
+      assert response =~ "Empty Fight"
+    end
+
+    test "successfully spends fortune points" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-success@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Spender"
+        })
+
+      discord_id = 600_000_000_000_000_007
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fortune Success Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with fortune
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Lucky Hero",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 5,
+            "Max Fortune" => 8
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Fortune Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight
+      {:ok, _shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 10
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_008
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_fortune_response(discord_id, server_id, 2)
+
+      # Check success message
+      assert response =~ "**Lucky Hero** spent **2** Fortune!"
+      assert response =~ "Add **+2** to your roll"
+      assert response =~ "Fortune remaining: **3/8**"
+
+      # Verify the character's fortune was actually updated
+      updated_character = Characters.get_character!(character.id)
+      assert updated_character.action_values["Fortune"] == 3
+    end
+
+    test "returns error when trying to spend more fortune than available" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-toomuch@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "TooMuch"
+        })
+
+      discord_id = 600_000_000_000_000_009
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fortune Too Much Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with limited fortune
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Poor Hero",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 2,
+            "Max Fortune" => 8
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Too Much Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight
+      {:ok, _shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 10
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_010
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_fortune_response(discord_id, server_id, 5)
+
+      assert response =~ "**Poor Hero** only has 2 Fortune points, but you tried to spend 5"
+
+      # Verify the character's fortune was NOT changed
+      updated_character = Characters.get_character!(character.id)
+      assert updated_character.action_values["Fortune"] == 2
+    end
+
+    test "returns error when character has zero fortune" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-zero@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Zero"
+        })
+
+      discord_id = 600_000_000_000_000_011
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fortune Zero Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with zero fortune
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Unlucky Hero",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 0,
+            "Max Fortune" => 8
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Zero Fortune Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight
+      {:ok, _shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 10
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_012
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_fortune_response(discord_id, server_id, 1)
+
+      assert response =~ "**Unlucky Hero** has no Fortune points to spend!"
+      assert response =~ "0/8"
+    end
+
+    test "displays custom fortune type (Chi) correctly" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-chi@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Chi"
+        })
+
+      discord_id = 600_000_000_000_000_013
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Chi Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with Chi instead of Fortune
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Martial Master",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 6,
+            "Max Fortune" => 10,
+            "FortuneType" => "Chi"
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Chi Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight
+      {:ok, _shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 10
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_014
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_fortune_response(discord_id, server_id, 3)
+
+      # Check that "Chi" is used instead of "Fortune" in the message
+      assert response =~ "**Martial Master** spent **3** Chi!"
+      assert response =~ "Chi remaining: **3/10**"
+      refute response =~ "Fortune remaining"
+    end
+
+    test "displays custom fortune type (Magic) correctly" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-magic@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Magic"
+        })
+
+      discord_id = 600_000_000_000_000_015
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Magic Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with Magic instead of Fortune
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Sorcerer Supreme",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 4,
+            "Max Fortune" => 7,
+            "FortuneType" => "Magic"
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Magic Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight
+      {:ok, _shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 10
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_016
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_fortune_response(discord_id, server_id, 1)
+
+      # Check that "Magic" is used
+      assert response =~ "**Sorcerer Supreme** spent **1** Magic!"
+      assert response =~ "Magic remaining: **3/7**"
+    end
+
+    test "fortune cannot go below zero" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-floor@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Floor"
+        })
+
+      discord_id = 600_000_000_000_000_017
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fortune Floor Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with exactly 1 fortune
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Last Fortune Hero",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 1,
+            "Max Fortune" => 8
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Floor Test Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight
+      {:ok, _shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 10
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_018
+      CurrentFight.set(server_id, fight.id)
+
+      # Spend exactly 1 fortune (the amount they have)
+      response = Commands.build_fortune_response(discord_id, server_id, 1)
+
+      # Should succeed
+      assert response =~ "**Last Fortune Hero** spent **1** Fortune!"
+      assert response =~ "Fortune remaining: **0/8**"
+
+      # Verify fortune is exactly 0, not negative
+      updated_character = Characters.get_character!(character.id)
+      assert updated_character.action_values["Fortune"] == 0
+    end
+
+    test "uses most recently updated character when user has multiple in fight" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-multi@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Multi"
+        })
+
+      discord_id = 600_000_000_000_000_019
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fortune Multi Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create two characters with different fortune values
+      {:ok, char1} =
+        Characters.create_character(%{
+          name: "First Fighter",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 3,
+            "Max Fortune" => 8
+          },
+          active: true
+        })
+
+      # Small delay to ensure different timestamps
+      Process.sleep(10)
+
+      {:ok, char2} =
+        Characters.create_character(%{
+          name: "Second Fighter",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 7,
+            "Max Fortune" => 10
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Multi Char Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add both characters to fight
+      {:ok, _shot1} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char1.id,
+          shot: 10
+        })
+
+      {:ok, _shot2} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char2.id,
+          shot: 8
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_020
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_fortune_response(discord_id, server_id, 1)
+
+      # Should spend from Second Fighter (most recently updated/created)
+      assert response =~ "**Second Fighter** spent **1** Fortune!"
+      assert response =~ "Add **+1** to your roll"
+      assert response =~ "Fortune remaining: **6/10**"
+
+      # Verify Second Fighter's fortune was updated, First Fighter unchanged
+      updated_char1 = Characters.get_character!(char1.id)
+      updated_char2 = Characters.get_character!(char2.id)
+      assert updated_char1.action_values["Fortune"] == 3
+      assert updated_char2.action_values["Fortune"] == 6
+    end
+
+    test "spends fortune from specified character when name provided" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-select@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Selector"
+        })
+
+      discord_id = 600_000_000_000_000_021
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fortune Select Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create two characters
+      {:ok, char1} =
+        Characters.create_character(%{
+          name: "Alpha Warrior",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 5,
+            "Max Fortune" => 8
+          },
+          active: true
+        })
+
+      Process.sleep(10)
+
+      {:ok, char2} =
+        Characters.create_character(%{
+          name: "Beta Mage",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 3,
+            "Max Fortune" => 6
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Selection Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add both characters to fight
+      {:ok, _shot1} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char1.id,
+          shot: 10
+        })
+
+      {:ok, _shot2} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char2.id,
+          shot: 8
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_022
+      CurrentFight.set(server_id, fight.id)
+
+      # Spend fortune from Alpha Warrior specifically (not the default Beta Mage)
+      response = Commands.build_fortune_response(discord_id, server_id, 2, "Alpha Warrior")
+
+      assert response =~ "**Alpha Warrior** spent **2** Fortune!"
+      assert response =~ "Fortune remaining: **3/8**"
+
+      # Verify Alpha Warrior's fortune was updated, Beta Mage unchanged
+      updated_char1 = Characters.get_character!(char1.id)
+      updated_char2 = Characters.get_character!(char2.id)
+      assert updated_char1.action_values["Fortune"] == 3
+      assert updated_char2.action_values["Fortune"] == 3
+    end
+
+    test "character selection is case insensitive" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fortune-case@example.com",
+          password: "password123",
+          first_name: "Fortune",
+          last_name: "Case"
+        })
+
+      discord_id = 600_000_000_000_000_023
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Case Test Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with mixed case name
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Johnny Thunder",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 4,
+            "Max Fortune" => 7
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Case Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight
+      {:ok, _shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 10
+        })
+
+      # Set the current fight
+      server_id = 600_000_000_000_000_024
+      CurrentFight.set(server_id, fight.id)
+
+      # Try with lowercase
+      response = Commands.build_fortune_response(discord_id, server_id, 1, "johnny thunder")
+
+      assert response =~ "**Johnny Thunder** spent **1** Fortune!"
+    end
+  end
+
+  describe "build_fortune_autocomplete_choices/3" do
+    test "returns empty list for unlinked Discord user" do
+      discord_id = 700_000_000_000_000_001
+      server_id = 700_000_000_000_000_002
+
+      choices = Commands.build_fortune_autocomplete_choices(discord_id, server_id, "")
+
+      assert choices == []
+    end
+
+    test "returns empty list when no active fight" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "autocomplete-nofight@example.com",
+          password: "password123",
+          first_name: "Auto",
+          last_name: "Complete"
+        })
+
+      discord_id = 700_000_000_000_000_003
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      server_id = 700_000_000_000_000_004
+
+      choices = Commands.build_fortune_autocomplete_choices(discord_id, server_id, "")
+
+      assert choices == []
+    end
+
+    test "returns user's characters in the current fight" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "autocomplete-chars@example.com",
+          password: "password123",
+          first_name: "Auto",
+          last_name: "Chars"
+        })
+
+      discord_id = 700_000_000_000_000_005
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Autocomplete Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create characters with fortune
+      {:ok, char1} =
+        Characters.create_character(%{
+          name: "Sword Master",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 5,
+            "Max Fortune" => 8
+          },
+          active: true
+        })
+
+      {:ok, char2} =
+        Characters.create_character(%{
+          name: "Fire Wizard",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Fortune" => 3,
+            "Max Fortune" => 6,
+            "FortuneType" => "Magic"
+          },
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Autocomplete Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add both characters to fight
+      {:ok, _shot1} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char1.id,
+          shot: 10
+        })
+
+      {:ok, _shot2} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char2.id,
+          shot: 8
+        })
+
+      # Set the current fight
+      server_id = 700_000_000_000_000_006
+      CurrentFight.set(server_id, fight.id)
+
+      choices = Commands.build_fortune_autocomplete_choices(discord_id, server_id, "")
+
+      assert length(choices) == 2
+
+      # Check that both characters appear with fortune info
+      names = Enum.map(choices, & &1.name)
+      assert Enum.any?(names, &String.contains?(&1, "Sword Master"))
+      assert Enum.any?(names, &String.contains?(&1, "Fire Wizard"))
+      assert Enum.any?(names, &String.contains?(&1, "Fortune: 5/8"))
+      assert Enum.any?(names, &String.contains?(&1, "Magic: 3/6"))
+
+      # Check values are the character names
+      values = Enum.map(choices, & &1.value)
+      assert "Sword Master" in values
+      assert "Fire Wizard" in values
+    end
+
+    test "filters characters by input" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "autocomplete-filter@example.com",
+          password: "password123",
+          first_name: "Auto",
+          last_name: "Filter"
+        })
+
+      discord_id = 700_000_000_000_000_007
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Filter Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create characters
+      {:ok, char1} =
+        Characters.create_character(%{
+          name: "Johnny Fist",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC", "Fortune" => 5, "Max Fortune" => 8},
+          active: true
+        })
+
+      {:ok, char2} =
+        Characters.create_character(%{
+          name: "Sarah Chen",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC", "Fortune" => 3, "Max Fortune" => 6},
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Filter Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add both characters to fight
+      {:ok, _shot1} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char1.id,
+          shot: 10
+        })
+
+      {:ok, _shot2} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char2.id,
+          shot: 8
+        })
+
+      # Set the current fight
+      server_id = 700_000_000_000_000_008
+      CurrentFight.set(server_id, fight.id)
+
+      # Filter by "john"
+      choices = Commands.build_fortune_autocomplete_choices(discord_id, server_id, "john")
+
+      assert length(choices) == 1
+      assert hd(choices).value == "Johnny Fist"
+    end
+
+    test "characters are ordered by most recently updated" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "autocomplete-order@example.com",
+          password: "password123",
+          first_name: "Auto",
+          last_name: "Order"
+        })
+
+      discord_id = 700_000_000_000_000_009
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Order Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create characters with delay to ensure different timestamps
+      {:ok, char1} =
+        Characters.create_character(%{
+          name: "First Created",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC", "Fortune" => 5, "Max Fortune" => 8},
+          active: true
+        })
+
+      Process.sleep(10)
+
+      {:ok, char2} =
+        Characters.create_character(%{
+          name: "Second Created",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC", "Fortune" => 3, "Max Fortune" => 6},
+          active: true
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Order Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add both characters to fight
+      {:ok, _shot1} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char1.id,
+          shot: 10
+        })
+
+      {:ok, _shot2} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: char2.id,
+          shot: 8
+        })
+
+      # Set the current fight
+      server_id = 700_000_000_000_000_010
+      CurrentFight.set(server_id, fight.id)
+
+      choices = Commands.build_fortune_autocomplete_choices(discord_id, server_id, "")
+
+      # Most recently created (Second Created) should be first
+      assert hd(choices).value == "Second Created"
+    end
+  end
 end

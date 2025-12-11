@@ -588,6 +588,11 @@ defmodule ShotElixir.Discord.Commands do
     |> Enum.filter(fn shot ->
       shot.character && shot.character.user_id == user.id
     end)
+    # Sort by most recently updated character first
+    |> Enum.sort_by(
+      fn shot -> shot.character.updated_at end,
+      &(DateTime.compare(&1, &2) == :gt)
+    )
   end
 
   defp format_character_stats(fight, shots) do
@@ -746,12 +751,81 @@ defmodule ShotElixir.Discord.Commands do
       )
     else
       amount = get_option(interaction, "amount") || 1
-      message = spend_fortune(discord_id, server_id, amount)
+      character_name = get_option(interaction, "character")
+      message = build_fortune_response(discord_id, server_id, amount, character_name)
       respond(interaction, message, ephemeral: false)
     end
   end
 
-  defp spend_fortune(discord_id, server_id, amount) do
+  @doc """
+  Handles autocomplete for the /fortune command's character parameter.
+  Lists the user's characters in the current fight, sorted by most recently updated.
+  """
+  def handle_fortune_autocomplete(interaction) do
+    discord_id = interaction.user.id
+    server_id = interaction.guild_id
+
+    # Get the user's current input for the character name
+    focused_option =
+      interaction.data.options
+      |> Enum.find(&Map.get(&1, :focused, false))
+
+    input_value = if focused_option, do: focused_option.value || "", else: ""
+
+    choices = build_fortune_autocomplete_choices(discord_id, server_id, input_value)
+
+    # Respond with autocomplete choices
+    Api.create_interaction_response(interaction, %{
+      type: 8,
+      # APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
+      data: %{
+        choices: choices
+      }
+    })
+  end
+
+  @doc """
+  Builds the autocomplete choices for the /fortune command.
+  Returns a list of character choices for the user in the current fight.
+  """
+  def build_fortune_autocomplete_choices(discord_id, server_id, input_value) do
+    with user when not is_nil(user) <- Accounts.get_user_by_discord_id(discord_id),
+         fight_id when not is_nil(fight_id) <- CurrentFight.get(server_id),
+         fight when not is_nil(fight) <- Fights.get_fight_with_shots(fight_id) do
+      user_shots = find_user_character_shots(fight, user)
+
+      user_shots
+      |> Enum.filter(fn shot ->
+        String.contains?(
+          String.downcase(shot.character.name),
+          String.downcase(input_value)
+        )
+      end)
+      |> Enum.take(25)
+      |> Enum.map(fn shot ->
+        char = shot.character
+        av = char.action_values || %{}
+        fortune = av["Fortune"] || 0
+        max_fortune = av["Max Fortune"] || 0
+        fortune_type = av["FortuneType"] || "Fortune"
+
+        # Show name with fortune info: "Johnny Fist (Fortune: 5/8)"
+        display_name = "#{char.name} (#{fortune_type}: #{fortune}/#{max_fortune})"
+
+        %{name: display_name, value: char.name}
+      end)
+    else
+      _ -> []
+    end
+  end
+
+  @doc """
+  Builds the response message for spending Fortune points.
+  Takes discord_id, server_id, amount to spend, and optional character_name.
+  If character_name is nil, uses the most recently updated character.
+  Returns a formatted string message.
+  """
+  def build_fortune_response(discord_id, server_id, amount, character_name \\ nil) do
     case Accounts.get_user_by_discord_id(discord_id) do
       nil ->
         """
@@ -760,21 +834,21 @@ defmodule ShotElixir.Discord.Commands do
         """
 
       user ->
-        spend_fortune_for_user(user, server_id, amount)
+        spend_fortune_for_user(user, server_id, amount, character_name)
     end
   end
 
-  defp spend_fortune_for_user(user, server_id, amount) do
+  defp spend_fortune_for_user(user, server_id, amount, character_name) do
     case CurrentFight.get(server_id) do
       nil ->
         "There is no active fight in this server. Use `/start` to begin a fight."
 
       fight_id ->
-        spend_fortune_in_fight(user, fight_id, amount)
+        spend_fortune_in_fight(user, fight_id, amount, character_name)
     end
   end
 
-  defp spend_fortune_in_fight(user, fight_id, amount) do
+  defp spend_fortune_in_fight(user, fight_id, amount, character_name) do
     case Fights.get_fight_with_shots(fight_id) do
       nil ->
         "Fight not found."
@@ -786,17 +860,25 @@ defmodule ShotElixir.Discord.Commands do
           [] ->
             "You don't have any characters in the fight \"#{fight.name}\"."
 
-          [shot] ->
-            # Single character - spend fortune directly
-            do_spend_fortune(shot.character, amount)
+          shots ->
+            # Find the character by name, or use the first (most recently updated)
+            shot = find_character_shot(shots, character_name)
 
-          _multiple ->
-            # Multiple characters - for now, spend from the first one
-            # Could add character selection later
-            shot = List.first(user_shots)
-            do_spend_fortune(shot.character, amount)
+            if shot do
+              do_spend_fortune(shot.character, amount)
+            else
+              "Character \"#{character_name}\" not found in this fight."
+            end
         end
     end
+  end
+
+  defp find_character_shot(shots, nil), do: List.first(shots)
+
+  defp find_character_shot(shots, character_name) do
+    Enum.find(shots, fn shot ->
+      String.downcase(shot.character.name) == String.downcase(character_name)
+    end) || List.first(shots)
   end
 
   defp do_spend_fortune(character, amount) do
@@ -813,7 +895,8 @@ defmodule ShotElixir.Discord.Commands do
         "**#{character.name}** only has #{current_fortune} #{fortune_type} points, but you tried to spend #{amount}."
 
       true ->
-        # Ensure fortune never goes below 0
+        # Subtract amount (validation above ensures result is non-negative)
+        # Defensive max() kept to prevent negative values in edge cases
         new_fortune = max(current_fortune - amount, 0)
         updated_av = Map.put(av, "Fortune", new_fortune)
 
