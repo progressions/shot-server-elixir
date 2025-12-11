@@ -71,6 +71,14 @@ defmodule ShotElixir.Characters do
         query
       end
 
+    # Apply unassigned filter if present (characters with no user_id)
+    query =
+      if params["unassigned"] == "true" || params["unassigned"] == true do
+        from c in query, where: is_nil(c.user_id)
+      else
+        query
+      end
+
     # Apply juncture_id filter if present
     # Special case: "__NONE__" means juncture_id IS NULL
     query =
