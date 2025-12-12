@@ -8,6 +8,7 @@ defmodule ShotElixirWeb.FightChannel do
   alias ShotElixirWeb.Presence
   alias ShotElixir.Fights
   alias ShotElixir.Campaigns
+  alias ShotElixir.Discord.Notifications
   alias Phoenix.Socket.Broadcast
 
   require Logger
@@ -80,6 +81,10 @@ defmodule ShotElixirWeb.FightChannel do
               "updated_by" => socket.assigns.user_id
             })
 
+            # Update Discord fight message if connected
+            fight = Fights.get_fight(shot.fight_id)
+            Notifications.maybe_notify_discord(fight)
+
             {:reply, :ok, socket}
 
           {:error, _changeset} ->
@@ -113,6 +118,9 @@ defmodule ShotElixirWeb.FightChannel do
           sequence: updated_fight.sequence
         })
 
+        # Update Discord fight message if connected
+        Notifications.maybe_notify_discord(updated_fight)
+
         {:reply, :ok, assign(socket, :fight, updated_fight)}
 
       {:error, reason} ->
@@ -130,6 +138,9 @@ defmodule ShotElixirWeb.FightChannel do
           shot_counter: updated_fight.sequence,
           sequence: updated_fight.sequence
         })
+
+        # Update Discord fight message if connected
+        Notifications.maybe_notify_discord(updated_fight)
 
         {:reply, :ok, assign(socket, :fight, updated_fight)}
 

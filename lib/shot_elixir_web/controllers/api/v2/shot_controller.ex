@@ -5,6 +5,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
   alias ShotElixir.Fights.Shot
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Discord.Notifications
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -24,6 +25,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
 
       case Fights.update_shot(shot, shot_params) do
         {:ok, _shot} ->
+          Notifications.maybe_notify_discord(fight)
           json(conn, %{success: true})
 
         {:error, changeset} ->
@@ -64,6 +66,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
          %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user),
          {:ok, _shot} <- Fights.delete_shot(shot) do
+      Notifications.maybe_notify_discord(fight)
       send_resp(conn, :no_content, "")
     else
       nil ->

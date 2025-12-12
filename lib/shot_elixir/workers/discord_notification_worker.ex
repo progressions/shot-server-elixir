@@ -31,23 +31,35 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
           # Try to edit existing message or send new one
           result =
             if fight.fight_message_id do
-              case Message.edit(fight.channel_id, fight.fight_message_id,
-                     content: message_content,
-                     embeds: [embed]
-                   ) do
-                {:ok, _message} ->
-                  Logger.info(
-                    "DISCORD: Updated message #{fight.fight_message_id} for fight #{fight_id}"
+              # Convert message_id from string to integer (Discord snowflake)
+              # Use Integer.parse to gracefully handle corrupted data
+              case Integer.parse(fight.fight_message_id) do
+                {message_id, _} ->
+                  case Message.edit(fight.channel_id, message_id,
+                         content: message_content,
+                         embeds: [embed]
+                       ) do
+                    {:ok, _message} ->
+                      Logger.info(
+                        "DISCORD: Updated message #{fight.fight_message_id} for fight #{fight_id}"
+                      )
+
+                      {:ok, :updated}
+
+                    {:error, %{status_code: 404}} ->
+                      # Message not found, send new one
+                      send_new_message(fight, message_content, embed)
+
+                    {:error, reason} ->
+                      Logger.error("DISCORD: Failed to edit message: #{inspect(reason)}")
+                      send_new_message(fight, message_content, embed)
+                  end
+
+                :error ->
+                  Logger.warning(
+                    "DISCORD: Invalid fight_message_id format: #{inspect(fight.fight_message_id)}"
                   )
 
-                  {:ok, :updated}
-
-                {:error, %{status_code: 404}} ->
-                  # Message not found, send new one
-                  send_new_message(fight, message_content, embed)
-
-                {:error, reason} ->
-                  Logger.error("DISCORD: Failed to edit message: #{inspect(reason)}")
                   send_new_message(fight, message_content, embed)
               end
             else
