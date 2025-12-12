@@ -325,11 +325,6 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
         |> put_status(:ok)
         |> json(%{message: "All entities already have images", total_entities: 0})
 
-      {:error, :forbidden} ->
-        conn
-        |> put_status(:forbidden)
-        |> json(%{error: "Only campaign owner can generate batch images"})
-
       {:error, reason} ->
         {:error, reason}
     end

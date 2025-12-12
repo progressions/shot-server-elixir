@@ -74,34 +74,62 @@ defmodule ShotElixir.Services.BatchImageGenerationService do
          :ok <- validate_entities_exist(entities) do
       total = length(entities)
 
-      # Update campaign status
-      campaign
-      |> Ecto.Changeset.change(%{
-        batch_image_status: "generating",
-        batch_images_total: total,
-        batch_images_completed: 0
-      })
-      |> Repo.update!()
+      # Enqueue jobs for each entity and count successful insertions
+      enqueue_results =
+        Enum.map(entities, fn {entity_id, entity_type} ->
+          job_args = %{
+            "entity_type" => entity_type,
+            "entity_id" => entity_id,
+            "campaign_id" => campaign_id
+          }
 
-      # Broadcast initial status
-      broadcast_batch_status(campaign_id, campaign.user_id, "generating", 0, total)
+          case BatchImageGenerationWorker.new(job_args) |> Oban.insert() do
+            {:ok, _job} ->
+              true
 
-      # Enqueue jobs for each entity
-      Enum.each(entities, fn {entity_id, entity_type} ->
-        %{
-          "entity_type" => entity_type,
-          "entity_id" => entity_id,
-          "campaign_id" => campaign_id
-        }
-        |> BatchImageGenerationWorker.new()
-        |> Oban.insert()
-      end)
+            {:error, changeset} ->
+              Logger.error(
+                "[BatchImageGenerationService] Failed to enqueue job for #{entity_type}:#{entity_id}: #{inspect(changeset)}"
+              )
 
-      Logger.info(
-        "[BatchImageGenerationService] Started batch generation for campaign #{campaign_id}: #{total} entities"
-      )
+              false
+          end
+        end)
 
-      {:ok, total}
+      # Count successfully enqueued jobs
+      successfully_enqueued = Enum.count(enqueue_results, & &1)
+
+      if successfully_enqueued == 0 do
+        Logger.error(
+          "[BatchImageGenerationService] All job enqueues failed for campaign #{campaign_id}"
+        )
+
+        {:error, :enqueue_failed}
+      else
+        # Update campaign status with actual enqueued count
+        campaign
+        |> Ecto.Changeset.change(%{
+          batch_image_status: "generating",
+          batch_images_total: successfully_enqueued,
+          batch_images_completed: 0
+        })
+        |> Repo.update!()
+
+        # Broadcast initial status
+        broadcast_batch_status(
+          campaign_id,
+          campaign.user_id,
+          "generating",
+          0,
+          successfully_enqueued
+        )
+
+        Logger.info(
+          "[BatchImageGenerationService] Started batch generation for campaign #{campaign_id}: #{successfully_enqueued}/#{total} entities enqueued"
+        )
+
+        {:ok, successfully_enqueued}
+      end
     end
   end
 
@@ -225,6 +253,14 @@ defmodule ShotElixir.Services.BatchImageGenerationService do
     :ok
   end
 
+  # Broadcasts batch image generation status updates via Phoenix PubSub.
+  #
+  # NOTE: Unlike CampaignSeederService which uses a flat broadcast structure,
+  # this service wraps the campaign data in a "campaign" key. This is intentional
+  # to match the frontend's subscribeToEntity("campaign", ...) pattern which expects
+  # updates in the format %{campaign: %{...}}. The seeder uses a different pattern
+  # because it sends step-by-step progress updates with "status" and "step" fields.
+  # See: shot-client-next/src/hooks/useEntitySubscription.ts
   defp broadcast_batch_status(campaign_id, user_id, status, completed, total) do
     campaign_data = %{
       id: campaign_id,

@@ -75,6 +75,18 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
           end
 
           {:discard, :entity_not_found}
+
+        {:error, :unsupported_type} ->
+          Logger.error(
+            "[BatchImageGenerationWorker] Unsupported entity type #{entity_type} - discarding job"
+          )
+
+          # Still increment progress so batch can complete
+          if campaign_id do
+            BatchImageGenerationService.increment_completion(campaign_id)
+          end
+
+          {:discard, :unsupported_type}
       end
     rescue
       e ->
@@ -99,7 +111,7 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
 
   # Generate a single image and attach it to the entity
   defp generate_and_attach_image(entity_type, entity_id, entity) do
-    with {:ok, prompt} <- build_image_prompt(entity),
+    with {:ok, prompt} <- build_image_prompt(entity, entity_type),
          {:ok, [image_url | _]} <- GrokService.generate_image(prompt, 1, "url"),
          {:ok, _attachment} <- AiService.attach_image_from_url(entity_type, entity_id, image_url) do
       {:ok, image_url}
@@ -107,7 +119,7 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
   end
 
   # Build image generation prompt from entity
-  defp build_image_prompt(entity) do
+  defp build_image_prompt(entity, entity_type) do
     prompt =
       cond do
         # Check description field first (for sites, factions, parties)
@@ -123,8 +135,9 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
         Map.has_key?(entity, :name) && entity.name ->
           "Generate an image of #{entity.name}"
 
+        # Fallback with entity type for better context
         true ->
-          "Generate an image"
+          "Generate a #{entity_type} image"
       end
 
     {:ok, prompt}
