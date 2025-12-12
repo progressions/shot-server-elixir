@@ -4,6 +4,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Guardian
+  alias ShotElixir.Services.BatchImageGenerationService
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -287,6 +288,50 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Starts batch image generation for all entities in a campaign that don't have images.
+  Gamemaster only.
+  """
+  def generate_batch_images(conn, %{"campaign_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Campaign{} = campaign <- Campaigns.get_campaign(id),
+         :ok <- authorize_campaign_owner(campaign, current_user),
+         {:ok, total} <- BatchImageGenerationService.start_batch_generation(id) do
+      conn
+      |> put_status(:accepted)
+      |> json(%{
+        message: "Batch image generation started",
+        total_entities: total,
+        campaign_id: id
+      })
+    else
+      nil ->
+        {:error, :not_found}
+
+      {:error, :campaign_not_found} ->
+        {:error, :not_found}
+
+      {:error, {:already_in_progress, status}} ->
+        conn
+        |> put_status(:conflict)
+        |> json(%{error: "Batch operation already in progress", status: status})
+
+      {:error, :no_entities_without_images} ->
+        conn
+        |> put_status(:ok)
+        |> json(%{message: "All entities already have images", total_entities: 0})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only campaign owner can generate batch images"})
+
+      {:error, reason} ->
+        {:error, reason}
     end
   end
 

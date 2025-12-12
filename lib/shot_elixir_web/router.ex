@@ -93,6 +93,7 @@ defmodule ShotElixirWeb.Router do
       get "/current_fight", CampaignController, :current_fight
       post "/members", CampaignController, :add_member
       delete "/members/:user_id", CampaignController, :remove_member
+      post "/generate_batch_images", CampaignController, :generate_batch_images
     end
 
     post "/campaigns/current", CampaignController, :set_current

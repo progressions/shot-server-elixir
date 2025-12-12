@@ -20,6 +20,11 @@ defmodule ShotElixir.Campaigns.Campaign do
     field :seeding_images_total, :integer, default: 0
     field :seeding_images_completed, :integer, default: 0
 
+    # Batch image generation tracking
+    field :batch_image_status, :string
+    field :batch_images_total, :integer, default: 0
+    field :batch_images_completed, :integer, default: 0
+
     belongs_to :user, ShotElixir.Accounts.User
 
     has_many :campaign_memberships, ShotElixir.Campaigns.CampaignMembership
@@ -53,7 +58,10 @@ defmodule ShotElixir.Campaigns.Campaign do
       :seeding_status,
       :seeding_images_total,
       :seeding_images_completed,
-      :seeded_at
+      :seeded_at,
+      :batch_image_status,
+      :batch_images_total,
+      :batch_images_completed
     ])
     |> validate_required([:name, :user_id])
     |> validate_unique_name_per_user()
@@ -72,6 +80,13 @@ defmodule ShotElixir.Campaigns.Campaign do
   """
   def seeded?(%__MODULE__{seeded_at: nil}), do: false
   def seeded?(%__MODULE__{seeded_at: _}), do: true
+
+  @doc """
+  Returns true if batch image generation is currently in progress.
+  """
+  def batch_images_in_progress?(%__MODULE__{batch_image_status: nil}), do: false
+  def batch_images_in_progress?(%__MODULE__{batch_image_status: "complete"}), do: false
+  def batch_images_in_progress?(%__MODULE__{batch_image_status: _}), do: true
 
   defp validate_unique_name_per_user(changeset) do
     case {get_field(changeset, :name), get_field(changeset, :user_id)} do
