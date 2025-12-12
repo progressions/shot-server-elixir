@@ -83,7 +83,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       seeding_images_completed: campaign.seeding_images_completed,
       seeded_at: campaign.seeded_at,
       is_seeding: Campaign.seeding?(campaign),
-      is_seeded: Campaign.seeded?(campaign)
+      is_seeded: Campaign.seeded?(campaign),
+      # Batch image generation fields
+      batch_image_status: campaign.batch_image_status,
+      batch_images_total: campaign.batch_images_total,
+      batch_images_completed: campaign.batch_images_completed,
+      is_batch_images_in_progress: Campaign.batch_images_in_progress?(campaign)
     }
   end
 
