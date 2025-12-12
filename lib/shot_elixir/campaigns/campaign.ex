@@ -15,6 +15,11 @@ defmodule ShotElixir.Campaigns.Campaign do
     field :is_master_template, :boolean, default: false
     field :seeded_at, :naive_datetime
 
+    # Seeding status tracking
+    field :seeding_status, :string
+    field :seeding_images_total, :integer, default: 0
+    field :seeding_images_completed, :integer, default: 0
+
     belongs_to :user, ShotElixir.Accounts.User
 
     has_many :campaign_memberships, ShotElixir.Campaigns.CampaignMembership
@@ -39,11 +44,34 @@ defmodule ShotElixir.Campaigns.Campaign do
 
   def changeset(campaign, attrs) do
     campaign
-    |> cast(attrs, [:name, :description, :active, :is_master_template, :user_id])
+    |> cast(attrs, [
+      :name,
+      :description,
+      :active,
+      :is_master_template,
+      :user_id,
+      :seeding_status,
+      :seeding_images_total,
+      :seeding_images_completed,
+      :seeded_at
+    ])
     |> validate_required([:name, :user_id])
     |> validate_unique_name_per_user()
     |> validate_only_one_master_template()
   end
+
+  @doc """
+  Returns true if the campaign is currently being seeded (status is not nil and not "complete").
+  """
+  def seeding?(%__MODULE__{seeding_status: nil}), do: false
+  def seeding?(%__MODULE__{seeding_status: "complete"}), do: false
+  def seeding?(%__MODULE__{seeding_status: _}), do: true
+
+  @doc """
+  Returns true if the campaign has been fully seeded (seeded_at is not nil).
+  """
+  def seeded?(%__MODULE__{seeded_at: nil}), do: false
+  def seeded?(%__MODULE__{seeded_at: _}), do: true
 
   defp validate_unique_name_per_user(changeset) do
     case {get_field(changeset, :name), get_field(changeset, :user_id)} do

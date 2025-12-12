@@ -27,6 +27,96 @@ defmodule ShotElixir.Services.CampaignSeederService do
   import Ecto.Query
 
   @doc """
+  Updates the seeding status of a campaign and broadcasts the change via PubSub.
+  """
+  def update_seeding_status(%Campaign{} = campaign, status, extra_data \\ %{}) do
+    attrs =
+      case status do
+        "images" ->
+          %{
+            seeding_status: status,
+            seeding_images_total: Map.get(extra_data, :images_total, 0),
+            seeding_images_completed: 0
+          }
+
+        "complete" ->
+          %{
+            seeding_status: status,
+            seeded_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+          }
+
+        _ ->
+          %{seeding_status: status}
+      end
+
+    {:ok, updated_campaign} =
+      campaign
+      |> Ecto.Changeset.change(attrs)
+      |> Repo.update()
+
+    broadcast_seeding_status(campaign.id, status, extra_data)
+    updated_campaign
+  end
+
+  @doc """
+  Broadcasts seeding status to the campaign channel and user channel via PubSub.
+  The user channel broadcast ensures the creator receives updates even if the
+  newly created campaign isn't their current active campaign yet.
+  """
+  def broadcast_seeding_status(campaign_id, status, extra_data \\ %{}) do
+    payload =
+      Map.merge(
+        %{
+          seeding_status: status,
+          campaign_id: campaign_id
+        },
+        extra_data
+      )
+
+    # Broadcast to campaign channel
+    Phoenix.PubSub.broadcast!(
+      ShotElixir.PubSub,
+      "campaign:#{campaign_id}",
+      {:campaign_broadcast, payload}
+    )
+
+    # Also broadcast to the campaign creator's user channel
+    # so they receive updates even if this isn't their current campaign
+    case Repo.get(Campaign, campaign_id) do
+      %Campaign{user_id: creator_id} when not is_nil(creator_id) ->
+        Phoenix.PubSub.broadcast!(
+          ShotElixir.PubSub,
+          "user:#{creator_id}",
+          {:user_broadcast, payload}
+        )
+
+        Logger.info(
+          "[CampaignSeederService] Broadcast seeding status: #{status} to user:#{creator_id}"
+        )
+
+      _ ->
+        :ok
+    end
+
+    Logger.info(
+      "[CampaignSeederService] Broadcast seeding status: #{status} for campaign #{campaign_id}"
+    )
+  end
+
+  @doc """
+  Counts total images that need to be copied for progress tracking.
+  """
+  def count_images_to_copy(mappings) do
+    # 1 for campaign + count of each entity type
+    1 +
+      map_size(mappings.schtick_mapping) +
+      map_size(mappings.weapon_mapping) +
+      map_size(mappings.faction_mapping) +
+      map_size(mappings.juncture_mapping) +
+      map_size(mappings.character_mapping)
+  end
+
+  @doc """
   Seeds a campaign with content from the master template.
   Returns {:ok, campaign} if successful, {:error, reason} otherwise.
 
@@ -85,24 +175,29 @@ defmodule ShotElixir.Services.CampaignSeederService do
       Repo.transaction(fn ->
         # Copy in order: dependencies first
         # 1. Schticks (needed by characters)
+        update_seeding_status(target_campaign, "schticks")
         Logger.info("[CampaignSeederService] Starting schtick duplication...")
         {:ok, schtick_mapping} = duplicate_schticks(source_campaign, target_campaign)
 
         # 2. Weapons (needed by characters)
+        update_seeding_status(target_campaign, "weapons")
         Logger.info("[CampaignSeederService] Starting weapon duplication...")
         {:ok, weapon_mapping} = duplicate_weapons(source_campaign, target_campaign)
 
         # 3. Factions (needed by junctures and characters)
+        update_seeding_status(target_campaign, "factions")
         Logger.info("[CampaignSeederService] Starting faction duplication...")
         {:ok, faction_mapping} = duplicate_factions(source_campaign, target_campaign)
 
         # 4. Junctures (references factions)
+        update_seeding_status(target_campaign, "junctures")
         Logger.info("[CampaignSeederService] Starting juncture duplication...")
 
         {:ok, juncture_mapping} =
           duplicate_junctures(source_campaign, target_campaign, faction_mapping)
 
         # 5. Characters (template characters, references schticks/weapons/factions/junctures)
+        update_seeding_status(target_campaign, "characters")
         Logger.info("[CampaignSeederService] Starting character duplication...")
 
         {:ok, character_mapping} =
@@ -114,6 +209,7 @@ defmodule ShotElixir.Services.CampaignSeederService do
           )
 
         # 6. Link schtick prerequisites (now that all schticks exist in target)
+        update_seeding_status(target_campaign, "prerequisites")
         Logger.info("[CampaignSeederService] Linking schtick prerequisites...")
         link_schtick_prerequisites(schtick_mapping)
 
@@ -121,21 +217,13 @@ defmodule ShotElixir.Services.CampaignSeederService do
         Logger.info("[CampaignSeederService] Copying image positions...")
         copy_image_positions(source_campaign, target_campaign, "Campaign")
 
-        # 8. Mark campaign as seeded
-        {:ok, updated_campaign} =
-          target_campaign
-          |> Ecto.Changeset.change(
-            seeded_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
-          )
-          |> Repo.update()
-
         Logger.info(
           "[CampaignSeederService] Database seeding complete for #{target_campaign.name}"
         )
 
-        # Return all mappings for image copying
+        # Return all mappings for image copying (campaign not yet updated - done after images)
         %{
-          campaign: updated_campaign,
+          campaign: target_campaign,
           source_campaign: source_campaign,
           schtick_mapping: schtick_mapping,
           weapon_mapping: weapon_mapping,
@@ -148,14 +236,39 @@ defmodule ShotElixir.Services.CampaignSeederService do
     # Phase 2: Copy images OUTSIDE the transaction to avoid DB connection timeouts
     case transaction_result do
       {:ok, mappings} ->
-        Logger.info("[CampaignSeederService] Starting image copying (outside transaction)...")
-        copy_all_images(mappings)
+        # Estimate total images for initial status update
+        estimated_total = count_images_to_copy(mappings)
+
+        updated_campaign =
+          update_seeding_status(target_campaign, "images", %{
+            images_total: estimated_total,
+            images_completed: 0
+          })
 
         Logger.info(
-          "[CampaignSeederService] Successfully seeded campaign #{target_campaign.name}"
+          "[CampaignSeederService] Starting image copying (outside transaction) - estimated #{estimated_total} images..."
         )
 
-        {:ok, mappings.campaign}
+        # Queue all jobs and get actual count of successfully queued jobs
+        actual_queued = copy_all_images(Map.put(mappings, :campaign, updated_campaign))
+
+        # Update the total to reflect actually queued jobs (in case some failed to queue)
+        if actual_queued != estimated_total do
+          Logger.warning(
+            "[CampaignSeederService] Only #{actual_queued}/#{estimated_total} jobs queued successfully"
+          )
+
+          updated_campaign
+          |> Ecto.Changeset.change(seeding_images_total: actual_queued)
+          |> Repo.update()
+        end
+
+        Logger.info(
+          "[CampaignSeederService] Queued #{actual_queued} image copy jobs for campaign #{target_campaign.name}"
+        )
+
+        # Return immediately - status will be set to "complete" by ImageCopyWorker when done
+        {:ok, updated_campaign}
 
       {:error, reason} = error ->
         Logger.error("[CampaignSeederService] Transaction failed: #{inspect(reason)}")
@@ -163,55 +276,85 @@ defmodule ShotElixir.Services.CampaignSeederService do
     end
   end
 
-  # Queue image copy jobs for all entity types
+  # Queue image copy jobs for all entity types and return the count of successfully queued jobs
   defp copy_all_images(mappings) do
+    campaign_id = mappings.campaign.id
+
     # Queue campaign image copy
-    queue_image_copy_job(mappings.source_campaign, mappings.campaign, "Campaign")
+    campaign_count =
+      if queue_image_copy_job(
+           mappings.source_campaign,
+           mappings.campaign,
+           "Campaign",
+           campaign_id
+         ),
+         do: 1,
+         else: 0
 
     # Queue schtick image copies
-    Enum.each(mappings.schtick_mapping, fn {_old_id, %{source: source, target: target}} ->
-      queue_image_copy_job(source, target, "Schtick")
-    end)
+    schtick_count =
+      Enum.reduce(mappings.schtick_mapping, 0, fn {_old_id, %{source: source, target: target}},
+                                                  acc ->
+        if queue_image_copy_job(source, target, "Schtick", campaign_id), do: acc + 1, else: acc
+      end)
 
     # Queue weapon image copies
-    Enum.each(mappings.weapon_mapping, fn {_old_id, %{source: source, target: target}} ->
-      queue_image_copy_job(source, target, "Weapon")
-    end)
+    weapon_count =
+      Enum.reduce(mappings.weapon_mapping, 0, fn {_old_id, %{source: source, target: target}},
+                                                 acc ->
+        if queue_image_copy_job(source, target, "Weapon", campaign_id), do: acc + 1, else: acc
+      end)
 
     # Queue faction image copies
-    Enum.each(mappings.faction_mapping, fn {_old_id, %{source: source, target: target}} ->
-      queue_image_copy_job(source, target, "Faction")
-    end)
+    faction_count =
+      Enum.reduce(mappings.faction_mapping, 0, fn {_old_id, %{source: source, target: target}},
+                                                  acc ->
+        if queue_image_copy_job(source, target, "Faction", campaign_id), do: acc + 1, else: acc
+      end)
 
     # Queue juncture image copies
-    Enum.each(mappings.juncture_mapping, fn {_old_id, %{source: source, target: target}} ->
-      queue_image_copy_job(source, target, "Juncture")
-    end)
+    juncture_count =
+      Enum.reduce(mappings.juncture_mapping, 0, fn {_old_id, %{source: source, target: target}},
+                                                   acc ->
+        if queue_image_copy_job(source, target, "Juncture", campaign_id), do: acc + 1, else: acc
+      end)
 
     # Queue character image copies
-    Enum.each(mappings.character_mapping, fn {_old_id, %{source: source, target: target}} ->
-      queue_image_copy_job(source, target, "Character")
-    end)
+    character_count =
+      Enum.reduce(mappings.character_mapping, 0, fn {_old_id, %{source: source, target: target}},
+                                                    acc ->
+        if queue_image_copy_job(source, target, "Character", campaign_id), do: acc + 1, else: acc
+      end)
 
-    :ok
+    total_queued =
+      campaign_count + schtick_count + weapon_count + faction_count + juncture_count +
+        character_count
+
+    Logger.info("[CampaignSeederService] Successfully queued #{total_queued} image copy jobs")
+    total_queued
   end
 
-  defp queue_image_copy_job(source, target, type) do
+  # Returns true if job was successfully queued, false otherwise
+  defp queue_image_copy_job(source, target, type, campaign_id) do
     job_args = %{
       "source_type" => type,
       "source_id" => source.id,
       "target_type" => type,
-      "target_id" => target.id
+      "target_id" => target.id,
+      "campaign_id" => campaign_id
     }
 
     case ImageCopyWorker.new(job_args) |> Oban.insert() do
       {:ok, _job} ->
         Logger.debug("[CampaignSeederService] Queued image copy job for #{type}:#{target.id}")
+        true
 
       {:error, changeset} ->
         Logger.error(
           "[CampaignSeederService] Failed to queue image copy job for #{type}:#{target.id} - #{inspect(changeset.errors)}"
         )
+
+        false
     end
   end
 
