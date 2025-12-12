@@ -60,6 +60,8 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
 
   # Rails CampaignSerializer format
   defp render_campaign(campaign) do
+    alias ShotElixir.Campaigns.Campaign
+
     %{
       id: campaign.id,
       name: campaign.name,
@@ -74,7 +76,14 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       image_url: get_image_url(campaign),
       entity_class: "Campaign",
       active: campaign.active,
-      image_positions: render_image_positions_if_loaded(campaign)
+      image_positions: render_image_positions_if_loaded(campaign),
+      # Seeding status fields
+      seeding_status: campaign.seeding_status,
+      seeding_images_total: campaign.seeding_images_total,
+      seeding_images_completed: campaign.seeding_images_completed,
+      seeded_at: campaign.seeded_at,
+      is_seeding: Campaign.seeding?(campaign),
+      is_seeded: Campaign.seeded?(campaign)
     }
   end
 
