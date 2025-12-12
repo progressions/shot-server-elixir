@@ -93,21 +93,25 @@ defmodule ShotElixir.Workers.ImageCopyWorker do
       end
     rescue
       e ->
-        Logger.error("[ImageCopyWorker] Exception while copying image: #{inspect(e)}")
+        Logger.error(
+          "[ImageCopyWorker] Exception while copying image: #{inspect(e)} (attempt #{attempt}/#{max_attempts})"
+        )
+
         Logger.error(Exception.format(:error, e, __STACKTRACE__))
 
-        # Increment counter so seeding can complete
-        # (we don't want a single failed image to block the entire campaign)
-        if campaign_id do
+        # Only increment counter on final attempt to allow retries for transient failures
+        if is_final_attempt && campaign_id do
           Logger.warning(
-            "[ImageCopyWorker] Incrementing counter despite error to prevent seeding from blocking"
+            "[ImageCopyWorker] Final attempt exception - incrementing counter to prevent seeding from blocking"
           )
 
           increment_image_completion(campaign_id)
+          # Discard since we've incremented the counter
+          {:discard, :exception}
+        else
+          # Re-raise to allow Oban to retry
+          reraise e, __STACKTRACE__
         end
-
-        # Discard instead of retrying - we've already incremented
-        {:discard, :exception}
     end
   end
 
@@ -131,8 +135,8 @@ defmodule ShotElixir.Workers.ImageCopyWorker do
 
     case Repo.update_all(query, []) do
       {1, [result]} ->
-        # Note: The SELECT happens BEFORE the UPDATE in update_all, so we need to add 1
-        new_completed = (result.seeding_images_completed || 0) + 1
+        # PostgreSQL RETURNING gives us the value AFTER the update, so no need to add 1
+        new_completed = result.seeding_images_completed || 0
         images_total = result.seeding_images_total
         user_id = result.user_id
 
@@ -178,47 +182,72 @@ defmodule ShotElixir.Workers.ImageCopyWorker do
 
   @doc """
   Marks the campaign seeding as complete.
+  Uses a conditional update to prevent race conditions when multiple workers
+  complete simultaneously - only updates if status is still "images".
   """
   def finalize_seeding(%Campaign{} = campaign) do
     Logger.info("[ImageCopyWorker] Finalizing seeding for campaign #{campaign.id}")
 
-    {:ok, _updated} =
-      campaign
-      |> Ecto.Changeset.change(
-        seeding_status: "complete",
-        seeded_at: NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second)
+    # Use conditional update to prevent race conditions - only update if status is still "images"
+    query =
+      from(c in Campaign,
+        where: c.id == ^campaign.id and c.seeding_status == "images",
+        update: [
+          set: [
+            seeding_status: "complete",
+            seeded_at: ^(NaiveDateTime.utc_now() |> NaiveDateTime.truncate(:second))
+          ]
+        ]
       )
-      |> Repo.update()
 
-    payload = %{
-      seeding_status: "complete",
-      campaign_id: campaign.id
-    }
+    case Repo.update_all(query, []) do
+      {1, _} ->
+        # Successfully updated - we were the first worker to finalize
+        :ok
 
-    # Broadcast completion to campaign channel
-    Phoenix.PubSub.broadcast!(
-      ShotElixir.PubSub,
-      "campaign:#{campaign.id}",
-      {:campaign_broadcast, payload}
-    )
+      {0, _} ->
+        # Already finalized by another worker - skip broadcasts
+        Logger.debug(
+          "[ImageCopyWorker] Campaign #{campaign.id} already finalized by another worker"
+        )
 
-    # Also broadcast to user channel for newly created campaigns
-    if campaign.user_id do
-      Phoenix.PubSub.broadcast!(
-        ShotElixir.PubSub,
-        "user:#{campaign.user_id}",
-        {:user_broadcast, payload}
-      )
+        :already_complete
     end
+    |> case do
+      :already_complete ->
+        :ok
 
-    # Also broadcast the standard campaign_seeded event for compatibility
-    Phoenix.PubSub.broadcast(
-      ShotElixir.PubSub,
-      "campaign:#{campaign.id}",
-      {:campaign_seeded, %{campaign_id: campaign.id}}
-    )
+      :ok ->
+        payload = %{
+          seeding_status: "complete",
+          campaign_id: campaign.id
+        }
 
-    Logger.info("[ImageCopyWorker] Campaign #{campaign.id} seeding complete!")
+        # Broadcast completion to campaign channel
+        Phoenix.PubSub.broadcast!(
+          ShotElixir.PubSub,
+          "campaign:#{campaign.id}",
+          {:campaign_broadcast, payload}
+        )
+
+        # Also broadcast to user channel for newly created campaigns
+        if campaign.user_id do
+          Phoenix.PubSub.broadcast!(
+            ShotElixir.PubSub,
+            "user:#{campaign.user_id}",
+            {:user_broadcast, payload}
+          )
+        end
+
+        # Also broadcast the standard campaign_seeded event for compatibility
+        Phoenix.PubSub.broadcast(
+          ShotElixir.PubSub,
+          "campaign:#{campaign.id}",
+          {:campaign_seeded, %{campaign_id: campaign.id}}
+        )
+
+        Logger.info("[ImageCopyWorker] Campaign #{campaign.id} seeding complete!")
+    end
   end
 
   # Helper to get entity by type and ID
