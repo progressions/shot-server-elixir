@@ -261,8 +261,17 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           weapon_ids: get_weapon_ids(character),
           schtick_ids: get_schtick_ids(character),
           effects: render_effects(shot),
-          user_id: character.user_id
+          user_id: character.user_id,
+          user: render_user_if_loaded(character)
         }
+    end
+  end
+
+  defp render_user_if_loaded(character) do
+    case Map.get(character, :user) do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      user -> %{id: user.id, name: "#{user.first_name} #{user.last_name}", email: user.email}
     end
   end
 

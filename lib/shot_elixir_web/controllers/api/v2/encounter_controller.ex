@@ -43,7 +43,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                         :character,
                         :vehicle,
                         :character_effects,
-                        character: [:faction, :character_schticks, :carries],
+                        character: [:faction, :character_schticks, :carries, :user],
                         vehicle: [:faction]
                       ]
                     ])
@@ -130,7 +130,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                                 :character,
                                 :vehicle,
                                 :character_effects,
-                                character: [:faction, :character_schticks, :carries],
+                                character: [:faction, :character_schticks, :carries, :user],
                                 vehicle: [:faction]
                               ]
                             ])
@@ -247,7 +247,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                         :character,
                         :vehicle,
                         :character_effects,
-                        character: [:faction, :character_schticks, :carries],
+                        character: [:faction, :character_schticks, :carries, :user],
                         vehicle: [:faction]
                       ]
                     ])
@@ -359,7 +359,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                     :character,
                     :vehicle,
                     :character_effects,
-                    character: [:faction, :character_schticks, :carries],
+                    character: [:faction, :character_schticks, :carries, :user],
                     vehicle: [:faction]
                   ]
                 ])
@@ -436,7 +436,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                     :character,
                     :vehicle,
                     :character_effects,
-                    character: [:faction, :character_schticks, :carries],
+                    character: [:faction, :character_schticks, :carries, :user],
                     vehicle: [:faction]
                   ]
                 ])
