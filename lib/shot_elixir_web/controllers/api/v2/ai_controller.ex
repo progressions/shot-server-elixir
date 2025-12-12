@@ -84,26 +84,40 @@ defmodule ShotElixirWeb.Api.V2.AiController do
                 |> json(%{error: "Character not found"})
 
               character ->
-                if character.campaign_id == current_user.current_campaign_id do
-                  # Enqueue AI character update job
-                  case %{character_id: character.id}
-                       |> AiCharacterUpdateWorker.new()
-                       |> Oban.insert() do
-                    {:ok, _job} ->
-                      # Return success response
-                      conn
-                      |> put_status(:accepted)
-                      |> json(%{message: "Character AI update in progress"})
+                cond do
+                  character.campaign_id != current_user.current_campaign_id ->
+                    conn
+                    |> put_status(:not_found)
+                    |> json(%{error: "Character not found"})
 
-                    {:error, _changeset} ->
-                      conn
-                      |> put_status(:internal_server_error)
-                      |> json(%{error: "Failed to queue character update"})
-                  end
-                else
-                  conn
-                  |> put_status(:not_found)
-                  |> json(%{error: "Character not found"})
+                  character.extending ->
+                    conn
+                    |> put_status(:conflict)
+                    |> json(%{error: "Character extension already in progress"})
+
+                  true ->
+                    # Set extending flag before enqueuing job
+                    {:ok, _updated_character} =
+                      Characters.update_character(character, %{extending: true})
+
+                    # Enqueue AI character update job
+                    case %{character_id: character.id}
+                         |> AiCharacterUpdateWorker.new()
+                         |> Oban.insert() do
+                      {:ok, _job} ->
+                        # Return success response
+                        conn
+                        |> put_status(:accepted)
+                        |> json(%{message: "Character AI update in progress"})
+
+                      {:error, _changeset} ->
+                        # Reset extending flag if job failed to queue
+                        Characters.update_character(character, %{extending: false})
+
+                        conn
+                        |> put_status(:internal_server_error)
+                        |> json(%{error: "Failed to queue character update"})
+                    end
                 end
             end
           else

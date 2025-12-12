@@ -31,9 +31,12 @@ defmodule ShotElixir.Workers.AiCharacterUpdateWorker do
       {:error, reason} ->
         Logger.error("AI character extension failed: #{inspect(reason)}")
 
-        # Try to get campaign_id for error broadcast
+        # Try to get campaign_id for error broadcast and clear extending flag
         case get_character(character_id) do
           {:ok, character} ->
+            # Clear extending flag on error
+            Characters.update_character(character, %{extending: false})
+
             error_message =
               if is_binary(reason), do: reason, else: "Character extension failed"
 
@@ -52,9 +55,12 @@ defmodule ShotElixir.Workers.AiCharacterUpdateWorker do
       Logger.error("Exception in AI character extension: #{inspect(e)}")
       Logger.error(Exception.format(:error, e, __STACKTRACE__))
 
-      # Try to broadcast error
+      # Try to clear extending flag and broadcast error
       case get_character(character_id) do
         {:ok, character} ->
+          # Clear extending flag on exception
+          Characters.update_character(character, %{extending: false})
+
           CampaignChannel.broadcast_ai_image_status(character.campaign_id, "error", %{
             error: Exception.message(e)
           })
@@ -77,14 +83,20 @@ defmodule ShotElixir.Workers.AiCharacterUpdateWorker do
 
   defp update_character(character, json) do
     Logger.info("Generated AI character JSON: #{inspect(json)}")
+    Logger.info("Original character description: #{inspect(character.description)}")
 
     # Merge AI-generated data with existing character
     updated_character = AiService.merge_json_with_character(json, character)
 
-    # Save to database
-    case Characters.update_character(updated_character, %{
+    Logger.info("Merged character description: #{inspect(updated_character.description)}")
+
+    # Save to database, also clearing the extending flag
+    # IMPORTANT: Pass the original `character` (not updated_character) so the changeset
+    # can detect the difference between the original DB values and the new merged values
+    case Characters.update_character(character, %{
            description: updated_character.description,
-           wealth: updated_character.wealth
+           wealth: updated_character.wealth,
+           extending: false
          }) do
       {:ok, saved_character} ->
         {:ok, saved_character}
