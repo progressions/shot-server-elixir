@@ -77,21 +77,32 @@ defmodule ShotElixir.Services.AiService do
 
     updated_description =
       Map.merge(description, %{
-        "Background" => description["Background"] || json["description"],
-        "Appearance" => description["Appearance"] || json["appearance"],
-        "Nicknames" => description["Nicknames"] || json["nicknames"],
-        "Melodramatic Hook" => description["Melodramatic Hook"] || json["melodramaticHook"],
-        "Age" => description["Age"] || json["age"],
-        "Height" => description["Height"] || json["height"],
-        "Weight" => description["Weight"] || json["weight"],
-        "Hair Color" => description["Hair Color"] || json["hairColor"],
-        "Eye Color" => description["Eye Color"] || json["eyeColor"],
-        "Style of Dress" => description["Style of Dress"] || json["styleOfDress"]
+        "Background" => non_empty(description["Background"], json["description"]),
+        "Appearance" => non_empty(description["Appearance"], json["appearance"]),
+        "Nicknames" => non_empty(description["Nicknames"], json["nicknames"]),
+        "Melodramatic Hook" =>
+          non_empty(description["Melodramatic Hook"], json["melodramaticHook"]),
+        "Age" => non_empty(description["Age"], json["age"]),
+        "Height" => non_empty(description["Height"], json["height"]),
+        "Weight" => non_empty(description["Weight"], json["weight"]),
+        "Hair Color" => non_empty(description["Hair Color"], json["hairColor"]),
+        "Eye Color" => non_empty(description["Eye Color"], json["eyeColor"]),
+        "Style of Dress" => non_empty(description["Style of Dress"], json["styleOfDress"])
       })
 
-    wealth = character.wealth || json["wealth"]
+    wealth = non_empty(character.wealth, json["wealth"])
 
     %{character | description: updated_description, wealth: wealth}
+  end
+
+  # Helper to prefer non-empty values - uses existing value if present and non-empty,
+  # otherwise falls back to the AI-generated value
+  defp non_empty(existing, fallback) do
+    cond do
+      is_binary(existing) && String.trim(existing) != "" -> existing
+      is_integer(existing) -> existing
+      true -> fallback
+    end
   end
 
   @doc """

@@ -64,6 +64,7 @@ defmodule ShotElixir.Characters.Character do
     field :summary, :string
     field :wealth, :string
     field :is_template, :boolean, default: false
+    field :extending, :boolean, default: false
     field :notion_page_id, Ecto.UUID
     field :last_synced_to_notion_at, :utc_datetime
 
@@ -108,6 +109,7 @@ defmodule ShotElixir.Characters.Character do
       :summary,
       :wealth,
       :is_template,
+      :extending,
       :notion_page_id,
       :last_synced_to_notion_at,
       :user_id,
