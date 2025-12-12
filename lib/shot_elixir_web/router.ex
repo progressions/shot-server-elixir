@@ -68,6 +68,9 @@ defmodule ShotElixirWeb.Router do
     # WebAuthn/Passkey authentication (public endpoints)
     post "/webauthn/authenticate/options", WebauthnController, :authentication_options
     post "/webauthn/authenticate/verify", WebauthnController, :verify_authentication
+
+    # Player View magic link redemption (public)
+    post "/player_tokens/:token/redeem", PlayerViewTokenController, :redeem
   end
 
   # API V2 endpoints - Authenticated
@@ -189,6 +192,10 @@ defmodule ShotElixirWeb.Router do
       post "/apply_combat_action", EncounterController, :apply_combat_action
       post "/apply_chase_action", EncounterController, :apply_chase_action
       patch "/update_initiatives", EncounterController, :update_initiatives
+
+      # Player View magic link generation (GM only)
+      get "/player_tokens", PlayerViewTokenController, :index
+      post "/player_tokens", PlayerViewTokenController, :create
     end
 
     # AI

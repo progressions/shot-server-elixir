@@ -147,4 +147,7 @@ if config_env() == :prod do
     scheme: "https",
     host: "chiwar.net",
     port: nil
+
+  # Frontend URL for magic links in production
+  config :shot_elixir, :frontend_url, "https://chiwar.net"
 end

@@ -87,6 +87,9 @@ config :shot_elixir, :mailer_url_options,
   host: "localhost",
   port: 3001
 
+# Frontend URL for magic links
+config :shot_elixir, :frontend_url, "http://localhost:3001"
+
 # Discord bot credentials are loaded from runtime.exs using environment variables
 
 # WebAuthn/Passkey configuration for development
