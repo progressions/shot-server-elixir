@@ -97,26 +97,37 @@ defmodule ShotElixirWeb.Api.V2.AiController do
 
                   true ->
                     # Set extending flag before enqueuing job
-                    {:ok, _updated_character} =
-                      Characters.update_character(character, %{extending: true})
+                    case Characters.update_character(character, %{extending: true}) do
+                      {:ok, _updated_character} ->
+                        # Enqueue AI character update job with unique constraint to prevent race conditions.
+                        # If two requests come in simultaneously, only one job will be created.
+                        case %{character_id: character.id}
+                             |> AiCharacterUpdateWorker.new(
+                               unique: [period: 60, fields: [:args], keys: [:character_id]]
+                             )
+                             |> Oban.insert() do
+                          {:ok, _job} ->
+                            # Return success response
+                            conn
+                            |> put_status(:accepted)
+                            |> json(%{message: "Character AI update in progress"})
 
-                    # Enqueue AI character update job
-                    case %{character_id: character.id}
-                         |> AiCharacterUpdateWorker.new()
-                         |> Oban.insert() do
-                      {:ok, _job} ->
-                        # Return success response
-                        conn
-                        |> put_status(:accepted)
-                        |> json(%{message: "Character AI update in progress"})
+                          {:error, _changeset} ->
+                            # Reset extending flag if job failed to queue (safe - log on error)
+                            case Characters.update_character(character, %{extending: false}) do
+                              {:ok, _} -> :ok
+                              {:error, _} -> :ok
+                            end
+
+                            conn
+                            |> put_status(:internal_server_error)
+                            |> json(%{error: "Failed to queue character update"})
+                        end
 
                       {:error, _changeset} ->
-                        # Reset extending flag if job failed to queue
-                        Characters.update_character(character, %{extending: false})
-
                         conn
-                        |> put_status(:internal_server_error)
-                        |> json(%{error: "Failed to queue character update"})
+                        |> put_status(:unprocessable_entity)
+                        |> json(%{error: "Failed to set character extending flag"})
                     end
                 end
             end
