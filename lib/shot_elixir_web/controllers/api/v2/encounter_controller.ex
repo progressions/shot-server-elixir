@@ -8,6 +8,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
   alias ShotElixir.Repo
   alias ShotElixir.Services.CombatActionService
   alias ShotElixir.Services.{BoostService, UpCheckService, ChaseActionService}
+  alias ShotElixir.Discord.Notifications
   alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
@@ -140,6 +141,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                             fight_with_associations
                           )
 
+                          # Update Discord fight message if connected
+                          Notifications.maybe_notify_discord(fight)
+
                           conn
                           |> put_view(ShotElixirWeb.Api.V2.EncounterView)
                           |> render("show.json", encounter: fight_with_associations)
@@ -254,6 +258,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                     fight_with_associations
                   )
 
+                  # Update Discord fight message if connected
+                  Notifications.maybe_notify_discord(fresh_fight)
+
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.EncounterView)
                   |> render("show.json", encounter: fight_with_associations)
@@ -363,6 +370,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 fight_with_associations
               )
 
+              # Update Discord fight message if connected
+              Notifications.maybe_notify_discord(result)
+
               conn
               |> put_view(ShotElixirWeb.Api.V2.EncounterView)
               |> render("show.json", encounter: fight_with_associations)
@@ -436,6 +446,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
                 result.campaign_id,
                 fight_with_associations
               )
+
+              # Update Discord fight message if connected
+              Notifications.maybe_notify_discord(result)
 
               conn
               |> put_view(ShotElixirWeb.Api.V2.EncounterView)

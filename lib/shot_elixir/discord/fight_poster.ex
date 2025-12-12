@@ -435,18 +435,78 @@ defmodule ShotElixir.Discord.FightPoster do
     |> String.trim()
   end
 
+  # Priority order for event types (lower = more interesting, show first)
+  @event_priority %{
+    "attack" => 1,
+    "chase_action" => 2,
+    "escape_attempt" => 3,
+    "boost" => 4,
+    "up_check" => 5,
+    "movement" => 6,
+    "act" => 7
+  }
+
   # Get latest fight event description
+  # Extracts detailed description from nested event details when available
+  # Prioritizes more interesting event types (attacks over acts)
   defp get_latest_event(%Fight{fight_events: events}) when is_list(events) do
     events
-    |> Enum.sort_by(& &1.created_at, {:desc, DateTime})
+    # Sort by time descending, then by priority (so attacks come before acts at same time)
+    |> Enum.sort_by(
+      fn event ->
+        priority = Map.get(@event_priority, event.event_type, 10)
+        {event.created_at, priority}
+      end,
+      fn {time1, pri1}, {time2, pri2} ->
+        case DateTime.compare(time1, time2) do
+          :gt -> true
+          :lt -> false
+          :eq -> pri1 <= pri2
+        end
+      end
+    )
     |> List.first()
     |> case do
       nil -> ""
-      event -> event.description || ""
+      event -> extract_event_description(event)
     end
   end
 
   defp get_latest_event(_), do: ""
+
+  # Extract the most descriptive text from a fight event
+  # For chase actions, the detailed description is nested in vehicle_updates
+  defp extract_event_description(%{details: details, description: fallback_description})
+       when is_map(details) do
+    # Try to get detailed description from vehicle_updates (chase actions)
+    vehicle_description =
+      details
+      |> Map.get("vehicle_updates", [])
+      |> List.first()
+      |> case do
+        %{"event" => %{"description" => desc}} when is_binary(desc) and desc != "" -> desc
+        _ -> nil
+      end
+
+    # Try to get detailed description from character_updates (combat actions)
+    character_description =
+      details
+      |> Map.get("character_updates", [])
+      |> List.first()
+      |> case do
+        %{"event" => %{"description" => desc}} when is_binary(desc) and desc != "" -> desc
+        _ -> nil
+      end
+
+    # Return the first available detailed description, or fall back to top-level
+    vehicle_description || character_description || fallback_description || ""
+  end
+
+  defp extract_event_description(%{description: description}) do
+    description || ""
+  end
+
+  defp extract_event_description(_), do: ""
 
   # Helper to convert value to integer
   defp to_integer(nil), do: 0

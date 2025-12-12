@@ -31,7 +31,10 @@ defmodule ShotElixir.Workers.DiscordNotificationWorker do
           # Try to edit existing message or send new one
           result =
             if fight.fight_message_id do
-              case Message.edit(fight.channel_id, fight.fight_message_id,
+              # Convert message_id from string to integer (Discord snowflake)
+              message_id = String.to_integer(fight.fight_message_id)
+
+              case Message.edit(fight.channel_id, message_id,
                      content: message_content,
                      embeds: [embed]
                    ) do

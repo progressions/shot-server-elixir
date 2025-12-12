@@ -5,6 +5,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   alias ShotElixir.Fights.Fight
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Discord.Notifications
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -116,6 +117,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
                   # Continue with fight update
                   case Fights.update_fight(fight, parse_json_params(fight_params)) do
                     {:ok, updated_fight} ->
+                      Notifications.maybe_notify_discord(updated_fight)
+
                       conn
                       |> put_view(ShotElixirWeb.Api.V2.FightView)
                       |> render("show.json", fight: updated_fight)
@@ -144,6 +147,8 @@ defmodule ShotElixirWeb.Api.V2.FightController do
           # No image upload, just update fight
           case Fights.update_fight(fight, parse_json_params(fight_params)) do
             {:ok, updated_fight} ->
+              Notifications.maybe_notify_discord(updated_fight)
+
               conn
               |> put_view(ShotElixirWeb.Api.V2.FightView)
               |> render("show.json", fight: updated_fight)
