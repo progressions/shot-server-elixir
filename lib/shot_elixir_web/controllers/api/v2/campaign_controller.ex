@@ -330,6 +330,62 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
     end
   end
 
+  @doc """
+  Resets the Grok credit exhaustion status for a campaign.
+  Also clears any stuck batch image generation status.
+  Gamemaster only.
+  """
+  def reset_grok_credits(conn, %{"campaign_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Campaign{} = campaign <- Campaigns.get_campaign(id),
+         :ok <- authorize_campaign_owner(campaign, current_user),
+         {:ok, updated_campaign} <-
+           Campaigns.update_campaign(campaign, %{
+             grok_credits_exhausted_at: nil,
+             batch_image_status: nil,
+             batch_images_completed: 0,
+             batch_images_total: 0
+           }) do
+      # Broadcast update to WebSocket subscribers using the tuple format CampaignChannel expects
+      Phoenix.PubSub.broadcast!(
+        ShotElixir.PubSub,
+        "campaign:#{campaign.id}",
+        {:campaign_broadcast,
+         %{
+           campaign: %{
+             id: campaign.id,
+             is_grok_credits_exhausted: false,
+             grok_credits_exhausted_at: nil,
+             is_batch_images_in_progress: false,
+             batch_image_status: nil,
+             batch_images_completed: 0,
+             batch_images_total: 0
+           }
+         }}
+      )
+
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.CampaignView)
+      |> render("show.json", campaign: updated_campaign)
+    else
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Campaign not found"})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Forbidden"})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to reset credits", details: inspect(changeset)})
+    end
+  end
+
   # Authorization helpers
   defp authorize_campaign_access(campaign, user) do
     cond do
