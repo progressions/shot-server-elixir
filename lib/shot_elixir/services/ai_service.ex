@@ -168,7 +168,7 @@ defmodule ShotElixir.Services.AiService do
 
       {:error, :server_error, message} ->
         Logger.error("Grok API server error: #{message}")
-        {:error, message}
+        {:error, :server_error, message}
 
       {:error, reason} = error ->
         Logger.error("Failed to generate images: #{inspect(reason)}")
