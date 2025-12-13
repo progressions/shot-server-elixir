@@ -1,10 +1,10 @@
 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; border: 1px solid #ffc107;">
     <h2 style="color: #856404; margin-top: 0;">AI Image Generation Temporarily Unavailable</h2>
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">Hello <%= @user.first_name || @user.email %>,</p>
+    <p style="font-size: 16px; line-height: 1.6; color: #444;">Hello <%= Phoenix.HTML.html_escape(@user.first_name || @user.email) %>,</p>
     <p style="font-size: 16px; line-height: 1.6; color: #444;">
       We wanted to let you know that AI image generation for the campaign
-      <strong><%= @campaign.name %></strong> is temporarily unavailable.
+      <strong><%= Phoenix.HTML.html_escape(@campaign.name) %></strong> is temporarily unavailable.
     </p>
     <p style="font-size: 16px; line-height: 1.6; color: #444;">
       The Grok API credits have been exhausted. This affects:

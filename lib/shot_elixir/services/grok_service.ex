@@ -151,9 +151,12 @@ defmodule ShotElixir.Services.GrokService do
         inspect(error)
       end
 
-    String.contains?(error_str, "credits") ||
-      String.contains?(error_str, "spending limit") ||
-      String.contains?(error_str, "exhausted")
+    # Use case-insensitive matching for reliable detection
+    error_str_lower = String.downcase(error_str)
+
+    String.contains?(error_str_lower, "credits") ||
+      String.contains?(error_str_lower, "spending limit") ||
+      String.contains?(error_str_lower, "exhausted")
   end
 
   defp credit_exhausted?(_), do: false

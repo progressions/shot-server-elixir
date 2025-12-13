@@ -28,8 +28,7 @@ defmodule ShotElixir.Services.GrokCreditNotificationService do
     - user_id: The user who triggered the action
 
   ## Returns
-    - {:ok, :notified} if notification was sent
-    - {:ok, :cooldown} if within cooldown period
+    - {:ok, :handled} on success (notification sent or within cooldown)
     - {:error, reason} on failure
   """
   def handle_credit_exhaustion(campaign_id, user_id) do
@@ -56,7 +55,7 @@ defmodule ShotElixir.Services.GrokCreditNotificationService do
       end
 
       # Broadcast to WebSocket regardless of notification
-      broadcast_credit_status(campaign_id, updated_campaign.user_id)
+      broadcast_credit_status(updated_campaign)
 
       {:ok, :handled}
     end
@@ -119,36 +118,46 @@ defmodule ShotElixir.Services.GrokCreditNotificationService do
 
   defp send_notification_email(campaign, user_id) do
     # Queue email - timestamp already updated by try_claim_notification_slot
-    %{
+    job_args = %{
       "type" => "grok_credits_exhausted",
       "user_id" => user_id,
       "campaign_id" => campaign.id
     }
-    |> EmailWorker.new()
-    |> Oban.insert()
+
+    case job_args |> EmailWorker.new() |> Oban.insert() do
+      {:ok, _job} ->
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "[GrokCreditNotificationService] Failed to enqueue email for campaign #{campaign.id}: #{inspect(reason)}"
+        )
+
+        {:error, reason}
+    end
   end
 
-  defp broadcast_credit_status(campaign_id, owner_user_id) do
+  defp broadcast_credit_status(%Campaign{} = campaign) do
     payload = %{
       campaign: %{
-        id: campaign_id,
+        id: campaign.id,
         is_grok_credits_exhausted: true,
-        grok_credits_exhausted_at: DateTime.utc_now()
+        grok_credits_exhausted_at: campaign.grok_credits_exhausted_at
       }
     }
 
     # Broadcast to campaign channel
     Phoenix.PubSub.broadcast!(
       ShotElixir.PubSub,
-      "campaign:#{campaign_id}",
+      "campaign:#{campaign.id}",
       {:campaign_broadcast, payload}
     )
 
     # Also broadcast to owner's user channel
-    if owner_user_id do
+    if campaign.user_id do
       Phoenix.PubSub.broadcast!(
         ShotElixir.PubSub,
-        "user:#{owner_user_id}",
+        "user:#{campaign.user_id}",
         {:user_broadcast, payload}
       )
     end
