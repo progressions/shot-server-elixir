@@ -111,6 +111,17 @@ defmodule ShotElixir.Workers.EmailWorker do
     UserEmail.otp_login(user, otp_code, magic_token)
   end
 
+  # Build Grok credits exhausted notification email
+  defp build_email(%{
+         "type" => "grok_credits_exhausted",
+         "user_id" => user_id,
+         "campaign_id" => campaign_id
+       }) do
+    user = Repo.get!(ShotElixir.Accounts.User, user_id)
+    campaign = Repo.get!(ShotElixir.Campaigns.Campaign, campaign_id)
+    UserEmail.grok_credits_exhausted(user, campaign)
+  end
+
   # Build admin error notification email
   defp build_email(%{
          "type" => "admin_error",

@@ -301,9 +301,12 @@ defmodule ShotElixir.Services.CampaignSeederServiceTest do
     test "sets seeded_at timestamp", %{master: master, target: target} do
       assert target.seeded_at == nil
 
-      {:ok, seeded} = CampaignSeederService.copy_campaign_content(master, target)
+      {:ok, _seeded} = CampaignSeederService.copy_campaign_content(master, target)
 
-      assert seeded.seeded_at != nil
+      # Reload from database to get the seeded_at value set by ImageCopyWorker
+      # (which runs inline in test mode after the function returns)
+      reloaded = Repo.get(Campaign, target.id)
+      assert reloaded.seeded_at != nil
     end
 
     test "copies image positions", %{master: master, target: target} do

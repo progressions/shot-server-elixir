@@ -158,6 +158,18 @@ defmodule ShotElixir.Services.AiService do
       Logger.info("Successfully generated #{length(urls)} images")
       {:ok, urls}
     else
+      {:error, :credit_exhausted, message} = error ->
+        Logger.error("Grok API credits exhausted: #{message}")
+        error
+
+      {:error, :rate_limited, message} ->
+        Logger.warning("Grok API rate limited: #{message}")
+        {:error, :rate_limited, message}
+
+      {:error, :server_error, message} ->
+        Logger.error("Grok API server error: #{message}")
+        {:error, message}
+
       {:error, reason} = error ->
         Logger.error("Failed to generate images: #{inspect(reason)}")
         error
