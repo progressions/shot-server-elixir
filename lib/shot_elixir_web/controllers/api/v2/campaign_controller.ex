@@ -347,14 +347,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
              batch_images_completed: 0,
              batch_images_total: 0
            }) do
-      # Broadcast update to WebSocket subscribers using the tuple format CampaignChannel expects
-      Phoenix.PubSub.broadcast!(
-        ShotElixir.PubSub,
-        "campaign:#{campaign.id}",
+      # Build broadcast payload
+      broadcast_payload =
         {:campaign_broadcast,
          %{
            campaign: %{
-             id: campaign.id,
+             id: updated_campaign.id,
              is_grok_credits_exhausted: false,
              grok_credits_exhausted_at: nil,
              is_batch_images_in_progress: false,
@@ -363,7 +361,22 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
              batch_images_total: 0
            }
          }}
+
+      # Broadcast to campaign channel
+      Phoenix.PubSub.broadcast!(
+        ShotElixir.PubSub,
+        "campaign:#{updated_campaign.id}",
+        broadcast_payload
       )
+
+      # Also broadcast to user channel if campaign has an owner
+      if updated_campaign.user_id do
+        Phoenix.PubSub.broadcast!(
+          ShotElixir.PubSub,
+          "user:#{updated_campaign.user_id}",
+          broadcast_payload
+        )
+      end
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.CampaignView)
