@@ -149,6 +149,23 @@ defmodule ShotElixir.Emails.UserEmail do
   end
 
   @doc """
+  Notification email when Grok API credits are exhausted.
+  Informs the user that AI image generation is temporarily unavailable.
+  """
+  def grok_credits_exhausted(user, campaign) do
+    new()
+    |> to({user.first_name || user.email, user.email})
+    |> from({@from_name, @from_email})
+    |> subject("AI Image Generation Unavailable - Credits Exhausted")
+    |> html_body(
+      render_template("grok_credits_exhausted.html", %{
+        user: user,
+        campaign: campaign
+      })
+    )
+  end
+
+  @doc """
   OTP login email with 6-digit code and magic link.
   Sent when user requests passwordless login.
   """

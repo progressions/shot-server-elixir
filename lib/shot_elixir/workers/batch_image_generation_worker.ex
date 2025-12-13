@@ -13,7 +13,13 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
 
   use Oban.Worker, queue: :images, max_attempts: 3
 
-  alias ShotElixir.Services.{AiService, GrokService, BatchImageGenerationService}
+  alias ShotElixir.Services.{
+    AiService,
+    GrokService,
+    BatchImageGenerationService,
+    GrokCreditNotificationService
+  }
+
   alias ShotElixir.Characters
   alias ShotElixir.Sites
   alias ShotElixir.Factions
@@ -46,6 +52,27 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
               end
 
               :ok
+
+            {:error, :credit_exhausted, message} ->
+              Logger.error("[BatchImageGenerationWorker] Grok API credits exhausted: #{message}")
+
+              # Notify user about credit exhaustion
+              if campaign_id do
+                campaign = ShotElixir.Repo.get(ShotElixir.Campaigns.Campaign, campaign_id)
+
+                if campaign do
+                  GrokCreditNotificationService.handle_credit_exhaustion(
+                    campaign_id,
+                    campaign.user_id
+                  )
+                end
+
+                # Increment completion so batch can finish
+                BatchImageGenerationService.increment_completion(campaign_id)
+              end
+
+              # Discard job - no point retrying when credits are exhausted
+              {:discard, :credit_exhausted}
 
             {:error, reason} ->
               Logger.error(

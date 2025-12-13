@@ -53,8 +53,7 @@ defmodule ShotElixir.Services.GrokService do
         {:ok, response}
 
       {:ok, %{status: status, body: body}} ->
-        Logger.error("Grok API request failed with status #{status}: #{inspect(body)}")
-        {:error, "Request failed with status #{status}: #{inspect(body)}"}
+        handle_error_response(status, body)
 
       {:error, reason} ->
         Logger.error("Grok API HTTP request failed: #{inspect(reason)}")
@@ -110,12 +109,68 @@ defmodule ShotElixir.Services.GrokService do
         extract_image_data(response, response_format, num_images)
 
       {:ok, %{status: status, body: body}} ->
-        {:error, "Request failed with status #{status}: #{inspect(body)}"}
+        handle_error_response(status, body)
 
       {:error, reason} ->
+        Logger.error("Grok image generation HTTP request failed: #{inspect(reason)}")
         {:error, "HTTP request failed: #{inspect(reason)}"}
     end
   end
+
+  # Handle error responses with specific classification for credit exhaustion
+  defp handle_error_response(status, body) do
+    error_message = extract_error_message(body)
+
+    cond do
+      status == 429 && credit_exhausted?(body) ->
+        Logger.error("Grok API credits exhausted: #{error_message}")
+        {:error, :credit_exhausted, error_message}
+
+      status == 429 ->
+        Logger.warning("Grok API rate limited: #{error_message}")
+        {:error, :rate_limited, error_message}
+
+      status >= 500 ->
+        Logger.error("Grok API server error (#{status}): #{error_message}")
+        {:error, :server_error, error_message}
+
+      true ->
+        Logger.error("Grok API request failed with status #{status}: #{error_message}")
+        {:error, error_message}
+    end
+  end
+
+  # Check if 429 error is due to credit exhaustion vs rate limiting
+  defp credit_exhausted?(body) when is_map(body) do
+    error = body["error"] || ""
+
+    error_str =
+      if is_binary(error) do
+        error
+      else
+        inspect(error)
+      end
+
+    # Use case-insensitive matching for reliable detection
+    error_str_lower = String.downcase(error_str)
+
+    String.contains?(error_str_lower, "credits") ||
+      String.contains?(error_str_lower, "spending limit") ||
+      String.contains?(error_str_lower, "exhausted")
+  end
+
+  defp credit_exhausted?(_), do: false
+
+  # Extract human-readable error message from response body
+  defp extract_error_message(body) when is_map(body) do
+    cond do
+      is_binary(body["error"]) -> body["error"]
+      is_map(body["error"]) && is_binary(body["error"]["message"]) -> body["error"]["message"]
+      true -> inspect(body)
+    end
+  end
+
+  defp extract_error_message(body), do: inspect(body)
 
   # Extract image URLs or base64 data from response
   defp extract_image_data(response, response_format, num_images) do

@@ -88,7 +88,10 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       batch_image_status: campaign.batch_image_status,
       batch_images_total: campaign.batch_images_total,
       batch_images_completed: campaign.batch_images_completed,
-      is_batch_images_in_progress: Campaign.batch_images_in_progress?(campaign)
+      is_batch_images_in_progress: Campaign.batch_images_in_progress?(campaign),
+      # Grok API credit exhaustion tracking
+      grok_credits_exhausted_at: campaign.grok_credits_exhausted_at,
+      is_grok_credits_exhausted: Campaign.grok_credits_exhausted?(campaign)
     }
   end
 

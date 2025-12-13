@@ -170,12 +170,17 @@ defmodule ShotElixir.Services.BatchImageGenerationServiceTest do
         })
         |> Repo.insert()
 
-      assert {:ok, 2} = BatchImageGenerationService.start_batch_generation(campaign.id)
+      # Use manual mode to prevent jobs from executing immediately
+      # This allows us to test the start_batch_generation function's behavior
+      # without the worker jobs interfering
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, 2} = BatchImageGenerationService.start_batch_generation(campaign.id)
 
-      updated = Repo.get(Campaign, campaign.id)
-      assert updated.batch_image_status == "generating"
-      assert updated.batch_images_total == 2
-      assert updated.batch_images_completed == 0
+        updated = Repo.get(Campaign, campaign.id)
+        assert updated.batch_image_status == "generating"
+        assert updated.batch_images_total == 2
+        assert updated.batch_images_completed == 0
+      end)
     end
 
     test "broadcasts initial status to campaign channel", %{campaign: campaign, user: user} do
@@ -191,12 +196,16 @@ defmodule ShotElixir.Services.BatchImageGenerationServiceTest do
         })
         |> Repo.insert()
 
-      assert {:ok, 1} = BatchImageGenerationService.start_batch_generation(campaign.id)
+      # Use manual mode to prevent jobs from executing immediately
+      # This ensures we only receive the initial broadcast, not job-related broadcasts
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        assert {:ok, 1} = BatchImageGenerationService.start_batch_generation(campaign.id)
 
-      assert_receive {:campaign_broadcast, payload}
-      assert payload.campaign.batch_image_status == "generating"
-      assert payload.campaign.batch_images_completed == 0
-      assert payload.campaign.batch_images_total == 1
+        assert_receive {:campaign_broadcast, payload}
+        assert payload.campaign.batch_image_status == "generating"
+        assert payload.campaign.batch_images_completed == 0
+        assert payload.campaign.batch_images_total == 1
+      end)
     end
   end
 
