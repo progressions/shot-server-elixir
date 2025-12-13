@@ -39,21 +39,20 @@ defmodule ShotElixir.Services.GrokCreditNotificationService do
 
     with {:ok, campaign} <- get_campaign(campaign_id),
          {:ok, updated_campaign} <- update_exhaustion_timestamp(campaign) do
-      # Check if we should send notification (cooldown check)
-      if should_notify?(campaign) do
-        send_notification(updated_campaign, user_id)
+      # Use atomic check-and-set to prevent race condition
+      # Only one worker will successfully claim the notification slot
+      case try_claim_notification_slot(campaign_id) do
+        {:ok, :claimed} ->
+          send_notification_email(updated_campaign, user_id)
 
-        Logger.info(
-          "[GrokCreditNotificationService] Notification sent for campaign #{campaign_id}"
-        )
+          Logger.info(
+            "[GrokCreditNotificationService] Notification sent for campaign #{campaign_id}"
+          )
 
-        {:ok, :notified}
-      else
-        Logger.info(
-          "[GrokCreditNotificationService] Within cooldown period for campaign #{campaign_id}"
-        )
-
-        {:ok, :cooldown}
+        {:ok, :cooldown} ->
+          Logger.info(
+            "[GrokCreditNotificationService] Within cooldown period for campaign #{campaign_id}"
+          )
       end
 
       # Broadcast to WebSocket regardless of notification
@@ -91,15 +90,35 @@ defmodule ShotElixir.Services.GrokCreditNotificationService do
     |> Repo.update()
   end
 
-  defp should_notify?(%Campaign{grok_credits_exhausted_notified_at: nil}), do: true
+  # Atomic check-and-set to prevent race condition when multiple workers
+  # hit credit exhaustion simultaneously. Only one will successfully update
+  # the notified_at timestamp and send the email.
+  defp try_claim_notification_slot(campaign_id) do
+    import Ecto.Query
 
-  defp should_notify?(%Campaign{grok_credits_exhausted_notified_at: last_notified}) do
-    hours_since = DateTime.diff(DateTime.utc_now(), last_notified, :hour)
-    hours_since >= @notification_cooldown_hours
+    now = DateTime.utc_now() |> DateTime.truncate(:second)
+    cooldown_threshold = DateTime.add(now, -@notification_cooldown_hours, :hour)
+
+    # Atomic update: only update if notified_at is NULL or older than cooldown period
+    # This ensures only one concurrent caller can "claim" the notification slot
+    {count, _} =
+      from(c in Campaign,
+        where: c.id == ^campaign_id,
+        where:
+          is_nil(c.grok_credits_exhausted_notified_at) or
+            c.grok_credits_exhausted_notified_at < ^cooldown_threshold
+      )
+      |> Repo.update_all(set: [grok_credits_exhausted_notified_at: now])
+
+    if count > 0 do
+      {:ok, :claimed}
+    else
+      {:ok, :cooldown}
+    end
   end
 
-  defp send_notification(campaign, user_id) do
-    # Queue email
+  defp send_notification_email(campaign, user_id) do
+    # Queue email - timestamp already updated by try_claim_notification_slot
     %{
       "type" => "grok_credits_exhausted",
       "user_id" => user_id,
@@ -107,13 +126,6 @@ defmodule ShotElixir.Services.GrokCreditNotificationService do
     }
     |> EmailWorker.new()
     |> Oban.insert()
-
-    # Update notified timestamp
-    now = DateTime.utc_now() |> DateTime.truncate(:second)
-
-    campaign
-    |> Ecto.Changeset.change(%{grok_credits_exhausted_notified_at: now})
-    |> Repo.update!()
   end
 
   defp broadcast_credit_status(campaign_id, owner_user_id) do
