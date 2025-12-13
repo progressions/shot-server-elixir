@@ -65,7 +65,9 @@ defmodule ShotElixir.Campaigns.Campaign do
       :seeded_at,
       :batch_image_status,
       :batch_images_total,
-      :batch_images_completed
+      :batch_images_completed,
+      :grok_credits_exhausted_at,
+      :grok_credits_exhausted_notified_at
     ])
     |> validate_required([:name, :user_id])
     |> validate_unique_name_per_user()
