@@ -22,36 +22,43 @@ defmodule ShotElixirWeb.Api.V2.AiController do
           |> json(%{error: "Campaign not found"})
 
         campaign ->
-          if authorize_campaign_access(campaign, current_user) do
-            # Extract AI parameters
-            ai_params = params["ai"] || %{}
-            description = ai_params["description"]
-
-            if description && String.trim(description) != "" do
-              # Enqueue AI character creation job
-              case %{description: description, campaign_id: campaign.id}
-                   |> AiCharacterCreationWorker.new()
-                   |> Oban.insert() do
-                {:ok, _job} ->
-                  # Return immediate response like Rails
-                  conn
-                  |> put_status(:accepted)
-                  |> json(%{message: "Character generation in progress"})
-
-                {:error, _changeset} ->
-                  conn
-                  |> put_status(:internal_server_error)
-                  |> json(%{error: "Failed to queue character generation"})
-              end
-            else
+          cond do
+            not authorize_campaign_access(campaign, current_user) ->
               conn
-              |> put_status(:bad_request)
-              |> json(%{error: "Description parameter is required"})
-            end
-          else
-            conn
-            |> put_status(:forbidden)
-            |> json(%{error: "Access denied"})
+              |> put_status(:forbidden)
+              |> json(%{error: "Access denied"})
+
+            not campaign.ai_generation_enabled ->
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "AI generation is disabled for this campaign"})
+
+            true ->
+              # Extract AI parameters
+              ai_params = params["ai"] || %{}
+              description = ai_params["description"]
+
+              if description && String.trim(description) != "" do
+                # Enqueue AI character creation job
+                case %{description: description, campaign_id: campaign.id}
+                     |> AiCharacterCreationWorker.new()
+                     |> Oban.insert() do
+                  {:ok, _job} ->
+                    # Return immediate response like Rails
+                    conn
+                    |> put_status(:accepted)
+                    |> json(%{message: "Character generation in progress"})
+
+                  {:error, _changeset} ->
+                    conn
+                    |> put_status(:internal_server_error)
+                    |> json(%{error: "Failed to queue character generation"})
+                end
+              else
+                conn
+                |> put_status(:bad_request)
+                |> json(%{error: "Description parameter is required"})
+              end
           end
       end
     else
@@ -75,66 +82,73 @@ defmodule ShotElixirWeb.Api.V2.AiController do
           |> json(%{error: "Campaign not found"})
 
         campaign ->
-          if authorize_campaign_access(campaign, current_user) do
-            # Find character in current campaign
-            case Characters.get_character(character_id) do
-              nil ->
-                conn
-                |> put_status(:not_found)
-                |> json(%{error: "Character not found"})
+          cond do
+            not authorize_campaign_access(campaign, current_user) ->
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Access denied"})
 
-              character ->
-                cond do
-                  character.campaign_id != current_user.current_campaign_id ->
-                    conn
-                    |> put_status(:not_found)
-                    |> json(%{error: "Character not found"})
+            not campaign.ai_generation_enabled ->
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "AI generation is disabled for this campaign"})
 
-                  character.extending ->
-                    conn
-                    |> put_status(:conflict)
-                    |> json(%{error: "Character extension already in progress"})
+            true ->
+              # Find character in current campaign
+              case Characters.get_character(character_id) do
+                nil ->
+                  conn
+                  |> put_status(:not_found)
+                  |> json(%{error: "Character not found"})
 
-                  true ->
-                    # Set extending flag before enqueuing job
-                    case Characters.update_character(character, %{extending: true}) do
-                      {:ok, _updated_character} ->
-                        # Enqueue AI character update job with unique constraint to prevent race conditions.
-                        # If two requests come in simultaneously, only one job will be created.
-                        case %{character_id: character.id}
-                             |> AiCharacterUpdateWorker.new(
-                               unique: [period: 60, fields: [:args], keys: [:character_id]]
-                             )
-                             |> Oban.insert() do
-                          {:ok, _job} ->
-                            # Return success response
-                            conn
-                            |> put_status(:accepted)
-                            |> json(%{message: "Character AI update in progress"})
+                character ->
+                  cond do
+                    character.campaign_id != current_user.current_campaign_id ->
+                      conn
+                      |> put_status(:not_found)
+                      |> json(%{error: "Character not found"})
 
-                          {:error, _changeset} ->
-                            # Reset extending flag if job failed to queue (safe - log on error)
-                            case Characters.update_character(character, %{extending: false}) do
-                              {:ok, _} -> :ok
-                              {:error, _} -> :ok
-                            end
+                    character.extending ->
+                      conn
+                      |> put_status(:conflict)
+                      |> json(%{error: "Character extension already in progress"})
 
-                            conn
-                            |> put_status(:internal_server_error)
-                            |> json(%{error: "Failed to queue character update"})
-                        end
+                    true ->
+                      # Set extending flag before enqueuing job
+                      case Characters.update_character(character, %{extending: true}) do
+                        {:ok, _updated_character} ->
+                          # Enqueue AI character update job with unique constraint to prevent race conditions.
+                          # If two requests come in simultaneously, only one job will be created.
+                          case %{character_id: character.id}
+                               |> AiCharacterUpdateWorker.new(
+                                 unique: [period: 60, fields: [:args], keys: [:character_id]]
+                               )
+                               |> Oban.insert() do
+                            {:ok, _job} ->
+                              # Return success response
+                              conn
+                              |> put_status(:accepted)
+                              |> json(%{message: "Character AI update in progress"})
 
-                      {:error, _changeset} ->
-                        conn
-                        |> put_status(:unprocessable_entity)
-                        |> json(%{error: "Failed to set character extending flag"})
-                    end
-                end
-            end
-          else
-            conn
-            |> put_status(:forbidden)
-            |> json(%{error: "Access denied"})
+                            {:error, _changeset} ->
+                              # Reset extending flag if job failed to queue (safe - log on error)
+                              case Characters.update_character(character, %{extending: false}) do
+                                {:ok, _} -> :ok
+                                {:error, _} -> :ok
+                              end
+
+                              conn
+                              |> put_status(:internal_server_error)
+                              |> json(%{error: "Failed to queue character update"})
+                          end
+
+                        {:error, _changeset} ->
+                          conn
+                          |> put_status(:unprocessable_entity)
+                          |> json(%{error: "Failed to set character extending flag"})
+                      end
+                  end
+              end
           end
       end
     else

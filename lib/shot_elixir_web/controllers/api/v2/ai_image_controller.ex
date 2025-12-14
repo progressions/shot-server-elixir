@@ -21,89 +21,96 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
           |> json(%{error: "Campaign not found"})
 
         campaign ->
-          if authorize_campaign_access(campaign, current_user) do
-            # Extract AI image parameters (handle both nested and flat formats)
-            ai_image_params = params["ai_image"] || params
-            entity_class = ai_image_params["entity_class"]
-            entity_id = ai_image_params["entity_id"]
+          cond do
+            not authorize_campaign_access(campaign, current_user) ->
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Access denied"})
 
-            # Validate required parameters
-            cond do
-              is_nil(entity_class) || String.trim(entity_class) == "" ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "entity_class parameter is required"})
+            not campaign.ai_generation_enabled ->
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "AI generation is disabled for this campaign"})
 
-              is_nil(entity_id) || String.trim(entity_id) == "" ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "entity_id parameter is required"})
+            true ->
+              # Extract AI image parameters (handle both nested and flat formats)
+              ai_image_params = params["ai_image"] || params
+              entity_class = ai_image_params["entity_class"]
+              entity_id = ai_image_params["entity_id"]
 
-              true ->
-                # Verify entity exists and belongs to campaign
-                case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
-                  {:ok, _entity} ->
-                    # Start AI image generation in background task
-                    campaign_id = campaign.id
+              # Validate required parameters
+              cond do
+                is_nil(entity_class) || String.trim(entity_class) == "" ->
+                  conn
+                  |> put_status(:bad_request)
+                  |> json(%{error: "entity_class parameter is required"})
 
-                    user_id = current_user.id
+                is_nil(entity_id) || String.trim(entity_id) == "" ->
+                  conn
+                  |> put_status(:bad_request)
+                  |> json(%{error: "entity_id parameter is required"})
 
-                    Task.start(fn ->
-                      case ShotElixir.Services.AiService.generate_images_for_entity(
-                             entity_class,
-                             entity_id,
-                             3
-                           ) do
-                        {:ok, urls} when is_list(urls) ->
-                          # Broadcast success with image URLs as JSON
-                          json = Jason.encode!(urls)
+                true ->
+                  # Verify entity exists and belongs to campaign
+                  case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
+                    {:ok, _entity} ->
+                      # Start AI image generation in background task
+                      campaign_id = campaign.id
 
-                          ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
-                            campaign_id,
-                            "preview_ready",
-                            %{json: json}
-                          )
+                      user_id = current_user.id
 
-                        {:error, :credit_exhausted, message} ->
-                          # Handle credit exhaustion - notify user
-                          GrokCreditNotificationService.handle_credit_exhaustion(
-                            campaign_id,
-                            user_id
-                          )
+                      Task.start(fn ->
+                        case ShotElixir.Services.AiService.generate_images_for_entity(
+                               entity_class,
+                               entity_id,
+                               3
+                             ) do
+                          {:ok, urls} when is_list(urls) ->
+                            # Broadcast success with image URLs as JSON
+                            json = Jason.encode!(urls)
 
-                          ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
-                            campaign_id,
-                            "credit_exhausted",
-                            %{error: message}
-                          )
+                            ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
+                              campaign_id,
+                              "preview_ready",
+                              %{json: json}
+                            )
 
-                        {:error, reason} ->
-                          # Broadcast error
-                          error_message = "Failed to generate images: #{inspect(reason)}"
+                          {:error, :credit_exhausted, message} ->
+                            # Handle credit exhaustion - notify user
+                            GrokCreditNotificationService.handle_credit_exhaustion(
+                              campaign_id,
+                              user_id
+                            )
 
-                          ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
-                            campaign_id,
-                            "error",
-                            %{error: error_message}
-                          )
-                      end
-                    end)
+                            ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
+                              campaign_id,
+                              "credit_exhausted",
+                              %{error: message}
+                            )
 
-                    # Return immediate response like Rails
-                    conn
-                    |> put_status(:accepted)
-                    |> json(%{message: "Character generation in progress"})
+                          {:error, reason} ->
+                            # Broadcast error
+                            error_message = "Failed to generate images: #{inspect(reason)}"
 
-                  {:error, :not_found} ->
-                    conn
-                    |> put_status(:not_found)
-                    |> json(%{error: "#{entity_class} not found"})
-                end
-            end
-          else
-            conn
-            |> put_status(:forbidden)
-            |> json(%{error: "Access denied"})
+                            ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(
+                              campaign_id,
+                              "error",
+                              %{error: error_message}
+                            )
+                        end
+                      end)
+
+                      # Return immediate response like Rails
+                      conn
+                      |> put_status(:accepted)
+                      |> json(%{message: "Character generation in progress"})
+
+                    {:error, :not_found} ->
+                      conn
+                      |> put_status(:not_found)
+                      |> json(%{error: "#{entity_class} not found"})
+                  end
+              end
           end
       end
     else
@@ -129,121 +136,132 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
           |> json(%{error: "Campaign not found"})
 
         campaign ->
-          if authorize_campaign_modification(campaign, current_user) do
-            # Extract AI image parameters (handle both nested and flat formats)
-            ai_image_params = params["ai_image"] || params
-            entity_class = ai_image_params["entity_class"]
-            entity_id = ai_image_params["entity_id"]
-            image_url = ai_image_params["image_url"]
+          cond do
+            not authorize_campaign_modification(campaign, current_user) ->
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can attach images"})
 
-            # Validate required parameters
-            cond do
-              is_nil(entity_class) || String.trim(entity_class) == "" ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "entity_class parameter is required"})
+            not campaign.ai_generation_enabled ->
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "AI generation is disabled for this campaign"})
 
-              is_nil(entity_id) || String.trim(entity_id) == "" ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "entity_id parameter is required"})
+            true ->
+              # Extract AI image parameters (handle both nested and flat formats)
+              ai_image_params = params["ai_image"] || params
+              entity_class = ai_image_params["entity_class"]
+              entity_id = ai_image_params["entity_id"]
+              image_url = ai_image_params["image_url"]
 
-              is_nil(image_url) || String.trim(image_url) == "" ->
-                conn
-                |> put_status(:bad_request)
-                |> json(%{error: "image_url parameter is required"})
+              # Validate required parameters
+              cond do
+                is_nil(entity_class) || String.trim(entity_class) == "" ->
+                  conn
+                  |> put_status(:bad_request)
+                  |> json(%{error: "entity_class parameter is required"})
 
-              true ->
-                # Verify entity exists and belongs to campaign
-                case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
-                  {:ok, entity} ->
-                    # Attach image from URL using AI service
-                    case ShotElixir.Services.AiService.attach_image_from_url(
-                           entity_class,
-                           entity.id,
-                           image_url
-                         ) do
-                      {:ok, _attachment} ->
-                        # Reload entity to get fresh data
-                        case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
-                          {:ok, refreshed_entity} ->
-                            # Get updated image URL
-                            image_url =
-                              ShotElixir.ActiveStorage.get_image_url(
-                                entity_class,
-                                refreshed_entity.id
+                is_nil(entity_id) || String.trim(entity_id) == "" ->
+                  conn
+                  |> put_status(:bad_request)
+                  |> json(%{error: "entity_id parameter is required"})
+
+                is_nil(image_url) || String.trim(image_url) == "" ->
+                  conn
+                  |> put_status(:bad_request)
+                  |> json(%{error: "image_url parameter is required"})
+
+                true ->
+                  # Verify entity exists and belongs to campaign
+                  case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
+                    {:ok, entity} ->
+                      # Attach image from URL using AI service
+                      case ShotElixir.Services.AiService.attach_image_from_url(
+                             entity_class,
+                             entity.id,
+                             image_url
+                           ) do
+                        {:ok, _attachment} ->
+                          # Reload entity to get fresh data
+                          case get_entity(
+                                 entity_class,
+                                 entity_id,
+                                 current_user.current_campaign_id
+                               ) do
+                            {:ok, refreshed_entity} ->
+                              # Get updated image URL
+                              image_url =
+                                ShotElixir.ActiveStorage.get_image_url(
+                                  entity_class,
+                                  refreshed_entity.id
+                                )
+
+                              # Return updated entity with image_url
+                              serialized_entity =
+                                serialize_entity(entity_class, refreshed_entity)
+                                |> Map.put(:image_url, image_url)
+
+                              # Broadcast entity update via WebSocket (Rails-compatible format)
+                              entity_key = entity_class |> String.downcase() |> String.to_atom()
+                              plural_string = pluralize_entity(entity_class)
+                              plural_key = String.to_atom(plural_string)
+
+                              IO.puts(
+                                "📡 Broadcasting #{entity_class} update to campaign:#{current_user.current_campaign_id}"
                               )
 
-                            # Return updated entity with image_url
-                            serialized_entity =
-                              serialize_entity(entity_class, refreshed_entity)
-                              |> Map.put(:image_url, image_url)
-
-                            # Broadcast entity update via WebSocket (Rails-compatible format)
-                            entity_key = entity_class |> String.downcase() |> String.to_atom()
-                            plural_string = pluralize_entity(entity_class)
-                            plural_key = String.to_atom(plural_string)
-
-                            IO.puts(
-                              "📡 Broadcasting #{entity_class} update to campaign:#{current_user.current_campaign_id}"
-                            )
-
-                            IO.puts(
-                              "🔑 Entity key: #{inspect(entity_key)}, Plural key: #{inspect(plural_key)} (from '#{plural_string}')"
-                            )
-
-                            IO.inspect(serialized_entity, label: "#{entity_class} data")
-
-                            # Use Phoenix PubSub for campaign broadcast with plural reload signal
-                            Phoenix.PubSub.broadcast!(
-                              ShotElixir.PubSub,
-                              "campaign:#{current_user.current_campaign_id}",
-                              {:campaign_broadcast,
-                               %{entity_key => serialized_entity, plural_key => "reload"}}
-                            )
-
-                            IO.puts("✅ Broadcast sent successfully")
-
-                            conn
-                            |> put_status(:ok)
-                            |> json(%{
-                              entity: serialized_entity,
-                              serializer: "#{entity_class}Serializer"
-                            })
-
-                          {:error, _} ->
-                            # Fallback to original entity if reload fails
-                            serialized_entity =
-                              serialize_entity(entity_class, entity)
-                              |> Map.put(
-                                :image_url,
-                                ShotElixir.ActiveStorage.get_image_url(entity_class, entity.id)
+                              IO.puts(
+                                "🔑 Entity key: #{inspect(entity_key)}, Plural key: #{inspect(plural_key)} (from '#{plural_string}')"
                               )
 
-                            conn
-                            |> put_status(:ok)
-                            |> json(%{
-                              entity: serialized_entity,
-                              serializer: "#{entity_class}Serializer"
-                            })
-                        end
+                              IO.inspect(serialized_entity, label: "#{entity_class} data")
 
-                      {:error, reason} ->
-                        conn
-                        |> put_status(:unprocessable_entity)
-                        |> json(%{error: "Failed to attach image: #{inspect(reason)}"})
-                    end
+                              # Use Phoenix PubSub for campaign broadcast with plural reload signal
+                              Phoenix.PubSub.broadcast!(
+                                ShotElixir.PubSub,
+                                "campaign:#{current_user.current_campaign_id}",
+                                {:campaign_broadcast,
+                                 %{entity_key => serialized_entity, plural_key => "reload"}}
+                              )
 
-                  {:error, :not_found} ->
-                    conn
-                    |> put_status(:not_found)
-                    |> json(%{error: "#{entity_class} not found"})
-                end
-            end
-          else
-            conn
-            |> put_status(:forbidden)
-            |> json(%{error: "Only gamemaster can attach images"})
+                              IO.puts("✅ Broadcast sent successfully")
+
+                              conn
+                              |> put_status(:ok)
+                              |> json(%{
+                                entity: serialized_entity,
+                                serializer: "#{entity_class}Serializer"
+                              })
+
+                            {:error, _} ->
+                              # Fallback to original entity if reload fails
+                              serialized_entity =
+                                serialize_entity(entity_class, entity)
+                                |> Map.put(
+                                  :image_url,
+                                  ShotElixir.ActiveStorage.get_image_url(entity_class, entity.id)
+                                )
+
+                              conn
+                              |> put_status(:ok)
+                              |> json(%{
+                                entity: serialized_entity,
+                                serializer: "#{entity_class}Serializer"
+                              })
+                          end
+
+                        {:error, reason} ->
+                          conn
+                          |> put_status(:unprocessable_entity)
+                          |> json(%{error: "Failed to attach image: #{inspect(reason)}"})
+                      end
+
+                    {:error, :not_found} ->
+                      conn
+                      |> put_status(:not_found)
+                      |> json(%{error: "#{entity_class} not found"})
+                  end
+              end
           end
       end
     else

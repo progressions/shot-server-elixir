@@ -29,6 +29,9 @@ defmodule ShotElixir.Campaigns.Campaign do
     field :grok_credits_exhausted_at, :utc_datetime
     field :grok_credits_exhausted_notified_at, :utc_datetime
 
+    # AI generation toggle
+    field :ai_generation_enabled, :boolean, default: true
+
     belongs_to :user, ShotElixir.Accounts.User
 
     has_many :campaign_memberships, ShotElixir.Campaigns.CampaignMembership
@@ -67,7 +70,8 @@ defmodule ShotElixir.Campaigns.Campaign do
       :batch_images_total,
       :batch_images_completed,
       :grok_credits_exhausted_at,
-      :grok_credits_exhausted_notified_at
+      :grok_credits_exhausted_notified_at,
+      :ai_generation_enabled
     ])
     |> validate_required([:name, :user_id])
     |> validate_unique_name_per_user()

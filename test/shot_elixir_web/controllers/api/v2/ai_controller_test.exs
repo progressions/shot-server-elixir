@@ -229,5 +229,56 @@ defmodule ShotElixirWeb.Api.V2.AiControllerTest do
 
       assert json_response(conn, 401)
     end
+
+    test "returns 403 when AI generation is disabled for campaign", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character,
+      campaign: campaign
+    } do
+      # Disable AI generation for the campaign
+      {:ok, _} = Campaigns.update_campaign(campaign, %{ai_generation_enabled: false})
+
+      {:ok, token, _claims} = Guardian.encode_and_sign(gm)
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v2/ai/#{character.id}/extend")
+
+      assert json_response(conn, 403) == %{
+               "error" => "AI generation is disabled for this campaign"
+             }
+
+      # Verify no job was enqueued
+      refute_enqueued(worker: AiCharacterUpdateWorker)
+    end
+  end
+
+  describe "create" do
+    test "returns 403 when AI generation is disabled for campaign", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      # Disable AI generation for the campaign
+      {:ok, _} = Campaigns.update_campaign(campaign, %{ai_generation_enabled: false})
+
+      {:ok, token, _claims} = Guardian.encode_and_sign(gm)
+
+      conn =
+        conn
+        |> put_req_header("authorization", "Bearer #{token}")
+        |> post(~p"/api/v2/ai", %{
+          "character" => %{
+            "name" => "New AI Character",
+            "archetype" => "Martial Artist"
+          }
+        })
+
+      assert json_response(conn, 403) == %{
+               "error" => "AI generation is disabled for this campaign"
+             }
+    end
   end
 end
