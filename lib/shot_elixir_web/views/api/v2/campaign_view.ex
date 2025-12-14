@@ -91,7 +91,9 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       is_batch_images_in_progress: Campaign.batch_images_in_progress?(campaign),
       # Grok API credit exhaustion tracking
       grok_credits_exhausted_at: campaign.grok_credits_exhausted_at,
-      is_grok_credits_exhausted: Campaign.grok_credits_exhausted?(campaign)
+      is_grok_credits_exhausted: Campaign.grok_credits_exhausted?(campaign),
+      # AI generation toggle
+      ai_generation_enabled: campaign.ai_generation_enabled
     }
   end
 
