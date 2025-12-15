@@ -7,6 +7,15 @@ defmodule ShotElixir.Application do
 
   @impl true
   def start(_type, _args) do
+    require Logger
+
+    # Log Guardian configuration for debugging auth issues
+    guardian_config = Application.get_env(:shot_elixir, ShotElixir.Guardian)
+    secret_key = guardian_config[:secret_key] || "NOT SET"
+    secret_preview = String.slice(secret_key, 0, 16)
+    Logger.info("[Application] Guardian secret_key prefix: #{secret_preview}...")
+    Logger.info("[Application] Guardian issuer: #{guardian_config[:issuer]}")
+
     # Initialize ETS tables for rate limiting
     ShotElixir.Invitations.init_rate_limiting()
     ShotElixir.RateLimiter.init()
