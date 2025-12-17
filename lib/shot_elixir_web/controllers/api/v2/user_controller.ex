@@ -491,7 +491,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     if password != password_confirmation do
       conn
       |> put_status(:unprocessable_entity)
-      |> json(%{errors: %{password_confirmation: ["does not match password"]}})
+      |> json(%{success: false, errors: %{password_confirmation: ["does not match password"]}})
     else
       case Accounts.change_password(current_user, current_password, password) do
         {:ok, _user} ->
@@ -501,7 +501,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
         {:error, :invalid_current_password} ->
           conn
           |> put_status(:unprocessable_entity)
-          |> json(%{errors: %{current_password: ["is incorrect"]}})
+          |> json(%{success: false, errors: %{current_password: ["is incorrect"]}})
 
         {:error, changeset} ->
           conn

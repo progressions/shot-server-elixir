@@ -297,6 +297,59 @@ defmodule ShotElixir.AccountsTest do
     end
   end
 
+  describe "change_password/3" do
+    test "successfully changes password with valid current password" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      assert {:ok, updated_user} =
+               Accounts.change_password(user, "password123", "newpassword1")
+
+      # Verify the new password works for authentication
+      assert {:ok, _} = Accounts.authenticate_user(user.email, "newpassword1")
+
+      # Verify the old password no longer works
+      assert {:error, :invalid_credentials} =
+               Accounts.authenticate_user(user.email, "password123")
+    end
+
+    test "fails when current password is incorrect" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      assert {:error, :invalid_current_password} =
+               Accounts.change_password(user, "wrongpassword", "newpassword1")
+
+      # Verify the original password still works
+      assert {:ok, _} = Accounts.authenticate_user(user.email, "password123")
+    end
+
+    test "fails when new password is too short" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      assert {:error, changeset} =
+               Accounts.change_password(user, "password123", "short1")
+
+      assert "must be at least 8 characters" in changeset_errors(changeset).password
+    end
+
+    test "fails when new password has no numbers" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      assert {:error, changeset} =
+               Accounts.change_password(user, "password123", "longpassword")
+
+      assert "must contain at least one number" in changeset_errors(changeset).password
+    end
+
+    test "fails when new password has no letters" do
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+
+      assert {:error, changeset} =
+               Accounts.change_password(user, "password123", "12345678")
+
+      assert "must contain at least one letter" in changeset_errors(changeset).password
+    end
+  end
+
   describe "OTP passwordless login" do
     test "generate_otp_code/1 generates a 6-digit code and magic token" do
       {:ok, user} = Accounts.create_user(@valid_attrs)
