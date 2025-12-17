@@ -1,8 +1,15 @@
 defmodule ShotElixirWeb.Api.V2.WeaponView do
-  def render("index.json", %{weapons: weapons, meta: meta}) do
+  def render("index.json", %{
+        weapons: weapons,
+        meta: meta,
+        categories: categories,
+        junctures: junctures
+      }) do
     %{
       weapons: Enum.map(weapons, &render_weapon/1),
-      meta: meta
+      meta: meta,
+      categories: categories,
+      junctures: junctures
     }
   end
 
