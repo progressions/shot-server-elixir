@@ -84,6 +84,7 @@ defmodule ShotElixirWeb.Router do
     patch "/users/profile", UserController, :update_profile
     post "/users/link_discord", UserController, :link_discord
     delete "/users/unlink_discord", UserController, :unlink_discord
+    post "/users/change-password", UserController, :change_password
     delete "/users/:id/image", UserController, :remove_image
     resources "/users", UserController, except: [:create]
 
