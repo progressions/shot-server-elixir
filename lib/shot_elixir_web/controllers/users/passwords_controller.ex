@@ -73,7 +73,10 @@ defmodule ShotElixirWeb.Users.PasswordsController do
   end
 
   defp update_with_token(conn, token, password) do
-    case Accounts.get_user_by_reset_password_token(token) do
+    # URL-decode the token in case it was encoded (e.g., = becomes %3D)
+    decoded_token = URI.decode(token)
+
+    case Accounts.get_user_by_reset_password_token(decoded_token) do
       nil ->
         conn
         |> put_status(:not_found)
