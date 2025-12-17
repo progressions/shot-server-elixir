@@ -5,7 +5,24 @@ defmodule ShotElixirWeb.Users.PasswordsController do
 
   # POST /users/password
   # Request password reset
+  # Handle nested user format from frontend: { user: { email: ... } }
+  def create(conn, %{"user" => %{"email" => email}}) do
+    create_with_email(conn, email)
+  end
+
+  # Handle direct email format: { email: ... }
   def create(conn, %{"email" => email}) do
+    create_with_email(conn, email)
+  end
+
+  # Handle missing email
+  def create(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing email address"})
+  end
+
+  defp create_with_email(conn, email) do
     case Accounts.get_user_by_email(email) do
       nil ->
         # Don't reveal whether user exists (prevent email enumeration)
@@ -34,13 +51,6 @@ defmodule ShotElixirWeb.Users.PasswordsController do
           message: "If your email is in our system, you will receive password reset instructions"
         })
     end
-  end
-
-  # Handle missing email
-  def create(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Missing email address"})
   end
 
   # PUT /users/password
