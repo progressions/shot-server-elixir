@@ -411,7 +411,16 @@ defmodule ShotElixir.Characters do
 
   def get_character!(id) do
     Repo.get!(Character, id)
-    |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
+    |> Repo.preload([
+      :image_positions,
+      :weapons,
+      :schticks,
+      :parties,
+      :sites,
+      :faction,
+      :juncture,
+      :user
+    ])
     |> ImageLoader.load_image_url("Character")
   end
 
@@ -422,7 +431,16 @@ defmodule ShotElixir.Characters do
 
       character ->
         character
-        |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
+        |> Repo.preload([
+          :image_positions,
+          :weapons,
+          :schticks,
+          :parties,
+          :sites,
+          :faction,
+          :juncture,
+          :user
+        ])
         |> ImageLoader.load_image_url("Character")
     end
   end
