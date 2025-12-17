@@ -5,7 +5,24 @@ defmodule ShotElixirWeb.Users.PasswordsController do
 
   # POST /users/password
   # Request password reset
+  # Handle nested user format from frontend: { user: { email: ... } }
+  def create(conn, %{"user" => %{"email" => email}}) do
+    create_with_email(conn, email)
+  end
+
+  # Handle direct email format: { email: ... }
   def create(conn, %{"email" => email}) do
+    create_with_email(conn, email)
+  end
+
+  # Handle missing email
+  def create(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing email address"})
+  end
+
+  defp create_with_email(conn, email) do
     case Accounts.get_user_by_email(email) do
       nil ->
         # Don't reveal whether user exists (prevent email enumeration)
@@ -36,17 +53,30 @@ defmodule ShotElixirWeb.Users.PasswordsController do
     end
   end
 
-  # Handle missing email
-  def create(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Missing email address"})
+  # PUT/PATCH /users/password
+  # Reset password with token
+  # Handle nested user format from frontend: { user: { reset_password_token, password, ... } }
+  def update(conn, %{"user" => %{"reset_password_token" => token, "password" => password}}) do
+    update_with_token(conn, token, password)
   end
 
-  # PUT /users/password
-  # Reset password with token
+  # Handle direct format: { reset_password_token, password }
   def update(conn, %{"reset_password_token" => token, "password" => password}) do
-    case Accounts.get_user_by_reset_password_token(token) do
+    update_with_token(conn, token, password)
+  end
+
+  # Handle missing parameters
+  def update(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing reset token or password"})
+  end
+
+  defp update_with_token(conn, token, password) do
+    # URL-decode the token in case it was encoded (e.g., = becomes %3D)
+    decoded_token = URI.decode(token)
+
+    case Accounts.get_user_by_reset_password_token(decoded_token) do
       nil ->
         conn
         |> put_status(:not_found)
@@ -76,13 +106,6 @@ defmodule ShotElixirWeb.Users.PasswordsController do
           end
         end
     end
-  end
-
-  # Handle missing parameters
-  def update(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Missing reset token or password"})
   end
 
   defp token_expired?(nil), do: true

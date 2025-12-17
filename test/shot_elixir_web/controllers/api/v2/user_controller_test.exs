@@ -614,6 +614,134 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
   end
 
+  describe "change_password" do
+    setup do
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "changepass@example.com",
+          password: "password123",
+          first_name: "Change",
+          last_name: "Password"
+        })
+
+      %{user: user}
+    end
+
+    test "successfully changes password with valid current password", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+
+      conn =
+        post(conn, ~p"/api/v2/users/change_password", %{
+          current_password: "password123",
+          password: "newpassword456",
+          password_confirmation: "newpassword456"
+        })
+
+      response = json_response(conn, 200)
+
+      assert response["success"] == true
+      assert response["message"] == "Password changed successfully"
+
+      # Verify user can now login with new password
+      assert {:ok, _} = Accounts.authenticate_user("changepass@example.com", "newpassword456")
+    end
+
+    test "returns error when current password is incorrect", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+
+      conn =
+        post(conn, ~p"/api/v2/users/change_password", %{
+          current_password: "wrongpassword",
+          password: "newpassword456",
+          password_confirmation: "newpassword456"
+        })
+
+      response = json_response(conn, 422)
+
+      assert response["errors"]["current_password"] == ["is incorrect"]
+    end
+
+    test "returns error when password confirmation does not match", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+
+      conn =
+        post(conn, ~p"/api/v2/users/change_password", %{
+          current_password: "password123",
+          password: "newpassword456",
+          password_confirmation: "differentpassword"
+        })
+
+      response = json_response(conn, 422)
+
+      assert response["errors"]["password_confirmation"] == ["does not match password"]
+    end
+
+    test "returns error when new password is too short", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+
+      conn =
+        post(conn, ~p"/api/v2/users/change_password", %{
+          current_password: "password123",
+          password: "short1",
+          password_confirmation: "short1"
+        })
+
+      response = json_response(conn, 422)
+
+      assert response["errors"]["password"] == ["must be at least 8 characters"]
+    end
+
+    test "returns error when new password has no letters", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+
+      conn =
+        post(conn, ~p"/api/v2/users/change_password", %{
+          current_password: "password123",
+          password: "12345678",
+          password_confirmation: "12345678"
+        })
+
+      response = json_response(conn, 422)
+
+      assert response["errors"]["password"] == ["must contain at least one letter"]
+    end
+
+    test "returns error when new password has no numbers", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+
+      conn =
+        post(conn, ~p"/api/v2/users/change_password", %{
+          current_password: "password123",
+          password: "abcdefgh",
+          password_confirmation: "abcdefgh"
+        })
+
+      response = json_response(conn, 422)
+
+      assert response["errors"]["password"] == ["must contain at least one number"]
+    end
+
+    test "returns error when required parameters are missing", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = post(conn, ~p"/api/v2/users/change_password", %{})
+      response = json_response(conn, 400)
+
+      assert response["error"] ==
+               "current_password, password, and password_confirmation are required"
+    end
+
+    test "returns unauthorized when not authenticated", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/v2/users/change_password", %{
+          current_password: "password123",
+          password: "newpassword456",
+          password_confirmation: "newpassword456"
+        })
+
+      assert json_response(conn, 401)["error"] == "Not authenticated"
+    end
+  end
+
   defp authenticate(conn, user) do
     {:ok, token, _} = Guardian.encode_and_sign(user)
     put_req_header(conn, "authorization", "Bearer #{token}")

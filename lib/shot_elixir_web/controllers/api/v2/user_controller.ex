@@ -479,6 +479,45 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     end
   end
 
+  # POST /api/v2/users/change_password
+  def change_password(conn, %{
+        "current_password" => current_password,
+        "password" => password,
+        "password_confirmation" => password_confirmation
+      }) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    # Verify password confirmation matches
+    if password != password_confirmation do
+      conn
+      |> put_status(:unprocessable_entity)
+      |> json(%{success: false, errors: %{password_confirmation: ["does not match password"]}})
+    else
+      case Accounts.change_password(current_user, current_password, password) do
+        {:ok, _user} ->
+          conn
+          |> json(%{success: true, message: "Password changed successfully"})
+
+        {:error, :invalid_current_password} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{success: false, errors: %{current_password: ["is incorrect"]}})
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.UserView)
+          |> render(:error, changeset: changeset)
+      end
+    end
+  end
+
+  def change_password(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "current_password, password, and password_confirmation are required"})
+  end
+
   # DELETE /api/v2/users/:id
   def delete(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)

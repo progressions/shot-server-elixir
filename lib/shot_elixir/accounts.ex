@@ -506,6 +506,21 @@ defmodule ShotElixir.Accounts do
     |> Repo.update()
   end
 
+  @doc """
+  Changes the user's password after verifying the current password.
+  Returns {:ok, user} on success, {:error, :invalid_current_password} if current password is wrong,
+  or {:error, changeset} if new password validation fails.
+  """
+  def change_password(%User{} = user, current_password, new_password) do
+    if User.verify_password(user, current_password) do
+      user
+      |> User.password_changeset(%{password: new_password})
+      |> Repo.update()
+    else
+      {:error, :invalid_current_password}
+    end
+  end
+
   # OTP Passwordless Login Functions
   @otp_expiry_minutes 10
 
