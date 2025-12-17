@@ -53,9 +53,26 @@ defmodule ShotElixirWeb.Users.PasswordsController do
     end
   end
 
-  # PUT /users/password
+  # PUT/PATCH /users/password
   # Reset password with token
+  # Handle nested user format from frontend: { user: { reset_password_token, password, ... } }
+  def update(conn, %{"user" => %{"reset_password_token" => token, "password" => password}}) do
+    update_with_token(conn, token, password)
+  end
+
+  # Handle direct format: { reset_password_token, password }
   def update(conn, %{"reset_password_token" => token, "password" => password}) do
+    update_with_token(conn, token, password)
+  end
+
+  # Handle missing parameters
+  def update(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing reset token or password"})
+  end
+
+  defp update_with_token(conn, token, password) do
     case Accounts.get_user_by_reset_password_token(token) do
       nil ->
         conn
@@ -86,13 +103,6 @@ defmodule ShotElixirWeb.Users.PasswordsController do
           end
         end
     end
-  end
-
-  # Handle missing parameters
-  def update(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Missing reset token or password"})
   end
 
   defp token_expired?(nil), do: true
