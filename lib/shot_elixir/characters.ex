@@ -701,6 +701,7 @@ defmodule ShotElixir.Characters do
       |> Map.delete(:updated_at)
       |> Map.put(:name, unique_name)
       |> Map.put(:user_id, user.id)
+      |> Map.put(:is_template, false)
 
     create_character(attrs)
   end

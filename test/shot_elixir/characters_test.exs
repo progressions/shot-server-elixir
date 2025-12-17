@@ -423,4 +423,61 @@ defmodule ShotElixir.CharactersTest do
       assert length(character_with_advancements.advancements) == 2
     end
   end
+
+  describe "duplicate_character/2" do
+    test "duplicated character has is_template set to false", %{campaign: campaign, user: user} do
+      # Create a template character
+      {:ok, template_char} =
+        Characters.create_character(%{
+          name: "Template Character",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          is_template: true
+        })
+
+      assert template_char.is_template == true
+
+      # Duplicate the template character
+      {:ok, duplicated_char} = Characters.duplicate_character(template_char, user)
+
+      # The duplicated character should NOT be a template
+      assert duplicated_char.is_template == false
+    end
+
+    test "duplicated non-template character also has is_template false", %{
+      campaign: campaign,
+      user: user
+    } do
+      # Create a regular (non-template) character
+      {:ok, regular_char} =
+        Characters.create_character(%{
+          name: "Regular Character",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          is_template: false
+        })
+
+      # Duplicate it
+      {:ok, duplicated_char} = Characters.duplicate_character(regular_char, user)
+
+      # Should still be not a template
+      assert duplicated_char.is_template == false
+    end
+
+    test "duplicated character gets a unique name", %{campaign: campaign, user: user} do
+      {:ok, original_char} =
+        Characters.create_character(%{
+          name: "Original Character",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, duplicated_char} = Characters.duplicate_character(original_char, user)
+
+      # Name should be different (unique)
+      refute duplicated_char.name == original_char.name
+      # Name should contain the original name
+      assert String.contains?(duplicated_char.name, "Original Character")
+    end
+  end
 end
