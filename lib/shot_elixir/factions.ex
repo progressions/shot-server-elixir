@@ -269,12 +269,20 @@ defmodule ShotElixir.Factions do
 
   def get_faction!(id) do
     Repo.get!(Faction, id)
+    |> Repo.preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
     |> ImageLoader.load_image_url("Faction")
   end
 
   def get_faction(id) do
-    Repo.get(Faction, id)
-    |> ImageLoader.load_image_url("Faction")
+    case Repo.get(Faction, id) do
+      nil ->
+        nil
+
+      faction ->
+        faction
+        |> Repo.preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
+        |> ImageLoader.load_image_url("Faction")
+    end
   end
 
   def create_faction(attrs \\ %{}) do
