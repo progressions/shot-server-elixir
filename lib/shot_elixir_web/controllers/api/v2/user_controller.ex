@@ -479,7 +479,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     end
   end
 
-  # POST /api/v2/users/change-password
+  # POST /api/v2/users/change_password
   def change_password(conn, %{
         "current_password" => current_password,
         "password" => password,

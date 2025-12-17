@@ -631,7 +631,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       conn = authenticate(conn, user)
 
       conn =
-        post(conn, ~p"/api/v2/users/change-password", %{
+        post(conn, ~p"/api/v2/users/change_password", %{
           current_password: "password123",
           password: "newpassword456",
           password_confirmation: "newpassword456"
@@ -650,7 +650,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       conn = authenticate(conn, user)
 
       conn =
-        post(conn, ~p"/api/v2/users/change-password", %{
+        post(conn, ~p"/api/v2/users/change_password", %{
           current_password: "wrongpassword",
           password: "newpassword456",
           password_confirmation: "newpassword456"
@@ -665,7 +665,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       conn = authenticate(conn, user)
 
       conn =
-        post(conn, ~p"/api/v2/users/change-password", %{
+        post(conn, ~p"/api/v2/users/change_password", %{
           current_password: "password123",
           password: "newpassword456",
           password_confirmation: "differentpassword"
@@ -680,7 +680,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       conn = authenticate(conn, user)
 
       conn =
-        post(conn, ~p"/api/v2/users/change-password", %{
+        post(conn, ~p"/api/v2/users/change_password", %{
           current_password: "password123",
           password: "short1",
           password_confirmation: "short1"
@@ -695,7 +695,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       conn = authenticate(conn, user)
 
       conn =
-        post(conn, ~p"/api/v2/users/change-password", %{
+        post(conn, ~p"/api/v2/users/change_password", %{
           current_password: "password123",
           password: "12345678",
           password_confirmation: "12345678"
@@ -710,7 +710,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
       conn = authenticate(conn, user)
 
       conn =
-        post(conn, ~p"/api/v2/users/change-password", %{
+        post(conn, ~p"/api/v2/users/change_password", %{
           current_password: "password123",
           password: "abcdefgh",
           password_confirmation: "abcdefgh"
@@ -723,7 +723,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
     test "returns error when required parameters are missing", %{conn: conn, user: user} do
       conn = authenticate(conn, user)
-      conn = post(conn, ~p"/api/v2/users/change-password", %{})
+      conn = post(conn, ~p"/api/v2/users/change_password", %{})
       response = json_response(conn, 400)
 
       assert response["error"] ==
@@ -732,7 +732,7 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
     test "returns unauthorized when not authenticated", %{conn: conn} do
       conn =
-        post(conn, ~p"/api/v2/users/change-password", %{
+        post(conn, ~p"/api/v2/users/change_password", %{
           current_password: "password123",
           password: "newpassword456",
           password_confirmation: "newpassword456"
