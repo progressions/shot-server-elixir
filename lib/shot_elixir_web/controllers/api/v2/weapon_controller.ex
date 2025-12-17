@@ -148,18 +148,18 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
     # Handle multipart/form-data with JSON string (like Rails does)
     weapon_params = parse_weapon_params(weapon_params)
 
-    cond do
-      weapon_params == {:error, :invalid_json} ->
+    case {weapon_params, weapon} do
+      {{:error, :invalid_json}, _} ->
         conn
         |> put_status(:bad_request)
         |> json(%{error: "Invalid weapon data format"})
 
-      weapon == nil ->
+      {_, nil} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Weapon not found"})
 
-      true ->
+      {params, weapon} when is_map(params) ->
         # Handle image upload if present
         case conn.params["image"] do
           %Plug.Upload{} = upload ->
@@ -172,7 +172,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
                     # Reload weapon to get fresh data after image attachment
                     weapon = Weapons.get_weapon(weapon.id)
                     # Continue with weapon update
-                    case Weapons.update_weapon(weapon, weapon_params) do
+                    case Weapons.update_weapon(weapon, params) do
                       {:ok, weapon} ->
                         conn
                         |> put_view(ShotElixirWeb.Api.V2.WeaponView)
@@ -200,7 +200,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
           _ ->
             # No image upload, just update weapon
-            case Weapons.update_weapon(weapon, weapon_params) do
+            case Weapons.update_weapon(weapon, params) do
               {:ok, weapon} ->
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.WeaponView)
