@@ -6,7 +6,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerFeaturesTest do
     Campaigns,
     Accounts,
     Schticks,
-    Weapons
+    Weapons,
+    Factions,
+    Junctures
   }
 
   alias ShotElixir.Guardian
@@ -111,6 +113,133 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerFeaturesTest do
       assert char["action_values"]["Type"] == "PC"
       assert char["user_id"] == character.user_id
       assert char["campaign_id"] == character.campaign_id
+    end
+
+    test "renders faction association when character has faction", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "The Dragons",
+          description: "A faction of heroes",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character with Faction",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          faction_id: faction.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters/#{character.id}")
+      response = json_response(conn, 200)
+
+      assert response["faction"] != nil
+      assert response["faction"]["id"] == faction.id
+      assert response["faction"]["name"] == "The Dragons"
+    end
+
+    test "renders juncture association when character has juncture", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Modern Day",
+          description: "The contemporary era",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character with Juncture",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          juncture_id: juncture.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters/#{character.id}")
+      response = json_response(conn, 200)
+
+      assert response["juncture"] != nil
+      assert response["juncture"]["id"] == juncture.id
+      assert response["juncture"]["name"] == "Modern Day"
+    end
+
+    test "renders user association when character has owner", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character with Owner",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters/#{character.id}")
+      response = json_response(conn, 200)
+
+      # Show action uses lite serializer format for user
+      assert response["user"] != nil
+      assert response["user"]["id"] == gm.id
+      assert response["user"]["name"] == "Game Master"
+      assert response["user"]["email"] == "gm@example.com"
+    end
+
+    test "renders all associations together when character has faction, juncture, and user", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "The Ascended",
+          description: "A faction of transformed animals",
+          campaign_id: campaign.id
+        })
+
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Ancient China",
+          description: "The era of the Chi War's origin",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Fully Associated Character",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          faction_id: faction.id,
+          juncture_id: juncture.id,
+          action_values: %{"Type" => "PC", "Archetype" => "Transformed Animal"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters/#{character.id}")
+      response = json_response(conn, 200)
+
+      # Verify all associations are present
+      assert response["faction"]["id"] == faction.id
+      assert response["faction"]["name"] == "The Ascended"
+
+      assert response["juncture"]["id"] == juncture.id
+      assert response["juncture"]["name"] == "Ancient China"
+
+      assert response["user"]["id"] == gm.id
     end
   end
 
