@@ -74,10 +74,21 @@ defmodule ShotElixir.AccountsTest do
       assert "has invalid format" in changeset_errors(changeset).email
     end
 
-    test "create_user/1 validates minimum password length" do
-      attrs = Map.put(@valid_attrs, :password, "short")
+    test "create_user/1 validates password strength" do
+      # Too short
+      attrs = Map.put(@valid_attrs, :password, "short1")
       assert {:error, %Ecto.Changeset{} = changeset} = Accounts.create_user(attrs)
-      assert "should be at least 6 characters" in changeset_errors(changeset).password
+      assert "must be at least 8 characters" in changeset_errors(changeset).password
+
+      # No numbers
+      attrs2 = Map.put(@valid_attrs, :password, "longpassword")
+      assert {:error, %Ecto.Changeset{} = changeset2} = Accounts.create_user(attrs2)
+      assert "must contain at least one number" in changeset_errors(changeset2).password
+
+      # No letters
+      attrs3 = Map.put(@valid_attrs, :password, "12345678")
+      assert {:error, %Ecto.Changeset{} = changeset3} = Accounts.create_user(attrs3)
+      assert "must contain at least one letter" in changeset_errors(changeset3).password
     end
 
     test "update_user/2 with valid data updates the user" do

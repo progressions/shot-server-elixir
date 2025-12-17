@@ -65,7 +65,7 @@ defmodule ShotElixir.Accounts.User do
     |> validate_format(:email, ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/)
     |> validate_length(:first_name, min: 2)
     |> validate_length(:last_name, min: 2)
-    |> validate_length(:password, min: 6, message: "should be at least 6 characters")
+    |> validate_password_strength()
     |> unique_constraint(:email, name: :index_users_on_email)
     |> set_name()
     |> hash_password()
@@ -99,7 +99,7 @@ defmodule ShotElixir.Accounts.User do
     user
     |> cast(attrs, [:password])
     |> validate_required([:password])
-    |> validate_length(:password, min: 6, message: "should be at least 6 characters")
+    |> validate_password_strength()
     |> hash_password()
   end
 
@@ -121,6 +121,28 @@ defmodule ShotElixir.Accounts.User do
         first = get_field(changeset, :first_name) || ""
         last = get_field(changeset, :last_name) || ""
         put_change(changeset, :name, String.trim("#{first} #{last}"))
+    end
+  end
+
+  defp validate_password_strength(changeset) do
+    case get_change(changeset, :password) do
+      nil ->
+        changeset
+
+      password ->
+        cond do
+          String.length(password) < 8 ->
+            add_error(changeset, :password, "must be at least 8 characters")
+
+          not Regex.match?(~r/[a-zA-Z]/, password) ->
+            add_error(changeset, :password, "must contain at least one letter")
+
+          not Regex.match?(~r/[0-9]/, password) ->
+            add_error(changeset, :password, "must contain at least one number")
+
+          true ->
+            changeset
+        end
     end
   end
 
