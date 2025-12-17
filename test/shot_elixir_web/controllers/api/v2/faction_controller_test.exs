@@ -1,6 +1,6 @@
 defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
   use ShotElixirWeb.ConnCase, async: true
-  alias ShotElixir.{Campaigns, Factions, Accounts}
+  alias ShotElixir.{Campaigns, Factions, Accounts, Characters}
   alias ShotElixir.Guardian
 
   @create_attrs %{
@@ -133,6 +133,65 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
       conn = conn |> delete_req_header("authorization")
       conn = get(conn, ~p"/api/v2/factions/#{faction.id}")
       assert json_response(conn, 401)
+    end
+
+    test "renders characters (members) association when faction has characters", %{
+      conn: conn,
+      campaign: campaign,
+      user: user
+    } do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Faction with Members",
+          description: "A faction with characters",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _character1} =
+        Characters.create_character(%{
+          name: "Member One",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          faction_id: faction.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      {:ok, _character2} =
+        Characters.create_character(%{
+          name: "Member Two",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          faction_id: faction.id,
+          action_values: %{"Type" => "NPC"}
+        })
+
+      conn = get(conn, ~p"/api/v2/factions/#{faction.id}")
+      response = json_response(conn, 200)
+
+      assert response["characters"] != nil
+      assert is_list(response["characters"])
+      assert length(response["characters"]) == 2
+
+      character_names = Enum.map(response["characters"], & &1["name"])
+      assert "Member One" in character_names
+      assert "Member Two" in character_names
+    end
+
+    test "renders empty characters array when faction has no characters", %{
+      conn: conn,
+      campaign: campaign
+    } do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Empty Faction",
+          description: "A faction with no characters",
+          campaign_id: campaign.id
+        })
+
+      conn = get(conn, ~p"/api/v2/factions/#{faction.id}")
+      response = json_response(conn, 200)
+
+      assert response["characters"] == []
     end
   end
 
