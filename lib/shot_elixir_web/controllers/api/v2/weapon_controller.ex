@@ -15,7 +15,12 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-      |> render("index.json", weapons: result.weapons, meta: result.meta)
+      |> render("index.json",
+        weapons: result.weapons,
+        meta: result.meta,
+        categories: result.categories,
+        junctures: result.junctures
+      )
     else
       conn
       |> put_status(:unprocessable_entity)
@@ -107,21 +112,32 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
   def create(conn, %{"weapon" => weapon_params}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    # Add campaign_id if not provided
-    weapon_params = Map.put_new(weapon_params, "campaign_id", current_user.current_campaign_id)
+    # Handle multipart/form-data with JSON string (like Rails does)
+    weapon_params = parse_weapon_params(weapon_params)
 
-    case Weapons.create_weapon(weapon_params) do
-      {:ok, weapon} ->
+    case weapon_params do
+      {:error, :invalid_json} ->
         conn
-        |> put_status(:created)
-        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-        |> render("show.json", weapon: weapon)
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid weapon data format"})
 
-      {:error, changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-        |> render("error.json", changeset: changeset)
+      params when is_map(params) ->
+        # Add campaign_id if not provided
+        params = Map.put_new(params, "campaign_id", current_user.current_campaign_id)
+
+        case Weapons.create_weapon(params) do
+          {:ok, weapon} ->
+            conn
+            |> put_status(:created)
+            |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+            |> render("show.json", weapon: weapon)
+
+          {:error, changeset} ->
+            conn
+            |> put_status(:unprocessable_entity)
+            |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+            |> render("error.json", changeset: changeset)
+        end
     end
   end
 
@@ -129,13 +145,21 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
   def update(conn, %{"id" => id, "weapon" => weapon_params}) do
     weapon = Weapons.get_weapon(id)
 
-    cond do
-      weapon == nil ->
+    # Handle multipart/form-data with JSON string (like Rails does)
+    weapon_params = parse_weapon_params(weapon_params)
+
+    case {weapon_params, weapon} do
+      {{:error, :invalid_json}, _} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Invalid weapon data format"})
+
+      {_, nil} ->
         conn
         |> put_status(:not_found)
         |> json(%{error: "Weapon not found"})
 
-      true ->
+      {params, weapon} when is_map(params) ->
         # Handle image upload if present
         case conn.params["image"] do
           %Plug.Upload{} = upload ->
@@ -148,7 +172,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
                     # Reload weapon to get fresh data after image attachment
                     weapon = Weapons.get_weapon(weapon.id)
                     # Continue with weapon update
-                    case Weapons.update_weapon(weapon, weapon_params) do
+                    case Weapons.update_weapon(weapon, params) do
                       {:ok, weapon} ->
                         conn
                         |> put_view(ShotElixirWeb.Api.V2.WeaponView)
@@ -176,7 +200,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
           _ ->
             # No image upload, just update weapon
-            case Weapons.update_weapon(weapon, weapon_params) do
+            case Weapons.update_weapon(weapon, params) do
               {:ok, weapon} ->
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.WeaponView)
@@ -305,4 +329,16 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
       {:error, :forbidden}
     end
   end
+
+  # Parse weapon params - handles JSON string from multipart/form-data
+  defp parse_weapon_params(params) when is_map(params), do: params
+
+  defp parse_weapon_params(params) when is_binary(params) do
+    case Jason.decode(params) do
+      {:ok, decoded} -> decoded
+      {:error, _} -> {:error, :invalid_json}
+    end
+  end
+
+  defp parse_weapon_params(_), do: {:error, :invalid_json}
 end

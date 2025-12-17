@@ -156,6 +156,100 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
       conn = get(conn, "/api/v2/weapons")
       assert conn.status == 401
     end
+
+    test "returns categories and junctures collections", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      # Create weapons with different categories and junctures
+      {:ok, _gun} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Pistol",
+            category: "guns",
+            juncture: "Contemporary"
+          })
+        )
+
+      {:ok, _sword} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Sword",
+            category: "melee",
+            juncture: "Ancient"
+          })
+        )
+
+      {:ok, _laser} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Laser Rifle",
+            category: "guns",
+            juncture: "Future"
+          })
+        )
+
+      conn =
+        conn
+        |> authenticate(gamemaster)
+        |> get("/api/v2/weapons")
+
+      response = json_response(conn, 200)
+
+      # Verify categories are returned (unique, sorted)
+      assert is_list(response["categories"])
+      assert "guns" in response["categories"]
+      assert "melee" in response["categories"]
+
+      # Verify junctures are returned (unique, sorted)
+      assert is_list(response["junctures"])
+      assert "Ancient" in response["junctures"]
+      assert "Contemporary" in response["junctures"]
+      assert "Future" in response["junctures"]
+    end
+
+    test "categories and junctures reflect filtered results", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      # Create weapons with different categories
+      {:ok, _gun} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Pistol",
+            category: "guns",
+            juncture: "Contemporary"
+          })
+        )
+
+      {:ok, _sword} =
+        Weapons.create_weapon(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            name: "Sword",
+            category: "melee",
+            juncture: "Ancient"
+          })
+        )
+
+      # Filter by category=melee - should only return melee category and Ancient juncture
+      conn =
+        conn
+        |> authenticate(gamemaster)
+        |> get("/api/v2/weapons?category=melee")
+
+      response = json_response(conn, 200)
+
+      # Only melee category should be in the filtered results
+      assert response["categories"] == ["melee"]
+      assert response["junctures"] == ["Ancient"]
+    end
   end
 
   describe "show" do
@@ -258,6 +352,45 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
 
       assert %{"id" => _id} = json_response(conn, 201)
     end
+
+    test "creates weapon from JSON string params (multipart/form-data)", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      campaign: campaign
+    } do
+      # Simulate multipart/form-data where weapon is a JSON string
+      json_params =
+        Jason.encode!(%{
+          name: "JSON Sword",
+          description: "Created from JSON string",
+          damage: 8,
+          concealment: 2,
+          category: "melee",
+          juncture: "Ancient"
+        })
+
+      conn =
+        conn
+        |> authenticate(gamemaster)
+        |> post("/api/v2/weapons", weapon: json_params)
+
+      assert %{"id" => id} = json_response(conn, 201)
+
+      # Verify weapon was created
+      weapon = Weapons.get_weapon(id)
+      assert weapon.name == "JSON Sword"
+      assert weapon.damage == 8
+      assert weapon.campaign_id == campaign.id
+    end
+
+    test "returns error for invalid JSON string", %{conn: conn, gamemaster: gamemaster} do
+      conn =
+        conn
+        |> authenticate(gamemaster)
+        |> post("/api/v2/weapons", weapon: "not valid json {")
+
+      assert json_response(conn, 400)["error"] == "Invalid weapon data format"
+    end
   end
 
   describe "update" do
@@ -317,6 +450,42 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
     test "requires authentication", %{conn: conn, weapon: weapon} do
       conn = patch(conn, "/api/v2/weapons/#{weapon.id}", weapon: @update_attrs)
       assert conn.status == 401
+    end
+
+    test "updates weapon from JSON string params (multipart/form-data)", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      weapon: weapon
+    } do
+      # Simulate multipart/form-data where weapon is a JSON string
+      json_params =
+        Jason.encode!(%{
+          name: "JSON Updated Weapon",
+          damage: 15
+        })
+
+      conn =
+        conn
+        |> authenticate(gamemaster)
+        |> patch("/api/v2/weapons/#{weapon.id}", weapon: json_params)
+
+      response = json_response(conn, 200)
+      assert response["id"] == weapon.id
+      assert response["name"] == "JSON Updated Weapon"
+      assert response["damage"] == 15
+    end
+
+    test "returns error for invalid JSON string on update", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      weapon: weapon
+    } do
+      conn =
+        conn
+        |> authenticate(gamemaster)
+        |> patch("/api/v2/weapons/#{weapon.id}", weapon: "invalid json {")
+
+      assert json_response(conn, 400)["error"] == "Invalid weapon data format"
     end
   end
 
