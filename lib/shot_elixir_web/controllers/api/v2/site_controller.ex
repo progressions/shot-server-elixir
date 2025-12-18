@@ -438,6 +438,8 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
     with {:ok, campaign_id} <- ensure_campaign(current_user),
          %{} = site <- Sites.get_site(id),
          true <- site.campaign_id == campaign_id,
+         campaign <- Campaigns.get_campaign(campaign_id),
+         true <- authorize_campaign_modification(campaign, current_user),
          {:ok, new_site} <- Sites.duplicate_site(site) do
       conn
       |> put_status(:created)
@@ -457,7 +459,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
       false ->
         conn
         |> put_status(:forbidden)
-        |> json(%{error: "Site does not belong to current campaign"})
+        |> json(%{error: "Only campaign owners, admins, or gamemasters can duplicate sites"})
 
       {:error, changeset} ->
         conn

@@ -346,6 +346,8 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
     with {:ok, campaign_id} <- ensure_campaign(current_user),
          %{} = faction <- Factions.get_faction(id),
          true <- faction.campaign_id == campaign_id,
+         campaign <- Campaigns.get_campaign(campaign_id),
+         true <- authorize_campaign_modification(campaign, current_user),
          {:ok, new_faction} <- Factions.duplicate_faction(faction) do
       conn
       |> put_status(:created)
@@ -364,8 +366,8 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
       false ->
         conn
-        |> put_status(:not_found)
-        |> json(%{error: "Faction not found"})
+        |> put_status(:forbidden)
+        |> json(%{error: "Only campaign owners, admins, or gamemasters can duplicate factions"})
 
       nil ->
         conn

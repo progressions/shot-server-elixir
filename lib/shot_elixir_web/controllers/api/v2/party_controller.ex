@@ -437,6 +437,8 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
     with {:ok, campaign_id} <- ensure_campaign(current_user),
          %{} = party <- Parties.get_party(id),
          true <- party.campaign_id == campaign_id,
+         campaign <- Campaigns.get_campaign(campaign_id),
+         true <- authorize_campaign_modification(campaign, current_user),
          {:ok, new_party} <- Parties.duplicate_party(party) do
       conn
       |> put_status(:created)
@@ -456,7 +458,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
       false ->
         conn
         |> put_status(:forbidden)
-        |> json(%{error: "Party does not belong to current campaign"})
+        |> json(%{error: "Only campaign owners, admins, or gamemasters can duplicate parties"})
 
       {:error, changeset} ->
         conn
