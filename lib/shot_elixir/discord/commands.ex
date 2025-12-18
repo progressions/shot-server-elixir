@@ -544,9 +544,16 @@ defmodule ShotElixir.Discord.Commands do
 
     case character do
       nil ->
+        error_msg =
+          if user.current_campaign do
+            "Couldn't find character \"#{character_name}\" in your current campaign."
+          else
+            "Couldn't find character \"#{character_name}\"."
+          end
+
         respond(
           interaction,
-          "Couldn't find character \"#{character_name}\" in your current campaign.",
+          error_msg,
           ephemeral: true
         )
 

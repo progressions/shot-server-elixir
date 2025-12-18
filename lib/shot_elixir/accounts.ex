@@ -672,12 +672,37 @@ defmodule ShotElixir.Accounts do
 
   @doc """
   Sets the current character for a user (typically via Discord).
+  Validates that the character belongs to the user before setting.
   Returns {:ok, user} on success, {:error, changeset} on failure.
   """
   def set_current_character(%User{} = user, character_id) do
-    user
-    |> User.discord_changeset(%{current_character_id: character_id})
-    |> Repo.update()
+    alias ShotElixir.Characters.Character
+
+    cond do
+      is_nil(character_id) ->
+        user
+        |> User.discord_changeset(%{current_character_id: nil})
+        |> Repo.update()
+
+      Repo.exists?(
+        from c in Character,
+          where: c.id == ^character_id and c.user_id == ^user.id
+      ) ->
+        user
+        |> User.discord_changeset(%{current_character_id: character_id})
+        |> Repo.update()
+
+      true ->
+        changeset =
+          user
+          |> User.discord_changeset(%{})
+          |> Ecto.Changeset.add_error(
+            :current_character_id,
+            "does not belong to this user or does not exist"
+          )
+
+        {:error, changeset}
+    end
   end
 
   @doc """
@@ -692,4 +717,6 @@ defmodule ShotElixir.Accounts do
       user -> Repo.preload(user, [:current_character, :current_campaign, :characters])
     end
   end
+
+  def get_user_with_current_character(_), do: nil
 end
