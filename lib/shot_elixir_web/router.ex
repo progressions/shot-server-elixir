@@ -124,6 +124,7 @@ defmodule ShotElixirWeb.Router do
     get "/vehicles/archetypes", VehicleController, :archetypes
 
     resources "/vehicles", VehicleController do
+      post "/duplicate", VehicleController, :duplicate
       delete "/image", VehicleController, :remove_image
       patch "/chase_state", VehicleController, :update_chase_state
     end
@@ -152,6 +153,7 @@ defmodule ShotElixirWeb.Router do
     get "/weapons/categories", WeaponController, :categories
 
     resources "/weapons", WeaponController do
+      post "/duplicate", WeaponController, :duplicate
       delete "/image", WeaponController, :remove_image
     end
 
@@ -162,6 +164,7 @@ defmodule ShotElixirWeb.Router do
     post "/schticks/import", SchticksController, :import
 
     resources "/schticks", SchticksController do
+      post "/duplicate", SchticksController, :duplicate
       delete "/image", SchticksController, :remove_image
     end
 
@@ -171,6 +174,7 @@ defmodule ShotElixirWeb.Router do
 
     # Sites with attunement
     resources "/sites", SiteController do
+      post "/duplicate", SiteController, :duplicate
       post "/attune", SiteController, :attune
       delete "/attune/:character_id", SiteController, :unattune
       delete "/image", SiteController, :remove_image
@@ -178,12 +182,14 @@ defmodule ShotElixirWeb.Router do
 
     # Parties with membership
     resources "/parties", PartyController do
+      post "/duplicate", PartyController, :duplicate
       post "/members", PartyController, :add_member
       delete "/members/:membership_id", PartyController, :remove_member
       delete "/image", PartyController, :remove_image
     end
 
     resources "/factions", FactionController do
+      post "/duplicate", FactionController, :duplicate
       delete "/image", FactionController, :remove_image
     end
 

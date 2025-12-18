@@ -431,6 +431,50 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
     end
   end
 
+  # POST /api/v2/sites/:id/duplicate
+  def duplicate(conn, %{"site_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, campaign_id} <- ensure_campaign(current_user),
+         %{} = site <- Sites.get_site(id),
+         true <- site.campaign_id == campaign_id,
+         {:ok, new_site} <- Sites.duplicate_site(site) do
+      conn
+      |> put_status(:created)
+      |> put_view(ShotElixirWeb.Api.V2.SiteView)
+      |> render("show.json", site: new_site)
+    else
+      {:error, :no_campaign} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Site not found"})
+
+      false ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Site does not belong to current campaign"})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> put_view(ShotElixirWeb.Api.V2.SiteView)
+        |> render("error.json", changeset: changeset)
+    end
+  end
+
+  defp ensure_campaign(user) do
+    if user.current_campaign_id do
+      {:ok, user.current_campaign_id}
+    else
+      {:error, :no_campaign}
+    end
+  end
+
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||

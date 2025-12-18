@@ -7,6 +7,7 @@ defmodule ShotElixir.Parties do
   alias ShotElixir.Repo
   alias ShotElixir.Parties.{Party, Membership}
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
   def list_parties(campaign_id) do
@@ -435,6 +436,105 @@ defmodule ShotElixir.Parties do
     case get_party(party_id) do
       nil -> :ok
       party -> broadcast_change(party, :update)
+    end
+  end
+
+  @doc """
+  Duplicates a party, creating a new party with the same attributes.
+  Also copies all memberships (characters and vehicles) to the new party.
+  The new party has a unique name within the campaign.
+  """
+  def duplicate_party(%Party{} = party) do
+    # Generate unique name for the duplicate
+    unique_name = generate_unique_name(party.name, party.campaign_id)
+
+    attrs =
+      Map.from_struct(party)
+      |> Map.delete(:id)
+      |> Map.delete(:__meta__)
+      |> Map.delete(:created_at)
+      |> Map.delete(:updated_at)
+      |> Map.delete(:image_url)
+      |> Map.delete(:image_positions)
+      |> Map.delete(:campaign)
+      |> Map.delete(:faction)
+      |> Map.delete(:juncture)
+      |> Map.delete(:memberships)
+      |> Map.put(:name, unique_name)
+
+    # Create the new party and copy memberships
+    Repo.transaction(fn ->
+      case create_party(attrs) do
+        {:ok, new_party} ->
+          # Queue image copy from original to new party
+          queue_image_copy(party, new_party)
+
+          # Copy all memberships from the original party
+          memberships = list_party_memberships(party.id)
+
+          Enum.each(memberships, fn membership ->
+            member_attrs = %{
+              "character_id" => membership.character_id,
+              "vehicle_id" => membership.vehicle_id
+            }
+
+            add_member(new_party.id, member_attrs)
+          end)
+
+          # Reload the new party with all preloads
+          get_party!(new_party.id)
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp queue_image_copy(source, target) do
+    %{
+      "source_type" => "Party",
+      "source_id" => source.id,
+      "target_type" => "Party",
+      "target_id" => target.id
+    }
+    |> ImageCopyWorker.new()
+    |> Oban.insert()
+  end
+
+  @doc """
+  Generates a unique name for a party within a campaign.
+  Strips any existing trailing number suffix like " (1)", " (2)", etc.
+  Then finds the next available number if the base name exists.
+  """
+  def generate_unique_name(name, campaign_id) when is_binary(name) and is_binary(campaign_id) do
+    trimmed_name = String.trim(name)
+
+    # Strip any existing trailing number suffix like " (1)", " (2)", etc.
+    base_name = Regex.replace(~r/ \(\d+\)$/, trimmed_name, "")
+
+    # Check if the base name exists
+    case Repo.exists?(
+           from p in Party, where: p.campaign_id == ^campaign_id and p.name == ^base_name
+         ) do
+      false ->
+        base_name
+
+      true ->
+        # Find the next available number
+        find_next_available_name(base_name, campaign_id, 1)
+    end
+  end
+
+  def generate_unique_name(name, _campaign_id), do: name
+
+  defp find_next_available_name(base_name, campaign_id, counter) do
+    new_name = "#{base_name} (#{counter})"
+
+    case Repo.exists?(
+           from p in Party, where: p.campaign_id == ^campaign_id and p.name == ^new_name
+         ) do
+      false -> new_name
+      true -> find_next_available_name(base_name, campaign_id, counter + 1)
     end
   end
 end

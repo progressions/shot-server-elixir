@@ -430,6 +430,50 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
     end
   end
 
+  # POST /api/v2/parties/:id/duplicate
+  def duplicate(conn, %{"party_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, campaign_id} <- ensure_campaign(current_user),
+         %{} = party <- Parties.get_party(id),
+         true <- party.campaign_id == campaign_id,
+         {:ok, new_party} <- Parties.duplicate_party(party) do
+      conn
+      |> put_status(:created)
+      |> put_view(ShotElixirWeb.Api.V2.PartyView)
+      |> render("show.json", party: new_party)
+    else
+      {:error, :no_campaign} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      false ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Party does not belong to current campaign"})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> put_view(ShotElixirWeb.Api.V2.PartyView)
+        |> render("error.json", changeset: changeset)
+    end
+  end
+
+  defp ensure_campaign(user) do
+    if user.current_campaign_id do
+      {:ok, user.current_campaign_id}
+    else
+      {:error, :no_campaign}
+    end
+  end
+
   # DELETE /api/v2/parties/:id/members/:membership_id
   def remove_member(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)

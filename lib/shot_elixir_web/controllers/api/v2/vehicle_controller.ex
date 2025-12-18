@@ -115,30 +115,28 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
   # PATCH/PUT /api/v2/vehicles/:id
   def update(conn, %{"id" => id, "vehicle" => vehicle_params}) do
     current_user = Guardian.Plug.current_resource(conn)
-    # Parse JSON params first to handle FormData with stringified JSON
-    parsed_params = parse_json_params(vehicle_params)
 
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
          :ok <- authorize_vehicle_edit(vehicle, current_user) do
+      # Parse JSON params after authorization to fail fast on invalid requests
+      parsed_params = parse_json_params(vehicle_params)
+
       # Handle image upload if present
-      # Only check for Plug.Upload if vehicle_params is a map (not a JSON string)
+      # Plug.Upload only exists when vehicle_params is a map from FormData, not a JSON string
       updated_vehicle =
-        case vehicle_params do
-          params when is_map(params) ->
-            case Map.get(params, "image") do
-              %Plug.Upload{} = upload ->
-                case Vehicles.update_vehicle(vehicle, %{"image" => upload}) do
-                  {:ok, v} -> v
-                  _ -> vehicle
-                end
+        if is_map(vehicle_params) do
+          case Map.get(vehicle_params, "image") do
+            %Plug.Upload{} = upload ->
+              case Vehicles.update_vehicle(vehicle, %{"image" => upload}) do
+                {:ok, v} -> v
+                _ -> vehicle
+              end
 
-              _ ->
-                vehicle
-            end
-
-          _ ->
-            # vehicle_params is a string, no Plug.Upload possible
-            vehicle
+            _ ->
+              vehicle
+          end
+        else
+          vehicle
         end
 
       # Continue with normal update using parsed params
@@ -278,6 +276,23 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
         conn
         |> put_status(:unprocessable_entity)
         |> json(%{error: inspect(reason)})
+    end
+  end
+
+  # POST /api/v2/vehicles/:vehicle_id/duplicate
+  def duplicate(conn, %{"vehicle_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
+         :ok <- authorize_vehicle_access(vehicle, current_user),
+         {:ok, new_vehicle} <- Vehicles.duplicate_vehicle(vehicle, current_user) do
+      conn
+      |> put_status(:created)
+      |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+      |> render("show.json", vehicle: new_vehicle)
+    else
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
     end
   end
 

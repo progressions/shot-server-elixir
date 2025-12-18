@@ -7,6 +7,7 @@ defmodule ShotElixir.Vehicles do
   alias ShotElixir.Repo
   alias ShotElixir.Vehicles.Vehicle
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
   def list_vehicles(campaign_id) do
@@ -541,5 +542,87 @@ defmodule ShotElixir.Vehicles do
       %{id: "helicopter", name: "Helicopter", frame: 10, handling: 10},
       %{id: "speedboat", name: "Speedboat", frame: 9, handling: 11}
     ]
+  end
+
+  @doc """
+  Duplicates a vehicle, creating a new vehicle with the same attributes.
+  The new vehicle is assigned to the given user with a unique name.
+  """
+  def duplicate_vehicle(%Vehicle{} = vehicle, user) do
+    # Generate unique name for the duplicate
+    unique_name = generate_unique_name(vehicle.name, vehicle.campaign_id)
+
+    attrs =
+      Map.from_struct(vehicle)
+      |> Map.delete(:id)
+      |> Map.delete(:__meta__)
+      |> Map.delete(:created_at)
+      |> Map.delete(:updated_at)
+      |> Map.delete(:image_url)
+      |> Map.delete(:image_positions)
+      |> Map.delete(:user)
+      |> Map.delete(:campaign)
+      |> Map.delete(:faction)
+      |> Map.delete(:juncture)
+      |> Map.put(:name, unique_name)
+      |> Map.put(:user_id, user.id)
+
+    case create_vehicle(attrs) do
+      {:ok, new_vehicle} ->
+        # Queue image copy job
+        queue_image_copy(vehicle, new_vehicle)
+        {:ok, new_vehicle}
+
+      error ->
+        error
+    end
+  end
+
+  defp queue_image_copy(source, target) do
+    %{
+      "source_type" => "Vehicle",
+      "source_id" => source.id,
+      "target_type" => "Vehicle",
+      "target_id" => target.id
+    }
+    |> ImageCopyWorker.new()
+    |> Oban.insert()
+  end
+
+  @doc """
+  Generates a unique name for a vehicle within a campaign.
+  Strips any existing trailing number suffix like " (1)", " (2)", etc.
+  Then finds the next available number if the base name exists.
+  """
+  def generate_unique_name(name, campaign_id) when is_binary(name) and is_binary(campaign_id) do
+    trimmed_name = String.trim(name)
+
+    # Strip any existing trailing number suffix like " (1)", " (2)", etc.
+    base_name = Regex.replace(~r/ \(\d+\)$/, trimmed_name, "")
+
+    # Check if the base name exists
+    case Repo.exists?(
+           from v in Vehicle, where: v.campaign_id == ^campaign_id and v.name == ^base_name
+         ) do
+      false ->
+        base_name
+
+      true ->
+        # Find the next available number
+        find_next_available_name(base_name, campaign_id, 1)
+    end
+  end
+
+  def generate_unique_name(name, _campaign_id), do: name
+
+  defp find_next_available_name(base_name, campaign_id, counter) do
+    new_name = "#{base_name} (#{counter})"
+
+    case Repo.exists?(
+           from v in Vehicle, where: v.campaign_id == ^campaign_id and v.name == ^new_name
+         ) do
+      false -> new_name
+      true -> find_next_available_name(base_name, campaign_id, counter + 1)
+    end
   end
 end

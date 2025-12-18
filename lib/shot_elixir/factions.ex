@@ -7,6 +7,7 @@ defmodule ShotElixir.Factions do
   alias ShotElixir.Repo
   alias ShotElixir.Factions.Faction
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
   def list_factions(campaign_id) do
@@ -315,5 +316,87 @@ defmodule ShotElixir.Factions do
     |> Ecto.Changeset.change(active: false)
     |> Repo.update()
     |> broadcast_result(:delete)
+  end
+
+  @doc """
+  Duplicates a faction, creating a new faction with the same attributes.
+  The new faction has a unique name within the campaign.
+  """
+  def duplicate_faction(%Faction{} = faction) do
+    # Generate unique name for the duplicate
+    unique_name = generate_unique_name(faction.name, faction.campaign_id)
+
+    attrs =
+      Map.from_struct(faction)
+      |> Map.delete(:id)
+      |> Map.delete(:__meta__)
+      |> Map.delete(:created_at)
+      |> Map.delete(:updated_at)
+      |> Map.delete(:image_url)
+      |> Map.delete(:image_positions)
+      |> Map.delete(:campaign)
+      |> Map.delete(:characters)
+      |> Map.delete(:vehicles)
+      |> Map.delete(:sites)
+      |> Map.delete(:parties)
+      |> Map.delete(:junctures)
+      |> Map.put(:name, unique_name)
+
+    case create_faction(attrs) do
+      {:ok, new_faction} ->
+        queue_image_copy(faction, new_faction)
+        {:ok, new_faction}
+
+      error ->
+        error
+    end
+  end
+
+  defp queue_image_copy(source, target) do
+    %{
+      "source_type" => "Faction",
+      "source_id" => source.id,
+      "target_type" => "Faction",
+      "target_id" => target.id
+    }
+    |> ImageCopyWorker.new()
+    |> Oban.insert()
+  end
+
+  @doc """
+  Generates a unique name for a faction within a campaign.
+  Strips any existing trailing number suffix like " (1)", " (2)", etc.
+  Then finds the next available number if the base name exists.
+  """
+  def generate_unique_name(name, campaign_id) when is_binary(name) and is_binary(campaign_id) do
+    trimmed_name = String.trim(name)
+
+    # Strip any existing trailing number suffix like " (1)", " (2)", etc.
+    base_name = Regex.replace(~r/ \(\d+\)$/, trimmed_name, "")
+
+    # Check if the base name exists
+    case Repo.exists?(
+           from f in Faction, where: f.campaign_id == ^campaign_id and f.name == ^base_name
+         ) do
+      false ->
+        base_name
+
+      true ->
+        # Find the next available number
+        find_next_available_name(base_name, campaign_id, 1)
+    end
+  end
+
+  def generate_unique_name(name, _campaign_id), do: name
+
+  defp find_next_available_name(base_name, campaign_id, counter) do
+    new_name = "#{base_name} (#{counter})"
+
+    case Repo.exists?(
+           from f in Faction, where: f.campaign_id == ^campaign_id and f.name == ^new_name
+         ) do
+      false -> new_name
+      true -> find_next_available_name(base_name, campaign_id, counter + 1)
+    end
   end
 end

@@ -279,6 +279,47 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
     end
   end
 
+  # POST /api/v2/weapons/:weapon_id/duplicate
+  def duplicate(conn, %{"weapon_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with {:ok, campaign_id} <- ensure_campaign(current_user),
+         %{} = weapon <- Weapons.get_weapon(id),
+         true <- weapon.campaign_id == campaign_id,
+         {:ok, new_weapon} <- Weapons.duplicate_weapon(weapon) do
+      conn
+      |> put_status(:created)
+      |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+      |> render("show.json", weapon: new_weapon)
+    else
+      {:error, :unauthorized} ->
+        conn
+        |> put_status(:unauthorized)
+        |> json(%{error: "Not authenticated"})
+
+      {:error, :no_campaign} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+
+      false ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Weapon not found"})
+
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Weapon not found"})
+
+      {:error, changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("error.json", changeset: changeset)
+    end
+  end
+
   defp ensure_campaign(nil), do: {:error, :unauthorized}
   defp ensure_campaign(%{current_campaign_id: nil}), do: {:error, :no_campaign}
   defp ensure_campaign(%{current_campaign_id: campaign_id}), do: {:ok, campaign_id}
