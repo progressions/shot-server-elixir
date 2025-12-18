@@ -1169,4 +1169,276 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert Enum.sort(Map.keys(fight_data)) == ["entity_class", "id", "image_url", "name"]
     end
   end
+
+  describe "duplicate character shots" do
+    alias ShotElixir.Fights.Shot
+    import Ecto.Query
+
+    setup %{gamemaster: gm, campaign: campaign, player: player} do
+      # Create a second character for testing
+      {:ok, character1} =
+        Characters.create_character(%{
+          name: "Character One",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      {:ok, character2} =
+        Characters.create_character(%{
+          name: "Character Two",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{"Type" => "NPC"}
+        })
+
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Duplicate Test Fight",
+          campaign_id: campaign.id
+        })
+
+      %{character1: character1, character2: character2, fight: fight}
+    end
+
+    test "adding same character multiple times creates multiple shot records", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      character1: character1
+    } do
+      # Add character1 three times
+      update_attrs = %{
+        character_ids: [character1.id, character1.id, character1.id]
+      }
+
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: update_attrs)
+      assert json_response(conn, 200)
+
+      # Verify three shots were created for the same character
+      shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(shots) == 3
+    end
+
+    test "reducing duplicate count only removes some shot records", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      character1: character1
+    } do
+      conn = authenticate(conn, gm)
+
+      # First add character1 three times
+      conn1 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            character_ids: [character1.id, character1.id, character1.id]
+          }
+        )
+
+      assert json_response(conn1, 200)
+
+      # Verify three shots
+      shots_before =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(shots_before) == 3
+
+      # Now reduce to only one instance
+      conn2 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            character_ids: [character1.id]
+          }
+        )
+
+      assert json_response(conn2, 200)
+
+      # Verify only one shot remains
+      shots_after =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(shots_after) == 1
+    end
+
+    test "removing duplicates removes newest shots first", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      character1: character1
+    } do
+      conn = authenticate(conn, gm)
+
+      # Manually create shots with different timestamps to test "newest first" removal
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      old_time = DateTime.add(now, -3600, :second)
+      medium_time = DateTime.add(now, -1800, :second)
+      new_time = now
+
+      # Insert shots directly with specific timestamps
+      # Shot schema uses created_at (not inserted_at) per timestamps() config
+      {:ok, oldest_shot} =
+        ShotElixir.Repo.insert(%Shot{
+          fight_id: fight.id,
+          character_id: character1.id,
+          shot: nil,
+          created_at: old_time,
+          updated_at: old_time
+        })
+
+      {:ok, _middle_shot} =
+        ShotElixir.Repo.insert(%Shot{
+          fight_id: fight.id,
+          character_id: character1.id,
+          shot: nil,
+          created_at: medium_time,
+          updated_at: medium_time
+        })
+
+      {:ok, _newest_shot} =
+        ShotElixir.Repo.insert(%Shot{
+          fight_id: fight.id,
+          character_id: character1.id,
+          shot: nil,
+          created_at: new_time,
+          updated_at: new_time
+        })
+
+      # Verify three shots exist
+      shots_before =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(shots_before) == 3
+
+      # Reduce to one shot via API
+      conn =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            character_ids: [character1.id]
+          }
+        )
+
+      assert json_response(conn, 200)
+
+      # The remaining shot should be the oldest one
+      shots_after =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(shots_after) == 1
+      assert List.first(shots_after).id == oldest_shot.id
+    end
+
+    test "handles mix of duplicates and unique characters", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      character1: character1,
+      character2: character2
+    } do
+      conn = authenticate(conn, gm)
+
+      # Add character1 twice and character2 once
+      conn =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            character_ids: [character1.id, character2.id, character1.id]
+          }
+        )
+
+      assert json_response(conn, 200)
+
+      # Verify character1 has 2 shots
+      char1_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(char1_shots) == 2
+
+      # Verify character2 has 1 shot
+      char2_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character2.id
+        )
+
+      assert length(char2_shots) == 1
+    end
+
+    test "completely removing a duplicated character removes all shots", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      character1: character1,
+      character2: character2
+    } do
+      conn = authenticate(conn, gm)
+
+      # First add character1 three times
+      conn1 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            character_ids: [character1.id, character1.id, character1.id]
+          }
+        )
+
+      assert json_response(conn1, 200)
+
+      # Verify three shots
+      shots_before =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(shots_before) == 3
+
+      # Now remove character1 entirely by passing only character2
+      conn2 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            character_ids: [character2.id]
+          }
+        )
+
+      assert json_response(conn2, 200)
+
+      # Verify character1 has no shots
+      char1_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character1.id
+        )
+
+      assert length(char1_shots) == 0
+
+      # Verify character2 has one shot
+      char2_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^character2.id
+        )
+
+      assert length(char2_shots) == 1
+    end
+  end
 end
