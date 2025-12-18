@@ -1441,4 +1441,276 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert length(char2_shots) == 1
     end
   end
+
+  describe "duplicate vehicle shots" do
+    alias ShotElixir.Fights.Shot
+    import Ecto.Query
+
+    setup %{gamemaster: gm, campaign: campaign, player: player} do
+      # Create vehicles for testing
+      {:ok, vehicle1} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle One",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{}
+        })
+
+      {:ok, vehicle2} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle Two",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{}
+        })
+
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Vehicle Duplicate Test Fight",
+          campaign_id: campaign.id
+        })
+
+      %{vehicle1: vehicle1, vehicle2: vehicle2, fight: fight}
+    end
+
+    test "adding same vehicle multiple times creates multiple shot records", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      vehicle1: vehicle1
+    } do
+      # Add vehicle1 three times
+      update_attrs = %{
+        vehicle_ids: [vehicle1.id, vehicle1.id, vehicle1.id]
+      }
+
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: update_attrs)
+      assert json_response(conn, 200)
+
+      # Verify three shots were created for the same vehicle
+      shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(shots) == 3
+    end
+
+    test "reducing duplicate count only removes some shot records", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      vehicle1: vehicle1
+    } do
+      conn = authenticate(conn, gm)
+
+      # First add vehicle1 three times
+      conn1 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            vehicle_ids: [vehicle1.id, vehicle1.id, vehicle1.id]
+          }
+        )
+
+      assert json_response(conn1, 200)
+
+      # Verify three shots
+      shots_before =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(shots_before) == 3
+
+      # Now reduce to only one instance
+      conn2 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            vehicle_ids: [vehicle1.id]
+          }
+        )
+
+      assert json_response(conn2, 200)
+
+      # Verify only one shot remains
+      shots_after =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(shots_after) == 1
+    end
+
+    test "removing duplicates removes newest shots first", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      vehicle1: vehicle1
+    } do
+      conn = authenticate(conn, gm)
+
+      # Manually create shots with different timestamps to test "newest first" removal
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+      old_time = DateTime.add(now, -3600, :second)
+      medium_time = DateTime.add(now, -1800, :second)
+      new_time = now
+
+      # Insert shots directly with specific timestamps
+      # Shot schema uses created_at (not inserted_at) per timestamps() config
+      {:ok, oldest_shot} =
+        ShotElixir.Repo.insert(%Shot{
+          fight_id: fight.id,
+          vehicle_id: vehicle1.id,
+          shot: nil,
+          created_at: old_time,
+          updated_at: old_time
+        })
+
+      {:ok, _middle_shot} =
+        ShotElixir.Repo.insert(%Shot{
+          fight_id: fight.id,
+          vehicle_id: vehicle1.id,
+          shot: nil,
+          created_at: medium_time,
+          updated_at: medium_time
+        })
+
+      {:ok, _newest_shot} =
+        ShotElixir.Repo.insert(%Shot{
+          fight_id: fight.id,
+          vehicle_id: vehicle1.id,
+          shot: nil,
+          created_at: new_time,
+          updated_at: new_time
+        })
+
+      # Verify three shots exist
+      shots_before =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(shots_before) == 3
+
+      # Reduce to one shot via API
+      conn =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            vehicle_ids: [vehicle1.id]
+          }
+        )
+
+      assert json_response(conn, 200)
+
+      # The remaining shot should be the oldest one
+      shots_after =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(shots_after) == 1
+      assert List.first(shots_after).id == oldest_shot.id
+    end
+
+    test "handles mix of duplicates and unique vehicles", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      vehicle1: vehicle1,
+      vehicle2: vehicle2
+    } do
+      conn = authenticate(conn, gm)
+
+      # Add vehicle1 twice and vehicle2 once
+      conn =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            vehicle_ids: [vehicle1.id, vehicle2.id, vehicle1.id]
+          }
+        )
+
+      assert json_response(conn, 200)
+
+      # Verify vehicle1 has 2 shots
+      vehicle1_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(vehicle1_shots) == 2
+
+      # Verify vehicle2 has 1 shot
+      vehicle2_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle2.id
+        )
+
+      assert length(vehicle2_shots) == 1
+    end
+
+    test "completely removing a duplicated vehicle removes all shots", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      vehicle1: vehicle1,
+      vehicle2: vehicle2
+    } do
+      conn = authenticate(conn, gm)
+
+      # First add vehicle1 three times
+      conn1 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            vehicle_ids: [vehicle1.id, vehicle1.id, vehicle1.id]
+          }
+        )
+
+      assert json_response(conn1, 200)
+
+      # Verify three shots
+      shots_before =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(shots_before) == 3
+
+      # Now remove vehicle1 entirely by passing only vehicle2
+      conn2 =
+        patch(conn, ~p"/api/v2/fights/#{fight.id}",
+          fight: %{
+            vehicle_ids: [vehicle2.id]
+          }
+        )
+
+      assert json_response(conn2, 200)
+
+      # Verify vehicle1 has no shots
+      vehicle1_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle1.id
+        )
+
+      assert length(vehicle1_shots) == 0
+
+      # Verify vehicle2 has one shot
+      vehicle2_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^vehicle2.id
+        )
+
+      assert length(vehicle2_shots) == 1
+    end
+  end
 end

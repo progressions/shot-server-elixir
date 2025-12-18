@@ -457,72 +457,73 @@ defmodule ShotElixir.Fights do
   end
 
   defp sync_vehicle_shots(fight, vehicle_ids) do
-    # Get current vehicle IDs in the fight
+    # Get current shots with vehicle_ids in the fight
     existing_shots =
       Repo.all(from s in Shot, where: s.fight_id == ^fight.id and not is_nil(s.vehicle_id))
 
-    # Convert existing vehicle IDs to binary format for comparison
-    existing_vehicle_ids =
-      Enum.map(existing_shots, fn shot ->
-        case Ecto.UUID.dump(shot.vehicle_id) do
-          {:ok, binary} -> binary
-          :error -> nil
-        end
-      end)
-      |> Enum.reject(&is_nil/1)
+    # Count existing shots per vehicle_id
+    existing_counts =
+      existing_shots
+      |> Enum.group_by(& &1.vehicle_id)
+      |> Enum.map(fn {vehicle_id, shots} -> {vehicle_id, length(shots)} end)
+      |> Map.new()
 
-    # Convert incoming string UUIDs to binary for comparison
-    new_vehicle_ids_binary =
-      Enum.map(vehicle_ids || [], fn id ->
-        case Ecto.UUID.dump(id) do
-          {:ok, binary} -> binary
-          :error -> nil
-        end
-      end)
-      |> Enum.reject(&is_nil/1)
+    # Count desired shots per vehicle_id (preserving duplicates)
+    desired_counts =
+      (vehicle_ids || [])
+      |> Enum.frequencies()
 
-    # Find IDs to add and remove (comparing binary formats)
-    ids_to_add = new_vehicle_ids_binary -- existing_vehicle_ids
-    ids_to_remove = existing_vehicle_ids -- new_vehicle_ids_binary
+    # Get all unique vehicle IDs from both existing and desired
+    all_vehicle_ids =
+      MapSet.union(
+        MapSet.new(Map.keys(existing_counts)),
+        MapSet.new(Map.keys(desired_counts))
+      )
 
-    # Add new shots for new vehicles
-    Enum.each(ids_to_add, fn vehicle_id_binary ->
-      # Convert binary back to string for changeset
-      {:ok, vehicle_id_string} = Ecto.UUID.cast(vehicle_id_binary)
+    # For each vehicle_id, add or remove shots to match desired count
+    Enum.each(all_vehicle_ids, fn vehicle_id ->
+      existing_count = Map.get(existing_counts, vehicle_id, 0)
+      desired_count = Map.get(desired_counts, vehicle_id, 0)
 
-      %Shot{}
-      |> Shot.changeset(%{fight_id: fight.id, vehicle_id: vehicle_id_string, shot: nil})
-      |> Repo.insert!()
-    end)
+      cond do
+        desired_count > existing_count ->
+          # Add more shots for this vehicle
+          shots_to_add = desired_count - existing_count
 
-    # Remove shots for vehicles no longer in the fight
-    if ids_to_remove != [] do
-      # Convert binary UUIDs back to strings for the query
-      ids_to_remove_strings =
-        Enum.map(ids_to_remove, fn binary ->
-          {:ok, string} = Ecto.UUID.cast(binary)
-          string
-        end)
+          Enum.each(1..shots_to_add, fn _ ->
+            %Shot{}
+            |> Shot.changeset(%{fight_id: fight.id, vehicle_id: vehicle_id, shot: nil})
+            |> Repo.insert!()
+          end)
 
-      # Get IDs of shots to be removed
-      shots_to_remove_ids =
-        from(s in Shot,
-          where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove_strings,
-          select: s.id
-        )
-        |> Repo.all()
+        desired_count < existing_count ->
+          # Remove excess shots for this vehicle
+          shots_to_remove_count = existing_count - desired_count
 
-      # Clear driving_id on any shots referencing the shots to be removed
-      if shots_to_remove_ids != [] do
-        from(s in Shot,
-          where: s.driving_id in ^shots_to_remove_ids
-        )
-        |> Repo.update_all(set: [driving_id: nil])
+          # Get existing shot IDs for this vehicle, sorted by creation date (remove newest first)
+          shots_for_vehicle =
+            existing_shots
+            |> Enum.filter(&(&1.vehicle_id == vehicle_id))
+            |> Enum.sort_by(& &1.created_at, :desc)
+            |> Enum.take(shots_to_remove_count)
+
+          shot_ids_to_remove = Enum.map(shots_for_vehicle, & &1.id)
+
+          if shot_ids_to_remove != [] do
+            # Clear driving_id on any shots referencing the shots to be removed
+            from(s in Shot, where: s.driving_id in ^shot_ids_to_remove)
+            |> Repo.update_all(set: [driving_id: nil])
+
+            # Delete the shots
+            from(s in Shot, where: s.id in ^shot_ids_to_remove)
+            |> Repo.delete_all()
+          end
+
+        true ->
+          # Count matches, nothing to do
+          :ok
       end
-
-      from(s in Shot, where: s.fight_id == ^fight.id and s.vehicle_id in ^ids_to_remove_strings)
-      |> Repo.delete_all()
-    end
+    end)
 
     {:ok, []}
   end
