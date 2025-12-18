@@ -29,13 +29,7 @@ defmodule ShotElixir.Discord.Commands do
 
     choices =
       if campaign do
-        # Get active, unended fights for this campaign
-        Fights.list_fights(campaign.id)
-        |> Enum.filter(fn fight -> fight.active && is_nil(fight.ended_at) end)
-        |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(input_value)))
-        # Discord allows max 25 choices
-        |> Enum.take(25)
-        |> Enum.map(&%{name: &1.name, value: &1.name})
+        build_fight_autocomplete_choices(campaign.id, input_value)
       else
         []
       end
@@ -48,6 +42,19 @@ defmodule ShotElixir.Discord.Commands do
         choices: choices
       }
     })
+  end
+
+  @doc """
+  Builds autocomplete choices for fight selection.
+  Returns only active, unended fights matching the input filter.
+  """
+  def build_fight_autocomplete_choices(campaign_id, input_value \\ "") do
+    Fights.list_fights(campaign_id)
+    |> Enum.filter(fn fight -> fight.active && is_nil(fight.ended_at) end)
+    |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(input_value)))
+    # Discord allows max 25 choices
+    |> Enum.take(25)
+    |> Enum.map(&%{name: &1.name, value: &1.name})
   end
 
   @doc """

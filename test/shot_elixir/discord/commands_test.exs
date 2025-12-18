@@ -5,7 +5,208 @@ defmodule ShotElixir.Discord.CommandsTest do
   alias ShotElixir.Discord.CurrentFight
   alias ShotElixir.{Accounts, Campaigns, Characters, Fights}
 
+  describe "build_fight_autocomplete_choices/2" do
+    test "returns only active, unended fights" do
+      # Create a user and campaign
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fight-autocomplete1@example.com",
+          password: "password123",
+          first_name: "Fight",
+          last_name: "Autocomplete"
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fight Autocomplete Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create an active, unended fight (should appear)
+      {:ok, _active_fight} =
+        Fights.create_fight(%{
+          name: "Active Battle",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      choices = Commands.build_fight_autocomplete_choices(campaign.id, "")
+
+      assert length(choices) == 1
+      assert hd(choices).name == "Active Battle"
+      assert hd(choices).value == "Active Battle"
+    end
+
+    test "excludes ended fights from autocomplete" do
+      # Create a user and campaign
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fight-autocomplete2@example.com",
+          password: "password123",
+          first_name: "Fight",
+          last_name: "Ended"
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fight Ended Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create an active, unended fight (should appear)
+      {:ok, _active_fight} =
+        Fights.create_fight(%{
+          name: "Ongoing Battle",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Create an active but ended fight (should NOT appear)
+      {:ok, _ended_fight} =
+        Fights.create_fight(%{
+          name: "Finished Battle",
+          campaign_id: campaign.id,
+          active: true,
+          ended_at: DateTime.utc_now()
+        })
+
+      choices = Commands.build_fight_autocomplete_choices(campaign.id, "")
+
+      assert length(choices) == 1
+      assert hd(choices).name == "Ongoing Battle"
+      refute Enum.any?(choices, fn c -> c.name == "Finished Battle" end)
+    end
+
+    test "excludes inactive fights from autocomplete" do
+      # Create a user and campaign
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fight-autocomplete3@example.com",
+          password: "password123",
+          first_name: "Fight",
+          last_name: "Inactive"
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fight Inactive Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create an active fight (should appear)
+      {:ok, _active_fight} =
+        Fights.create_fight(%{
+          name: "Active Skirmish",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Create an inactive fight (should NOT appear)
+      {:ok, _inactive_fight} =
+        Fights.create_fight(%{
+          name: "Inactive Skirmish",
+          campaign_id: campaign.id,
+          active: false
+        })
+
+      choices = Commands.build_fight_autocomplete_choices(campaign.id, "")
+
+      assert length(choices) == 1
+      assert hd(choices).name == "Active Skirmish"
+    end
+
+    test "filters fights by input value (case insensitive)" do
+      # Create a user and campaign
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fight-autocomplete4@example.com",
+          password: "password123",
+          first_name: "Fight",
+          last_name: "Filter"
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fight Filter Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create multiple active fights
+      {:ok, _fight1} =
+        Fights.create_fight(%{
+          name: "Dragon's Lair",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      {:ok, _fight2} =
+        Fights.create_fight(%{
+          name: "Temple Showdown",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      {:ok, _fight3} =
+        Fights.create_fight(%{
+          name: "Dragon's Cave",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Filter by "dragon" (case insensitive)
+      choices = Commands.build_fight_autocomplete_choices(campaign.id, "dragon")
+
+      assert length(choices) == 2
+      names = Enum.map(choices, & &1.name)
+      assert "Dragon's Lair" in names
+      assert "Dragon's Cave" in names
+      refute "Temple Showdown" in names
+    end
+
+    test "returns empty list for campaign with no matching fights" do
+      # Create a user and campaign
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "fight-autocomplete5@example.com",
+          password: "password123",
+          first_name: "Fight",
+          last_name: "Empty"
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Fight Empty Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Only create ended fights
+      {:ok, _ended_fight} =
+        Fights.create_fight(%{
+          name: "Old Battle",
+          campaign_id: campaign.id,
+          active: true,
+          ended_at: DateTime.utc_now()
+        })
+
+      choices = Commands.build_fight_autocomplete_choices(campaign.id, "")
+
+      assert choices == []
+    end
+  end
+
   describe "handle_start started_at behavior" do
+    # Note: These tests simulate the handle_start logic rather than calling the actual
+    # function directly. This is because handle_start requires Discord interaction objects
+    # which are complex to mock (involving Nostrum API responses, Discord channel/guild IDs,
+    # and async job enqueueing). The simulated tests validate the core database behavior
+    # that handle_start depends on - specifically that started_at is only set when nil.
+    # The actual handle_start function is integration-tested via Discord bot interactions.
+
     test "sets started_at when fight has not been started" do
       # Create a user and campaign
       {:ok, user} =
