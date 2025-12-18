@@ -131,4 +131,6 @@ jobs:
           PGPASSWORD: postgres
 
       - name: Run tests
-        run: mix test --partitions 4 --partition ${{ matrix.partition }} --max-failures 10
+        run: mix test --max-failures 10
+        env:
+          MIX_TEST_PARTITION: ${{ matrix.partition }}
