@@ -138,4 +138,4 @@ jobs:
           PGPASSWORD: postgres
 
       - name: Run tests
-        run: mix test --max-failures 10
+        run: mix test --partitions 4 --max-failures 10
