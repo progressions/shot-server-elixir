@@ -467,4 +467,124 @@ defmodule ShotElixir.AccountsTest do
       assert cleared_user.reset_password_sent_at == nil
     end
   end
+
+  describe "current character functions" do
+    alias ShotElixir.Campaigns
+    alias ShotElixir.Characters
+
+    setup do
+      # Create a user with discord linked
+      {:ok, user} = Accounts.create_user(@valid_attrs)
+      discord_id = 123_456_789_012_345_700
+      {:ok, user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign owned by the user
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Test Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character owned by the user
+      {:ok, character} =
+        Characters.create_character(%{
+          "name" => "Test Character",
+          "user_id" => user.id,
+          "campaign_id" => campaign.id,
+          "active" => true,
+          "action_values" => %{"Type" => "PC"}
+        })
+
+      # Create another user and character (for ownership tests)
+      {:ok, other_user} =
+        Accounts.create_user(%{
+          email: "other@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User"
+        })
+
+      {:ok, other_character} =
+        Characters.create_character(%{
+          "name" => "Other Character",
+          "user_id" => other_user.id,
+          "campaign_id" => campaign.id,
+          "active" => true,
+          "action_values" => %{"Type" => "PC"}
+        })
+
+      %{
+        user: user,
+        discord_id: discord_id,
+        campaign: campaign,
+        character: character,
+        other_user: other_user,
+        other_character: other_character
+      }
+    end
+
+    test "set_current_character/2 sets a valid character for user", %{
+      user: user,
+      character: character
+    } do
+      assert {:ok, updated_user} = Accounts.set_current_character(user, character.id)
+      assert updated_user.current_character_id == character.id
+    end
+
+    test "set_current_character/2 clears character when nil is passed", %{
+      user: user,
+      character: character
+    } do
+      # First set a character
+      {:ok, user_with_char} = Accounts.set_current_character(user, character.id)
+      assert user_with_char.current_character_id == character.id
+
+      # Then clear it
+      assert {:ok, cleared_user} = Accounts.set_current_character(user_with_char, nil)
+      assert cleared_user.current_character_id == nil
+    end
+
+    test "set_current_character/2 fails when character belongs to another user", %{
+      user: user,
+      other_character: other_character
+    } do
+      assert {:error, changeset} = Accounts.set_current_character(user, other_character.id)
+
+      assert "does not belong to this user or does not exist" in changeset_errors(changeset).current_character_id
+    end
+
+    test "set_current_character/2 fails when character does not exist", %{user: user} do
+      fake_id = Ecto.UUID.generate()
+      assert {:error, changeset} = Accounts.set_current_character(user, fake_id)
+
+      assert "does not belong to this user or does not exist" in changeset_errors(changeset).current_character_id
+    end
+
+    test "get_user_with_current_character/1 returns user with preloaded associations", %{
+      user: user,
+      discord_id: discord_id,
+      character: character
+    } do
+      # Set a current character first
+      {:ok, _} = Accounts.set_current_character(user, character.id)
+
+      # Fetch user with preloaded associations
+      fetched_user = Accounts.get_user_with_current_character(discord_id)
+
+      assert fetched_user.id == user.id
+      assert fetched_user.current_character.id == character.id
+      assert Ecto.assoc_loaded?(fetched_user.current_campaign)
+      assert Ecto.assoc_loaded?(fetched_user.characters)
+    end
+
+    test "get_user_with_current_character/1 returns nil for non-existent Discord ID" do
+      assert nil == Accounts.get_user_with_current_character(999_999_999_999_999_999)
+    end
+
+    test "get_user_with_current_character/1 returns nil for invalid input" do
+      assert nil == Accounts.get_user_with_current_character(nil)
+      assert nil == Accounts.get_user_with_current_character("not_an_integer")
+    end
+  end
 end

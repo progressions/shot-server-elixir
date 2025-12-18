@@ -2,6 +2,7 @@ defmodule ShotElixir.Accounts.User do
   use Ecto.Schema
   import Ecto.Changeset
   alias ShotElixir.Campaigns.Campaign
+  alias ShotElixir.Characters.Character
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Accounts.WebauthnCredential
 
@@ -31,6 +32,7 @@ defmodule ShotElixir.Accounts.User do
     field :discord_id, :integer
 
     belongs_to :current_campaign, Campaign
+    belongs_to :current_character, Character
     belongs_to :pending_invitation, ShotElixir.Invitations.Invitation
 
     has_many :campaigns, ShotElixir.Campaigns.Campaign, foreign_key: :user_id
@@ -108,8 +110,9 @@ defmodule ShotElixir.Accounts.User do
   """
   def discord_changeset(user, attrs) do
     user
-    |> cast(attrs, [:discord_id])
+    |> cast(attrs, [:discord_id, :current_character_id])
     |> unique_constraint(:discord_id, name: :users_discord_id_index)
+    |> foreign_key_constraint(:current_character_id)
   end
 
   defp set_name(changeset) do

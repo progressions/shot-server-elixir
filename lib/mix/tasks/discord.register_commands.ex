@@ -112,7 +112,17 @@ defmodule Mix.Tasks.Discord.RegisterCommands do
       },
       %{
         name: "link",
-        description: "Generate a code to link your Discord account to Chi War"
+        description: "Link your Discord account to Chi War, or set your current character",
+        options: [
+          %{
+            type: 3,
+            # STRING type
+            name: "character",
+            description: "Select your current character (only works after linking)",
+            required: false,
+            autocomplete: true
+          }
+        ]
       },
       %{
         name: "whoami",

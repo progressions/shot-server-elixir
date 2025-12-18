@@ -39,6 +39,7 @@ defmodule ShotElixir.Discord.Consumer do
           "start" -> Commands.handle_autocomplete(interaction)
           "campaign" -> Commands.handle_campaign_autocomplete(interaction)
           "advance_party" -> Commands.handle_advance_party_autocomplete(interaction)
+          "link" -> Commands.handle_link_autocomplete(interaction)
           "fortune" -> Commands.handle_fortune_autocomplete(interaction)
           _ -> :noop
         end
