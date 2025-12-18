@@ -787,7 +787,7 @@ defmodule ShotElixir.Discord.Commands do
       nil ->
         """
         There is no active fight in this server.
-        You can set a current character with `/play` to view your stats anytime.
+        You can set a current character with `/link` to view your stats anytime.
         """
 
       character ->

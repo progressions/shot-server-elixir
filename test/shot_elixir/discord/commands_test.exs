@@ -544,7 +544,7 @@ defmodule ShotElixir.Discord.CommandsTest do
       response = Commands.build_stats_response(discord_id, server_id)
 
       assert response =~ "There is no active fight in this server"
-      assert response =~ "You can set a current character with `/play`"
+      assert response =~ "You can set a current character with `/link`"
     end
 
     test "returns current character stats when no fight but current_character is set" do
@@ -557,7 +557,7 @@ defmodule ShotElixir.Discord.CommandsTest do
           last_name: "Character"
         })
 
-      discord_id = 999_888_777_666_555_444
+      discord_id = 888_777_666_555_444_333
       {:ok, user} = Accounts.link_discord(user, discord_id)
 
       # Create a campaign
