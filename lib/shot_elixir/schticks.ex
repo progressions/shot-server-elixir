@@ -50,13 +50,14 @@ defmodule ShotElixir.Schticks do
         query
       end
 
-    # Category filtering - handle "__NONE__" special case
+    # Category filtering - handle "__NONE__" special case (case-insensitive)
     query =
       if params["category"] && params["category"] != "" do
         if params["category"] == "__NONE__" do
           from s in query, where: is_nil(s.category)
         else
-          from s in query, where: s.category == ^params["category"]
+          from s in query,
+            where: fragment("lower(?) = lower(?)", s.category, ^params["category"])
         end
       else
         query
@@ -117,7 +118,8 @@ defmodule ShotElixir.Schticks do
         if params["category"] == "__NONE__" do
           from s in count_query, where: is_nil(s.category)
         else
-          from s in count_query, where: s.category == ^params["category"]
+          from s in count_query,
+            where: fragment("lower(?) = lower(?)", s.category, ^params["category"])
         end
       else
         count_query
