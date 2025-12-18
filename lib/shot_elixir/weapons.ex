@@ -8,6 +8,7 @@ defmodule ShotElixir.Weapons do
   alias ShotElixir.Repo
   alias ShotElixir.Weapons.Weapon
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
   def list_weapons(campaign_id, filters \\ %{}) do
@@ -205,5 +206,81 @@ defmodule ShotElixir.Weapons do
 
   defp total_pages(total_count, per_page) when per_page > 0 do
     div(total_count + per_page - 1, per_page)
+  end
+
+  @doc """
+  Duplicates a weapon, creating a new weapon with the same attributes.
+  The new weapon has a unique name within the campaign.
+  """
+  def duplicate_weapon(%Weapon{} = weapon) do
+    # Generate unique name for the duplicate
+    unique_name = generate_unique_name(weapon.name, weapon.campaign_id)
+
+    attrs =
+      Map.from_struct(weapon)
+      |> Map.delete(:id)
+      |> Map.delete(:__meta__)
+      |> Map.delete(:created_at)
+      |> Map.delete(:updated_at)
+      |> Map.delete(:image_url)
+      |> Map.delete(:campaign)
+      |> Map.put(:name, unique_name)
+
+    case create_weapon(attrs) do
+      {:ok, new_weapon} ->
+        queue_image_copy(weapon, new_weapon)
+        {:ok, new_weapon}
+
+      error ->
+        error
+    end
+  end
+
+  defp queue_image_copy(source, target) do
+    %{
+      "source_type" => "Weapon",
+      "source_id" => source.id,
+      "target_type" => "Weapon",
+      "target_id" => target.id
+    }
+    |> ImageCopyWorker.new()
+    |> Oban.insert()
+  end
+
+  @doc """
+  Generates a unique name for a weapon within a campaign.
+  Strips any existing trailing number suffix like " (1)", " (2)", etc.
+  Then finds the next available number if the base name exists.
+  """
+  def generate_unique_name(name, campaign_id) when is_binary(name) and is_binary(campaign_id) do
+    trimmed_name = String.trim(name)
+
+    # Strip any existing trailing number suffix like " (1)", " (2)", etc.
+    base_name = Regex.replace(~r/ \(\d+\)$/, trimmed_name, "")
+
+    # Check if the base name exists
+    case Repo.exists?(
+           from w in Weapon, where: w.campaign_id == ^campaign_id and w.name == ^base_name
+         ) do
+      false ->
+        base_name
+
+      true ->
+        # Find the next available number
+        find_next_available_name(base_name, campaign_id, 1)
+    end
+  end
+
+  def generate_unique_name(name, _campaign_id), do: name
+
+  defp find_next_available_name(base_name, campaign_id, counter) do
+    new_name = "#{base_name} (#{counter})"
+
+    case Repo.exists?(
+           from w in Weapon, where: w.campaign_id == ^campaign_id and w.name == ^new_name
+         ) do
+      false -> new_name
+      true -> find_next_available_name(base_name, campaign_id, counter + 1)
+    end
   end
 end

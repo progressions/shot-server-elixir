@@ -10,6 +10,7 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Parties.Membership
   alias ShotElixir.Sites.Attunement
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Workers.ImageCopyWorker
   alias Ecto.Multi
   use ShotElixir.Models.Broadcastable
 
@@ -703,7 +704,25 @@ defmodule ShotElixir.Characters do
       |> Map.put(:user_id, user.id)
       |> Map.put(:is_template, false)
 
-    create_character(attrs)
+    case create_character(attrs) do
+      {:ok, new_character} ->
+        queue_image_copy(character, new_character)
+        {:ok, new_character}
+
+      error ->
+        error
+    end
+  end
+
+  defp queue_image_copy(source, target) do
+    %{
+      "source_type" => "Character",
+      "source_id" => source.id,
+      "target_type" => "Character",
+      "target_id" => target.id
+    }
+    |> ImageCopyWorker.new()
+    |> Oban.insert()
   end
 
   # Advancement functions

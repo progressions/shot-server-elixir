@@ -7,6 +7,7 @@ defmodule ShotElixir.Sites do
   alias ShotElixir.Repo
   alias ShotElixir.Sites.{Site, Attunement}
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
   def list_sites(campaign_id) do
@@ -385,6 +386,105 @@ defmodule ShotElixir.Sites do
         site
         |> Repo.preload([:faction, :juncture], force: true)
         |> broadcast_change(:update)
+    end
+  end
+
+  @doc """
+  Duplicates a site, creating a new site with the same attributes.
+  Also copies all attunements (character associations) to the new site.
+  The new site has a unique name within the campaign.
+  """
+  def duplicate_site(%Site{} = site) do
+    # Generate unique name for the duplicate
+    unique_name = generate_unique_name(site.name, site.campaign_id)
+
+    attrs =
+      Map.from_struct(site)
+      |> Map.delete(:id)
+      |> Map.delete(:__meta__)
+      |> Map.delete(:created_at)
+      |> Map.delete(:updated_at)
+      |> Map.delete(:image_url)
+      |> Map.delete(:image_positions)
+      |> Map.delete(:campaign)
+      |> Map.delete(:faction)
+      |> Map.delete(:juncture)
+      |> Map.delete(:attunements)
+      |> Map.put(:name, unique_name)
+
+    # Create the new site and copy attunements
+    Repo.transaction(fn ->
+      case create_site(attrs) do
+        {:ok, new_site} ->
+          # Queue image copy from original to new site
+          queue_image_copy(site, new_site)
+
+          # Copy all attunements from the original site
+          attunements = list_site_attunements(site.id)
+
+          Enum.each(attunements, fn attunement ->
+            attunement_attrs = %{
+              "site_id" => new_site.id,
+              "character_id" => attunement.character_id
+            }
+
+            create_attunement(attunement_attrs)
+          end)
+
+          # Reload the new site with all preloads
+          get_site!(new_site.id)
+
+        {:error, changeset} ->
+          Repo.rollback(changeset)
+      end
+    end)
+  end
+
+  defp queue_image_copy(source, target) do
+    %{
+      "source_type" => "Site",
+      "source_id" => source.id,
+      "target_type" => "Site",
+      "target_id" => target.id
+    }
+    |> ImageCopyWorker.new()
+    |> Oban.insert()
+  end
+
+  @doc """
+  Generates a unique name for a site within a campaign.
+  Strips any existing trailing number suffix like " (1)", " (2)", etc.
+  Then finds the next available number if the base name exists.
+  """
+  def generate_unique_name(name, campaign_id) when is_binary(name) and is_binary(campaign_id) do
+    trimmed_name = String.trim(name)
+
+    # Strip any existing trailing number suffix like " (1)", " (2)", etc.
+    base_name = Regex.replace(~r/ \(\d+\)$/, trimmed_name, "")
+
+    # Check if the base name exists
+    case Repo.exists?(
+           from s in Site, where: s.campaign_id == ^campaign_id and s.name == ^base_name
+         ) do
+      false ->
+        base_name
+
+      true ->
+        # Find the next available number
+        find_next_available_name(base_name, campaign_id, 1)
+    end
+  end
+
+  def generate_unique_name(name, _campaign_id), do: name
+
+  defp find_next_available_name(base_name, campaign_id, counter) do
+    new_name = "#{base_name} (#{counter})"
+
+    case Repo.exists?(
+           from s in Site, where: s.campaign_id == ^campaign_id and s.name == ^new_name
+         ) do
+      false -> new_name
+      true -> find_next_available_name(base_name, campaign_id, counter + 1)
     end
   end
 end

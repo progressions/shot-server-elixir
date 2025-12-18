@@ -279,6 +279,46 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
     end
   end
 
+  # POST /api/v2/vehicles/:vehicle_id/duplicate
+  def duplicate(conn, %{"vehicle_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
+         :ok <- authorize_vehicle_edit(vehicle, current_user),
+         {:ok, new_vehicle} <- Vehicles.duplicate_vehicle(vehicle, current_user) do
+      conn
+      |> put_status(:created)
+      |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+      |> render("show.json", vehicle: new_vehicle)
+    else
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Vehicle not found"})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only campaign owners, admins, or gamemasters can duplicate vehicles"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Vehicle not found"})
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+        |> render("error.json", changeset: changeset)
+
+      {:error, reason} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: inspect(reason)})
+    end
+  end
+
   # Authorization helpers
   defp authorize_vehicle_access(vehicle, user) do
     campaign_id = vehicle.campaign_id
