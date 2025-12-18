@@ -880,17 +880,31 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert "Player Fight" in fight_names
     end
 
-    test "shows hidden fights when show_hidden=true", %{
+    test "shows all fights when visibility=all", %{
       conn: conn,
       gamemaster: gm,
       inactive_fight: inactive_fight
     } do
       conn = authenticate(conn, gm)
-      conn = get(conn, ~p"/api/v2/fights", %{show_hidden: "true"})
+      conn = get(conn, ~p"/api/v2/fights", %{visibility: "all"})
       response = json_response(conn, 200)
 
       fight_names = Enum.map(response["fights"], & &1["name"])
       assert "Inactive Fight" in fight_names
+    end
+
+    test "shows only hidden fights when visibility=hidden", %{
+      conn: conn,
+      gamemaster: gm,
+      inactive_fight: inactive_fight
+    } do
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{visibility: "hidden"})
+      response = json_response(conn, 200)
+
+      fight_names = Enum.map(response["fights"], & &1["name"])
+      assert "Inactive Fight" in fight_names
+      refute "Airport Battle" in fight_names
     end
 
     test "hides inactive fights by default", %{
