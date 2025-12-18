@@ -252,7 +252,7 @@ defmodule ShotElixir.Discord.Commands do
         campaign ->
           fights =
             Fights.list_fights(campaign.id)
-            |> Enum.filter(& &1.active)
+            |> Enum.filter(fn fight -> fight.active && is_nil(fight.ended_at) end)
 
           if Enum.empty?(fights) do
             respond(interaction, "No active fights in #{campaign.name}.")
