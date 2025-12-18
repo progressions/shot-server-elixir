@@ -306,6 +306,25 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
       conn = patch(conn, "/api/v2/vehicles/#{vehicle.id}", vehicle: @update_attrs)
       assert conn.status == 401
     end
+
+    test "updates vehicle when params are sent as JSON string (FormData compatibility)", %{
+      conn: conn,
+      gamemaster: gamemaster,
+      vehicle: vehicle
+    } do
+      # This simulates the frontend sending vehicle params as a JSON string via FormData
+      json_string = Jason.encode!(%{name: "JSON String Update", color: "green"})
+
+      conn =
+        conn
+        |> authenticate(gamemaster)
+        |> patch("/api/v2/vehicles/#{vehicle.id}", vehicle: json_string)
+
+      response = json_response(conn, 200)
+      assert response["id"] == vehicle.id
+      assert response["name"] == "JSON String Update"
+      assert response["color"] == "green"
+    end
   end
 
   describe "delete" do

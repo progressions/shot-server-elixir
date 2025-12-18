@@ -115,24 +115,34 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
   # PATCH/PUT /api/v2/vehicles/:id
   def update(conn, %{"id" => id, "vehicle" => vehicle_params}) do
     current_user = Guardian.Plug.current_resource(conn)
+    # Parse JSON params first to handle FormData with stringified JSON
+    parsed_params = parse_json_params(vehicle_params)
 
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
          :ok <- authorize_vehicle_edit(vehicle, current_user) do
       # Handle image upload if present
+      # Only check for Plug.Upload if vehicle_params is a map (not a JSON string)
       updated_vehicle =
-        case Map.get(vehicle_params, "image") do
-          %Plug.Upload{} = upload ->
-            case Vehicles.update_vehicle(vehicle, %{"image" => upload}) do
-              {:ok, v} -> v
-              _ -> vehicle
+        case vehicle_params do
+          params when is_map(params) ->
+            case Map.get(params, "image") do
+              %Plug.Upload{} = upload ->
+                case Vehicles.update_vehicle(vehicle, %{"image" => upload}) do
+                  {:ok, v} -> v
+                  _ -> vehicle
+                end
+
+              _ ->
+                vehicle
             end
 
           _ ->
+            # vehicle_params is a string, no Plug.Upload possible
             vehicle
         end
 
-      # Continue with normal update
-      case Vehicles.update_vehicle(updated_vehicle, parse_json_params(vehicle_params)) do
+      # Continue with normal update using parsed params
+      case Vehicles.update_vehicle(updated_vehicle, parsed_params) do
         {:ok, final_vehicle} ->
           conn
           |> put_view(ShotElixirWeb.Api.V2.VehicleView)
