@@ -669,4 +669,27 @@ defmodule ShotElixir.Accounts do
   end
 
   def get_user_by_discord_id(_), do: nil
+
+  @doc """
+  Sets the current character for a user (typically via Discord).
+  Returns {:ok, user} on success, {:error, changeset} on failure.
+  """
+  def set_current_character(%User{} = user, character_id) do
+    user
+    |> User.discord_changeset(%{current_character_id: character_id})
+    |> Repo.update()
+  end
+
+  @doc """
+  Gets a user by Discord ID with current character preloaded.
+  Returns nil if no user is linked to that Discord account.
+  """
+  def get_user_with_current_character(discord_id) when is_integer(discord_id) do
+    User
+    |> Repo.get_by(discord_id: discord_id)
+    |> case do
+      nil -> nil
+      user -> Repo.preload(user, [:current_character, :current_campaign, :characters])
+    end
+  end
 end

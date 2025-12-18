@@ -492,16 +492,18 @@ defmodule ShotElixir.Discord.Commands do
   end
 
   @doc """
-  Handles the /link command to generate a code for linking Discord to Chi War.
+  Handles the /link command to generate a code for linking Discord to Chi War,
+  or to set/view the current character when already linked.
   """
   def handle_link(interaction) do
     discord_id = interaction.user.id
     discord_username = interaction.user.username
+    character_name = get_option(interaction, "character")
 
     # Check if this Discord user is already linked
-    case Accounts.get_user_by_discord_id(discord_id) do
+    case Accounts.get_user_with_current_character(discord_id) do
       nil ->
-        # Generate a link code
+        # Not linked - generate a link code
         code = LinkCodes.generate(discord_id, discord_username)
         link_url = "https://chiwar.net/link-discord?code=#{code}"
 
@@ -522,11 +524,198 @@ defmodule ShotElixir.Discord.Commands do
         )
 
       user ->
+        # Already linked - handle character selection or show status
+        if character_name do
+          set_current_character(interaction, user, character_name)
+        else
+          show_link_status(interaction, user)
+        end
+    end
+  end
+
+  defp set_current_character(interaction, user, character_name) do
+    # Find the character by name from user's characters in current campaign
+    characters = get_user_characters_for_campaign(user)
+
+    character =
+      Enum.find(characters, fn char ->
+        String.downcase(char.name) == String.downcase(character_name)
+      end)
+
+    case character do
+      nil ->
         respond(
           interaction,
-          "Your Discord account is already linked to Chi War user **#{user.name}** (#{user.email}).\n\nTo unlink, use the Chi War website.",
+          "Couldn't find character \"#{character_name}\" in your current campaign.",
           ephemeral: true
         )
+
+      character ->
+        case Accounts.set_current_character(user, character.id) do
+          {:ok, _user} ->
+            # Show the character stats
+            message = build_character_stats_message(character)
+
+            respond(
+              interaction,
+              """
+              **Current character set to #{character.name}**
+
+              #{message}
+              """,
+              ephemeral: true
+            )
+
+          {:error, _} ->
+            respond(interaction, "Failed to set current character.", ephemeral: true)
+        end
+    end
+  end
+
+  defp show_link_status(interaction, user) do
+    campaign_line =
+      if user.current_campaign do
+        "Campaign: **#{user.current_campaign.name}**"
+      else
+        "Campaign: _None set_"
+      end
+
+    character_section =
+      if user.current_character do
+        char = user.current_character
+        stats_message = build_character_stats_message(char)
+
+        """
+        **Current Character: #{char.name}**
+
+        #{stats_message}
+        """
+      else
+        "Current Character: _None set_\n\nUse `/link character:<name>` to select your character."
+      end
+
+    respond(
+      interaction,
+      """
+      **Chi War Account: #{user.name}**
+      #{campaign_line}
+
+      #{character_section}
+      """,
+      ephemeral: true
+    )
+  end
+
+  defp build_character_stats_message(character) do
+    av = character.action_values || %{}
+
+    wounds = av["Wounds"] || 0
+    defense = av["Defense"] || 0
+    toughness = av["Toughness"] || 0
+    speed = av["Speed"] || 0
+    fortune = av["Fortune"] || 0
+    max_fortune = av["Max Fortune"] || 0
+    fortune_type = av["FortuneType"] || "Fortune"
+    impairments = character.impairments || 0
+
+    main_attack = av["MainAttack"] || "Guns"
+    main_attack_value = av[main_attack] || 0
+    secondary_attack = av["SecondaryAttack"]
+
+    secondary_attack_line =
+      if secondary_attack && secondary_attack != "" do
+        secondary_value = av[secondary_attack] || 0
+        "#{secondary_attack}: **#{secondary_value}**"
+      else
+        nil
+      end
+
+    lines =
+      [
+        "Type: **#{av["Type"] || "PC"}**",
+        "Wounds: **#{wounds}** | Defense: **#{defense}** | Toughness: **#{toughness}**",
+        "#{main_attack}: **#{main_attack_value}**",
+        secondary_attack_line,
+        "Speed: **#{speed}** | #{fortune_type}: **#{fortune}/#{max_fortune}**",
+        if(impairments > 0, do: "Impairments: **#{impairments}**", else: nil)
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.join(lines, "\n")
+  end
+
+  defp get_user_characters_for_campaign(user) do
+    if user.current_campaign do
+      user.characters
+      |> Enum.filter(fn char ->
+        char.active && char.campaign_id == user.current_campaign_id
+      end)
+      |> Enum.sort_by(& &1.name)
+    else
+      user.characters
+      |> Enum.filter(& &1.active)
+      |> Enum.sort_by(& &1.name)
+    end
+  end
+
+  @doc """
+  Handles autocomplete for the /link command's character parameter.
+  Lists the user's characters in their current campaign.
+  """
+  def handle_link_autocomplete(interaction) do
+    discord_id = interaction.user.id
+
+    # Get the user's current input for the character name
+    focused_option =
+      interaction.data.options
+      |> Enum.find(&Map.get(&1, :focused, false))
+
+    input_value = if focused_option, do: focused_option.value || "", else: ""
+
+    choices = build_link_autocomplete_choices(discord_id, input_value)
+
+    # Respond with autocomplete choices
+    Api.create_interaction_response(interaction, %{
+      type: 8,
+      # APPLICATION_COMMAND_AUTOCOMPLETE_RESULT
+      data: %{
+        choices: choices
+      }
+    })
+  end
+
+  @doc """
+  Builds the autocomplete choices for the /link command.
+  Returns a list of character choices for the user in their current campaign.
+  """
+  def build_link_autocomplete_choices(discord_id, input_value) do
+    case Accounts.get_user_with_current_character(discord_id) do
+      nil ->
+        []
+
+      user ->
+        characters = get_user_characters_for_campaign(user)
+
+        characters
+        |> Enum.filter(fn char ->
+          String.contains?(
+            String.downcase(char.name),
+            String.downcase(input_value)
+          )
+        end)
+        |> Enum.take(25)
+        |> Enum.map(fn char ->
+          av = char.action_values || %{}
+          char_type = av["Type"] || "PC"
+
+          # Mark current character with a checkmark
+          is_current = user.current_character_id == char.id
+          marker = if is_current, do: " ✓", else: ""
+
+          display_name = "#{char.name} (#{char_type})#{marker}"
+
+          %{name: display_name, value: char.name}
+        end)
     end
   end
 
