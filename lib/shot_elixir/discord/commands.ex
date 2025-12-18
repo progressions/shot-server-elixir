@@ -29,9 +29,9 @@ defmodule ShotElixir.Discord.Commands do
 
     choices =
       if campaign do
-        # Get active fights for this campaign
+        # Get active, unended fights for this campaign
         Fights.list_fights(campaign.id)
-        |> Enum.filter(& &1.active)
+        |> Enum.filter(fn fight -> fight.active && is_nil(fight.ended_at) end)
         |> Enum.filter(&String.contains?(String.downcase(&1.name), String.downcase(input_value)))
         # Discord allows max 25 choices
         |> Enum.take(25)
