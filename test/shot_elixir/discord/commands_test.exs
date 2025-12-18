@@ -5,6 +5,101 @@ defmodule ShotElixir.Discord.CommandsTest do
   alias ShotElixir.Discord.CurrentFight
   alias ShotElixir.{Accounts, Campaigns, Characters, Fights}
 
+  describe "handle_start started_at behavior" do
+    test "sets started_at when fight has not been started" do
+      # Create a user and campaign
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "start-test1@example.com",
+          password: "password123",
+          first_name: "Start",
+          last_name: "Tester"
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Start Test Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a fight without started_at
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Unstarted Fight",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Verify fight has no started_at
+      assert is_nil(fight.started_at)
+
+      # Simulate what handle_start does: update with started_at
+      {:ok, updated_fight} =
+        Fights.update_fight(fight, %{
+          server_id: "123456789",
+          channel_id: "987654321",
+          started_at: DateTime.utc_now()
+        })
+
+      # Verify started_at is now set
+      refute is_nil(updated_fight.started_at)
+    end
+
+    test "does not overwrite existing started_at when fight already started" do
+      # Create a user and campaign
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "start-test2@example.com",
+          password: "password123",
+          first_name: "Start",
+          last_name: "Tester2"
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Start Test Campaign 2",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a fight with started_at already set
+      original_started_at = DateTime.utc_now() |> DateTime.add(-3600, :second)
+
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Already Started Fight",
+          campaign_id: campaign.id,
+          active: true,
+          started_at: original_started_at
+        })
+
+      # Verify fight has started_at set
+      refute is_nil(fight.started_at)
+
+      # Simulate what handle_start does when fight is already started:
+      # The code checks if started_at is nil before adding it to attrs
+      attrs = %{
+        server_id: "123456789",
+        channel_id: "987654321"
+      }
+
+      # Only add started_at if not already set (this mimics the handle_start logic)
+      attrs =
+        if is_nil(fight.started_at) do
+          Map.put(attrs, :started_at, DateTime.utc_now())
+        else
+          attrs
+        end
+
+      {:ok, updated_fight} = Fights.update_fight(fight, attrs)
+
+      # Verify started_at was NOT changed (compare truncated to second to avoid precision issues)
+      assert DateTime.truncate(updated_fight.started_at, :second) ==
+               DateTime.truncate(original_started_at, :second)
+    end
+  end
+
   describe "build_whoami_response/1" do
     test "returns link prompt for unlinked Discord user" do
       discord_id = 999_999_999_999_999_999

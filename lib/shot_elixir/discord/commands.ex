@@ -77,12 +77,22 @@ defmodule ShotElixir.Discord.Commands do
                 respond(interaction, "Couldn't find that fight!")
 
               fight ->
-                # Update fight with Discord info
-                case Fights.update_fight(fight, %{
-                       server_id: to_string(server_id),
-                       channel_id: to_string(channel_id),
-                       fight_message_id: nil
-                     }) do
+                # Update fight with Discord info and set started_at if not already set
+                attrs = %{
+                  server_id: to_string(server_id),
+                  channel_id: to_string(channel_id),
+                  fight_message_id: nil
+                }
+
+                # Only set started_at if the fight hasn't been started yet
+                attrs =
+                  if is_nil(fight.started_at) do
+                    Map.put(attrs, :started_at, DateTime.utc_now())
+                  else
+                    attrs
+                  end
+
+                case Fights.update_fight(fight, attrs) do
                   {:ok, fight} ->
                     # Set as current fight
                     CurrentFight.set(server_id, fight.id)

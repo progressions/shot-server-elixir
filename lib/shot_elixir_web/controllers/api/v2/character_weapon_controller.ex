@@ -20,9 +20,31 @@ defmodule ShotElixirWeb.Api.V2.CharacterWeaponController do
          :ok <- authorize_character_access(character, current_user) do
       weapons = list_character_weapons(character_id)
 
+      # Extract unique categories and junctures from the weapons
+      categories =
+        weapons
+        |> Enum.map(& &1.category)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      junctures =
+        weapons
+        |> Enum.map(& &1.juncture)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.reject(&(&1 == ""))
+        |> Enum.uniq()
+        |> Enum.sort()
+
       conn
       |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-      |> render("index.json", weapons: weapons, meta: %{total: length(weapons)})
+      |> render("index.json",
+        weapons: weapons,
+        meta: %{total: length(weapons)},
+        categories: categories,
+        junctures: junctures
+      )
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
