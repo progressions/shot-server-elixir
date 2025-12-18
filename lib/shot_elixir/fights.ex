@@ -432,7 +432,7 @@ defmodule ShotElixir.Fights do
           shots_for_char =
             existing_shots
             |> Enum.filter(&(&1.character_id == char_id))
-            |> Enum.sort_by(& &1.created_at, {:desc, DateTime})
+            |> Enum.sort_by(& &1.created_at, :desc)
             |> Enum.take(shots_to_remove_count)
 
           shot_ids_to_remove = Enum.map(shots_for_char, & &1.id)
