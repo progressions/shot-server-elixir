@@ -262,14 +262,16 @@ defmodule ShotElixir.Discord.Commands do
             |> Enum.filter(fn fight -> fight.active && is_nil(fight.ended_at) end)
 
           if Enum.empty?(fights) do
-            respond(interaction, "No active fights in #{campaign.name}.")
+            respond(interaction, "No active fights in #{campaign.name}.", ephemeral: true)
           else
             fight_list =
               fights
               |> Enum.map(fn fight -> "• #{fight.name}" end)
               |> Enum.join("\n")
 
-            respond(interaction, "**Active fights in #{campaign.name}:**\n#{fight_list}")
+            respond(interaction, "**Active fights in #{campaign.name}:**\n#{fight_list}",
+              ephemeral: true
+            )
           end
       end
     end
