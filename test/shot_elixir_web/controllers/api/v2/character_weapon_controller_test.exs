@@ -112,6 +112,57 @@ defmodule ShotElixirWeb.Api.V2.CharacterWeaponControllerTest do
 
       assert response["weapons"] == []
       assert response["meta"]["total"] == 0
+      assert response["categories"] == []
+      assert response["junctures"] == []
+    end
+
+    test "returns unique categories and junctures from character weapons", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character,
+      campaign: campaign
+    } do
+      # Create weapons with different categories and junctures
+      {:ok, weapon1} =
+        Weapons.create_weapon(%{
+          name: "Modern Pistol",
+          campaign_id: campaign.id,
+          damage: "9",
+          category: "Guns",
+          juncture: "Contemporary"
+        })
+
+      {:ok, weapon2} =
+        Weapons.create_weapon(%{
+          name: "Ancient Sword",
+          campaign_id: campaign.id,
+          damage: "10",
+          category: "Melee",
+          juncture: "Ancient"
+        })
+
+      {:ok, weapon3} =
+        Weapons.create_weapon(%{
+          name: "Future Rifle",
+          campaign_id: campaign.id,
+          damage: "12",
+          category: "Guns",
+          juncture: "Future"
+        })
+
+      add_weapon_to_character(character.id, weapon1.id)
+      add_weapon_to_character(character.id, weapon2.id)
+      add_weapon_to_character(character.id, weapon3.id)
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters/#{character.id}/weapons")
+      response = json_response(conn, 200)
+
+      assert response["meta"]["total"] == 3
+      # Categories should be unique and sorted
+      assert response["categories"] == ["Guns", "Melee"]
+      # Junctures should be unique and sorted
+      assert response["junctures"] == ["Ancient", "Contemporary", "Future"]
     end
 
     test "returns 404 for non-existent character", %{conn: conn, gamemaster: gm} do
