@@ -655,12 +655,12 @@ defmodule ShotElixir.Discord.Commands do
     if user.current_campaign do
       user.characters
       |> Enum.filter(fn char ->
-        char.active && char.campaign_id == user.current_campaign_id
+        char.active && char.campaign_id == user.current_campaign_id && !char.is_template
       end)
       |> Enum.sort_by(& &1.name)
     else
       user.characters
-      |> Enum.filter(& &1.active)
+      |> Enum.filter(fn char -> char.active && !char.is_template end)
       |> Enum.sort_by(& &1.name)
     end
   end

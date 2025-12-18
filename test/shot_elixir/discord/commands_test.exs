@@ -1589,6 +1589,124 @@ defmodule ShotElixir.Discord.CommandsTest do
     end
   end
 
+  describe "build_link_autocomplete_choices/2" do
+    test "excludes template characters from autocomplete" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "link-template@example.com",
+          password: "password123",
+          first_name: "Link",
+          last_name: "Template"
+        })
+
+      discord_id = 800_000_000_000_000_001
+      {:ok, user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign and set it as user's current campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Link Template Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      {:ok, _user} = Accounts.update_user(user, %{current_campaign_id: campaign.id})
+
+      # Create a regular character (should appear)
+      {:ok, _regular_char} =
+        Characters.create_character(%{
+          name: "Regular Hero",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC"},
+          active: true,
+          is_template: false
+        })
+
+      # Create a template character (should NOT appear)
+      {:ok, _template_char} =
+        Characters.create_character(%{
+          name: "Template Character",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC"},
+          active: true,
+          is_template: true
+        })
+
+      choices = Commands.build_link_autocomplete_choices(discord_id, "")
+
+      # Should only show the regular character, not the template
+      assert length(choices) == 1
+      values = Enum.map(choices, & &1.value)
+      assert "Regular Hero" in values
+      refute "Template Character" in values
+    end
+
+    test "includes active non-template characters in autocomplete" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "link-active@example.com",
+          password: "password123",
+          first_name: "Link",
+          last_name: "Active"
+        })
+
+      discord_id = 800_000_000_000_000_002
+      {:ok, user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign and set it as user's current campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Link Active Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      {:ok, _user} = Accounts.update_user(user, %{current_campaign_id: campaign.id})
+
+      # Create multiple active characters (all should appear)
+      {:ok, _char1} =
+        Characters.create_character(%{
+          name: "Fighter One",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC"},
+          active: true
+        })
+
+      {:ok, _char2} =
+        Characters.create_character(%{
+          name: "Fighter Two",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "NPC"},
+          active: true
+        })
+
+      # Create an inactive character (should NOT appear)
+      {:ok, _inactive_char} =
+        Characters.create_character(%{
+          name: "Inactive Fighter",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC"},
+          active: false
+        })
+
+      choices = Commands.build_link_autocomplete_choices(discord_id, "")
+
+      # Should show both active characters, not the inactive one
+      assert length(choices) == 2
+      values = Enum.map(choices, & &1.value)
+      assert "Fighter One" in values
+      assert "Fighter Two" in values
+      refute "Inactive Fighter" in values
+    end
+  end
+
   describe "build_fortune_autocomplete_choices/3" do
     test "returns empty list for unlinked Discord user" do
       discord_id = 700_000_000_000_000_001
