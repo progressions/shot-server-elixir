@@ -46,14 +46,11 @@ defmodule ShotElixir.Fights do
       |> normalize_uuid_param("vehicle_id")
       |> normalize_uuid_param("user_id")
 
-    # Base query with visibility filtering
-    # show_hidden controls whether to include inactive fights
-    query =
-      if params["show_hidden"] == "true" || params["show_hidden"] == true do
-        from f in Fight, where: f.campaign_id == ^campaign_id
-      else
-        from f in Fight, where: f.campaign_id == ^campaign_id and f.active == true
-      end
+    # Base query with campaign scope
+    query = from f in Fight, where: f.campaign_id == ^campaign_id
+
+    # Apply visibility filtering (default to active only)
+    query = apply_visibility_filter(query, params)
 
     # Apply basic filters
     query =
@@ -292,6 +289,20 @@ defmodule ShotElixir.Fights do
 
       _ ->
         order_by(query, [f], desc: f.created_at, asc: f.id)
+    end
+  end
+
+  defp apply_visibility_filter(query, params) do
+    case params["visibility"] do
+      "hidden" ->
+        from f in query, where: f.active == false
+
+      "all" ->
+        query
+
+      _ ->
+        # Default to visible (active) only
+        from f in query, where: f.active == true
     end
   end
 
