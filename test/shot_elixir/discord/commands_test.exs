@@ -526,8 +526,8 @@ defmodule ShotElixir.Discord.CommandsTest do
       assert response =~ "Use `/link` to generate a link code"
     end
 
-    test "returns no active fight message when no fight is set" do
-      # Create a linked user
+    test "returns no active fight message when no fight is set and no current character" do
+      # Create a linked user without a current character
       {:ok, user} =
         Accounts.create_user(%{
           email: "mystats-test1@example.com",
@@ -544,7 +544,63 @@ defmodule ShotElixir.Discord.CommandsTest do
       response = Commands.build_stats_response(discord_id, server_id)
 
       assert response =~ "There is no active fight in this server"
-      assert response =~ "Use `/start` to begin a fight"
+      assert response =~ "You can set a current character with `/play`"
+    end
+
+    test "returns current character stats when no fight but current_character is set" do
+      # Create a linked user with a current character
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "mystats-current-char@example.com",
+          password: "password123",
+          first_name: "Has",
+          last_name: "Character"
+        })
+
+      discord_id = 999_888_777_666_555_444
+      {:ok, user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Stats Current Char Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character with action values
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Test Fighter",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Wounds" => 0,
+            "Defense" => 14,
+            "Toughness" => 6,
+            "Speed" => 7,
+            "Fortune" => 5,
+            "Max Fortune" => 7,
+            "MainAttack" => "Martial Arts",
+            "Martial Arts" => 15
+          }
+        })
+
+      # Set the current character
+      {:ok, _user} = Accounts.set_current_character(user, character.id)
+
+      server_id = 111_222_333_444_555_666
+
+      response = Commands.build_stats_response(discord_id, server_id)
+
+      # Should show the character stats without requiring a fight
+      assert response =~ "Your Current Character"
+      assert response =~ "Test Fighter"
+      assert response =~ "PC"
+      assert response =~ "Defense: **14**"
+      assert response =~ "Martial Arts: **15**"
+      assert response =~ "Fortune: **5/7**"
     end
 
     test "returns no characters message when user has no characters in fight" do
