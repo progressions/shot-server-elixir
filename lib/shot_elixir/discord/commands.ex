@@ -754,10 +754,11 @@ defmodule ShotElixir.Discord.Commands do
 
   @doc """
   Builds the response message for the /stats command.
-  Returns a string with the user's character stats in the current fight.
+  Returns a string with the user's character stats in the current fight,
+  or their current character's stats if no fight is active.
   """
   def build_stats_response(discord_id, server_id) do
-    case Accounts.get_user_by_discord_id(discord_id) do
+    case Accounts.get_user_with_current_character(discord_id) do
       nil ->
         """
         Your Discord account is not linked to Chi War.
@@ -773,10 +774,25 @@ defmodule ShotElixir.Discord.Commands do
     # Get the current fight for this server
     case CurrentFight.get(server_id) do
       nil ->
-        "There is no active fight in this server. Use `/start` to begin a fight."
+        # No active fight - show current character stats if set
+        build_stats_without_fight(user)
 
       fight_id ->
         build_stats_for_fight(user, fight_id)
+    end
+  end
+
+  defp build_stats_without_fight(user) do
+    case user.current_character do
+      nil ->
+        """
+        There is no active fight in this server.
+        You can set a current character with `/link` to view your stats anytime.
+        """
+
+      character ->
+        header = "**Your Current Character**\n"
+        header <> format_character_stats_standalone(character)
     end
   end
 
@@ -884,6 +900,48 @@ defmodule ShotElixir.Discord.Commands do
         "Speed: **#{speed}** | Fortune: **#{fortune}/#{max_fortune}**",
         if(impairments > 0, do: "⚠️ Impairments: **#{impairments}**", else: nil),
         effects_line
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.join(lines, "\n")
+  end
+
+  # Formats a character's stats without a fight/shot context.
+  # Used when displaying current character stats outside of an active fight.
+  defp format_character_stats_standalone(character) do
+    av = character.action_values || %{}
+
+    # Get key combat stats
+    wounds = av["Wounds"] || 0
+    defense = av["Defense"] || 0
+    toughness = av["Toughness"] || 0
+    speed = av["Speed"] || 0
+    fortune = av["Fortune"] || 0
+    max_fortune = av["Max Fortune"] || 0
+    impairments = character.impairments || 0
+
+    # Get attack values
+    main_attack = av["MainAttack"] || "Guns"
+    main_attack_value = av[main_attack] || 0
+    secondary_attack = av["SecondaryAttack"]
+
+    secondary_attack_line =
+      if secondary_attack && secondary_attack != "" do
+        secondary_value = av[secondary_attack] || 0
+        "#{secondary_attack}: **#{secondary_value}**"
+      else
+        nil
+      end
+
+    # Build the character section (no shot position when not in a fight)
+    lines =
+      [
+        "**#{character.name}** (#{av["Type"] || "PC"})",
+        "Wounds: **#{wounds}** | Defense: **#{defense}** | Toughness: **#{toughness}**",
+        "#{main_attack}: **#{main_attack_value}**",
+        secondary_attack_line,
+        "Speed: **#{speed}** | Fortune: **#{fortune}/#{max_fortune}**",
+        if(impairments > 0, do: "⚠️ Impairments: **#{impairments}**", else: nil)
       ]
       |> Enum.reject(&is_nil/1)
 
