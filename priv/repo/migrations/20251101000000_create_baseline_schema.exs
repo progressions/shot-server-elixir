@@ -103,7 +103,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create table(:campaigns, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :user_id, references(:users, type: :uuid), null: false
-      add :description, :string
+      add :description, :text
       add :name, :string
       add :active, :boolean, null: false, default: true
       add :is_master_template, :boolean, null: false, default: false
@@ -128,7 +128,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create table(:factions, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :name, :string
-      add :description, :string
+      add :description, :text
       add :campaign_id, references(:campaigns, type: :uuid), null: false
       add :active, :boolean, null: false, default: true
 
@@ -144,7 +144,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create table(:junctures, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :name, :string
-      add :description, :string
+      add :description, :text
       add :active, :boolean, null: false, default: true
       add :faction_id, references(:factions, type: :uuid)
       add :notion_page_id, :uuid
@@ -256,7 +256,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     # Sites table
     create table(:sites, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
-      add :description, :string
+      add :description, :text
       add :campaign_id, references(:campaigns, type: :uuid)
       add :name, :string
       add :faction_id, references(:factions, type: :uuid)
@@ -278,7 +278,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create table(:parties, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :name, :string
-      add :description, :string
+      add :description, :text
       add :campaign_id, references(:campaigns, type: :uuid), null: false
       add :faction_id, references(:factions, type: :uuid)
       add :juncture_id, references(:junctures, type: :uuid)
@@ -299,7 +299,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :campaign_id, references(:campaigns, type: :uuid), null: false
       add :name, :string, null: false
-      add :description, :string
+      add :description, :text
       add :damage, :integer, null: false
       add :concealment, :integer
       add :reload_value, :integer
@@ -322,7 +322,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create table(:schticks, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :campaign_id, references(:campaigns, type: :uuid), null: false
-      add :description, :string
+      add :description, :text
       add :prerequisite_id, references(:schticks, type: :uuid)
       add :category, :string
       add :path, :string
@@ -407,15 +407,16 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create table(:advancements, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :character_id, references(:characters, type: :uuid), null: false
-      add :description, :string
+      add :description, :text
 
       timestamps(inserted_at: :created_at, type: :naive_datetime_usec)
     end
 
     create index(:advancements, [:character_id])
 
-    # Attunements table
-    create table(:attunements) do
+    # Attunements table (uses integer id, not UUID)
+    create table(:attunements, primary_key: false) do
+      add :id, :serial, primary_key: true
       add :character_id, references(:characters, type: :uuid), null: false
       add :site_id, references(:sites, type: :uuid), null: false
 
@@ -458,7 +459,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :character_id, references(:characters, type: :uuid)
       add :vehicle_id, references(:vehicles, type: :uuid)
-      add :description, :string
+      add :description, :text
       add :severity, :string, null: false, default: "info"
       add :change, :string
       add :action_value, :string
@@ -472,8 +473,9 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create index(:character_effects, [:vehicle_id])
     create index(:character_effects, [:shot_id])
 
-    # Character schticks table
-    create table(:character_schticks) do
+    # Character schticks table (uses integer id, not UUID)
+    create table(:character_schticks, primary_key: false) do
+      add :id, :serial, primary_key: true
       add :character_id, references(:characters, type: :uuid), null: false
       add :schtick_id, references(:schticks, type: :uuid), null: false
 
@@ -521,7 +523,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       add :start_shot, :integer
       add :end_shot, :integer
       add :severity, :string
-      add :description, :string
+      add :description, :text
       add :name, :string
 
       timestamps(inserted_at: :created_at, type: :naive_datetime_usec)
@@ -535,7 +537,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :fight_id, references(:fights, type: :uuid), null: false
       add :event_type, :string
-      add :description, :string
+      add :description, :text
       add :details, :jsonb, default: "{}"
 
       timestamps(inserted_at: :created_at, type: :naive_datetime_usec)
