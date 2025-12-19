@@ -3,7 +3,7 @@ defmodule ShotElixir.Discord.CommandsTest do
 
   alias ShotElixir.Discord.Commands
   alias ShotElixir.Discord.CurrentFight
-  alias ShotElixir.{Accounts, Campaigns, Characters, Fights}
+  alias ShotElixir.{Accounts, Campaigns, Characters, Fights, Vehicles}
 
   describe "build_fight_autocomplete_choices/2" do
     test "returns only active, unended fights" do
@@ -943,6 +943,315 @@ defmodule ShotElixir.Discord.CommandsTest do
 
       assert response =~ "**Waiting Hero**"
       assert response =~ "Shot: _Not set_"
+    end
+
+    test "includes vehicle stats when user has a vehicle in the fight" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "stats-vehicle@example.com",
+          password: "password123",
+          first_name: "Vehicle",
+          last_name: "Driver"
+        })
+
+      discord_id = 800_000_000_000_000_001
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Vehicle Stats Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a driver character (the user's character who drives the vehicle)
+      {:ok, driver} =
+        Characters.create_character(%{
+          name: "Speed Racer",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Driving" => 15
+          }
+        })
+
+      # Create a vehicle with stats
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Muscle Car",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Acceleration" => 8,
+            "Handling" => 7,
+            "Squeal" => 10,
+            "Frame" => 6,
+            "Chase Points" => 3,
+            "Condition Points" => 5
+          }
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Chase Scene",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add the driver character to fight first
+      {:ok, driver_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: driver.id,
+          shot: 12
+        })
+
+      # Add vehicle to fight with driver_id pointing to the driver's shot
+      {:ok, _vehicle_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          vehicle_id: vehicle.id,
+          shot: 10,
+          impairments: 1,
+          driver_id: driver_shot.id
+        })
+
+      # Set up the fight context
+      server_id = 800_000_000_000_000_002
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_stats_response(discord_id, server_id)
+
+      # Should show "Your Characters & Vehicles in" header (driver + vehicle)
+      assert response =~ "Your Characters & Vehicles in Chase Scene"
+      # Should show the vehicle name with emoji
+      assert response =~ "🚗 **Muscle Car**"
+      # Should show vehicle-specific stats
+      assert response =~ "Acceleration: **8**"
+      assert response =~ "Handling: **7**"
+      assert response =~ "Squeal: **10**"
+      assert response =~ "Frame: **6**"
+      # Should show chase stats
+      assert response =~ "Chase Points: **3**"
+      assert response =~ "Condition Points: **5**"
+      # Should show impairments
+      assert response =~ "Impairments: **1**"
+      # Should show shot position
+      assert response =~ "Shot: **10**"
+    end
+
+    test "shows both characters and vehicles when user has both in fight" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "stats-both@example.com",
+          password: "password123",
+          first_name: "Both",
+          last_name: "Types"
+        })
+
+      discord_id = 800_000_000_000_000_003
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Both Types Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create a character
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Johnny Driver",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Wounds" => 10,
+            "Defense" => 14,
+            "Toughness" => 6,
+            "Speed" => 7,
+            "Fortune" => 5,
+            "Max Fortune" => 8,
+            "MainAttack" => "Driving",
+            "Driving" => 15
+          }
+        })
+
+      # Create a vehicle
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Hot Rod",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{
+            "Type" => "PC",
+            "Acceleration" => 9,
+            "Handling" => 8,
+            "Squeal" => 11,
+            "Frame" => 7
+          }
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Street Race",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add character to fight (this character will also be the driver)
+      {:ok, char_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: character.id,
+          shot: 12
+        })
+
+      # Add vehicle to fight with the character as driver
+      {:ok, _vehicle_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          vehicle_id: vehicle.id,
+          shot: 8,
+          driver_id: char_shot.id
+        })
+
+      # Set up the fight context
+      server_id = 800_000_000_000_000_004
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_stats_response(discord_id, server_id)
+
+      # Should show "Characters & Vehicles" header
+      assert response =~ "Your Characters & Vehicles in Street Race"
+      # Should show the character
+      assert response =~ "**Johnny Driver**"
+      assert response =~ "Driving: **15**"
+      # Should show the vehicle
+      assert response =~ "🚗 **Hot Rod**"
+      assert response =~ "Acceleration: **9**"
+    end
+
+    test "does not show vehicles driven by other characters (mooks)" do
+      # Create a linked user
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "stats-mook-driver@example.com",
+          password: "password123",
+          first_name: "User",
+          last_name: "Character"
+        })
+
+      discord_id = 800_000_000_000_000_005
+      {:ok, _user} = Accounts.link_discord(user, discord_id)
+
+      # Create a campaign
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Mook Driver Campaign",
+          user_id: user.id,
+          active: true
+        })
+
+      # Create user's character
+      {:ok, user_character} =
+        Characters.create_character(%{
+          name: "Hero Driver",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC", "Driving" => 15}
+        })
+
+      # Create a mook (no user_id)
+      {:ok, mook} =
+        Characters.create_character(%{
+          name: "Bad Guy Mook",
+          campaign_id: campaign.id,
+          user_id: nil,
+          action_values: %{"Type" => "Mook"}
+        })
+
+      # Create user's vehicle (driven by user's character)
+      {:ok, user_vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Hero Car",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC", "Acceleration" => 10}
+        })
+
+      # Create another vehicle owned by user but driven by mook
+      {:ok, mook_driven_vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Enemy Car",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "Mook", "Acceleration" => 8}
+        })
+
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Chase Test",
+          campaign_id: campaign.id,
+          active: true
+        })
+
+      # Add user's character to fight
+      {:ok, user_char_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: user_character.id,
+          shot: 12
+        })
+
+      # Add mook to fight
+      {:ok, mook_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          character_id: mook.id,
+          shot: 10
+        })
+
+      # Add user's vehicle (driven by user's character)
+      {:ok, _user_vehicle_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          vehicle_id: user_vehicle.id,
+          shot: 11,
+          driver_id: user_char_shot.id
+        })
+
+      # Add mook-driven vehicle (should NOT appear in user's stats)
+      {:ok, _mook_vehicle_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          vehicle_id: mook_driven_vehicle.id,
+          shot: 9,
+          driver_id: mook_shot.id
+        })
+
+      # Set up the fight context
+      server_id = 800_000_000_000_000_006
+      CurrentFight.set(server_id, fight.id)
+
+      response = Commands.build_stats_response(discord_id, server_id)
+
+      # Should show user's character and their vehicle
+      assert response =~ "**Hero Driver**"
+      assert response =~ "🚗 **Hero Car**"
+      # Should NOT show the mook-driven vehicle
+      refute response =~ "Enemy Car"
+      refute response =~ "Bad Guy Mook"
     end
   end
 
