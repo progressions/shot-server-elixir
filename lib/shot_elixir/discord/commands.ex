@@ -804,17 +804,17 @@ defmodule ShotElixir.Discord.Commands do
 
       fight ->
         # Find the user's character shots in this fight
-        user_shots = find_user_character_shots(fight, user)
+        user_shots = find_user_shots(fight, user)
 
         if Enum.empty?(user_shots) do
           "You don't have any characters in the fight \"#{fight.name}\"."
         else
-          format_character_stats(fight, user_shots)
+          format_shot_stats(fight, user_shots)
         end
     end
   end
 
-  defp find_user_character_shots(fight, user) do
+  defp find_user_shots(fight, user) do
     # Build a map of shot_id -> shot for quick driver lookup
     shots_by_id = Map.new(fight.shots, fn shot -> {shot.id, shot} end)
 
@@ -850,16 +850,17 @@ defmodule ShotElixir.Discord.Commands do
     )
   end
 
-  defp format_character_stats(fight, shots) do
+  defp format_shot_stats(fight, shots) do
     # Check if we have any vehicles
+    # Note: With current filtering, vehicles always come with their driver character,
+    # so we just need to check for vehicles to determine the header
     has_vehicles = Enum.any?(shots, & &1.vehicle)
-    has_characters = Enum.any?(shots, & &1.character)
 
     header =
-      cond do
-        has_characters && has_vehicles -> "**Your Characters & Vehicles in #{fight.name}**\n"
-        has_vehicles -> "**Your Vehicles in #{fight.name}**\n"
-        true -> "**Your Characters in #{fight.name}**\n"
+      if has_vehicles do
+        "**Your Characters & Vehicles in #{fight.name}**\n"
+      else
+        "**Your Characters in #{fight.name}**\n"
       end
 
     sections =
@@ -993,10 +994,8 @@ defmodule ShotElixir.Discord.Commands do
         shot_line,
         "Acceleration: **#{acceleration}** | Handling: **#{handling}**",
         "Squeal: **#{squeal}** | Frame: **#{frame}**",
-        if(chase_points > 0 || condition_points > 0,
-          do: "Chase Points: **#{chase_points}** | Condition Points: **#{condition_points}**",
-          else: nil
-        ),
+        if(chase_points > 0, do: "Chase Points: **#{chase_points}**", else: nil),
+        if(condition_points > 0, do: "Condition Points: **#{condition_points}**", else: nil),
         if(impairments > 0, do: "⚠️ Impairments: **#{impairments}**", else: nil),
         effects_line
       ]
@@ -1164,7 +1163,7 @@ defmodule ShotElixir.Discord.Commands do
     with user when not is_nil(user) <- Accounts.get_user_by_discord_id(discord_id),
          fight_id when not is_nil(fight_id) <- CurrentFight.get(server_id),
          fight when not is_nil(fight) <- Fights.get_fight_with_shots(fight_id) do
-      user_shots = find_user_character_shots(fight, user)
+      user_shots = find_user_shots(fight, user)
 
       user_shots
       |> Enum.filter(fn shot ->
@@ -1226,7 +1225,7 @@ defmodule ShotElixir.Discord.Commands do
         "Fight not found."
 
       fight ->
-        user_shots = find_user_character_shots(fight, user)
+        user_shots = find_user_shots(fight, user)
 
         case user_shots do
           [] ->
