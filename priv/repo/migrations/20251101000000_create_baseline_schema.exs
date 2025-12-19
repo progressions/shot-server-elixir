@@ -593,10 +593,39 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     end
 
     create index(:onboarding_progresses, [:user_id])
+
+    # Active Storage tables (Rails file storage, used for images)
+    create table(:active_storage_blobs, primary_key: false) do
+      add :id, :serial, primary_key: true
+      add :key, :string, null: false
+      add :filename, :string, null: false
+      add :content_type, :string
+      add :metadata, :text
+      add :service_name, :string, null: false
+      add :byte_size, :bigint, null: false
+      add :checksum, :string
+      add :created_at, :naive_datetime_usec, null: false
+    end
+
+    create unique_index(:active_storage_blobs, [:key])
+
+    create table(:active_storage_attachments, primary_key: false) do
+      add :id, :serial, primary_key: true
+      add :name, :string, null: false
+      add :record_type, :string, null: false
+      add :record_id, :uuid
+      add :blob_id, references(:active_storage_blobs, type: :bigint), null: false
+      add :created_at, :naive_datetime_usec, null: false
+    end
+
+    create index(:active_storage_attachments, [:blob_id])
+    create index(:active_storage_attachments, [:record_type, :name, :record_id])
   end
 
   defp drop_baseline_schema do
     # Drop tables in reverse order of creation
+    drop_if_exists table(:active_storage_attachments)
+    drop_if_exists table(:active_storage_blobs)
     drop_if_exists table(:onboarding_progresses)
     drop_if_exists table(:memberships)
     drop_if_exists table(:image_positions)
