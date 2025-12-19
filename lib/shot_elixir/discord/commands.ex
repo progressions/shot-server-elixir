@@ -815,26 +815,67 @@ defmodule ShotElixir.Discord.Commands do
   end
 
   defp find_user_character_shots(fight, user) do
+    # Build a map of shot_id -> shot for quick driver lookup
+    shots_by_id = Map.new(fight.shots, fn shot -> {shot.id, shot} end)
+
     fight.shots
     |> Enum.filter(fn shot ->
-      shot.character && shot.character.user_id == user.id
+      cond do
+        # Character shots: check if the character belongs to the user
+        shot.character ->
+          shot.character.user_id == user.id
+
+        # Vehicle shots: check if the DRIVER of the vehicle belongs to the user
+        shot.vehicle && shot.driver_id ->
+          driver_shot = Map.get(shots_by_id, shot.driver_id)
+
+          driver_shot && driver_shot.character &&
+            driver_shot.character.user_id == user.id
+
+        # Vehicle with no driver - don't show (or could check vehicle.user_id as fallback)
+        true ->
+          false
+      end
     end)
-    # Sort by most recently updated character first
+    # Sort by most recently updated entity first
     |> Enum.sort_by(
-      fn shot -> shot.character.updated_at end,
-      &(DateTime.compare(&1, &2) == :gt)
+      fn shot ->
+        cond do
+          shot.character -> shot.character.updated_at
+          shot.vehicle -> shot.vehicle.updated_at
+          true -> nil
+        end
+      end,
+      &(DateTime.compare(&1 || DateTime.from_unix!(0), &2 || DateTime.from_unix!(0)) == :gt)
     )
   end
 
   defp format_character_stats(fight, shots) do
-    header = "**Your Characters in #{fight.name}**\n"
+    # Check if we have any vehicles
+    has_vehicles = Enum.any?(shots, & &1.vehicle)
+    has_characters = Enum.any?(shots, & &1.character)
 
-    character_sections =
+    header =
+      cond do
+        has_characters && has_vehicles -> "**Your Characters & Vehicles in #{fight.name}**\n"
+        has_vehicles -> "**Your Vehicles in #{fight.name}**\n"
+        true -> "**Your Characters in #{fight.name}**\n"
+      end
+
+    sections =
       shots
-      |> Enum.map(&format_single_character_stats/1)
+      |> Enum.map(&format_single_shot_stats/1)
       |> Enum.join("\n\n")
 
-    header <> character_sections
+    header <> sections
+  end
+
+  defp format_single_shot_stats(shot) do
+    cond do
+      shot.character -> format_single_character_stats(shot)
+      shot.vehicle -> format_single_vehicle_stats(shot)
+      true -> "Unknown shot type"
+    end
   end
 
   defp format_single_character_stats(shot) do
@@ -898,6 +939,64 @@ defmodule ShotElixir.Discord.Commands do
         "#{main_attack}: **#{main_attack_value}**",
         secondary_attack_line,
         "Speed: **#{speed}** | Fortune: **#{fortune}/#{max_fortune}**",
+        if(impairments > 0, do: "⚠️ Impairments: **#{impairments}**", else: nil),
+        effects_line
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.join(lines, "\n")
+  end
+
+  defp format_single_vehicle_stats(shot) do
+    vehicle = shot.vehicle
+    av = vehicle.action_values || %{}
+
+    # Get key vehicle stats
+    acceleration = av["Acceleration"] || 0
+    handling = av["Handling"] || 0
+    squeal = av["Squeal"] || 0
+    frame = av["Frame"] || 0
+    chase_points = av["Chase Points"] || 0
+    condition_points = av["Condition Points"] || 0
+    impairments = shot.impairments || vehicle.impairments || 0
+
+    # Get shot position
+    shot_position = shot.shot
+
+    shot_line =
+      if shot_position do
+        "Shot: **#{shot_position}**"
+      else
+        "Shot: _Not set_"
+      end
+
+    # Get active effects (handle unloaded association)
+    effects =
+      case shot.character_effects do
+        %Ecto.Association.NotLoaded{} -> []
+        nil -> []
+        loaded -> loaded
+      end
+
+    effects_line =
+      if Enum.empty?(effects) do
+        nil
+      else
+        effect_names = Enum.map(effects, & &1.name) |> Enum.join(", ")
+        "Effects: #{effect_names}"
+      end
+
+    # Build the vehicle section
+    lines =
+      [
+        "🚗 **#{vehicle.name}** (#{av["Type"] || "Vehicle"})",
+        shot_line,
+        "Acceleration: **#{acceleration}** | Handling: **#{handling}**",
+        "Squeal: **#{squeal}** | Frame: **#{frame}**",
+        if(chase_points > 0 || condition_points > 0,
+          do: "Chase Points: **#{chase_points}** | Condition Points: **#{condition_points}**",
+          else: nil
+        ),
         if(impairments > 0, do: "⚠️ Impairments: **#{impairments}**", else: nil),
         effects_line
       ]
