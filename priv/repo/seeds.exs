@@ -44,9 +44,12 @@ if File.exists?(seed_file) do
         Ecto.Adapters.SQL.query!(Repo, statement <> ";", [])
       rescue
         e in Postgrex.Error ->
-          # Ignore duplicate key errors (ON CONFLICT DO NOTHING handles this)
-          unless e.postgres.code == "23505" do
-            IO.puts("Warning: #{inspect(e.postgres.message)}")
+          # Only ignore duplicate key errors (ON CONFLICT DO NOTHING handles this)
+          # Re-raise all other errors to avoid silently suppressing real issues
+          if e.postgres.code == "23505" do
+            :ok
+          else
+            reraise e, __STACKTRACE__
           end
       end
     end

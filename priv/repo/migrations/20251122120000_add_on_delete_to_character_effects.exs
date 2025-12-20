@@ -46,13 +46,29 @@ defmodule ShotElixir.Repo.Migrations.AddOnDeleteToCharacterEffects do
   end
 
   def down do
-    # Always use Ecto naming for rollback
-    if constraint_exists?("character_effects_shot_id_fkey") do
-      drop constraint(:character_effects, "character_effects_shot_id_fkey")
+    # Handle both Ecto and Rails FK naming conventions
+    cond do
+      constraint_exists?("character_effects_shot_id_fkey") ->
+        drop constraint(:character_effects, "character_effects_shot_id_fkey")
 
-      alter table(:character_effects) do
-        modify :shot_id, references(:shots, type: :uuid, on_delete: :nothing)
-      end
+        alter table(:character_effects) do
+          modify :shot_id, references(:shots, type: :uuid, on_delete: :nothing)
+        end
+
+      constraint_exists?("fk_rails_1163db7ee4") ->
+        drop constraint(:character_effects, "fk_rails_1163db7ee4")
+
+        alter table(:character_effects) do
+          modify :shot_id,
+                 references(:shots,
+                   type: :uuid,
+                   on_delete: :nothing,
+                   name: "fk_rails_1163db7ee4"
+                 )
+        end
+
+      true ->
+        :ok
     end
   end
 

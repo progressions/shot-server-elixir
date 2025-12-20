@@ -245,8 +245,8 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       add :server_id, :bigint
       add :fight_message_id, :string
       add :channel_id, :bigint
-      add :started_at, :naive_datetime
-      add :ended_at, :naive_datetime
+      add :started_at, :naive_datetime_usec
+      add :ended_at, :naive_datetime_usec
       add :season, :integer
       add :session, :integer
       add :action_id, :uuid
@@ -591,13 +591,13 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create table(:onboarding_progresses, primary_key: false) do
       add :id, :uuid, primary_key: true, default: fragment("gen_random_uuid()")
       add :user_id, references(:users, type: :uuid), null: false
-      add :first_campaign_created_at, :naive_datetime
-      add :first_character_created_at, :naive_datetime
-      add :first_fight_created_at, :naive_datetime
-      add :first_faction_created_at, :naive_datetime
-      add :first_party_created_at, :naive_datetime
-      add :first_site_created_at, :naive_datetime
-      add :congratulations_dismissed_at, :naive_datetime
+      add :first_campaign_created_at, :naive_datetime_usec
+      add :first_character_created_at, :naive_datetime_usec
+      add :first_fight_created_at, :naive_datetime_usec
+      add :first_faction_created_at, :naive_datetime_usec
+      add :first_party_created_at, :naive_datetime_usec
+      add :first_site_created_at, :naive_datetime_usec
+      add :congratulations_dismissed_at, :naive_datetime_usec
       add :first_campaign_activated_at, :naive_datetime_usec
 
       timestamps(inserted_at: :created_at, type: :naive_datetime_usec)
