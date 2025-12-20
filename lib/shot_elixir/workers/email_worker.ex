@@ -47,7 +47,7 @@ defmodule ShotElixir.Workers.EmailWorker do
   defp build_email(%{"type" => "invitation", "invitation_id" => invitation_id}) do
     invitation =
       Repo.get!(ShotElixir.Invitations.Invitation, invitation_id)
-      |> Repo.preload([:campaign, campaign: :user])
+      |> Repo.preload([:user, :campaign, campaign: :user])
 
     UserEmail.invitation(invitation)
   end

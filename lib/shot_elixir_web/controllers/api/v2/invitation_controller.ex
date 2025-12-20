@@ -9,6 +9,8 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
   action_fallback ShotElixirWeb.FallbackController
 
+  plug :put_view, ShotElixirWeb.Api.V2.InvitationView
+
   # GET /api/v2/invitations
   # Returns pending invitations for current campaign
   def index(conn, _params) do
@@ -277,23 +279,52 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
                     # Generate and persist confirmation token
                     {:ok, user} = Accounts.generate_confirmation_token(user)
 
-                    # Queue confirmation email
-                    %{
-                      "type" => "confirmation_instructions",
-                      "user_id" => user.id,
-                      "token" => user.confirmation_token
-                    }
-                    |> EmailWorker.new()
-                    |> Oban.insert()
+                    # Add user to campaign and mark invitation as redeemed
+                    case Invitations.redeem_invitation(invitation, user.id) do
+                      {:ok, campaign} ->
+                        # Set user's current campaign to the one they were invited to
+                        {:ok, user} =
+                          Accounts.update_user(user, %{current_campaign_id: campaign.id})
 
-                    conn
-                    |> put_status(:created)
-                    |> render("register.json", %{
-                      message:
-                        "Account created! Check #{invitation.email} for confirmation email.",
-                      requires_confirmation: true,
-                      user: user
-                    })
+                        # Queue confirmation email
+                        %{
+                          "type" => "confirmation_instructions",
+                          "user_id" => user.id,
+                          "token" => user.confirmation_token
+                        }
+                        |> EmailWorker.new()
+                        |> Oban.insert()
+
+                        # Broadcast campaign update for real-time UI updates
+                        ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
+                          campaign.id,
+                          "Campaign"
+                        )
+
+                        conn
+                        |> put_status(:created)
+                        |> render("register.json", %{
+                          message: "Account created! You've been added to #{campaign.name}.",
+                          requires_confirmation: true,
+                          campaign: campaign,
+                          user: user
+                        })
+
+                      {:error, :already_member} ->
+                        campaign = Campaigns.get_campaign(invitation.campaign_id)
+
+                        conn
+                        |> put_status(:conflict)
+                        |> json(%{
+                          error: "You are already a member of this campaign",
+                          campaign: %{id: campaign.id, name: campaign.name}
+                        })
+
+                      {:error, _reason} ->
+                        conn
+                        |> put_status(:unprocessable_entity)
+                        |> json(%{error: "Failed to join campaign"})
+                    end
 
                   {:error, changeset} ->
                     conn

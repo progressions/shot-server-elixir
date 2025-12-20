@@ -8,12 +8,13 @@ defmodule ShotElixir.Invitations do
   alias ShotElixir.Invitations.Invitation
   alias ShotElixir.Accounts.User
   alias ShotElixir.Campaigns.Campaign
+  alias ShotElixir.Campaigns.CampaignMembership
 
   def list_campaign_invitations(campaign_id) do
     query =
       from i in Invitation,
         where: i.campaign_id == ^campaign_id,
-        preload: [:user, :campaign],
+        preload: [:user, :pending_user, :campaign],
         order_by: [desc: i.created_at]
 
     Repo.all(query)
@@ -21,13 +22,13 @@ defmodule ShotElixir.Invitations do
 
   def get_invitation!(id) do
     Invitation
-    |> preload([:user, :campaign])
+    |> preload([:user, :pending_user, :campaign])
     |> Repo.get!(id)
   end
 
   def get_invitation(id) do
     Invitation
-    |> preload([:user, :campaign])
+    |> preload([:user, :pending_user, :campaign])
     |> Repo.get(id)
   end
 
@@ -52,36 +53,30 @@ defmodule ShotElixir.Invitations do
   def redeem_invitation(invitation, user_id) do
     # Check if user already in campaign
     existing_membership =
-      from(cm in "campaign_memberships",
-        where: cm.campaign_id == ^invitation.campaign_id and cm.user_id == ^user_id,
-        select: cm
+      from(cm in CampaignMembership,
+        where: cm.campaign_id == ^invitation.campaign_id and cm.user_id == ^user_id
       )
-      |> Repo.one()
+      |> Repo.exists?()
 
     if existing_membership do
       {:error, :already_member}
     else
       Repo.transaction(fn ->
-        # Add user to campaign
-        campaign_membership_attrs = %{
-          "campaign_id" => invitation.campaign_id,
-          "user_id" => user_id,
-          "created_at" => DateTime.utc_now(),
-          "updated_at" => DateTime.utc_now()
-        }
-
-        {1, _} = Repo.insert_all("campaign_memberships", [campaign_membership_attrs])
+        # Add user to campaign using the schema
+        %CampaignMembership{}
+        |> CampaignMembership.changeset(%{
+          campaign_id: invitation.campaign_id,
+          user_id: user_id
+        })
+        |> Repo.insert!()
 
         # Mark invitation as redeemed
         invitation
         |> Invitation.changeset(%{
           "redeemed" => true,
-          "redeemed_at" => DateTime.utc_now()
+          "redeemed_at" => NaiveDateTime.utc_now()
         })
         |> Repo.update!()
-
-        # Delete the invitation
-        Repo.delete!(invitation)
 
         # Return the campaign
         Campaign |> Repo.get!(invitation.campaign_id)
