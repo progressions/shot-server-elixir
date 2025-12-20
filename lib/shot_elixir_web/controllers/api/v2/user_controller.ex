@@ -292,9 +292,12 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     if conn.halted do
       conn
     else
-      # Set gamemaster to true by default like Rails
+      # The gamemaster flag is a self-selected role, not a security privilege.
+      # Gamemasters run campaigns and see onboarding milestones; players join campaigns.
+      # Both roles have equal system access - this only affects UX flow.
+      # Default to player (gamemaster: false) unless explicitly set.
       final_params =
-        Map.put(parsed_params, "gamemaster", Map.get(parsed_params, "gamemaster", true))
+        Map.put(parsed_params, "gamemaster", Map.get(parsed_params, "gamemaster", false))
 
       case Accounts.create_user(final_params) do
         {:ok, user} ->
