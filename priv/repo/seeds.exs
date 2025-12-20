@@ -32,10 +32,12 @@ if File.exists?(seed_file) do
   Enum.each(statements, fn statement ->
     # Skip pure comment lines
     lines = String.split(statement, "\n")
-    non_comment_lines = Enum.reject(lines, fn line ->
-      trimmed = String.trim(line)
-      trimmed == "" || String.starts_with?(trimmed, "--")
-    end)
+
+    non_comment_lines =
+      Enum.reject(lines, fn line ->
+        trimmed = String.trim(line)
+        trimmed == "" || String.starts_with?(trimmed, "--")
+      end)
 
     unless Enum.empty?(non_comment_lines) do
       try do

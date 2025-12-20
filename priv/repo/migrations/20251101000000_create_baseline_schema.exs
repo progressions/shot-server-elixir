@@ -38,6 +38,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       AND table_name = '#{table_name}'
     )
     """
+
     %{rows: [[exists]]} = repo().query!(query)
     exists
   end
@@ -50,6 +51,7 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       AND table_name = '#{table_name}'
     )
     """
+
     %{rows: [[exists]]} = repo().query!(query)
     exists
   end
@@ -83,10 +85,12 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       add :failed_attempts, :integer, null: false, default: 0
       add :unlock_token, :string
       add :locked_at, :naive_datetime_usec
-      add :current_campaign_id, :uuid  # FK added later
+      # FK added later
+      add :current_campaign_id, :uuid
       add :name, :string
       add :active, :boolean, null: false, default: true
-      add :pending_invitation_id, :uuid  # FK added later
+      # FK added later
+      add :pending_invitation_id, :uuid
 
       timestamps(inserted_at: :created_at, type: :naive_datetime_usec)
     end
@@ -193,7 +197,9 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
     create index(:characters, [:faction_id])
     create index(:characters, [:juncture_id])
     create index(:characters, [:created_at])
+
     execute "CREATE INDEX index_characters_on_action_values ON characters USING gin (action_values)"
+
     execute "CREATE INDEX index_characters_on_status ON characters USING gin (status)"
     execute "CREATE INDEX index_characters_on_lower_name ON characters (lower(name))"
 
@@ -352,9 +358,11 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       add :position, :string
       add :count, :integer, default: 0
       add :color, :string
-      add :driver_id, :uuid  # Self-reference, FK added later
+      # Self-reference, FK added later
+      add :driver_id, :uuid
       add :impairments, :integer, default: 0
-      add :driving_id, :uuid  # Self-reference, FK added later
+      # Self-reference, FK added later
+      add :driving_id, :uuid
       add :location, :string
       add :was_rammed_or_damaged, :boolean, null: false, default: false
 
@@ -504,7 +512,10 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
 
     # Add check constraints
     create constraint(:chase_relationships, :different_vehicles, check: "pursuer_id <> evader_id")
-    create constraint(:chase_relationships, :position_values, check: "position IN ('near', 'far')")
+
+    create constraint(:chase_relationships, :position_values,
+             check: "position IN ('near', 'far')"
+           )
 
     # Unique index for active relationships
     execute """

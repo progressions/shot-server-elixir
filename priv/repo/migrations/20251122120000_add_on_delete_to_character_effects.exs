@@ -18,6 +18,7 @@ defmodule ShotElixir.Repo.Migrations.AddOnDeleteToCharacterEffects do
       constraint_exists?("fk_rails_1163db7ee4") ->
         # Rails setup - drop Rails FK and recreate with on_delete
         drop constraint(:character_effects, "fk_rails_1163db7ee4")
+
         alter table(:character_effects) do
           modify :shot_id, references(:shots, type: :uuid, on_delete: :delete_all)
         end
@@ -30,6 +31,7 @@ defmodule ShotElixir.Repo.Migrations.AddOnDeleteToCharacterEffects do
         else
           # Legacy Elixir setup without on_delete - recreate
           drop constraint(:character_effects, "character_effects_shot_id_fkey")
+
           alter table(:character_effects) do
             modify :shot_id, references(:shots, type: :uuid, on_delete: :delete_all)
           end
@@ -62,6 +64,7 @@ defmodule ShotElixir.Repo.Migrations.AddOnDeleteToCharacterEffects do
       AND table_name = 'character_effects'
     )
     """
+
     %{rows: [[exists]]} = repo().query!(query)
     exists
   end
@@ -73,6 +76,7 @@ defmodule ShotElixir.Repo.Migrations.AddOnDeleteToCharacterEffects do
     WHERE conname = 'character_effects_shot_id_fkey'
     AND conrelid = 'character_effects'::regclass
     """
+
     case repo().query!(query) do
       %{rows: [[true]]} -> true
       _ -> false
