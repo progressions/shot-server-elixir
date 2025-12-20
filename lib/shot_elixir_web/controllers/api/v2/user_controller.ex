@@ -292,7 +292,10 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     if conn.halted do
       conn
     else
-      # Default to player (gamemaster: false) unless explicitly set
+      # The gamemaster flag is a self-selected role, not a security privilege.
+      # Gamemasters run campaigns and see onboarding milestones; players join campaigns.
+      # Both roles have equal system access - this only affects UX flow.
+      # Default to player (gamemaster: false) unless explicitly set.
       final_params =
         Map.put(parsed_params, "gamemaster", Map.get(parsed_params, "gamemaster", false))
 
