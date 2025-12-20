@@ -74,7 +74,7 @@ defmodule ShotElixir.Invitations do
         invitation
         |> Invitation.changeset(%{
           "redeemed" => true,
-          "redeemed_at" => DateTime.utc_now()
+          "redeemed_at" => NaiveDateTime.utc_now()
         })
         |> Repo.update!()
 
