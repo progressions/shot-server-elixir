@@ -318,7 +318,8 @@ defmodule ShotElixir.Discord.CommandsTest do
           email: "whoami-test@example.com",
           password: "password123",
           first_name: "Test",
-          last_name: "User"
+          last_name: "User",
+          gamemaster: true
         })
 
       discord_id = 123_456_789_012_345_678
