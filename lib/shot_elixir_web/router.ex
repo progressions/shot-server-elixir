@@ -71,6 +71,12 @@ defmodule ShotElixirWeb.Router do
 
     # Player View magic link redemption (public)
     post "/player_tokens/:token/redeem", PlayerViewTokenController, :redeem
+
+    # Invitation show (public for redemption page)
+    get "/invitations/:id", InvitationController, :show
+
+    # Invitation registration (public - creates new user from invitation)
+    post "/invitations/:id/register", InvitationController, :register
   end
 
   # API V2 endpoints - Authenticated
@@ -193,7 +199,11 @@ defmodule ShotElixirWeb.Router do
       delete "/image", FactionController, :remove_image
     end
 
-    resources "/invitations", InvitationController
+    resources "/invitations", InvitationController, except: [:show] do
+      post "/resend", InvitationController, :resend
+    end
+
+    post "/invitations/:id/redeem", InvitationController, :redeem
 
     # Encounters
     resources "/encounters", EncounterController, only: [:show] do

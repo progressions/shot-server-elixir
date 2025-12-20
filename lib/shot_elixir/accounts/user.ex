@@ -18,7 +18,7 @@ defmodule ShotElixir.Accounts.User do
     field :name, :string
     field :active, :boolean, default: true
     field :admin, :boolean, default: false
-    field :gamemaster, :boolean, default: true
+    field :gamemaster, :boolean, default: false
     field :jti, :string
     field :confirmed_at, :naive_datetime_usec
     field :confirmation_token, :string

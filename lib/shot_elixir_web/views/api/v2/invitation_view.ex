@@ -1,6 +1,8 @@
 defmodule ShotElixirWeb.Api.V2.InvitationView do
   def render("index.json", %{invitations: invitations}) do
-    Enum.map(invitations, &render_invitation_index/1)
+    %{
+      invitations: Enum.map(invitations, &render_invitation_index/1)
+    }
   end
 
   def render("show.json", %{invitation: invitation}) do
@@ -11,6 +13,26 @@ defmodule ShotElixirWeb.Api.V2.InvitationView do
     %{
       campaign: render_campaign_basic(campaign),
       message: message
+    }
+  end
+
+  def render("register.json", %{
+        user: user,
+        message: message,
+        requires_confirmation: requires_confirmation,
+        campaign: campaign
+      }) do
+    %{
+      message: message,
+      requires_confirmation: requires_confirmation,
+      user: %{
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        current_campaign_id: user.current_campaign_id
+      },
+      campaign: render_campaign_basic(campaign)
     }
   end
 

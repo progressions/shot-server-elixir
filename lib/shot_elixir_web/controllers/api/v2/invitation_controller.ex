@@ -9,6 +9,8 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
 
   action_fallback ShotElixirWeb.FallbackController
 
+  plug :put_view, ShotElixirWeb.Api.V2.InvitationView
+
   # GET /api/v2/invitations
   # Returns pending invitations for current campaign
   def index(conn, _params) do
@@ -277,6 +279,12 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
                     # Generate and persist confirmation token
                     {:ok, user} = Accounts.generate_confirmation_token(user)
 
+                    # Add user to campaign and mark invitation as redeemed
+                    {:ok, campaign} = Invitations.redeem_invitation(invitation, user.id)
+
+                    # Set user's current campaign to the one they were invited to
+                    {:ok, user} = Accounts.update_user(user, %{current_campaign_id: campaign.id})
+
                     # Queue confirmation email
                     %{
                       "type" => "confirmation_instructions",
@@ -286,12 +294,15 @@ defmodule ShotElixirWeb.Api.V2.InvitationController do
                     |> EmailWorker.new()
                     |> Oban.insert()
 
+                    # Broadcast campaign update for real-time UI updates
+                    ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign.id, "Campaign")
+
                     conn
                     |> put_status(:created)
                     |> render("register.json", %{
-                      message:
-                        "Account created! Check #{invitation.email} for confirmation email.",
+                      message: "Account created! You've been added to #{campaign.name}.",
                       requires_confirmation: true,
+                      campaign: campaign,
                       user: user
                     })
 
