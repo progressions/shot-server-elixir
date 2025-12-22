@@ -17,17 +17,13 @@ if File.exists?(seed_file) do
   # Read and execute the SQL file
   sql = File.read!(seed_file)
 
-  # Split by semicolons and execute each statement
-  # Filter out empty statements and comments
+  # Split by semicolons followed by newline to avoid splitting inside values
+  # Then execute each statement
   statements =
     sql
-    |> String.split(";")
+    |> String.split(";\n")
     |> Enum.map(&String.trim/1)
-    |> Enum.reject(fn s ->
-      s == "" ||
-        String.starts_with?(s, "--") ||
-        String.starts_with?(s, "/*")
-    end)
+    |> Enum.reject(fn s -> s == "" end)
 
   Enum.each(statements, fn statement ->
     # Skip pure comment lines
