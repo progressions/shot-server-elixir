@@ -97,10 +97,48 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
           case Vehicles.create_vehicle(params) do
             {:ok, vehicle} ->
-              conn
-              |> put_status(:created)
-              |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-              |> render("show.json", vehicle: vehicle)
+              # Handle image upload if present
+              case conn.params["image"] do
+                %Plug.Upload{} = upload ->
+                  case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                    {:ok, upload_result} ->
+                      case ShotElixir.ActiveStorage.attach_image(
+                             "Vehicle",
+                             vehicle.id,
+                             upload_result
+                           ) do
+                        {:ok, _attachment} ->
+                          # Reload vehicle to get fresh data with image
+                          vehicle = Vehicles.get_vehicle(vehicle.id)
+
+                          conn
+                          |> put_status(:created)
+                          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                          |> render("show.json", vehicle: vehicle)
+
+                        {:error, _changeset} ->
+                          # Image attachment failed, but vehicle was created
+                          conn
+                          |> put_status(:created)
+                          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                          |> render("show.json", vehicle: vehicle)
+                      end
+
+                    {:error, _reason} ->
+                      # Image upload failed, but vehicle was created
+                      conn
+                      |> put_status(:created)
+                      |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                      |> render("show.json", vehicle: vehicle)
+                  end
+
+                _ ->
+                  # No image uploaded
+                  conn
+                  |> put_status(:created)
+                  |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                  |> render("show.json", vehicle: vehicle)
+              end
 
             {:error, %Ecto.Changeset{} = changeset} ->
               conn
