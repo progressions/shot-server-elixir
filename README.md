@@ -14,7 +14,7 @@ Phoenix/Elixir API backend for [Chi War](https://chiwar.net), a campaign managem
 
 ## Requirements
 
-- Elixir 1.18+
+- Elixir 1.15+
 - Erlang/OTP 26+
 - PostgreSQL 14+
 - Node.js (for asset compilation, if needed)
@@ -96,9 +96,13 @@ SHOT_ELIXIR_DEV_DB_PORT=5433 mix phx.server
 
 ## API Endpoints
 
-All endpoints are under `/api/v2/`:
+### Authentication
 
-- `POST /users/sign_in` - Authentication
+- `POST /users/sign_in` - Login (returns JWT)
+- `POST /users/sign_up` - Registration
+- `DELETE /users/sign_out` - Logout
+
+### Resources (under `/api/v2/`)
 - `GET /api/v2/campaigns` - List campaigns
 - `GET /api/v2/characters` - List characters
 - `GET /api/v2/fights` - Combat encounters
