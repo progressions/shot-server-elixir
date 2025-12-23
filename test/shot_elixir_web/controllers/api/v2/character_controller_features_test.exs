@@ -145,6 +145,40 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerFeaturesTest do
       assert response["faction"]["name"] == "The Dragons"
     end
 
+    test "returns faction association when updating character's faction_id", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "The Ascended",
+          description: "Transformed animals",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character without Faction",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+
+      conn =
+        patch(conn, ~p"/api/v2/characters/#{character.id}", character: %{faction_id: faction.id})
+
+      response = json_response(conn, 200)
+
+      # Verify faction association is returned in the update response
+      assert response["faction_id"] == faction.id
+      assert response["faction"] != nil
+      assert response["faction"]["id"] == faction.id
+      assert response["faction"]["name"] == "The Ascended"
+    end
+
     test "renders juncture association when character has juncture", %{
       conn: conn,
       gamemaster: gm,
