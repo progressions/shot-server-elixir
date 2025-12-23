@@ -198,10 +198,44 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
 
           case Schticks.create_schtick(schtick_params) do
             {:ok, schtick} ->
-              conn
-              |> put_status(:created)
-              |> put_view(ShotElixirWeb.Api.V2.SchticksView)
-              |> render("show.json", schtick: schtick)
+              # Handle image upload if present
+              case conn.params["image"] do
+                %Plug.Upload{} = upload ->
+                  case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                    {:ok, upload_result} ->
+                      case ShotElixir.ActiveStorage.attach_image(
+                             "Schtick",
+                             schtick.id,
+                             upload_result
+                           ) do
+                        {:ok, _attachment} ->
+                          schtick = Schticks.get_schtick(schtick.id)
+
+                          conn
+                          |> put_status(:created)
+                          |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                          |> render("show.json", schtick: schtick)
+
+                        {:error, _changeset} ->
+                          conn
+                          |> put_status(:created)
+                          |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                          |> render("show.json", schtick: schtick)
+                      end
+
+                    {:error, _reason} ->
+                      conn
+                      |> put_status(:created)
+                      |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                      |> render("show.json", schtick: schtick)
+                  end
+
+                _ ->
+                  conn
+                  |> put_status(:created)
+                  |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+                  |> render("show.json", schtick: schtick)
+              end
 
             {:error, changeset} ->
               conn

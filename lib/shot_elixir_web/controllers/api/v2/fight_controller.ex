@@ -82,10 +82,40 @@ defmodule ShotElixirWeb.Api.V2.FightController do
             # Broadcast reload signal to campaign channel (Rails compatible)
             ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Fight")
 
-            conn
-            |> put_status(:created)
-            |> put_view(ShotElixirWeb.Api.V2.FightView)
-            |> render("show.json", fight: fight)
+            # Handle image upload if present
+            case conn.params["image"] do
+              %Plug.Upload{} = upload ->
+                case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                  {:ok, upload_result} ->
+                    case ShotElixir.ActiveStorage.attach_image("Fight", fight.id, upload_result) do
+                      {:ok, _attachment} ->
+                        fight = Fights.get_fight(fight.id)
+
+                        conn
+                        |> put_status(:created)
+                        |> put_view(ShotElixirWeb.Api.V2.FightView)
+                        |> render("show.json", fight: fight)
+
+                      {:error, _changeset} ->
+                        conn
+                        |> put_status(:created)
+                        |> put_view(ShotElixirWeb.Api.V2.FightView)
+                        |> render("show.json", fight: fight)
+                    end
+
+                  {:error, _reason} ->
+                    conn
+                    |> put_status(:created)
+                    |> put_view(ShotElixirWeb.Api.V2.FightView)
+                    |> render("show.json", fight: fight)
+                end
+
+              _ ->
+                conn
+                |> put_status(:created)
+                |> put_view(ShotElixirWeb.Api.V2.FightView)
+                |> render("show.json", fight: fight)
+            end
 
           {:error, %Ecto.Changeset{} = changeset} ->
             conn

@@ -127,10 +127,40 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
         case Weapons.create_weapon(params) do
           {:ok, weapon} ->
-            conn
-            |> put_status(:created)
-            |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-            |> render("show.json", weapon: weapon)
+            # Handle image upload if present
+            case conn.params["image"] do
+              %Plug.Upload{} = upload ->
+                case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                  {:ok, upload_result} ->
+                    case ShotElixir.ActiveStorage.attach_image("Weapon", weapon.id, upload_result) do
+                      {:ok, _attachment} ->
+                        weapon = Weapons.get_weapon(weapon.id)
+
+                        conn
+                        |> put_status(:created)
+                        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+                        |> render("show.json", weapon: weapon)
+
+                      {:error, _changeset} ->
+                        conn
+                        |> put_status(:created)
+                        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+                        |> render("show.json", weapon: weapon)
+                    end
+
+                  {:error, _reason} ->
+                    conn
+                    |> put_status(:created)
+                    |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+                    |> render("show.json", weapon: weapon)
+                end
+
+              _ ->
+                conn
+                |> put_status(:created)
+                |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+                |> render("show.json", weapon: weapon)
+            end
 
           {:error, changeset} ->
             conn

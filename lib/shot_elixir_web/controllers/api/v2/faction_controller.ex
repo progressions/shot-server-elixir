@@ -121,10 +121,44 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
           if authorize_campaign_modification(campaign, current_user) do
             case Factions.create_faction(faction_params) do
               {:ok, faction} ->
-                conn
-                |> put_status(:created)
-                |> put_view(ShotElixirWeb.Api.V2.FactionView)
-                |> render("show.json", faction: faction)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        case ShotElixir.ActiveStorage.attach_image(
+                               "Faction",
+                               faction.id,
+                               upload_result
+                             ) do
+                          {:ok, _attachment} ->
+                            faction = Factions.get_faction(faction.id)
+
+                            conn
+                            |> put_status(:created)
+                            |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                            |> render("show.json", faction: faction)
+
+                          {:error, _changeset} ->
+                            conn
+                            |> put_status(:created)
+                            |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                            |> render("show.json", faction: faction)
+                        end
+
+                      {:error, _reason} ->
+                        conn
+                        |> put_status(:created)
+                        |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                        |> render("show.json", faction: faction)
+                    end
+
+                  _ ->
+                    conn
+                    |> put_status(:created)
+                    |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                    |> render("show.json", faction: faction)
+                end
 
               {:error, changeset} ->
                 conn
