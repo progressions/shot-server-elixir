@@ -74,11 +74,44 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       case Characters.create_character(params) do
         {:ok, character} ->
-          # Broadcasting now happens automatically in Characters context
-          conn
-          |> put_status(:created)
-          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-          |> render("show.json", character: character)
+          # Handle image upload if present
+          case conn.params["image"] do
+            %Plug.Upload{} = upload ->
+              case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                {:ok, upload_result} ->
+                  case ShotElixir.ActiveStorage.attach_image(
+                         "Character",
+                         character.id,
+                         upload_result
+                       ) do
+                    {:ok, _attachment} ->
+                      character = Characters.get_character(character.id)
+
+                      conn
+                      |> put_status(:created)
+                      |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                      |> render("show.json", character: character)
+
+                    {:error, _changeset} ->
+                      conn
+                      |> put_status(:created)
+                      |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                      |> render("show.json", character: character)
+                  end
+
+                {:error, _reason} ->
+                  conn
+                  |> put_status(:created)
+                  |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                  |> render("show.json", character: character)
+              end
+
+            _ ->
+              conn
+              |> put_status(:created)
+              |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+              |> render("show.json", character: character)
+          end
 
         {:error, %Ecto.Changeset{} = changeset} ->
           conn

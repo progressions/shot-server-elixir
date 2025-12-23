@@ -120,9 +120,40 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
           if authorize_campaign_modification(campaign, current_user) do
             case Junctures.create_juncture(juncture_params) do
               {:ok, juncture} ->
-                conn
-                |> put_status(:created)
-                |> render(:show, juncture: juncture)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        case ShotElixir.ActiveStorage.attach_image(
+                               "Juncture",
+                               juncture.id,
+                               upload_result
+                             ) do
+                          {:ok, _attachment} ->
+                            juncture = Junctures.get_juncture(juncture.id)
+
+                            conn
+                            |> put_status(:created)
+                            |> render(:show, juncture: juncture)
+
+                          {:error, _changeset} ->
+                            conn
+                            |> put_status(:created)
+                            |> render(:show, juncture: juncture)
+                        end
+
+                      {:error, _reason} ->
+                        conn
+                        |> put_status(:created)
+                        |> render(:show, juncture: juncture)
+                    end
+
+                  _ ->
+                    conn
+                    |> put_status(:created)
+                    |> render(:show, juncture: juncture)
+                end
 
               {:error, changeset} ->
                 conn

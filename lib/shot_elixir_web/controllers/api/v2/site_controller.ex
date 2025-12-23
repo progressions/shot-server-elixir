@@ -122,10 +122,40 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
           if authorize_campaign_modification(campaign, current_user) do
             case Sites.create_site(site_params) do
               {:ok, site} ->
-                conn
-                |> put_status(:created)
-                |> put_view(ShotElixirWeb.Api.V2.SiteView)
-                |> render("show.json", site: site)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        case ShotElixir.ActiveStorage.attach_image("Site", site.id, upload_result) do
+                          {:ok, _attachment} ->
+                            site = Sites.get_site(site.id)
+
+                            conn
+                            |> put_status(:created)
+                            |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                            |> render("show.json", site: site)
+
+                          {:error, _changeset} ->
+                            conn
+                            |> put_status(:created)
+                            |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                            |> render("show.json", site: site)
+                        end
+
+                      {:error, _reason} ->
+                        conn
+                        |> put_status(:created)
+                        |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                        |> render("show.json", site: site)
+                    end
+
+                  _ ->
+                    conn
+                    |> put_status(:created)
+                    |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                    |> render("show.json", site: site)
+                end
 
               {:error, changeset} ->
                 conn

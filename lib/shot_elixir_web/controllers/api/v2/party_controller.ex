@@ -126,10 +126,44 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
           if authorize_campaign_modification(campaign, current_user) do
             case Parties.create_party(party_params) do
               {:ok, party} ->
-                conn
-                |> put_status(:created)
-                |> put_view(ShotElixirWeb.Api.V2.PartyView)
-                |> render("show.json", party: party)
+                # Handle image upload if present
+                case conn.params["image"] do
+                  %Plug.Upload{} = upload ->
+                    case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                      {:ok, upload_result} ->
+                        case ShotElixir.ActiveStorage.attach_image(
+                               "Party",
+                               party.id,
+                               upload_result
+                             ) do
+                          {:ok, _attachment} ->
+                            party = Parties.get_party(party.id)
+
+                            conn
+                            |> put_status(:created)
+                            |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                            |> render("show.json", party: party)
+
+                          {:error, _changeset} ->
+                            conn
+                            |> put_status(:created)
+                            |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                            |> render("show.json", party: party)
+                        end
+
+                      {:error, _reason} ->
+                        conn
+                        |> put_status(:created)
+                        |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                        |> render("show.json", party: party)
+                    end
+
+                  _ ->
+                    conn
+                    |> put_status(:created)
+                    |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                    |> render("show.json", party: party)
+                end
 
               {:error, changeset} ->
                 conn

@@ -97,10 +97,48 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
           case Vehicles.create_vehicle(params) do
             {:ok, vehicle} ->
-              conn
-              |> put_status(:created)
-              |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-              |> render("show.json", vehicle: vehicle)
+              # Handle image upload if present
+              case conn.params["image"] do
+                %Plug.Upload{} = upload ->
+                  case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+                    {:ok, upload_result} ->
+                      case ShotElixir.ActiveStorage.attach_image(
+                             "Vehicle",
+                             vehicle.id,
+                             upload_result
+                           ) do
+                        {:ok, _attachment} ->
+                          # Reload vehicle to get fresh data with image
+                          vehicle = Vehicles.get_vehicle(vehicle.id)
+
+                          conn
+                          |> put_status(:created)
+                          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                          |> render("show.json", vehicle: vehicle)
+
+                        {:error, _changeset} ->
+                          # Image attachment failed, but vehicle was created
+                          conn
+                          |> put_status(:created)
+                          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                          |> render("show.json", vehicle: vehicle)
+                      end
+
+                    {:error, _reason} ->
+                      # Image upload failed, but vehicle was created
+                      conn
+                      |> put_status(:created)
+                      |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                      |> render("show.json", vehicle: vehicle)
+                  end
+
+                _ ->
+                  # No image uploaded
+                  conn
+                  |> put_status(:created)
+                  |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                  |> render("show.json", vehicle: vehicle)
+              end
 
             {:error, %Ecto.Changeset{} = changeset} ->
               conn
@@ -122,35 +160,35 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
       parsed_params = parse_json_params(vehicle_params)
 
       # Handle image upload if present
-      # Plug.Upload only exists when vehicle_params is a map from FormData, not a JSON string
-      updated_vehicle =
-        if is_map(vehicle_params) do
-          case Map.get(vehicle_params, "image") do
-            %Plug.Upload{} = upload ->
-              case Vehicles.update_vehicle(vehicle, %{"image" => upload}) do
-                {:ok, v} -> v
-                _ -> vehicle
+      case conn.params["image"] do
+        %Plug.Upload{} = upload ->
+          # Upload image to ImageKit
+          case ShotElixir.Services.ImagekitService.upload_plug(upload) do
+            {:ok, upload_result} ->
+              # Attach image to vehicle via ActiveStorage
+              case ShotElixir.ActiveStorage.attach_image("Vehicle", vehicle.id, upload_result) do
+                {:ok, _attachment} ->
+                  # Reload vehicle to get fresh data after image attachment
+                  vehicle = Vehicles.get_vehicle(vehicle.id)
+                  # Continue with vehicle update
+                  update_vehicle_with_params(conn, vehicle, parsed_params)
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+                  |> render("error.json", changeset: changeset)
               end
 
-            _ ->
-              vehicle
+            {:error, reason} ->
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Image upload failed: #{inspect(reason)}"})
           end
-        else
-          vehicle
-        end
 
-      # Continue with normal update using parsed params
-      case Vehicles.update_vehicle(updated_vehicle, parsed_params) do
-        {:ok, final_vehicle} ->
-          conn
-          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-          |> render("show.json", vehicle: final_vehicle)
-
-        {:error, %Ecto.Changeset{} = changeset} ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-          |> render("error.json", changeset: changeset)
+        _ ->
+          # No image uploaded, proceed with normal update
+          update_vehicle_with_params(conn, vehicle, parsed_params)
       end
     else
       nil ->
@@ -341,6 +379,22 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
       user.gamemaster && Campaigns.is_member?(campaign.id, user.id) -> :ok
       Campaigns.is_member?(campaign.id, user.id) -> {:error, :forbidden}
       true -> {:error, :not_found}
+    end
+  end
+
+  # Helper to update vehicle with parsed params
+  defp update_vehicle_with_params(conn, vehicle, parsed_params) do
+    case Vehicles.update_vehicle(vehicle, parsed_params) do
+      {:ok, final_vehicle} ->
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+        |> render("show.json", vehicle: final_vehicle)
+
+      {:error, %Ecto.Changeset{} = changeset} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+        |> render("error.json", changeset: changeset)
     end
   end
 
