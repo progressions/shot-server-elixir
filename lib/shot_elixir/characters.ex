@@ -520,8 +520,12 @@ defmodule ShotElixir.Characters do
     |> case do
       {:ok, %{character: character}} ->
         {:ok, get_character(character.id) || character}
-      {:error, :character, changeset, _} -> {:error, changeset}
-      {:error, _step, reason, _changes} -> {:error, reason}
+
+      {:error, :character, changeset, _} ->
+        {:error, changeset}
+
+      {:error, _step, reason, _changes} ->
+        {:error, reason}
     end
   end
 
