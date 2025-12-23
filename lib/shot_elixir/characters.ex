@@ -511,14 +511,15 @@ defmodule ShotElixir.Characters do
     |> Multi.run(:broadcast, fn _repo, %{character: character} ->
       # Preload associations before broadcasting
       character_with_associations =
-        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions], force: true)
 
       broadcast_change(character_with_associations, :update)
       {:ok, character}
     end)
     |> Repo.transaction()
     |> case do
-      {:ok, %{character: character}} -> {:ok, character}
+      {:ok, %{character: character}} ->
+        {:ok, get_character(character.id) || character}
       {:error, :character, changeset, _} -> {:error, changeset}
       {:error, _step, reason, _changes} -> {:error, reason}
     end
