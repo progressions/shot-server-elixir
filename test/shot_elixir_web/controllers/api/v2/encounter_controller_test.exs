@@ -79,6 +79,107 @@ defmodule ShotElixirWeb.Api.V2.EncounterControllerTest do
     assert Enum.all?(characters_in_shots, fn char -> char["id"] == character.id end)
   end
 
+  test "show returns shot.color with fallback to character.color", %{
+    conn: conn,
+    gamemaster: gm,
+    campaign: campaign
+  } do
+    # Character with a color set
+    {:ok, char_with_color} =
+      Characters.create_character(%{
+        name: "Character With Color",
+        campaign_id: campaign.id,
+        user_id: gm.id,
+        color: "#ff0000",
+        action_values: %{"Type" => "PC"}
+      })
+
+    # Character without a color
+    {:ok, char_no_color} =
+      Characters.create_character(%{
+        name: "Character No Color",
+        campaign_id: campaign.id,
+        user_id: gm.id,
+        action_values: %{"Type" => "PC"}
+      })
+
+    {:ok, fight} =
+      Fights.create_fight(%{
+        name: "Color Test Fight",
+        campaign_id: campaign.id
+      })
+
+    {:ok, _fight} =
+      Fights.update_fight(fight, %{
+        "character_ids" => [char_with_color.id, char_no_color.id]
+      })
+
+    # Get the shot for the character with color and set a different shot-specific color
+    shot_with_override =
+      Repo.one(
+        from s in Shot,
+          where: s.fight_id == ^fight.id and s.character_id == ^char_with_color.id
+      )
+
+    {:ok, _} = Fights.update_shot(shot_with_override, %{"color" => "#00ff00"})
+
+    conn = authenticate(conn, gm)
+    conn = get(conn, ~p"/api/v2/encounters/#{fight.id}")
+    response = json_response(conn, 200)
+
+    characters =
+      response["shots"]
+      |> Enum.flat_map(fn shot -> shot["characters"] || [] end)
+
+    # Character with shot-specific color should use shot.color
+    char_with_override = Enum.find(characters, fn c -> c["id"] == char_with_color.id end)
+    assert char_with_override["color"] == "#00ff00"
+
+    # Character without shot-specific color should fall back to character.color (nil in this case)
+    char_without_color = Enum.find(characters, fn c -> c["id"] == char_no_color.id end)
+    assert char_without_color["color"] == nil
+  end
+
+  test "show falls back to character.color when shot.color is nil", %{
+    conn: conn,
+    gamemaster: gm,
+    campaign: campaign
+  } do
+    {:ok, character} =
+      Characters.create_character(%{
+        name: "Character With Base Color",
+        campaign_id: campaign.id,
+        user_id: gm.id,
+        color: "#ff5500",
+        action_values: %{"Type" => "PC"}
+      })
+
+    {:ok, fight} =
+      Fights.create_fight(%{
+        name: "Fallback Color Test Fight",
+        campaign_id: campaign.id
+      })
+
+    {:ok, _fight} =
+      Fights.update_fight(fight, %{
+        "character_ids" => [character.id]
+      })
+
+    # Don't set shot.color - it should fall back to character.color
+
+    conn = authenticate(conn, gm)
+    conn = get(conn, ~p"/api/v2/encounters/#{fight.id}")
+    response = json_response(conn, 200)
+
+    characters =
+      response["shots"]
+      |> Enum.flat_map(fn shot -> shot["characters"] || [] end)
+
+    char_response = Enum.find(characters, fn c -> c["id"] == character.id end)
+    # Should fall back to character.color since shot.color is nil
+    assert char_response["color"] == "#ff5500"
+  end
+
   test "show includes driver details for vehicles", %{
     conn: conn,
     gamemaster: gm,
