@@ -413,7 +413,7 @@ defmodule ShotElixir.Vehicles do
 
   @doc """
   Gets multiple vehicles by their IDs in a single query.
-  Returns a list of vehicles (without image URLs for efficiency).
+  Returns a list of vehicles with image URLs loaded.
   """
   def list_vehicles_by_ids(ids) when is_list(ids) do
     ids = Enum.reject(ids, &is_nil/1)
@@ -423,6 +423,7 @@ defmodule ShotElixir.Vehicles do
     else
       from(v in Vehicle, where: v.id in ^ids)
       |> Repo.all()
+      |> ImageLoader.load_image_urls("Vehicle")
     end
   end
 
