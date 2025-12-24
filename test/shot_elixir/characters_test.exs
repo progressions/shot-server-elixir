@@ -498,14 +498,21 @@ defmodule ShotElixir.CharactersTest do
           user_id: user.id
         })
 
-      # Create characters with different names and timestamps
+      # Create characters with different names and explicit timestamps
+      # Using Repo directly to set specific created_at values for reliable ordering
+      now = DateTime.utc_now()
+
       {:ok, char_alpha} =
         Characters.create_character(%{
           name: "Alpha Character",
           campaign_id: campaign.id
         })
 
-      Process.sleep(10)
+      # Update created_at to ensure ordering (1 second apart)
+      char_alpha =
+        char_alpha
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -2, :second)})
+        |> Repo.update!()
 
       {:ok, char_beta} =
         Characters.create_character(%{
@@ -513,13 +520,21 @@ defmodule ShotElixir.CharactersTest do
           campaign_id: campaign.id
         })
 
-      Process.sleep(10)
+      char_beta =
+        char_beta
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+        |> Repo.update!()
 
       {:ok, char_gamma} =
         Characters.create_character(%{
           name: "Gamma Character",
           campaign_id: campaign.id
         })
+
+      char_gamma =
+        char_gamma
+        |> Ecto.Changeset.change(%{created_at: now})
+        |> Repo.update!()
 
       {:ok,
        campaign: campaign, char_alpha: char_alpha, char_beta: char_beta, char_gamma: char_gamma}

@@ -189,7 +189,10 @@ defmodule ShotElixir.CampaignsTest do
           gamemaster: true
         })
 
-      # Create campaigns with different names and timestamps
+      # Create campaigns with different names and explicit timestamps
+      # Using Repo directly to set specific created_at values for reliable ordering
+      now = DateTime.utc_now()
+
       {:ok, campaign_alpha} =
         Campaigns.create_campaign(%{
           name: "Alpha Campaign",
@@ -197,8 +200,11 @@ defmodule ShotElixir.CampaignsTest do
           user_id: user.id
         })
 
-      # Small delay to ensure different timestamps
-      Process.sleep(10)
+      # Update created_at to ensure ordering (1 second apart)
+      campaign_alpha =
+        campaign_alpha
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -2, :second)})
+        |> Repo.update!()
 
       {:ok, campaign_beta} =
         Campaigns.create_campaign(%{
@@ -207,7 +213,10 @@ defmodule ShotElixir.CampaignsTest do
           user_id: user.id
         })
 
-      Process.sleep(10)
+      campaign_beta =
+        campaign_beta
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+        |> Repo.update!()
 
       {:ok, campaign_gamma} =
         Campaigns.create_campaign(%{
@@ -215,6 +224,11 @@ defmodule ShotElixir.CampaignsTest do
           description: "Third alphabetically",
           user_id: user.id
         })
+
+      campaign_gamma =
+        campaign_gamma
+        |> Ecto.Changeset.change(%{created_at: now})
+        |> Repo.update!()
 
       {:ok,
        user: user,
