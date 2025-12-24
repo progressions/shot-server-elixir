@@ -245,7 +245,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           action_values: action_values,
           skills: character.skills,
           faction_id: character.faction_id,
-          color: character.color,
+          color: shot.color || character.color,
           count: shot.count,
           impairments: get_character_impairments(character, shot),
           shot_id: shot.id,
