@@ -235,10 +235,14 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> SyncCharacterToNotionWorker.new()
       |> Oban.insert()
 
+      # Use source character's image_url for immediate display
+      # (the actual image copy happens async via ImageCopyWorker)
+      new_character_with_image = %{new_character | image_url: character.image_url}
+
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-      |> render("show.json", character: new_character)
+      |> render("show.json", character: new_character_with_image)
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}

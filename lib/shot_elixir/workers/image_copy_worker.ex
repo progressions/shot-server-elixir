@@ -42,6 +42,9 @@ defmodule ShotElixir.Workers.ImageCopyWorker do
               "[ImageCopyWorker] Successfully copied image to #{target_type}:#{target_id}"
             )
 
+            # Broadcast update for entities with campaign_id so frontend can refresh
+            broadcast_image_update(target_type, target_id)
+
             # Success - increment counter
             if campaign_id do
               increment_image_completion(campaign_id)
@@ -249,6 +252,55 @@ defmodule ShotElixir.Workers.ImageCopyWorker do
         Logger.info("[ImageCopyWorker] Campaign #{campaign.id} seeding complete!")
     end
   end
+
+  # Broadcast image update to frontend so it can refresh the entity
+  # Uses the same broadcast format as regular entity updates so the frontend's
+  # existing "character" subscription will pick up the change
+  defp broadcast_image_update("Character", character_id) do
+    case ShotElixir.Characters.get_character(character_id) do
+      %{campaign_id: campaign_id} = character when not is_nil(campaign_id) ->
+        # Broadcast the full character using the same format as regular updates
+        serialized =
+          ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: character})
+
+        Phoenix.PubSub.broadcast!(
+          ShotElixir.PubSub,
+          "campaign:#{campaign_id}",
+          {:campaign_broadcast, %{character: serialized}}
+        )
+
+        Logger.info(
+          "[ImageCopyWorker] Broadcasted character update for #{character_id} to campaign #{campaign_id}"
+        )
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp broadcast_image_update("Vehicle", vehicle_id) do
+    case ShotElixir.Vehicles.get_vehicle(vehicle_id) do
+      %{campaign_id: campaign_id} = vehicle when not is_nil(campaign_id) ->
+        # Broadcast the full vehicle using the same format as regular updates
+        serialized = ShotElixirWeb.Api.V2.VehicleView.render("show.json", %{vehicle: vehicle})
+
+        Phoenix.PubSub.broadcast!(
+          ShotElixir.PubSub,
+          "campaign:#{campaign_id}",
+          {:campaign_broadcast, %{vehicle: serialized}}
+        )
+
+        Logger.info(
+          "[ImageCopyWorker] Broadcasted vehicle update for #{vehicle_id} to campaign #{campaign_id}"
+        )
+
+      _ ->
+        :ok
+    end
+  end
+
+  # For other entity types, no broadcast needed
+  defp broadcast_image_update(_type, _id), do: :ok
 
   # Helper to get entity by type and ID
   defp get_entity(type, id) do
