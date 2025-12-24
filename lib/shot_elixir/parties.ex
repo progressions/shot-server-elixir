@@ -276,7 +276,7 @@ defmodule ShotElixir.Parties do
 
   defp apply_sorting(query, params) do
     sort = params["sort"] || "created_at"
-    order = if params["order"] == "ASC", do: :asc, else: :desc
+    order = if String.downcase(params["order"] || "") == "asc", do: :asc, else: :desc
 
     case sort do
       "name" ->

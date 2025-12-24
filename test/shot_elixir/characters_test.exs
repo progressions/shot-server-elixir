@@ -293,10 +293,15 @@ defmodule ShotElixir.CharactersTest do
     test "list_advancements/1 returns all advancements for a character in descending order", %{
       character: character
     } do
-      {:ok, _advancement1} =
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, advancement1} =
         Characters.create_advancement(character.id, %{description: "First advancement"})
 
-      :timer.sleep(100)
+      advancement1
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+      |> Repo.update!()
 
       {:ok, _advancement2} =
         Characters.create_advancement(character.id, %{description: "Second advancement"})
@@ -304,20 +309,12 @@ defmodule ShotElixir.CharactersTest do
       advancements = Characters.list_advancements(character.id)
 
       assert length(advancements) == 2
-      # Verify the most recent advancement is first
+      # Verify the most recent advancement is first (descending order)
       first_advancement = Enum.at(advancements, 0)
       second_advancement = Enum.at(advancements, 1)
 
-      # The first advancement should have a created_at >= the second one (descending order)
-      assert DateTime.compare(first_advancement.created_at, second_advancement.created_at) in [
-               :gt,
-               :eq
-             ]
-
-      # Verify both advancements are present by description
-      descriptions = Enum.map(advancements, & &1.description)
-      assert "First advancement" in descriptions
-      assert "Second advancement" in descriptions
+      assert first_advancement.description == "Second advancement"
+      assert second_advancement.description == "First advancement"
     end
 
     test "list_advancements/1 returns empty list when character has no advancements", %{
@@ -387,7 +384,6 @@ defmodule ShotElixir.CharactersTest do
         Characters.create_advancement(character.id, %{description: "Original description"})
 
       original_created_at = advancement.created_at
-      :timer.sleep(10)
 
       {:ok, updated_advancement} =
         Characters.update_advancement(advancement, %{description: "Updated description"})
@@ -478,6 +474,189 @@ defmodule ShotElixir.CharactersTest do
       refute duplicated_char.name == original_char.name
       # Name should contain the original name
       assert String.contains?(duplicated_char.name, "Original Character")
+    end
+  end
+
+  describe "list_campaign_characters/3 sorting" do
+    setup do
+      {:ok, user} =
+        ShotElixir.Accounts.create_user(%{
+          email: "sorting_user@example.com",
+          password: "password123",
+          first_name: "Sort",
+          last_name: "Tester",
+          gamemaster: true
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Sorting Test Campaign",
+          user_id: user.id
+        })
+
+      # Create characters with different names and explicit timestamps
+      # Using Repo directly to set specific created_at values for reliable ordering
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, char_alpha} =
+        Characters.create_character(%{
+          name: "Alpha Character",
+          campaign_id: campaign.id
+        })
+
+      # Update created_at to ensure ordering (1 second apart)
+      char_alpha =
+        char_alpha
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -2, :second)})
+        |> Repo.update!()
+
+      {:ok, char_beta} =
+        Characters.create_character(%{
+          name: "Beta Character",
+          campaign_id: campaign.id
+        })
+
+      char_beta =
+        char_beta
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+        |> Repo.update!()
+
+      {:ok, char_gamma} =
+        Characters.create_character(%{
+          name: "Gamma Character",
+          campaign_id: campaign.id
+        })
+
+      char_gamma =
+        char_gamma
+        |> Ecto.Changeset.change(%{created_at: now})
+        |> Repo.update!()
+
+      {:ok,
+       campaign: campaign, char_alpha: char_alpha, char_beta: char_beta, char_gamma: char_gamma}
+    end
+
+    test "sorts by created_at ascending with lowercase 'asc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at", "order" => "asc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert alpha_idx < gamma_idx,
+             "Alpha should come before Gamma when sorting by created_at asc"
+    end
+
+    test "sorts by created_at descending with lowercase 'desc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at", "order" => "desc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert gamma_idx < alpha_idx,
+             "Gamma should come before Alpha when sorting by created_at desc"
+    end
+
+    test "sorts by name ascending with lowercase 'asc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "name", "order" => "asc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert alpha_idx < gamma_idx, "Alpha should come before Gamma when sorting by name asc"
+    end
+
+    test "sorts by name descending with lowercase 'desc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "name", "order" => "desc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert gamma_idx < alpha_idx, "Gamma should come before Alpha when sorting by name desc"
+    end
+
+    test "handles uppercase 'ASC' for backwards compatibility", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at", "order" => "ASC"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert alpha_idx < gamma_idx, "Should handle uppercase ASC"
+    end
+
+    test "defaults to descending when order is not specified", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert gamma_idx < alpha_idx, "Should default to descending order"
     end
   end
 end

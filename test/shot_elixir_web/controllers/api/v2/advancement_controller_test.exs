@@ -1,7 +1,7 @@
 defmodule ShotElixirWeb.Api.V2.AdvancementControllerTest do
   use ShotElixirWeb.ConnCase, async: true
 
-  alias ShotElixir.{Characters, Campaigns, Accounts}
+  alias ShotElixir.{Characters, Campaigns, Accounts, Repo}
   alias ShotElixir.Guardian
 
   setup %{conn: conn} do
@@ -55,10 +55,15 @@ defmodule ShotElixirWeb.Api.V2.AdvancementControllerTest do
       gamemaster: gm,
       character: character
     } do
-      {:ok, _advancement1} =
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, advancement1} =
         Characters.create_advancement(character.id, %{description: "First advancement"})
 
-      :timer.sleep(100)
+      advancement1
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+      |> Repo.update!()
 
       {:ok, _advancement2} =
         Characters.create_advancement(character.id, %{description: "Second advancement"})
@@ -68,17 +73,12 @@ defmodule ShotElixirWeb.Api.V2.AdvancementControllerTest do
       response = json_response(conn, 200)
 
       assert length(response) == 2
-      # Verify both advancements are present by description
-      descriptions = Enum.map(response, & &1["description"])
-      assert "First advancement" in descriptions
-      assert "Second advancement" in descriptions
+      # Verify descending order - second advancement (most recent) should be first
+      first_response = Enum.at(response, 0)
+      second_response = Enum.at(response, 1)
 
-      # Verify descending order - first advancement should have created_at >= second
-      first_created = response |> Enum.at(0) |> Map.get("created_at")
-      second_created = response |> Enum.at(1) |> Map.get("created_at")
-      {:ok, first_dt, _} = DateTime.from_iso8601(first_created)
-      {:ok, second_dt, _} = DateTime.from_iso8601(second_created)
-      assert DateTime.compare(first_dt, second_dt) in [:gt, :eq]
+      assert first_response["description"] == "Second advancement"
+      assert second_response["description"] == "First advancement"
     end
 
     test "returns empty list when character has no advancements", %{
@@ -242,7 +242,6 @@ defmodule ShotElixirWeb.Api.V2.AdvancementControllerTest do
         Characters.create_advancement(character.id, %{description: "Original"})
 
       original_created_at = advancement.created_at
-      :timer.sleep(100)
 
       conn = authenticate(conn, gm)
 

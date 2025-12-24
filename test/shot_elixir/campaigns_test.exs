@@ -3,6 +3,7 @@ defmodule ShotElixir.CampaignsTest do
   alias ShotElixir.Campaigns
   alias ShotElixir.Campaigns.{Campaign, CampaignMembership}
   alias ShotElixir.Accounts
+  alias ShotElixir.Repo
 
   describe "campaigns" do
     setup do
@@ -175,6 +176,155 @@ defmodule ShotElixir.CampaignsTest do
     test "remove_member/2 returns 0 if member doesn't exist", %{user: user, player: player} do
       {:ok, campaign} = Campaigns.create_campaign(Map.put(@valid_attrs, :user_id, user.id))
       assert {0, nil} = Campaigns.remove_member(campaign, player)
+    end
+  end
+
+  describe "list_user_campaigns/3 sorting" do
+    setup do
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "sorting_gm@example.com",
+          password: "password123",
+          first_name: "Sort",
+          last_name: "Tester",
+          gamemaster: true
+        })
+
+      # Create campaigns with different names and explicit timestamps
+      # Using Repo directly to set specific created_at values for reliable ordering
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, campaign_alpha} =
+        Campaigns.create_campaign(%{
+          name: "Alpha Campaign",
+          description: "First alphabetically",
+          user_id: user.id
+        })
+
+      # Update created_at to ensure ordering (1 second apart)
+      campaign_alpha =
+        campaign_alpha
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -2, :second)})
+        |> Repo.update!()
+
+      {:ok, campaign_beta} =
+        Campaigns.create_campaign(%{
+          name: "Beta Campaign",
+          description: "Second alphabetically",
+          user_id: user.id
+        })
+
+      campaign_beta =
+        campaign_beta
+        |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+        |> Repo.update!()
+
+      {:ok, campaign_gamma} =
+        Campaigns.create_campaign(%{
+          name: "Gamma Campaign",
+          description: "Third alphabetically",
+          user_id: user.id
+        })
+
+      campaign_gamma =
+        campaign_gamma
+        |> Ecto.Changeset.change(%{created_at: now})
+        |> Repo.update!()
+
+      {:ok,
+       user: user,
+       campaign_alpha: campaign_alpha,
+       campaign_beta: campaign_beta,
+       campaign_gamma: campaign_gamma}
+    end
+
+    test "sorts by created_at ascending with lowercase 'asc'", %{
+      user: user,
+      campaign_alpha: campaign_alpha,
+      campaign_gamma: campaign_gamma
+    } do
+      result = Campaigns.list_user_campaigns(user.id, %{"sort" => "created_at", "order" => "asc"})
+      campaign_ids = Enum.map(result.campaigns, & &1.id)
+
+      alpha_idx = Enum.find_index(campaign_ids, &(&1 == campaign_alpha.id))
+      gamma_idx = Enum.find_index(campaign_ids, &(&1 == campaign_gamma.id))
+
+      assert alpha_idx < gamma_idx,
+             "Alpha should come before Gamma when sorting by created_at asc"
+    end
+
+    test "sorts by created_at descending with lowercase 'desc'", %{
+      user: user,
+      campaign_alpha: campaign_alpha,
+      campaign_gamma: campaign_gamma
+    } do
+      result =
+        Campaigns.list_user_campaigns(user.id, %{"sort" => "created_at", "order" => "desc"})
+
+      campaign_ids = Enum.map(result.campaigns, & &1.id)
+
+      alpha_idx = Enum.find_index(campaign_ids, &(&1 == campaign_alpha.id))
+      gamma_idx = Enum.find_index(campaign_ids, &(&1 == campaign_gamma.id))
+
+      assert gamma_idx < alpha_idx,
+             "Gamma should come before Alpha when sorting by created_at desc"
+    end
+
+    test "sorts by name ascending with lowercase 'asc'", %{
+      user: user,
+      campaign_alpha: campaign_alpha,
+      campaign_gamma: campaign_gamma
+    } do
+      result = Campaigns.list_user_campaigns(user.id, %{"sort" => "name", "order" => "asc"})
+      campaign_ids = Enum.map(result.campaigns, & &1.id)
+
+      alpha_idx = Enum.find_index(campaign_ids, &(&1 == campaign_alpha.id))
+      gamma_idx = Enum.find_index(campaign_ids, &(&1 == campaign_gamma.id))
+
+      assert alpha_idx < gamma_idx, "Alpha should come before Gamma when sorting by name asc"
+    end
+
+    test "sorts by name descending with lowercase 'desc'", %{
+      user: user,
+      campaign_alpha: campaign_alpha,
+      campaign_gamma: campaign_gamma
+    } do
+      result = Campaigns.list_user_campaigns(user.id, %{"sort" => "name", "order" => "desc"})
+      campaign_ids = Enum.map(result.campaigns, & &1.id)
+
+      alpha_idx = Enum.find_index(campaign_ids, &(&1 == campaign_alpha.id))
+      gamma_idx = Enum.find_index(campaign_ids, &(&1 == campaign_gamma.id))
+
+      assert gamma_idx < alpha_idx, "Gamma should come before Alpha when sorting by name desc"
+    end
+
+    test "handles uppercase 'ASC' for backwards compatibility", %{
+      user: user,
+      campaign_alpha: campaign_alpha,
+      campaign_gamma: campaign_gamma
+    } do
+      result = Campaigns.list_user_campaigns(user.id, %{"sort" => "created_at", "order" => "ASC"})
+      campaign_ids = Enum.map(result.campaigns, & &1.id)
+
+      alpha_idx = Enum.find_index(campaign_ids, &(&1 == campaign_alpha.id))
+      gamma_idx = Enum.find_index(campaign_ids, &(&1 == campaign_gamma.id))
+
+      assert alpha_idx < gamma_idx, "Should handle uppercase ASC"
+    end
+
+    test "defaults to descending when order is not specified", %{
+      user: user,
+      campaign_alpha: campaign_alpha,
+      campaign_gamma: campaign_gamma
+    } do
+      result = Campaigns.list_user_campaigns(user.id, %{"sort" => "created_at"})
+      campaign_ids = Enum.map(result.campaigns, & &1.id)
+
+      alpha_idx = Enum.find_index(campaign_ids, &(&1 == campaign_alpha.id))
+      gamma_idx = Enum.find_index(campaign_ids, &(&1 == campaign_gamma.id))
+
+      assert gamma_idx < alpha_idx, "Should default to descending order"
     end
   end
 end
