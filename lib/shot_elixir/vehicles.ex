@@ -532,16 +532,157 @@ defmodule ShotElixir.Vehicles do
   end
 
   def list_vehicle_archetypes do
-    # This would normally come from a configuration or database
-    # For now, return a simple list
+    # Vehicle archetypes from Feng Shui 2 Action Guide
+    # Keys are capitalized strings to match frontend VehicleArchetype type
     [
-      %{id: "sports_car", name: "Sports Car", frame: 8, handling: 11},
-      %{id: "motorcycle", name: "Motorcycle", frame: 6, handling: 12},
-      %{id: "sedan", name: "Sedan", frame: 9, handling: 10},
-      %{id: "suv", name: "SUV", frame: 10, handling: 9},
-      %{id: "truck", name: "Truck", frame: 11, handling: 8},
-      %{id: "helicopter", name: "Helicopter", frame: 10, handling: 10},
-      %{id: "speedboat", name: "Speedboat", frame: 9, handling: 11}
+      # Small Vehicles
+      %{
+        "name" => "Horse",
+        "Acceleration" => 6,
+        "Handling" => 6,
+        "Squeal" => 8,
+        "Frame" => 0,
+        "Crunch" => 0
+      },
+      %{
+        "name" => "Motorcycle",
+        "Acceleration" => 8,
+        "Handling" => 8,
+        "Squeal" => 10,
+        "Frame" => 0,
+        "Crunch" => 0
+      },
+      %{
+        "name" => "Compact Car",
+        "Acceleration" => 6,
+        "Handling" => 7,
+        "Squeal" => 9,
+        "Frame" => 6,
+        "Crunch" => 8
+      },
+      # Medium Vehicles
+      %{
+        "name" => "Cop Car",
+        "Acceleration" => 8,
+        "Handling" => 8,
+        "Squeal" => 10,
+        "Frame" => 6,
+        "Crunch" => 8
+      },
+      %{
+        "name" => "Junker Car",
+        "Acceleration" => 5,
+        "Handling" => 6,
+        "Squeal" => 8,
+        "Frame" => 6,
+        "Crunch" => 8
+      },
+      %{
+        "name" => "Muscle Car",
+        "Acceleration" => 8,
+        "Handling" => 8,
+        "Squeal" => 10,
+        "Frame" => 6,
+        "Crunch" => 8
+      },
+      %{
+        "name" => "Jeep, Military",
+        "Acceleration" => 6,
+        "Handling" => 6,
+        "Squeal" => 7,
+        "Frame" => 7,
+        "Crunch" => 10
+      },
+      %{
+        "name" => "Pickup Truck",
+        "Acceleration" => 6,
+        "Handling" => 6,
+        "Squeal" => 8,
+        "Frame" => 8,
+        "Crunch" => 10
+      },
+      # Large Vehicles
+      %{
+        "name" => "Luxury Sedan",
+        "Acceleration" => 8,
+        "Handling" => 7,
+        "Squeal" => 9,
+        "Frame" => 7,
+        "Crunch" => 9
+      },
+      %{
+        "name" => "Panel Van",
+        "Acceleration" => 6,
+        "Handling" => 6,
+        "Squeal" => 7,
+        "Frame" => 8,
+        "Crunch" => 9
+      },
+      %{
+        "name" => "SUV, Security",
+        "Acceleration" => 7,
+        "Handling" => 6,
+        "Squeal" => 8,
+        "Frame" => 7,
+        "Crunch" => 10
+      },
+      %{
+        "name" => "Armored HUMV",
+        "Acceleration" => 6,
+        "Handling" => 6,
+        "Squeal" => 7,
+        "Frame" => 8,
+        "Crunch" => 11
+      },
+      %{
+        "name" => "18-Wheeler",
+        "Acceleration" => 5,
+        "Handling" => 5,
+        "Squeal" => 7,
+        "Frame" => 9,
+        "Crunch" => 12
+      },
+      # Other Vehicles
+      %{
+        "name" => "Cigarette Boat",
+        "Acceleration" => 9,
+        "Handling" => 7,
+        "Squeal" => 10,
+        "Frame" => 2,
+        "Crunch" => 4
+      },
+      %{
+        "name" => "Coast Guard",
+        "Acceleration" => 8,
+        "Handling" => 7,
+        "Squeal" => 9,
+        "Frame" => 6,
+        "Crunch" => 8
+      },
+      %{
+        "name" => "Light Aircraft",
+        "Acceleration" => 6,
+        "Handling" => 6,
+        "Squeal" => 8,
+        "Frame" => 5,
+        "Crunch" => 7
+      },
+      %{
+        "name" => "Helicopter",
+        "Acceleration" => 6,
+        "Handling" => 7,
+        "Squeal" => 8,
+        "Frame" => 5,
+        "Crunch" => 7
+      },
+      %{
+        "name" => "Assault Copter",
+        "Acceleration" => 10,
+        "Handling" => 7,
+        "Squeal" => 9,
+        "Frame" => 6,
+        "Crunch" => 8
+      }
     ]
   end
 
