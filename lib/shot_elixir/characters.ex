@@ -339,7 +339,7 @@ defmodule ShotElixir.Characters do
     alias ShotElixir.Junctures.Juncture
 
     sort = params["sort"] || "created_at"
-    order = if String.upcase(params["order"] || "") == "ASC", do: :asc, else: :desc
+    order = if String.downcase(params["order"] || "") == "asc", do: :asc, else: :desc
 
     case sort do
       "type" ->
