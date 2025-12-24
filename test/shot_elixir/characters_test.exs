@@ -293,10 +293,14 @@ defmodule ShotElixir.CharactersTest do
     test "list_advancements/1 returns all advancements for a character in descending order", %{
       character: character
     } do
-      {:ok, _advancement1} =
+      now = DateTime.utc_now()
+
+      {:ok, advancement1} =
         Characters.create_advancement(character.id, %{description: "First advancement"})
 
-      :timer.sleep(100)
+      advancement1
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+      |> Repo.update!()
 
       {:ok, _advancement2} =
         Characters.create_advancement(character.id, %{description: "Second advancement"})
@@ -304,20 +308,12 @@ defmodule ShotElixir.CharactersTest do
       advancements = Characters.list_advancements(character.id)
 
       assert length(advancements) == 2
-      # Verify the most recent advancement is first
+      # Verify the most recent advancement is first (descending order)
       first_advancement = Enum.at(advancements, 0)
       second_advancement = Enum.at(advancements, 1)
 
-      # The first advancement should have a created_at >= the second one (descending order)
-      assert DateTime.compare(first_advancement.created_at, second_advancement.created_at) in [
-               :gt,
-               :eq
-             ]
-
-      # Verify both advancements are present by description
-      descriptions = Enum.map(advancements, & &1.description)
-      assert "First advancement" in descriptions
-      assert "Second advancement" in descriptions
+      assert first_advancement.description == "Second advancement"
+      assert second_advancement.description == "First advancement"
     end
 
     test "list_advancements/1 returns empty list when character has no advancements", %{
@@ -387,7 +383,6 @@ defmodule ShotElixir.CharactersTest do
         Characters.create_advancement(character.id, %{description: "Original description"})
 
       original_created_at = advancement.created_at
-      :timer.sleep(10)
 
       {:ok, updated_advancement} =
         Characters.update_advancement(advancement, %{description: "Updated description"})

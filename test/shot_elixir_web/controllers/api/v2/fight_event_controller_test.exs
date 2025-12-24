@@ -1,7 +1,7 @@
 defmodule ShotElixirWeb.Api.V2.FightEventControllerTest do
   use ShotElixirWeb.ConnCase, async: true
 
-  alias ShotElixir.{Fights, Campaigns, Accounts}
+  alias ShotElixir.{Fights, Campaigns, Accounts, Repo}
   alias ShotElixir.Guardian
 
   setup %{conn: conn} do
@@ -243,7 +243,8 @@ defmodule ShotElixirWeb.Api.V2.FightEventControllerTest do
       gamemaster: gm,
       fight: fight
     } do
-      # Create events with slight delay to ensure ordering
+      now = DateTime.utc_now()
+
       {:ok, event1} =
         Fights.create_fight_event(%{
           fight_id: fight.id,
@@ -252,8 +253,9 @@ defmodule ShotElixirWeb.Api.V2.FightEventControllerTest do
           details: %{}
         })
 
-      # Small delay to ensure different timestamps
-      Process.sleep(10)
+      event1
+      |> Ecto.Changeset.change(%{inserted_at: DateTime.add(now, -1, :second)})
+      |> Repo.update!()
 
       {:ok, event2} =
         Fights.create_fight_event(%{

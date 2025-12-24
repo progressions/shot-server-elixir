@@ -3,7 +3,7 @@ defmodule ShotElixir.Discord.CommandsTest do
 
   alias ShotElixir.Discord.Commands
   alias ShotElixir.Discord.CurrentFight
-  alias ShotElixir.{Accounts, Campaigns, Characters, Fights, Vehicles}
+  alias ShotElixir.{Accounts, Campaigns, Characters, Fights, Repo, Vehicles}
 
   describe "build_fight_autocomplete_choices/2" do
     test "returns only active, unended fights" do
@@ -1734,6 +1734,8 @@ defmodule ShotElixir.Discord.CommandsTest do
         })
 
       # Create two characters with different fortune values
+      now = DateTime.utc_now()
+
       {:ok, char1} =
         Characters.create_character(%{
           name: "First Fighter",
@@ -1747,8 +1749,9 @@ defmodule ShotElixir.Discord.CommandsTest do
           active: true
         })
 
-      # Small delay to ensure different timestamps
-      Process.sleep(10)
+      char1
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+      |> Repo.update!()
 
       {:ok, char2} =
         Characters.create_character(%{
@@ -1825,6 +1828,8 @@ defmodule ShotElixir.Discord.CommandsTest do
         })
 
       # Create two characters
+      now = DateTime.utc_now()
+
       {:ok, char1} =
         Characters.create_character(%{
           name: "Alpha Warrior",
@@ -1838,7 +1843,9 @@ defmodule ShotElixir.Discord.CommandsTest do
           active: true
         })
 
-      Process.sleep(10)
+      char1
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+      |> Repo.update!()
 
       {:ok, char2} =
         Characters.create_character(%{
@@ -2291,7 +2298,9 @@ defmodule ShotElixir.Discord.CommandsTest do
           active: true
         })
 
-      # Create characters with delay to ensure different timestamps
+      # Create characters with explicit timestamps for ordering
+      now = DateTime.utc_now()
+
       {:ok, char1} =
         Characters.create_character(%{
           name: "First Created",
@@ -2301,7 +2310,9 @@ defmodule ShotElixir.Discord.CommandsTest do
           active: true
         })
 
-      Process.sleep(10)
+      char1
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
+      |> Repo.update!()
 
       {:ok, char2} =
         Characters.create_character(%{
