@@ -192,7 +192,8 @@ defmodule ShotElixir.CampaignsTest do
 
       # Create campaigns with different names and explicit timestamps
       # Using Repo directly to set specific created_at values for reliable ordering
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, campaign_alpha} =
         Campaigns.create_campaign(%{

@@ -1734,7 +1734,8 @@ defmodule ShotElixir.Discord.CommandsTest do
         })
 
       # Create two characters with different fortune values
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, char1} =
         Characters.create_character(%{
@@ -1828,7 +1829,8 @@ defmodule ShotElixir.Discord.CommandsTest do
         })
 
       # Create two characters
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, char1} =
         Characters.create_character(%{
@@ -2299,7 +2301,8 @@ defmodule ShotElixir.Discord.CommandsTest do
         })
 
       # Create characters with explicit timestamps for ordering
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, char1} =
         Characters.create_character(%{

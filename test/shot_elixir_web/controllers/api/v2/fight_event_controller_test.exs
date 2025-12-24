@@ -243,7 +243,8 @@ defmodule ShotElixirWeb.Api.V2.FightEventControllerTest do
       gamemaster: gm,
       fight: fight
     } do
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, event1} =
         Fights.create_fight_event(%{
@@ -254,7 +255,7 @@ defmodule ShotElixirWeb.Api.V2.FightEventControllerTest do
         })
 
       event1
-      |> Ecto.Changeset.change(%{inserted_at: DateTime.add(now, -1, :second)})
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
       |> Repo.update!()
 
       {:ok, event2} =

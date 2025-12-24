@@ -55,7 +55,8 @@ defmodule ShotElixirWeb.Api.V2.AdvancementControllerTest do
       gamemaster: gm,
       character: character
     } do
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, advancement1} =
         Characters.create_advancement(character.id, %{description: "First advancement"})

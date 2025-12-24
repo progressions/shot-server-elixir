@@ -293,7 +293,8 @@ defmodule ShotElixir.CharactersTest do
     test "list_advancements/1 returns all advancements for a character in descending order", %{
       character: character
     } do
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, advancement1} =
         Characters.create_advancement(character.id, %{description: "First advancement"})
@@ -495,7 +496,8 @@ defmodule ShotElixir.CharactersTest do
 
       # Create characters with different names and explicit timestamps
       # Using Repo directly to set specific created_at values for reliable ordering
-      now = DateTime.utc_now()
+      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       {:ok, char_alpha} =
         Characters.create_character(%{
