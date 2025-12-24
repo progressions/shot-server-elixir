@@ -3,6 +3,7 @@ defmodule ShotElixir.CampaignsTest do
   alias ShotElixir.Campaigns
   alias ShotElixir.Campaigns.{Campaign, CampaignMembership}
   alias ShotElixir.Accounts
+  alias ShotElixir.Repo
 
   describe "campaigns" do
     setup do
