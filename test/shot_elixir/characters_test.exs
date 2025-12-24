@@ -480,4 +480,171 @@ defmodule ShotElixir.CharactersTest do
       assert String.contains?(duplicated_char.name, "Original Character")
     end
   end
+
+  describe "list_campaign_characters/3 sorting" do
+    setup do
+      {:ok, user} =
+        ShotElixir.Accounts.create_user(%{
+          email: "sorting_user@example.com",
+          password: "password123",
+          first_name: "Sort",
+          last_name: "Tester",
+          gamemaster: true
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Sorting Test Campaign",
+          user_id: user.id
+        })
+
+      # Create characters with different names and timestamps
+      {:ok, char_alpha} =
+        Characters.create_character(%{
+          name: "Alpha Character",
+          campaign_id: campaign.id
+        })
+
+      Process.sleep(10)
+
+      {:ok, char_beta} =
+        Characters.create_character(%{
+          name: "Beta Character",
+          campaign_id: campaign.id
+        })
+
+      Process.sleep(10)
+
+      {:ok, char_gamma} =
+        Characters.create_character(%{
+          name: "Gamma Character",
+          campaign_id: campaign.id
+        })
+
+      {:ok,
+       campaign: campaign, char_alpha: char_alpha, char_beta: char_beta, char_gamma: char_gamma}
+    end
+
+    test "sorts by created_at ascending with lowercase 'asc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at", "order" => "asc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert alpha_idx < gamma_idx,
+             "Alpha should come before Gamma when sorting by created_at asc"
+    end
+
+    test "sorts by created_at descending with lowercase 'desc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at", "order" => "desc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert gamma_idx < alpha_idx,
+             "Gamma should come before Alpha when sorting by created_at desc"
+    end
+
+    test "sorts by name ascending with lowercase 'asc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "name", "order" => "asc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert alpha_idx < gamma_idx, "Alpha should come before Gamma when sorting by name asc"
+    end
+
+    test "sorts by name descending with lowercase 'desc'", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "name", "order" => "desc"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert gamma_idx < alpha_idx, "Gamma should come before Alpha when sorting by name desc"
+    end
+
+    test "handles uppercase 'ASC' for backwards compatibility", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at", "order" => "ASC"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert alpha_idx < gamma_idx, "Should handle uppercase ASC"
+    end
+
+    test "defaults to descending when order is not specified", %{
+      campaign: campaign,
+      char_alpha: char_alpha,
+      char_gamma: char_gamma
+    } do
+      result =
+        Characters.list_campaign_characters(
+          campaign.id,
+          %{"sort" => "created_at"},
+          nil
+        )
+
+      character_ids = Enum.map(result.characters, & &1.id)
+
+      alpha_idx = Enum.find_index(character_ids, &(&1 == char_alpha.id))
+      gamma_idx = Enum.find_index(character_ids, &(&1 == char_gamma.id))
+
+      assert gamma_idx < alpha_idx, "Should default to descending order"
+    end
+  end
 end
