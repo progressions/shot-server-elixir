@@ -243,6 +243,122 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerFeaturesTest do
     end
   end
 
+  describe "color field" do
+    test "returns color field in show response", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Colorful Character",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          color: "#ff5500",
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters/#{character.id}")
+      response = json_response(conn, 200)
+
+      assert response["color"] == "#ff5500"
+    end
+
+    test "returns null color when not set", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "No Color Character",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters/#{character.id}")
+      response = json_response(conn, 200)
+
+      assert response["color"] == nil
+    end
+
+    test "returns color field in index response", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Red Character",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          color: "#ff0000",
+          action_values: %{"Type" => "PC"}
+        })
+
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Blue Character",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          color: "#0000ff",
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/characters")
+      response = json_response(conn, 200)
+
+      colors = Enum.map(response["characters"], & &1["color"])
+      assert "#ff0000" in colors
+      assert "#0000ff" in colors
+    end
+
+    test "can update character color", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character to Color",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/characters/#{character.id}", character: %{color: "#00ff00"})
+      response = json_response(conn, 200)
+
+      assert response["color"] == "#00ff00"
+    end
+
+    test "can clear character color", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character to Clear Color",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          color: "#ff5500",
+          action_values: %{"Type" => "PC"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/characters/#{character.id}", character: %{color: nil})
+      response = json_response(conn, 200)
+
+      assert response["color"] == nil
+    end
+  end
+
   describe "wounds and impairments" do
     setup %{gamemaster: gm, campaign: campaign} do
       {:ok, character} =
