@@ -44,7 +44,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       {:ok, _reply, socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
 
       # Give presence time to sync
-      :timer.sleep(100)
+      :timer.sleep(10)
 
       presences = Presence.list(socket)
       assert Map.has_key?(presences, user.id)
@@ -156,7 +156,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       {:ok, _reply, socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
 
       # Verify user is present
-      :timer.sleep(100)
+      :timer.sleep(10)
       presences = Presence.list(socket)
       assert Map.has_key?(presences, user.id)
 
@@ -166,7 +166,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       assert_reply ref, :ok
 
       # Verify user is removed from presence
-      :timer.sleep(100)
+      :timer.sleep(10)
       presences_after = Presence.list("fight:#{fight.id}")
       refute Map.has_key?(presences_after, user.id)
     end
@@ -187,7 +187,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       {:ok, _reply, socket1} = subscribe_and_join(socket1, FightChannel, "fight:#{fight.id}")
       {:ok, _reply, socket2} = subscribe_and_join(socket2, FightChannel, "fight:#{fight.id}")
 
-      :timer.sleep(100)
+      :timer.sleep(10)
       presences = Presence.list(socket1)
 
       assert Map.has_key?(presences, user1.id)
