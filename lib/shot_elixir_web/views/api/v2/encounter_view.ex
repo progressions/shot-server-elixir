@@ -86,7 +86,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         shots
         |> Enum.filter(& &1.character_id)
         |> Enum.map(& &1.character_id)
-        |> Enum.uniq()
     end
   end
 
@@ -102,7 +101,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         shots
         |> Enum.filter(& &1.vehicle_id)
         |> Enum.map(& &1.vehicle_id)
-        |> Enum.uniq()
     end
   end
 
@@ -308,6 +306,34 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
     end
   end
 
+  defp get_vehicle_driver(shot, fight) do
+    case shot.driver_id do
+      nil ->
+        nil
+
+      driver_shot_id ->
+        driver_shot =
+          fight.shots
+          |> Enum.find(fn s -> s.id == driver_shot_id && s.character_id end)
+
+        case driver_shot && driver_shot.character do
+          %Ecto.Association.NotLoaded{} ->
+            nil
+
+          nil ->
+            nil
+
+          character ->
+            %{
+              id: character.id,
+              name: character.name,
+              entity_class: "Character",
+              shot_id: driver_shot.id
+            }
+        end
+    end
+  end
+
   # Shared helper to build vehicle map structure
   defp build_vehicle_map(vehicle, shot, fight) do
     %{
@@ -319,6 +345,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       current_shot: shot.shot,
       location: shot.location,
       driver_id: shot.driver_id,
+      driver: get_vehicle_driver(shot, fight),
       was_rammed_or_damaged: shot.was_rammed_or_damaged,
       image_url: get_image_url(vehicle),
       chase_relationships: get_chase_relationships_for_vehicle(fight, vehicle.id),
