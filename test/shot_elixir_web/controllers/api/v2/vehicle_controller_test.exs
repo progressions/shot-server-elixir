@@ -149,12 +149,14 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
       assert is_list(archetypes)
       assert length(archetypes) > 0
 
-      # Check structure of archetype
+      # Check structure of archetype (capitalized keys to match frontend)
       first = hd(archetypes)
-      assert Map.has_key?(first, "id")
       assert Map.has_key?(first, "name")
-      assert Map.has_key?(first, "frame")
-      assert Map.has_key?(first, "handling")
+      assert Map.has_key?(first, "Acceleration")
+      assert Map.has_key?(first, "Handling")
+      assert Map.has_key?(first, "Squeal")
+      assert Map.has_key?(first, "Frame")
+      assert Map.has_key?(first, "Crunch")
     end
   end
 
