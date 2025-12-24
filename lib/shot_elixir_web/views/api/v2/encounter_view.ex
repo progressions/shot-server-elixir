@@ -86,7 +86,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         shots
         |> Enum.filter(& &1.character_id)
         |> Enum.map(& &1.character_id)
-        |> Enum.uniq()
     end
   end
 
@@ -102,7 +101,6 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         shots
         |> Enum.filter(& &1.vehicle_id)
         |> Enum.map(& &1.vehicle_id)
-        |> Enum.uniq()
     end
   end
 
