@@ -1,4 +1,11 @@
 defmodule ShotElixir.Chases.ChaseRelationship do
+  @moduledoc """
+  Represents a chase relationship between two vehicle instances (shots) in a fight.
+
+  Note: pursuer_id and evader_id reference shots (vehicle instances in a fight),
+  not the vehicle templates. This allows multiple instances of the same vehicle
+  template to participate in different chase relationships.
+  """
   use Ecto.Schema
   import Ecto.Changeset
 
@@ -10,8 +17,9 @@ defmodule ShotElixir.Chases.ChaseRelationship do
     field :active, :boolean, default: true
 
     belongs_to :fight, ShotElixir.Fights.Fight
-    belongs_to :pursuer, ShotElixir.Vehicles.Vehicle
-    belongs_to :evader, ShotElixir.Vehicles.Vehicle
+    # These reference shots (vehicle instances), not vehicles (templates)
+    belongs_to :pursuer, ShotElixir.Fights.Shot
+    belongs_to :evader, ShotElixir.Fights.Shot
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
@@ -28,6 +36,10 @@ defmodule ShotElixir.Chases.ChaseRelationship do
         :fight_id
       ],
       name: :unique_active_relationship
+    )
+    |> check_constraint(:pursuer_id,
+      name: :different_shots,
+      message: "pursuer and evader cannot be the same"
     )
   end
 

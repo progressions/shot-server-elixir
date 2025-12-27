@@ -1,13 +1,17 @@
 defmodule ShotElixir.Chases do
   @moduledoc """
   Domain logic for chase relationships.
+
+  Chase relationships use shot IDs (vehicle instances in a fight) rather than
+  vehicle template IDs. This allows multiple instances of the same vehicle
+  to participate in different chase relationships.
   """
 
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Chases.ChaseRelationship
   alias ShotElixir.Fights
-  alias ShotElixir.Vehicles
+  alias ShotElixir.Fights.Shot
 
   def list_relationships(campaign_id, params \\ %{}) do
     ChaseRelationship
@@ -48,15 +52,16 @@ defmodule ShotElixir.Chases do
 
   @doc """
   Gets or creates a chase relationship between a pursuer and evader in a fight.
+  Uses shot IDs (vehicle instances) not vehicle template IDs.
   """
-  def get_or_create_relationship(fight_id, pursuer_id, evader_id) do
-    case get_relationship_by_vehicles(fight_id, pursuer_id, evader_id) do
+  def get_or_create_relationship(fight_id, pursuer_shot_id, evader_shot_id) do
+    case get_relationship_by_shots(fight_id, pursuer_shot_id, evader_shot_id) do
       nil ->
         %ChaseRelationship{}
         |> ChaseRelationship.changeset(%{
           "fight_id" => fight_id,
-          "pursuer_id" => pursuer_id,
-          "evader_id" => evader_id,
+          "pursuer_id" => pursuer_shot_id,
+          "evader_id" => evader_shot_id,
           "position" => "far"
         })
         |> Repo.insert()
@@ -67,14 +72,14 @@ defmodule ShotElixir.Chases do
   end
 
   @doc """
-  Gets a chase relationship by pursuer and evader vehicle IDs.
+  Gets a chase relationship by pursuer and evader shot IDs (vehicle instances).
   """
-  def get_relationship_by_vehicles(fight_id, pursuer_id, evader_id) do
+  def get_relationship_by_shots(fight_id, pursuer_shot_id, evader_shot_id) do
     ChaseRelationship
     |> where(
       [cr],
-      cr.fight_id == ^fight_id and cr.pursuer_id == ^pursuer_id and cr.evader_id == ^evader_id and
-        cr.active == true
+      cr.fight_id == ^fight_id and cr.pursuer_id == ^pursuer_shot_id and
+        cr.evader_id == ^evader_shot_id and cr.active == true
     )
     |> Repo.one()
   end
@@ -91,9 +96,9 @@ defmodule ShotElixir.Chases do
     with {:ok, fight_id} <- require_uuid(attrs, "fight_id"),
          {:ok, pursuer_id} <- require_uuid(attrs, "pursuer_id"),
          {:ok, evader_id} <- require_uuid(attrs, "evader_id"),
-         {:ok, _fight} <- verify_fight(fight_id, campaign_id),
-         {:ok, _pursuer} <- verify_vehicle(pursuer_id, campaign_id),
-         {:ok, _evader} <- verify_vehicle(evader_id, campaign_id) do
+         {:ok, fight} <- verify_fight(fight_id, campaign_id),
+         {:ok, _pursuer} <- verify_shot(pursuer_id, fight),
+         {:ok, _evader} <- verify_shot(evader_id, fight) do
       {:ok,
        attrs
        |> Map.put("fight_id", fight_id)
@@ -120,10 +125,10 @@ defmodule ShotElixir.Chases do
     end
   end
 
-  defp verify_vehicle(id, campaign_id) do
-    case Vehicles.get_vehicle(id) do
+  defp verify_shot(id, fight) do
+    case Repo.get(Shot, id) do
       nil -> {:error, :invalid_resource}
-      vehicle when vehicle.campaign_id == campaign_id -> {:ok, vehicle}
+      shot when shot.fight_id == fight.id -> {:ok, shot}
       _ -> {:error, :invalid_resource}
     end
   end
@@ -134,6 +139,12 @@ defmodule ShotElixir.Chases do
 
   defp maybe_filter_by_fight(query, _), do: query
 
+  defp maybe_filter_by_vehicle(query, %{"shot_id" => shot_id})
+       when shot_id not in [nil, ""] do
+    where(query, [cr, _f], cr.pursuer_id == ^shot_id or cr.evader_id == ^shot_id)
+  end
+
+  # Also support legacy vehicle_id parameter for backwards compatibility
   defp maybe_filter_by_vehicle(query, %{"vehicle_id" => vehicle_id})
        when vehicle_id not in [nil, ""] do
     where(query, [cr, _f], cr.pursuer_id == ^vehicle_id or cr.evader_id == ^vehicle_id)
