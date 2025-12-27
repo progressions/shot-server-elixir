@@ -13,9 +13,12 @@ defmodule ShotElixir.Repo.Migrations.ChangeChaseRelationshipsToReferenceShots do
     # Drop any existing foreign key constraints (using IF EXISTS for idempotency)
     # Include both Rails-generated names and Ecto-style names
     execute "ALTER TABLE chase_relationships DROP CONSTRAINT IF EXISTS chase_relationships_pursuer_id_fkey"
+
     execute "ALTER TABLE chase_relationships DROP CONSTRAINT IF EXISTS chase_relationships_evader_id_fkey"
+
     # Rails-generated constraint names (from original Rails schema)
     execute "ALTER TABLE chase_relationships DROP CONSTRAINT IF EXISTS fk_rails_c50d4f4bde"
+
     execute "ALTER TABLE chase_relationships DROP CONSTRAINT IF EXISTS fk_rails_5a7e7d9f8c"
 
     # Add new foreign key constraints that reference shots instead of vehicles
