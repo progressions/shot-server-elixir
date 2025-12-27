@@ -2,6 +2,11 @@ defmodule ShotElixir.Repo.Migrations.ChangeChaseRelationshipsToReferenceShots do
   use Ecto.Migration
 
   def up do
+    # Delete all existing chase relationships since they contain vehicle template IDs
+    # which will violate the new foreign key constraints pointing to shots table
+    # Chase relationships are ephemeral and recreated during gameplay
+    execute "DELETE FROM chase_relationships"
+
     # Drop the check constraint that prevents same vehicle chasing itself
     execute "ALTER TABLE chase_relationships DROP CONSTRAINT IF EXISTS different_vehicles"
 
