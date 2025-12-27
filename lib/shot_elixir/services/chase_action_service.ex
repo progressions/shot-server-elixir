@@ -4,7 +4,6 @@ defmodule ShotElixir.Services.ChaseActionService do
   """
 
   require Logger
-  import Ecto.Query
   alias ShotElixir.{Repo, Fights, Vehicles, Chases}
   alias ShotElixir.Fights.{Fight, Shot}
 
