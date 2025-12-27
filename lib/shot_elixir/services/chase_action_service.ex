@@ -147,32 +147,37 @@ defmodule ShotElixir.Services.ChaseActionService do
 
   defp parse_integer(_), do: 0
 
-  # Update the chase relationship position between two vehicles
+  # Update the chase relationship position between two vehicle shots
   # The "position" (near/far) is stored on the ChaseRelationship, not the vehicle
-  defp maybe_update_chase_position(fight, vehicle, update) do
+  # Chase relationships use shot IDs (vehicle instances) not vehicle template IDs
+  defp maybe_update_chase_position(fight, _vehicle, update) do
     position = update["position"]
-    target_vehicle_id = update["target_vehicle_id"]
+    # Use shot_id (vehicle instance) instead of vehicle_id (template)
+    shot_id = update["shot_id"]
+    target_shot_id = update["target_shot_id"]
     role = update["role"] || "pursuer"
 
-    if position && target_vehicle_id do
-      # Validate target vehicle exists and belongs to the same campaign
-      target_vehicle = Vehicles.get_vehicle(target_vehicle_id)
+    if position && shot_id && target_shot_id do
+      # Validate both shots exist and belong to this fight
+      pursuer_shot = Repo.get(Shot, shot_id)
+      evader_shot = Repo.get(Shot, target_shot_id)
 
-      if target_vehicle && target_vehicle.campaign_id == fight.campaign_id do
+      if pursuer_shot && evader_shot &&
+           pursuer_shot.fight_id == fight.id && evader_shot.fight_id == fight.id do
         Logger.info(
-          "Updating chase position: vehicle #{vehicle.id} -> #{target_vehicle_id}, position: #{position}, role: #{role}"
+          "Updating chase position: shot #{shot_id} -> #{target_shot_id}, position: #{position}, role: #{role}"
         )
 
         # Determine pursuer/evader based on role
-        {pursuer_id, evader_id} =
+        {final_pursuer_id, final_evader_id} =
           if role == "evader" do
-            {target_vehicle_id, vehicle.id}
+            {target_shot_id, shot_id}
           else
-            {vehicle.id, target_vehicle_id}
+            {shot_id, target_shot_id}
           end
 
-        # Find or create the chase relationship
-        case Chases.get_or_create_relationship(fight.id, pursuer_id, evader_id) do
+        # Find or create the chase relationship using shot IDs
+        case Chases.get_or_create_relationship(fight.id, final_pursuer_id, final_evader_id) do
           {:ok, relationship} ->
             # Update the position
             case Chases.update_relationship(relationship, %{position: position}) do
@@ -193,7 +198,9 @@ defmodule ShotElixir.Services.ChaseActionService do
             {:error, reason}
         end
       else
-        Logger.warning("Target vehicle #{target_vehicle_id} not found or not in fight's campaign")
+        Logger.warning(
+          "Shot(s) not found or not in fight: shot_id=#{shot_id}, target_shot_id=#{target_shot_id}"
+        )
 
         :ok
       end
@@ -202,27 +209,25 @@ defmodule ShotElixir.Services.ChaseActionService do
     end
   end
 
-  # Spend shots for the character if shot_cost and character_id are present
+  # Spend shots for the driver if shot_cost and driver_shot_id are present
+  # Uses driver_shot_id (the character's shot record) instead of character_id
+  # because a character can appear multiple times in a fight at different shot positions
   defp maybe_spend_shots(fight, update) do
-    character_id = update["character_id"]
+    driver_shot_id = update["driver_shot_id"]
     shot_cost = update["shot_cost"]
 
-    if character_id && shot_cost && shot_cost > 0 do
+    if driver_shot_id && shot_cost && shot_cost > 0 do
       Logger.info(
-        "Spending #{shot_cost} shots for character #{character_id} in fight #{fight.id}"
+        "Spending #{shot_cost} shots for driver shot #{driver_shot_id} in fight #{fight.id}"
       )
 
-      # Find the shot for this character in this fight
-      shot =
-        Repo.one(
-          from s in Shot,
-            where: s.fight_id == ^fight.id and s.character_id == ^character_id
-        )
+      # Get the shot directly by ID (no need to query by character_id)
+      shot = Repo.get(Shot, driver_shot_id)
 
-      if shot do
+      if shot && shot.fight_id == fight.id do
         case Fights.act_shot(shot, shot_cost) do
           {:ok, _updated_shot} ->
-            Logger.info("Successfully spent #{shot_cost} shots for character #{character_id}")
+            Logger.info("Successfully spent #{shot_cost} shots for driver shot #{driver_shot_id}")
             :ok
 
           {:error, reason} ->
@@ -230,7 +235,7 @@ defmodule ShotElixir.Services.ChaseActionService do
             {:error, reason}
         end
       else
-        Logger.warning("No shot found for character #{character_id} in fight #{fight.id}")
+        Logger.warning("No shot found with id #{driver_shot_id} in fight #{fight.id}")
         :ok
       end
     else
