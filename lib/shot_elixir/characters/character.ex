@@ -72,6 +72,7 @@ defmodule ShotElixir.Characters.Character do
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction
     belongs_to :juncture, ShotElixir.Junctures.Juncture
+    belongs_to :equipped_weapon, ShotElixir.Weapons.Weapon
 
     has_many :shots, ShotElixir.Fights.Shot
     has_many :fights, through: [:shots, :fight]
@@ -115,7 +116,8 @@ defmodule ShotElixir.Characters.Character do
       :user_id,
       :campaign_id,
       :faction_id,
-      :juncture_id
+      :juncture_id,
+      :equipped_weapon_id
     ])
     |> validate_required([:name, :campaign_id])
     |> validate_number(:impairments, greater_than_or_equal_to: 0)
