@@ -257,6 +257,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           image_url: get_image_url(character),
           faction: render_faction_if_loaded(character),
           weapon_ids: get_weapon_ids(character),
+          equipped_weapon_id: character.equipped_weapon_id,
           schtick_ids: get_schtick_ids(character),
           effects: render_effects(shot),
           user_id: character.user_id,
