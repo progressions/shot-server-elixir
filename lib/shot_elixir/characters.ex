@@ -511,7 +511,9 @@ defmodule ShotElixir.Characters do
     |> Multi.run(:broadcast, fn _repo, %{character: character} ->
       # Preload associations before broadcasting
       character_with_associations =
-        Repo.preload(character, [:user, :faction, :juncture, :image_positions], force: true)
+        Repo.preload(character, [:user, :faction, :juncture, :image_positions, :weapons],
+          force: true
+        )
 
       broadcast_change(character_with_associations, :update)
       {:ok, character}
