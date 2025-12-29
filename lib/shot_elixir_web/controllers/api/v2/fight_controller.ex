@@ -299,6 +299,38 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     end
   end
 
+  # PATCH /api/v2/fights/:id/reset
+  def reset(conn, %{"fight_id" => id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+    delete_events = params["delete_events"] == true || params["delete_events"] == "true"
+
+    with %Fight{} = fight <- Fights.get_fight(id),
+         :ok <- authorize_fight_edit(fight, current_user),
+         {:ok, fight} <- Fights.reset_fight(fight, delete_events: delete_events) do
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.FightView)
+      |> render("show.json", fight: fight)
+    else
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can reset fights"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  end
+
   # Custom endpoints
   def remove_image(conn, %{"fight_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
