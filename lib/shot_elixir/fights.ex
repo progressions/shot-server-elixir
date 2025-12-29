@@ -545,6 +545,59 @@ defmodule ShotElixir.Fights do
     update_fight(fight, %{sequence: 18})
   end
 
+  @doc """
+  Reset a fight to its initial state.
+  This resets the sequence to 0, clears started_at/ended_at,
+  and resets all shots to their default state (no initiative, no impairments, etc).
+  Optionally deletes all fight events.
+  """
+  def reset_fight(%Fight{} = fight, opts \\ []) do
+    delete_events = Keyword.get(opts, :delete_events, false)
+
+    Ecto.Multi.new()
+    |> Ecto.Multi.update(:fight, fn _ ->
+      fight
+      |> Ecto.Changeset.change(%{
+        sequence: 0,
+        started_at: nil,
+        ended_at: nil,
+        active: true
+      })
+    end)
+    |> Ecto.Multi.run(:reset_shots, fn _repo, _changes ->
+      # Reset all shots in this fight
+      from(s in Shot, where: s.fight_id == ^fight.id)
+      |> Repo.update_all(
+        set: [
+          shot: nil,
+          impairments: 0,
+          count: 0,
+          was_rammed_or_damaged: false
+        ]
+      )
+
+      {:ok, :shots_reset}
+    end)
+    |> Ecto.Multi.run(:delete_events, fn _repo, _changes ->
+      if delete_events do
+        from(fe in FightEvent, where: fe.fight_id == ^fight.id)
+        |> Repo.delete_all()
+      end
+
+      {:ok, :events_handled}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{fight: updated_fight}} ->
+        result = Repo.preload(updated_fight, fight_broadcast_preloads(), force: true)
+        broadcast_change(result, :update)
+        {:ok, result}
+
+      {:error, _step, changeset, _changes} ->
+        {:error, changeset}
+    end
+  end
+
   def delete_fight(%Fight{} = fight) do
     fight
     |> Ecto.Changeset.change(active: false)

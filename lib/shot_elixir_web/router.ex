@@ -139,6 +139,7 @@ defmodule ShotElixirWeb.Router do
     resources "/fights", FightController do
       patch "/touch", FightController, :touch
       patch "/end_fight", FightController, :end_fight
+      patch "/reset", FightController, :reset
       delete "/image", FightController, :remove_image
 
       resources "/shots", ShotController, only: [:update, :delete] do
