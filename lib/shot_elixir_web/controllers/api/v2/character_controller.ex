@@ -268,6 +268,48 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
+  def create_notion_page(conn, %{"character_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Character{} = character <- Characters.get_character(id),
+         :ok <- authorize_character_edit(character, current_user) do
+      # Check if character already has a Notion page
+      if character.notion_page_id do
+        conn
+        |> put_status(:conflict)
+        |> json(%{error: "Character already has a Notion page linked"})
+      else
+        # Create new Notion page
+        case ShotElixir.Services.NotionService.create_notion_from_character(character) do
+          {:ok, page} ->
+            Logger.info("Notion page created with ID: #{inspect(page["id"])}")
+
+            # Reload character to get updated notion_page_id
+            updated_character = Characters.get_character(id)
+
+            Logger.info(
+              "Character after reload - notion_page_id: #{inspect(updated_character.notion_page_id)}"
+            )
+
+            conn
+            |> put_status(:created)
+            |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+            |> render("show.json", character: updated_character)
+
+          {:error, reason} ->
+            Logger.error("Failed to create Notion page: #{inspect(reason)}")
+
+            conn
+            |> put_status(:unprocessable_entity)
+            |> json(%{error: "Failed to create Notion page: #{inspect(reason)}"})
+        end
+      end
+    else
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
   def pdf(conn, %{"character_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 

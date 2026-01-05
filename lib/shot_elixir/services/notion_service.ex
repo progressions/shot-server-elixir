@@ -56,14 +56,20 @@ defmodule ShotElixir.Services.NotionService do
   Create a new Notion page from character data.
   """
   def create_notion_from_character(%Character{} = character) do
+    # Ensure faction is loaded for Notion properties
+    character = Repo.preload(character, :faction)
     properties = Character.as_notion(character)
 
     properties =
       if character.faction do
-        Map.put(properties, "Faction", notion_faction_properties(character.faction.name))
+        faction_props = notion_faction_properties(character.faction.name)
+        # Only add Faction if we found a matching faction in Notion
+        if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
         properties
       end
+
+    Logger.info("Creating Notion page with database_id: #{database_id()}")
 
     page =
       NotionClient.create_page(%{
@@ -71,14 +77,26 @@ defmodule ShotElixir.Services.NotionService do
         "properties" => properties
       })
 
+    Logger.info("Notion API response: #{inspect(page)}")
+
+    page_id = page["id"]
+    Logger.info("Extracted page ID: #{inspect(page_id)}")
+
     # Update character with notion_page_id
-    {:ok, updated_character} =
-      Characters.update_character(character, %{notion_page_id: page["id"]})
+    case Characters.update_character(character, %{notion_page_id: page_id}) do
+      {:ok, updated_character} ->
+        Logger.info(
+          "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
+        )
 
-    # Add image if present
-    add_image_to_notion(updated_character)
+        # Add image if present
+        add_image_to_notion(updated_character)
+        {:ok, page}
 
-    {:ok, page}
+      {:error, changeset} ->
+        Logger.error("Failed to update character with notion_page_id: #{inspect(changeset)}")
+        {:error, changeset}
+    end
   rescue
     error ->
       Logger.error("Failed to create Notion page: #{inspect(error)}")
@@ -95,7 +113,9 @@ defmodule ShotElixir.Services.NotionService do
 
     properties =
       if character.faction do
-        Map.put(properties, "Faction", notion_faction_properties(character.faction.name))
+        faction_props = notion_faction_properties(character.faction.name)
+        # Only add Faction if we found a matching faction in Notion
+        if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
         properties
       end

@@ -187,7 +187,7 @@ defmodule ShotElixir.Characters.Character do
     desc = character.description || %{}
 
     base_properties = %{
-      "Name" => %{"title" => [%{"text" => %{"content" => character.name}}]},
+      "Name" => %{"title" => [%{"type" => "text", "text" => %{"content" => character.name}}]},
       "Enemy Type" => %{"select" => %{"name" => av["Type"] || "PC"}},
       "Wounds" => %{"number" => av["Wounds"]},
       "Defense" => %{"number" => av["Defense"]},
@@ -200,41 +200,37 @@ defmodule ShotElixir.Characters.Character do
       "Mutant" => %{"number" => av["Mutant"]},
       "Scroungetech" => %{"number" => av["Scroungetech"]},
       "Creature" => %{"number" => av["Creature"]},
-      "Damage" => %{"rich_text" => [%{"text" => %{"content" => to_string(av["Damage"] || "")}}]},
       "Inactive" => %{"checkbox" => !character.active},
-      "Tags" => %{"multi_select" => tags_for_notion(character)},
-      "Age" => %{"rich_text" => [%{"text" => %{"content" => to_string(desc["Age"] || "")}}]},
-      "Nicknames" => %{
-        "rich_text" => [%{"text" => %{"content" => to_string(desc["Nicknames"] || "")}}]
-      },
-      "Height" => %{"rich_text" => [%{"text" => %{"content" => to_string(desc["Height"] || "")}}]},
-      "Weight" => %{"rich_text" => [%{"text" => %{"content" => to_string(desc["Weight"] || "")}}]},
-      "Hair Color" => %{
-        "rich_text" => [%{"text" => %{"content" => to_string(desc["Hair Color"] || "")}}]
-      },
-      "Eye Color" => %{
-        "rich_text" => [%{"text" => %{"content" => to_string(desc["Eye Color"] || "")}}]
-      },
-      "Style of Dress" => %{
-        "rich_text" => [%{"text" => %{"content" => to_string(desc["Style of Dress"] || "")}}]
-      },
-      "Melodramatic Hook" => %{
-        "rich_text" => [
-          %{"text" => %{"content" => strip_html(desc["Melodramatic Hook"] || "")}}
-        ]
-      },
-      "Description" => %{
-        "rich_text" => [%{"text" => %{"content" => strip_html(desc["Appearance"] || "")}}]
-      }
+      "Tags" => %{"multi_select" => tags_for_notion(character)}
     }
 
-    # Add optional select fields
+    # Add rich_text fields only if they have content (Notion rejects empty rich_text)
     base_properties
+    |> maybe_add_rich_text("Damage", to_string(av["Damage"] || ""))
+    |> maybe_add_rich_text("Age", to_string(desc["Age"] || ""))
+    |> maybe_add_rich_text("Nicknames", to_string(desc["Nicknames"] || ""))
+    |> maybe_add_rich_text("Height", to_string(desc["Height"] || ""))
+    |> maybe_add_rich_text("Weight", to_string(desc["Weight"] || ""))
+    |> maybe_add_rich_text("Hair Color", to_string(desc["Hair Color"] || ""))
+    |> maybe_add_rich_text("Eye Color", to_string(desc["Eye Color"] || ""))
+    |> maybe_add_rich_text("Style of Dress", to_string(desc["Style of Dress"] || ""))
+    |> maybe_add_rich_text("Melodramatic Hook", strip_html(desc["Melodramatic Hook"] || ""))
+    |> maybe_add_rich_text("Description", strip_html(desc["Appearance"] || ""))
     |> maybe_add_select("MainAttack", av["MainAttack"])
     |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
+  end
+
+  # Only add rich_text property if value is not empty
+  defp maybe_add_rich_text(properties, _key, nil), do: properties
+  defp maybe_add_rich_text(properties, _key, ""), do: properties
+
+  defp maybe_add_rich_text(properties, key, value) do
+    Map.put(properties, key, %{
+      "rich_text" => [%{"type" => "text", "text" => %{"content" => value}}]
+    })
   end
 
   defp tags_for_notion(character) do
@@ -259,7 +255,7 @@ defmodule ShotElixir.Characters.Character do
 
   defp maybe_add_archetype(properties, archetype) do
     Map.put(properties, "Type", %{
-      "rich_text" => [%{"text" => %{"content" => archetype}}]
+      "rich_text" => [%{"type" => "text", "text" => %{"content" => archetype}}]
     })
   end
 
