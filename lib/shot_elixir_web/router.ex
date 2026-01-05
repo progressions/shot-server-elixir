@@ -219,6 +219,9 @@ defmodule ShotElixirWeb.Router do
       post "/player_tokens", PlayerViewTokenController, :create
     end
 
+    # AI Credentials
+    resources "/ai_credentials", AiCredentialController, except: [:new, :edit, :show]
+
     # AI
     post "/ai", AiController, :create
     post "/ai/:id/extend", AiController, :extend

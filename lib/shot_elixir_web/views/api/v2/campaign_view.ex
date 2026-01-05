@@ -1,4 +1,6 @@
 defmodule ShotElixirWeb.Api.V2.CampaignView do
+  alias ShotElixir.AiCredentials
+
   def render("index.json", %{campaigns: campaigns, meta: meta}) do
     %{
       campaigns: Enum.map(campaigns, &render_campaign/1),
@@ -93,8 +95,18 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       grok_credits_exhausted_at: campaign.grok_credits_exhausted_at,
       is_grok_credits_exhausted: Campaign.grok_credits_exhausted?(campaign),
       # AI generation toggle
-      ai_generation_enabled: campaign.ai_generation_enabled
+      ai_generation_enabled: campaign.ai_generation_enabled,
+      # AI provider configuration
+      ai_provider: campaign.ai_provider,
+      ai_provider_connected: has_ai_provider_credential?(campaign)
     }
+  end
+
+  # Check if the campaign owner has a credential for the selected AI provider
+  defp has_ai_provider_credential?(%{ai_provider: nil}), do: false
+
+  defp has_ai_provider_credential?(%{ai_provider: provider, user_id: user_id}) do
+    AiCredentials.has_credential?(user_id, provider)
   end
 
   defp render_campaign_detail(campaign) do
