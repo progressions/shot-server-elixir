@@ -185,9 +185,11 @@ defmodule ShotElixir.Characters.Character do
   def as_notion(%__MODULE__{} = character) do
     av = character.action_values || @default_action_values
     desc = character.description || %{}
+    # Ensure name is never nil for Notion API (titles cannot be nil)
+    name = character.name || "Unnamed Character"
 
     base_properties = %{
-      "Name" => %{"title" => [%{"type" => "text", "text" => %{"content" => character.name}}]},
+      "Name" => %{"title" => [%{"type" => "text", "text" => %{"content" => name}}]},
       "Enemy Type" => %{"select" => %{"name" => av["Type"] || "PC"}},
       "Wounds" => %{"number" => av["Wounds"]},
       "Defense" => %{"number" => av["Defense"]},
