@@ -282,12 +282,12 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
         # Create new Notion page
         case ShotElixir.Services.NotionService.create_notion_from_character(character) do
           {:ok, page} ->
-            Logger.info("Notion page created with ID: #{inspect(page["id"])}")
+            Logger.debug("Notion page created with ID: #{inspect(page["id"])}")
 
             # Reload character to get updated notion_page_id
             updated_character = Characters.get_character(id)
 
-            Logger.info(
+            Logger.debug(
               "Character after reload - notion_page_id: #{inspect(updated_character.notion_page_id)}"
             )
 
@@ -296,12 +296,13 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
             |> put_view(ShotElixirWeb.Api.V2.CharacterView)
             |> render("show.json", character: updated_character)
 
-          {:error, reason} ->
-            Logger.error("Failed to create Notion page: #{inspect(reason)}")
+          {:error, _reason} ->
+            # Avoid logging potentially sensitive HTTP request metadata (e.g., Authorization headers)
+            Logger.error("Failed to create Notion page")
 
             conn
             |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed to create Notion page: #{inspect(reason)}"})
+            |> json(%{error: "Failed to create Notion page"})
         end
       end
     else

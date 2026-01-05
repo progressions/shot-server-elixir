@@ -69,7 +69,7 @@ defmodule ShotElixir.Services.NotionService do
         properties
       end
 
-    Logger.info("Creating Notion page with database_id: #{database_id()}")
+    Logger.debug("Creating Notion page with database_id: #{database_id()}")
 
     page =
       NotionClient.create_page(%{
@@ -77,30 +77,42 @@ defmodule ShotElixir.Services.NotionService do
         "properties" => properties
       })
 
-    Logger.info("Notion API response: #{inspect(page)}")
+    Logger.debug("Notion API response received")
 
-    page_id = page["id"]
-    Logger.info("Extracted page ID: #{inspect(page_id)}")
+    # Check if Notion returned an error response
+    case page do
+      %{"id" => page_id} when is_binary(page_id) ->
+        Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
-    # Update character with notion_page_id
-    case Characters.update_character(character, %{notion_page_id: page_id}) do
-      {:ok, updated_character} ->
-        Logger.info(
-          "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
-        )
+        # Update character with notion_page_id
+        case Characters.update_character(character, %{notion_page_id: page_id}) do
+          {:ok, updated_character} ->
+            Logger.debug(
+              "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
+            )
 
-        # Add image if present
-        add_image_to_notion(updated_character)
-        {:ok, page}
+            # Add image if present
+            add_image_to_notion(updated_character)
+            {:ok, page}
 
-      {:error, changeset} ->
-        Logger.error("Failed to update character with notion_page_id: #{inspect(changeset)}")
-        {:error, changeset}
+          {:error, changeset} ->
+            Logger.error("Failed to update character with notion_page_id")
+            {:error, changeset}
+        end
+
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        Logger.error("Unexpected response from Notion API")
+        {:error, :unexpected_notion_response}
     end
   rescue
     error ->
-      Logger.error("Failed to create Notion page: #{inspect(error)}")
-      {:error, error}
+      # Avoid logging potentially sensitive HTTP request metadata
+      Logger.error("Failed to create Notion page: #{Exception.message(error)}")
+      {:error, :notion_request_failed}
   end
 
   @doc """
