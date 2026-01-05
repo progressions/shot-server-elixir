@@ -264,7 +264,7 @@ defmodule ShotElixir.Characters.Character do
   end
 
   defp maybe_add_chi_war_link(properties, character) do
-    if Application.get_env(:shot_elixir, :env) == :prod do
+    if Application.get_env(:shot_elixir, :environment) == :prod do
       url = "https://chiwar.net/characters/#{character.id}"
       Map.put(properties, "Chi War Link", %{"url" => url})
     else
