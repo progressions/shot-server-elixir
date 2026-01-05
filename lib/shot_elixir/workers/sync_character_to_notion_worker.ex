@@ -12,7 +12,7 @@ defmodule ShotElixir.Workers.SyncCharacterToNotionWorker do
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"character_id" => character_id}}) do
     # Only run in production
-    if Application.get_env(:shot_elixir, :env) == :prod do
+    if Application.get_env(:shot_elixir, :environment) == :prod do
       character = Characters.get_character!(character_id)
 
       case NotionService.sync_character(character) do
