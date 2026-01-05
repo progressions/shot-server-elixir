@@ -165,29 +165,38 @@ defmodule ShotElixir.Services.AiService do
   def generate_images_for_entity(entity_type, entity_id, num_images \\ 3) do
     Logger.info("Generating #{num_images} AI images for #{entity_type}:#{entity_id}")
 
+    # Get entity, campaign, credential, and prompt first
     with {:ok, entity} <- get_entity(entity_type, entity_id),
          {:ok, campaign} <- get_campaign_for_entity(entity_type, entity),
          {:ok, credential} <- get_credential_for_campaign(campaign),
-         {:ok, prompt} <- build_image_prompt(entity),
-         {:ok, urls} <-
-           Provider.generate_images(credential, prompt, num_images, response_format: "url") do
-      # Handle single URL vs list
-      urls_list = if is_list(urls), do: urls, else: [urls]
-      Logger.info("Successfully generated #{length(urls_list)} images")
-      {:ok, urls_list}
+         {:ok, prompt} <- build_image_prompt(entity) do
+      # Now call generate_images with credential in scope for error handling
+      case Provider.generate_images(credential, prompt, num_images, response_format: "url") do
+        {:ok, urls} ->
+          # Handle single URL vs list
+          urls_list = if is_list(urls), do: urls, else: [urls]
+          Logger.info("Successfully generated #{length(urls_list)} images")
+          {:ok, urls_list}
+
+        {:error, :credit_exhausted, message} = error ->
+          Logger.error("AI API credits exhausted: #{message}")
+          # Mark the credential as suspended so user knows they need to update billing
+          mark_credential_suspended(credential, message)
+          error
+
+        {:error, :rate_limited, message} ->
+          Logger.warning("AI API rate limited: #{message}")
+          {:error, :rate_limited, message}
+
+        {:error, :server_error, message} ->
+          Logger.error("AI API server error: #{message}")
+          {:error, :server_error, message}
+
+        {:error, reason} = error ->
+          Logger.error("Failed to generate images: #{inspect(reason)}")
+          error
+      end
     else
-      {:error, :credit_exhausted, message} = error ->
-        Logger.error("AI API credits exhausted: #{message}")
-        error
-
-      {:error, :rate_limited, message} ->
-        Logger.warning("AI API rate limited: #{message}")
-        {:error, :rate_limited, message}
-
-      {:error, :server_error, message} ->
-        Logger.error("AI API server error: #{message}")
-        {:error, :server_error, message}
-
       {:error, :no_credential} ->
         Logger.error("No AI credential configured for campaign")
         {:error, "No AI provider configured for this campaign"}
@@ -441,6 +450,8 @@ defmodule ShotElixir.Services.AiService do
 
       {:error, :credit_exhausted, message} ->
         Logger.error("AI API credits exhausted: #{message}")
+        # Mark the credential as suspended so user knows they need to update billing
+        mark_credential_suspended(credential, message)
         {:error, :credit_exhausted, message}
 
       {:error, :rate_limited, message} ->
@@ -612,5 +623,18 @@ defmodule ShotElixir.Services.AiService do
     """
 
     {:ok, prompt}
+  end
+
+  # Helper to mark a credential as suspended due to billing issues
+  defp mark_credential_suspended(credential, message) do
+    case AiCredentials.mark_suspended(credential, message) do
+      {:ok, _credential} ->
+        Logger.info("Credential #{credential.id} marked as suspended: #{message}")
+        :ok
+
+      {:error, changeset} ->
+        Logger.error("Failed to mark credential as suspended: #{inspect(changeset)}")
+        :error
+    end
   end
 end

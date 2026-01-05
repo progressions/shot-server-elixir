@@ -219,4 +219,45 @@ defmodule ShotElixir.AiCredentials do
     |> where([c], c.user_id == ^user_id and c.provider == ^provider)
     |> Repo.exists?()
   end
+
+  @doc """
+  Updates the status of a credential.
+
+  ## Examples
+
+      iex> update_status(credential, "suspended", "Billing hard limit reached")
+      {:ok, %AiCredential{status: "suspended"}}
+  """
+  def update_status(%AiCredential{} = credential, status, message \\ nil) do
+    credential
+    |> AiCredential.status_changeset(%{status: status, status_message: message})
+    |> Repo.update()
+  end
+
+  @doc """
+  Marks a credential as suspended due to billing/quota issues.
+  """
+  def mark_suspended(%AiCredential{} = credential, message) do
+    update_status(credential, "suspended", message)
+  end
+
+  @doc """
+  Marks a credential as invalid due to authentication failure.
+  """
+  def mark_invalid(%AiCredential{} = credential, message \\ "Authentication failed") do
+    update_status(credential, "invalid", message)
+  end
+
+  @doc """
+  Reactivates a credential (e.g., after updating the API key).
+  """
+  def reactivate(%AiCredential{} = credential) do
+    update_status(credential, "active", nil)
+  end
+
+  @doc """
+  Checks if a credential is active and usable.
+  """
+  def active?(%AiCredential{status: "active"}), do: true
+  def active?(_), do: false
 end

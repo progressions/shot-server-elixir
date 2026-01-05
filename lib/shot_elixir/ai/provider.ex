@@ -85,18 +85,22 @@ defmodule ShotElixir.AI.Provider do
               {:ok, AiCredential.t()} | {:error, :expired | :invalid}
 
   @doc """
-  Returns the appropriate provider module for a given provider atom.
+  Returns the appropriate provider module for a given provider atom or string.
   """
-  @spec provider_module(provider()) :: module()
+  @spec provider_module(provider() | String.t()) :: module()
   def provider_module(:grok), do: ShotElixir.AI.Providers.GrokProvider
   def provider_module(:openai), do: ShotElixir.AI.Providers.OpenAIProvider
   def provider_module(:gemini), do: ShotElixir.AI.Providers.GeminiProvider
+  def provider_module("grok"), do: ShotElixir.AI.Providers.GrokProvider
+  def provider_module("openai"), do: ShotElixir.AI.Providers.OpenAIProvider
+  def provider_module("gemini"), do: ShotElixir.AI.Providers.GeminiProvider
 
   @doc """
-  Validates provider atom is supported.
+  Validates provider atom or string is supported.
   """
   @spec valid_provider?(term()) :: boolean()
   def valid_provider?(provider) when provider in [:grok, :openai, :gemini], do: true
+  def valid_provider?(provider) when provider in ["grok", "openai", "gemini"], do: true
   def valid_provider?(_), do: false
 
   @doc """

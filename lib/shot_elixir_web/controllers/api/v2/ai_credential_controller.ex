@@ -73,7 +73,19 @@ defmodule ShotElixirWeb.Api.V2.AiCredentialController do
       credential ->
         case AiCredentials.update_credential(credential, credential_params) do
           {:ok, updated_credential} ->
-            render(conn, :show, ai_credential: updated_credential)
+            # If an API key was updated, reactivate the credential
+            # (user is presumably fixing a billing issue)
+            final_credential =
+              if Map.has_key?(credential_params, "api_key") do
+                case AiCredentials.reactivate(updated_credential) do
+                  {:ok, reactivated} -> reactivated
+                  {:error, _} -> updated_credential
+                end
+              else
+                updated_credential
+              end
+
+            render(conn, :show, ai_credential: final_credential)
 
           {:error, changeset} ->
             conn

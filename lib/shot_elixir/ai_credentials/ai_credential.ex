@@ -16,6 +16,7 @@ defmodule ShotElixir.AiCredentials.AiCredential do
   @foreign_key_type :binary_id
 
   @valid_providers ["grok", "openai", "gemini"]
+  @valid_statuses ["active", "suspended", "invalid"]
 
   schema "ai_credentials" do
     belongs_to :user, User
@@ -25,6 +26,11 @@ defmodule ShotElixir.AiCredentials.AiCredential do
     field :access_token_encrypted, EncryptedBinary
     field :refresh_token_encrypted, EncryptedBinary
     field :token_expires_at, :utc_datetime
+
+    # Status tracking for integration health
+    field :status, :string, default: "active"
+    field :status_message, :string
+    field :status_updated_at, :utc_datetime
 
     # Virtual fields for input (not stored directly)
     field :api_key, :string, virtual: true
@@ -65,6 +71,37 @@ defmodule ShotElixir.AiCredentials.AiCredential do
   Returns the list of valid provider names.
   """
   def valid_providers, do: @valid_providers
+
+  @doc """
+  Returns the list of valid status values.
+  """
+  def valid_statuses, do: @valid_statuses
+
+  @doc """
+  Creates a changeset for updating credential status.
+
+  Used when marking a credential as suspended (billing issues) or invalid (auth failed).
+  """
+  def status_changeset(credential, attrs) do
+    credential
+    |> cast(attrs, [:status, :status_message, :status_updated_at])
+    |> validate_inclusion(:status, @valid_statuses)
+    |> put_status_timestamp()
+  end
+
+  defp put_status_timestamp(changeset) do
+    case get_change(changeset, :status) do
+      nil ->
+        changeset
+
+      _ ->
+        put_change(
+          changeset,
+          :status_updated_at,
+          DateTime.utc_now() |> DateTime.truncate(:second)
+        )
+    end
+  end
 
   # Encrypt api_key virtual field into api_key_encrypted
   defp encrypt_api_key(changeset) do

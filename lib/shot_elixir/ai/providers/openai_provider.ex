@@ -182,8 +182,9 @@ defmodule ShotElixir.AI.Providers.OpenAIProvider do
     error_message = extract_error_message(body)
 
     cond do
-      status == 429 && quota_exceeded?(body) ->
-        Logger.error("OpenAIProvider: Quota exceeded: #{error_message}")
+      # Check for billing/quota errors on any status (400, 429, etc.)
+      quota_exceeded?(body) ->
+        Logger.error("OpenAIProvider: Quota/billing limit exceeded: #{error_message}")
         {:error, :credit_exhausted, error_message}
 
       status == 429 ->
@@ -205,8 +206,16 @@ defmodule ShotElixir.AI.Providers.OpenAIProvider do
   end
 
   defp quota_exceeded?(body) when is_map(body) do
-    error = get_in(body, ["error", "type"]) || ""
-    String.contains?(String.downcase(error), "insufficient_quota")
+    error_type = get_in(body, ["error", "type"]) || ""
+    error_message = get_in(body, ["error", "message"]) || ""
+    error_code = get_in(body, ["error", "code"]) || ""
+
+    # Check for various billing/quota errors
+    String.contains?(String.downcase(error_type), "insufficient_quota") ||
+      String.contains?(String.downcase(error_message), "billing hard limit") ||
+      String.contains?(String.downcase(error_message), "quota") ||
+      String.contains?(String.downcase(error_code), "billing") ||
+      String.contains?(String.downcase(error_code), "insufficient_quota")
   end
 
   defp quota_exceeded?(_), do: false
