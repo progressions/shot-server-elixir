@@ -121,6 +121,7 @@ defmodule ShotElixirWeb.Router do
       post "/duplicate", CharacterController, :duplicate
       get "/pdf", CharacterController, :pdf
       delete "/image", CharacterController, :remove_image
+      post "/notion/create", CharacterController, :create_notion_page
       resources "/advancements", AdvancementController
       resources "/weapons", CharacterWeaponController, only: [:index, :create, :delete]
       resources "/schticks", CharacterSchtickController, only: [:index, :create, :delete]

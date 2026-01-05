@@ -56,14 +56,20 @@ defmodule ShotElixir.Services.NotionService do
   Create a new Notion page from character data.
   """
   def create_notion_from_character(%Character{} = character) do
+    # Ensure faction is loaded for Notion properties
+    character = Repo.preload(character, :faction)
     properties = Character.as_notion(character)
 
     properties =
       if character.faction do
-        Map.put(properties, "Faction", notion_faction_properties(character.faction.name))
+        faction_props = notion_faction_properties(character.faction.name)
+        # Only add Faction if we found a matching faction in Notion
+        if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
         properties
       end
+
+    Logger.debug("Creating Notion page with database_id: #{database_id()}")
 
     page =
       NotionClient.create_page(%{
@@ -71,18 +77,42 @@ defmodule ShotElixir.Services.NotionService do
         "properties" => properties
       })
 
-    # Update character with notion_page_id
-    {:ok, updated_character} =
-      Characters.update_character(character, %{notion_page_id: page["id"]})
+    Logger.debug("Notion API response received")
 
-    # Add image if present
-    add_image_to_notion(updated_character)
+    # Check if Notion returned an error response
+    case page do
+      %{"id" => page_id} when is_binary(page_id) ->
+        Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
-    {:ok, page}
+        # Update character with notion_page_id
+        case Characters.update_character(character, %{notion_page_id: page_id}) do
+          {:ok, updated_character} ->
+            Logger.debug(
+              "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
+            )
+
+            # Add image if present
+            add_image_to_notion(updated_character)
+            {:ok, page}
+
+          {:error, changeset} ->
+            Logger.error("Failed to update character with notion_page_id")
+            {:error, changeset}
+        end
+
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        Logger.error("Unexpected response from Notion API")
+        {:error, :unexpected_notion_response}
+    end
   rescue
     error ->
-      Logger.error("Failed to create Notion page: #{inspect(error)}")
-      {:error, error}
+      # Avoid logging potentially sensitive HTTP request metadata
+      Logger.error("Failed to create Notion page: #{Exception.message(error)}")
+      {:error, :notion_request_failed}
   end
 
   @doc """
@@ -95,7 +125,9 @@ defmodule ShotElixir.Services.NotionService do
 
     properties =
       if character.faction do
-        Map.put(properties, "Faction", notion_faction_properties(character.faction.name))
+        faction_props = notion_faction_properties(character.faction.name)
+        # Only add Faction if we found a matching faction in Notion
+        if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
         properties
       end

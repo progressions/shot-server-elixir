@@ -60,6 +60,12 @@ defmodule ShotElixir.Services.NotionClient do
     |> Map.get(:body)
   end
 
+  def get_database(database_id) do
+    client()
+    |> Req.get!(url: "/databases/#{database_id}")
+    |> Map.get(:body)
+  end
+
   def get_block_children(block_id) do
     client()
     |> Req.get!(url: "/blocks/#{block_id}/children")
