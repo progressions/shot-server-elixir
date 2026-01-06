@@ -28,13 +28,15 @@ defmodule ShotElixirWeb.Api.V2.AiCredentialView do
   end
 
   defp render_credential(credential) do
+    status = credential.status || "active"
+
     %{
       id: credential.id,
       provider: credential.provider,
-      connected: true,
+      connected: status == "active",
       api_key_hint: AiCredentials.mask_api_key(credential),
       token_expires_at: credential.token_expires_at,
-      status: credential.status || "active",
+      status: status,
       status_message: credential.status_message,
       status_updated_at: credential.status_updated_at,
       inserted_at: credential.created_at,

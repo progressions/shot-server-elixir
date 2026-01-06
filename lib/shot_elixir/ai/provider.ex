@@ -86,6 +86,26 @@ defmodule ShotElixir.AI.Provider do
 
   @doc """
   Returns the appropriate provider module for a given provider atom or string.
+
+  ## Returns
+    - `{:ok, module}` for valid providers
+    - `{:error, :unknown_provider}` for invalid providers
+  """
+  @spec get_provider(provider() | String.t() | nil) ::
+          {:ok, module()} | {:error, :unknown_provider}
+  def get_provider(:grok), do: {:ok, ShotElixir.AI.Providers.GrokProvider}
+  def get_provider(:openai), do: {:ok, ShotElixir.AI.Providers.OpenAIProvider}
+  def get_provider(:gemini), do: {:ok, ShotElixir.AI.Providers.GeminiProvider}
+  def get_provider("grok"), do: {:ok, ShotElixir.AI.Providers.GrokProvider}
+  def get_provider("openai"), do: {:ok, ShotElixir.AI.Providers.OpenAIProvider}
+  def get_provider("gemini"), do: {:ok, ShotElixir.AI.Providers.GeminiProvider}
+  def get_provider(_), do: {:error, :unknown_provider}
+
+  @doc """
+  Returns the appropriate provider module for a given provider atom or string.
+
+  Raises FunctionClauseError for unknown providers. Prefer `get_provider/1` for
+  safe error handling.
   """
   @spec provider_module(provider() | String.t()) :: module()
   def provider_module(:grok), do: ShotElixir.AI.Providers.GrokProvider
@@ -108,8 +128,10 @@ defmodule ShotElixir.AI.Provider do
   """
   @spec send_chat_request(AiCredential.t(), String.t(), keyword()) :: chat_response()
   def send_chat_request(%AiCredential{provider: provider} = credential, prompt, opts \\ []) do
-    module = provider_module(provider)
-    module.send_chat_request(credential, prompt, opts)
+    case get_provider(provider) do
+      {:ok, module} -> module.send_chat_request(credential, prompt, opts)
+      {:error, :unknown_provider} -> {:error, :unknown_provider}
+    end
   end
 
   @doc """
@@ -123,17 +145,21 @@ defmodule ShotElixir.AI.Provider do
         num_images,
         opts \\ []
       ) do
-    module = provider_module(provider)
-    module.generate_images(credential, prompt, num_images, opts)
+    case get_provider(provider) do
+      {:ok, module} -> module.generate_images(credential, prompt, num_images, opts)
+      {:error, :unknown_provider} -> {:error, :unknown_provider}
+    end
   end
 
   @doc """
   Validates a credential using the appropriate provider.
   """
   @spec validate_credential(AiCredential.t()) ::
-          {:ok, AiCredential.t()} | {:error, :expired | :invalid}
+          {:ok, AiCredential.t()} | {:error, :expired | :invalid | :unknown_provider}
   def validate_credential(%AiCredential{provider: provider} = credential) do
-    module = provider_module(provider)
-    module.validate_credential(credential)
+    case get_provider(provider) do
+      {:ok, module} -> module.validate_credential(credential)
+      {:error, :unknown_provider} -> {:error, :unknown_provider}
+    end
   end
 end

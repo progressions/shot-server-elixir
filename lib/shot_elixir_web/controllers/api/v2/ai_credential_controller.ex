@@ -8,6 +8,8 @@ defmodule ShotElixirWeb.Api.V2.AiCredentialController do
   """
   use ShotElixirWeb, :controller
 
+  require Logger
+
   alias ShotElixir.AiCredentials
   alias ShotElixir.Guardian
 
@@ -78,8 +80,15 @@ defmodule ShotElixirWeb.Api.V2.AiCredentialController do
             final_credential =
               if Map.has_key?(credential_params, "api_key") do
                 case AiCredentials.reactivate(updated_credential) do
-                  {:ok, reactivated} -> reactivated
-                  {:error, _} -> updated_credential
+                  {:ok, reactivated} ->
+                    reactivated
+
+                  {:error, reason} ->
+                    Logger.warning(
+                      "Failed to reactivate credential #{updated_credential.id} after API key update: #{inspect(reason)}"
+                    )
+
+                    updated_credential
                 end
               else
                 updated_credential

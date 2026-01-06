@@ -22,8 +22,11 @@ defmodule ShotElixir.AI.Providers.GeminiProvider do
 
   require Logger
 
+  import Ecto.Query, only: [from: 2]
+
   alias ShotElixir.AiCredentials
   alias ShotElixir.AiCredentials.AiCredential
+  alias ShotElixir.Repo
 
   @base_url "https://generativelanguage.googleapis.com"
   @default_max_tokens 4096
@@ -162,7 +165,48 @@ defmodule ShotElixir.AI.Providers.GeminiProvider do
     end
   end
 
+  # Use database-level locking to prevent concurrent token refresh race conditions.
+  # Multiple requests may simultaneously detect an expired token - this ensures
+  # only one actually performs the refresh while others wait and get the new token.
   defp refresh_token(credential) do
+    Repo.transaction(fn ->
+      # Acquire row lock - other processes will wait here
+      locked_credential =
+        from(c in AiCredential,
+          where: c.id == ^credential.id,
+          lock: "FOR UPDATE"
+        )
+        |> Repo.one()
+
+      case locked_credential do
+        nil ->
+          Repo.rollback(:credential_not_found)
+
+        cred ->
+          # Re-check if token is still expired - another process may have refreshed it
+          if token_still_expired?(cred) do
+            do_refresh_token(cred)
+          else
+            # Token was refreshed by another process, use the updated credential
+            Logger.info("GeminiProvider: Token already refreshed by concurrent request")
+            {:ok, cred}
+          end
+      end
+    end)
+    |> case do
+      {:ok, result} -> result
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp token_still_expired?(credential) do
+    case credential.token_expires_at do
+      nil -> true
+      expires_at -> DateTime.compare(expires_at, DateTime.utc_now()) != :gt
+    end
+  end
+
+  defp do_refresh_token(credential) do
     case AiCredentials.get_decrypted_refresh_token(credential) do
       {:ok, refresh_token} when is_binary(refresh_token) and byte_size(refresh_token) > 0 ->
         # Call Google's token refresh endpoint
@@ -318,12 +362,35 @@ defmodule ShotElixir.AI.Providers.GeminiProvider do
 
   # Config helpers
   defp google_client_id do
-    Application.get_env(:shot_elixir, :google_oauth)[:client_id] ||
-      System.get_env("GOOGLE_CLIENT_ID")
+    fetch_google_oauth_config_value!(
+      :client_id,
+      "GOOGLE_CLIENT_ID",
+      "Google OAuth client_id is not configured. " <>
+        "Set :google_oauth, :client_id in config or the GOOGLE_CLIENT_ID environment variable."
+    )
   end
 
   defp google_client_secret do
-    Application.get_env(:shot_elixir, :google_oauth)[:client_secret] ||
-      System.get_env("GOOGLE_CLIENT_SECRET")
+    fetch_google_oauth_config_value!(
+      :client_secret,
+      "GOOGLE_CLIENT_SECRET",
+      "Google OAuth client_secret is not configured. " <>
+        "Set :google_oauth, :client_secret in config or the GOOGLE_CLIENT_SECRET environment variable."
+    )
+  end
+
+  defp fetch_google_oauth_config_value!(key, env_var, error_message) do
+    config = Application.get_env(:shot_elixir, :google_oauth) || []
+
+    case Keyword.get(config, key) || System.get_env(env_var) do
+      nil ->
+        raise ArgumentError, error_message
+
+      "" ->
+        raise ArgumentError, error_message
+
+      value ->
+        value
+    end
   end
 end

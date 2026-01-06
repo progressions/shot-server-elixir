@@ -5,6 +5,19 @@ defmodule ShotElixir.AiCredentials.AiCredential do
   Supports:
   - API keys for Grok and OpenAI (stored encrypted)
   - OAuth tokens for Gemini (access_token, refresh_token, expiration)
+
+  ## Changesets
+
+  This schema uses two separate changesets:
+
+  - `changeset/2` - For creating and updating credentials (provider, api_key, tokens).
+    Does NOT include status fields. New credentials default to status "active".
+
+  - `status_changeset/2` - For updating credential status (status, status_message).
+    Use this after creation to mark a credential as "suspended" or "invalid".
+
+  This separation ensures credential data updates and status updates are handled
+  independently, preventing accidental status changes during normal edits.
   """
   use Ecto.Schema
   import Ecto.Changeset

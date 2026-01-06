@@ -14,7 +14,10 @@ defmodule ShotElixir.Repo.Migrations.CreateAiCredentials do
       timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
     end
 
-    create unique_index(:ai_credentials, [:user_id, :provider])
+    create unique_index(:ai_credentials, [:user_id, :provider],
+             name: :ai_credentials_user_id_provider_index
+           )
+
     create index(:ai_credentials, [:user_id])
   end
 end

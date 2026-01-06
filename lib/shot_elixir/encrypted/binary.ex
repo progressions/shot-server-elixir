@@ -4,6 +4,24 @@ defmodule ShotElixir.Encrypted.Binary do
   Uses Phoenix's built-in MessageEncryptor (AES-GCM under the hood).
 
   Keys are derived from SECRET_KEY_BASE, so no additional configuration needed.
+
+  ## Key Rotation Warning
+
+  Encryption keys are derived from the application's SECRET_KEY_BASE using static
+  salts ("encrypted binary secret" and "encrypted binary sign"). While MessageEncryptor
+  uses unique initialization vectors per encryption (so identical plaintexts produce
+  different ciphertexts), the derived keys remain constant for a given SECRET_KEY_BASE.
+
+  **Important:** If SECRET_KEY_BASE is rotated, all existing encrypted credentials
+  will become unreadable and users will need to re-enter their API keys/tokens.
+
+  To rotate keys while preserving data:
+  1. Export all credentials (decrypted) before rotation
+  2. Rotate SECRET_KEY_BASE
+  3. Re-encrypt and store all credentials with new keys
+
+  Alternatively, implement a key versioning scheme that stores the key version
+  with each encrypted value and supports decryption with multiple key versions.
   """
   use Ecto.Type
 

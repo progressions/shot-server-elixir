@@ -206,16 +206,44 @@ defmodule ShotElixir.AI.Providers.OpenAIProvider do
   end
 
   defp quota_exceeded?(body) when is_map(body) do
-    error_type = get_in(body, ["error", "type"]) || ""
-    error_message = get_in(body, ["error", "message"]) || ""
-    error_code = get_in(body, ["error", "code"]) || ""
+    error_type =
+      body
+      |> get_in(["error", "type"])
+      |> to_string()
+      |> String.downcase()
 
-    # Check for various billing/quota errors
-    String.contains?(String.downcase(error_type), "insufficient_quota") ||
-      String.contains?(String.downcase(error_message), "billing hard limit") ||
-      String.contains?(String.downcase(error_message), "quota") ||
-      String.contains?(String.downcase(error_code), "billing") ||
-      String.contains?(String.downcase(error_code), "insufficient_quota")
+    error_message =
+      body
+      |> get_in(["error", "message"])
+      |> to_string()
+      |> String.downcase()
+
+    error_code =
+      body
+      |> get_in(["error", "code"])
+      |> to_string()
+      |> String.downcase()
+
+    # Prefer structured fields (type/code) with exact matches, then fall back to message substrings
+    type_indicates_quota =
+      error_type in [
+        "insufficient_quota",
+        "insufficient_quota_error"
+      ]
+
+    code_indicates_quota =
+      error_code in [
+        "insufficient_quota",
+        "billing_hard_limit_reached",
+        "account_deactivated"
+      ]
+
+    message_indicates_quota =
+      String.contains?(error_message, "billing hard limit") ||
+        String.contains?(error_message, "quota") ||
+        String.contains?(error_message, "insufficient_quota")
+
+    type_indicates_quota || code_indicates_quota || message_indicates_quota
   end
 
   defp quota_exceeded?(_), do: false
