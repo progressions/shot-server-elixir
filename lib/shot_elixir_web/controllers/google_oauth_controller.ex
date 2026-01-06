@@ -14,6 +14,7 @@ defmodule ShotElixirWeb.GoogleOAuthController do
 
   require Logger
 
+  alias ShotElixir.Accounts
   alias ShotElixir.AiCredentials
 
   @google_auth_url "https://accounts.google.com/o/oauth2/v2/auth"
@@ -45,23 +46,33 @@ defmodule ShotElixirWeb.GoogleOAuthController do
   and replay attacks (valid for 10 minutes).
   """
   def authorize(conn, %{"user_id" => user_id}) do
-    state = generate_state(user_id)
+    case Ecto.UUID.cast(user_id) do
+      {:ok, valid_user_id} ->
+        state = generate_state(valid_user_id)
 
-    params = %{
-      client_id: google_client_id(),
-      redirect_uri: callback_url(),
-      response_type: "code",
-      scope: Enum.join(@scopes, " "),
-      access_type: "offline",
-      prompt: "consent",
-      state: state
-    }
+        params = %{
+          client_id: google_client_id(),
+          redirect_uri: callback_url(),
+          response_type: "code",
+          scope: Enum.join(@scopes, " "),
+          access_type: "offline",
+          prompt: "consent",
+          state: state
+        }
 
-    auth_url = "#{@google_auth_url}?#{URI.encode_query(params)}"
+        auth_url = "#{@google_auth_url}?#{URI.encode_query(params)}"
 
-    Logger.info("GoogleOAuth: Redirecting user #{user_id} to Google OAuth")
+        Logger.info("GoogleOAuth: Redirecting user #{valid_user_id} to Google OAuth")
 
-    redirect(conn, external: auth_url)
+        redirect(conn, external: auth_url)
+
+      :error ->
+        Logger.warning("GoogleOAuth: Invalid UUID format for user_id: #{inspect(user_id)}")
+
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "user_id must be a valid UUID"})
+    end
   end
 
   def authorize(conn, _params) do
@@ -92,6 +103,10 @@ defmodule ShotElixirWeb.GoogleOAuthController do
       {:error, :invalid_state} ->
         Logger.warning("GoogleOAuth: Invalid state parameter")
         redirect(conn, external: frontend_redirect_url("error", "Invalid state"))
+
+      {:error, :user_not_found} ->
+        Logger.error("GoogleOAuth: User not found for provided user_id")
+        redirect(conn, external: frontend_redirect_url("error", "User not found"))
 
       {:error, :token_exchange_failed, reason} ->
         Logger.error("GoogleOAuth: Token exchange failed: #{inspect(reason)}")
@@ -137,9 +152,9 @@ defmodule ShotElixirWeb.GoogleOAuthController do
   end
 
   defp valid_timestamp?(timestamp) do
-    # State is valid for 10 minutes
+    # State is valid for 10 minutes and cannot be in the future
     current = System.system_time(:second)
-    current - timestamp < 600
+    timestamp <= current and current - timestamp < 600
   end
 
   defp valid_signature?(user_id, timestamp, signature) do
@@ -159,12 +174,25 @@ defmodule ShotElixirWeb.GoogleOAuthController do
 
     case Req.post(@google_token_url, form: body) do
       {:ok, %{status: 200, body: response}} ->
-        {:ok,
-         %{
-           access_token: response["access_token"],
-           refresh_token: response["refresh_token"],
-           expires_in: response["expires_in"]
-         }}
+        access_token = response["access_token"]
+        refresh_token = response["refresh_token"]
+        expires_in = response["expires_in"]
+
+        cond do
+          is_nil(access_token) or access_token == "" ->
+            {:error, :token_exchange_failed,
+             "Google did not return an access token during the OAuth exchange."}
+
+          true ->
+            # Note: refresh_token may be nil for re-authorization flows.
+            # The store_tokens function handles this appropriately.
+            {:ok,
+             %{
+               access_token: access_token,
+               refresh_token: refresh_token,
+               expires_in: expires_in
+             }}
+        end
 
       {:ok, %{status: status, body: body}} ->
         {:error, :token_exchange_failed, "HTTP #{status}: #{inspect(body)}"}
@@ -175,6 +203,17 @@ defmodule ShotElixirWeb.GoogleOAuthController do
   end
 
   defp store_tokens(user_id, tokens) do
+    # Verify user exists before storing tokens
+    case Accounts.get_user(user_id) do
+      nil ->
+        {:error, :user_not_found}
+
+      _user ->
+        do_store_tokens(user_id, tokens)
+    end
+  end
+
+  defp do_store_tokens(user_id, tokens) do
     expires_at =
       if tokens.expires_in do
         DateTime.add(DateTime.utc_now(), tokens.expires_in, :second)
@@ -185,24 +224,37 @@ defmodule ShotElixirWeb.GoogleOAuthController do
     # Check if credential already exists
     case AiCredentials.get_credential_by_user_and_provider(user_id, "gemini") do
       nil ->
-        # Create new credential
-        AiCredentials.create_credential(%{
-          "user_id" => user_id,
-          "provider" => "gemini",
-          "access_token" => tokens.access_token,
-          "refresh_token" => tokens.refresh_token,
-          "token_expires_at" => expires_at
-        })
+        # Create new credential - refresh_token is required for new credentials
+        if is_nil(tokens.refresh_token) or tokens.refresh_token == "" do
+          {:error,
+           "Google did not return a refresh token. Try removing this app's access in your Google Account and reconnecting."}
+        else
+          AiCredentials.create_credential(%{
+            "user_id" => user_id,
+            "provider" => "gemini",
+            "access_token" => tokens.access_token,
+            "refresh_token" => tokens.refresh_token,
+            "token_expires_at" => expires_at
+          })
+        end
 
       existing ->
-        # Update existing credential
-        AiCredentials.update_credential(existing, %{
+        # Update existing credential - preserve old refresh_token if new one is nil
+        update_attrs = %{
           "access_token" => tokens.access_token,
-          "refresh_token" => tokens.refresh_token,
           "token_expires_at" => expires_at,
           "status" => "active",
           "status_message" => nil
-        })
+        }
+
+        update_attrs =
+          if tokens.refresh_token do
+            Map.put(update_attrs, "refresh_token", tokens.refresh_token)
+          else
+            update_attrs
+          end
+
+        AiCredentials.update_credential(existing, update_attrs)
     end
   end
 
