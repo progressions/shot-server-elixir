@@ -50,6 +50,37 @@ defmodule ShotElixir.Encrypted.Binary do
   end
 
   defp secret_key_base do
-    Application.get_env(:shot_elixir, ShotElixirWeb.Endpoint)[:secret_key_base]
+    case Application.get_env(:shot_elixir, ShotElixirWeb.Endpoint) do
+      nil ->
+        raise """
+        :secret_key_base is not configured for ShotElixirWeb.Endpoint.
+
+        ShotElixir.Encrypted.Binary derives encryption keys from your endpoint's
+        :secret_key_base. Please ensure it is set in your config (e.g. config/runtime.exs)
+        for the :shot_elixir, ShotElixirWeb.Endpoint application.
+        """
+
+      config ->
+        case config[:secret_key_base] do
+          nil ->
+            raise """
+            :secret_key_base is nil for ShotElixirWeb.Endpoint.
+
+            ShotElixir.Encrypted.Binary requires a non-empty :secret_key_base
+            to derive encryption keys. Please check your endpoint configuration.
+            """
+
+          "" ->
+            raise """
+            :secret_key_base is empty for ShotElixirWeb.Endpoint.
+
+            ShotElixir.Encrypted.Binary requires a non-empty :secret_key_base
+            to derive encryption keys. Please check your endpoint configuration.
+            """
+
+          key when is_binary(key) ->
+            key
+        end
+    end
   end
 end

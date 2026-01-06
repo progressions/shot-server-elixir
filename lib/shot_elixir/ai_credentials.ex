@@ -221,6 +221,37 @@ defmodule ShotElixir.AiCredentials do
   end
 
   @doc """
+  Batch checks if multiple user/provider pairs have credentials.
+
+  Returns a MapSet of {user_id, provider} tuples that have credentials.
+  Used to avoid N+1 queries when rendering campaign lists.
+
+  ## Examples
+
+      iex> check_credentials_batch([{user_id1, "grok"}, {user_id2, "openai"}])
+      #MapSet<[{user_id1, "grok"}]>
+  """
+  def check_credentials_batch(user_provider_pairs) when is_list(user_provider_pairs) do
+    if Enum.empty?(user_provider_pairs) do
+      MapSet.new()
+    else
+      # Build OR conditions for all pairs
+      conditions =
+        Enum.reduce(user_provider_pairs, dynamic(false), fn {user_id, provider}, acc ->
+          dynamic([c], ^acc or (c.user_id == ^user_id and c.provider == ^provider))
+        end)
+
+      existing =
+        AiCredential
+        |> where(^conditions)
+        |> select([c], {c.user_id, c.provider})
+        |> Repo.all()
+
+      MapSet.new(existing)
+    end
+  end
+
+  @doc """
   Updates the status of a credential.
 
   ## Examples

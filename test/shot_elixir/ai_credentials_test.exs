@@ -206,7 +206,8 @@ defmodule ShotElixir.AiCredentialsTest do
         AiCredentials.create_credential(%{
           "user_id" => user.id,
           "provider" => "gemini",
-          "access_token" => original_token
+          "access_token" => original_token,
+          "refresh_token" => "1//refresh-token"
         })
 
       assert AiCredentials.get_decrypted_access_token(credential) == {:ok, original_token}

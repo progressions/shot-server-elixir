@@ -62,9 +62,42 @@ defmodule ShotElixir.AiCredentials.AiCredential do
       name: :ai_credentials_user_id_provider_index,
       message: "has already been taken"
     )
+    |> validate_credentials_provided()
     |> encrypt_api_key()
     |> encrypt_access_token()
     |> encrypt_refresh_token()
+  end
+
+  # Validate that appropriate credentials are provided for the provider type
+  defp validate_credentials_provided(changeset) do
+    provider = get_field(changeset, :provider)
+    api_key = get_field(changeset, :api_key)
+    access_token = get_field(changeset, :access_token)
+    refresh_token = get_field(changeset, :refresh_token)
+
+    case provider do
+      provider when provider in ["grok", "openai"] ->
+        if is_nil(api_key) or api_key == "" do
+          add_error(changeset, :api_key, "is required for #{provider}")
+        else
+          changeset
+        end
+
+      "gemini" ->
+        cond do
+          is_nil(access_token) or access_token == "" ->
+            add_error(changeset, :access_token, "is required for gemini")
+
+          is_nil(refresh_token) or refresh_token == "" ->
+            add_error(changeset, :refresh_token, "is required for gemini")
+
+          true ->
+            changeset
+        end
+
+      _ ->
+        changeset
+    end
   end
 
   @doc """

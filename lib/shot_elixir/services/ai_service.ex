@@ -355,58 +355,12 @@ defmodule ShotElixir.Services.AiService do
   end
 
   # Get the campaign for an entity (used for image generation)
-  defp get_campaign_for_entity("Character", entity) do
-    case entity.campaign_id do
-      nil -> {:error, "Character has no campaign"}
-      campaign_id -> get_campaign_with_associations(campaign_id)
-    end
-  end
+  @campaign_entity_types ~w(Character Vehicle Party Faction Site Weapon Schtick Fight)
 
-  defp get_campaign_for_entity("Vehicle", entity) do
+  defp get_campaign_for_entity(entity_type, entity)
+       when entity_type in @campaign_entity_types do
     case entity.campaign_id do
-      nil -> {:error, "Vehicle has no campaign"}
-      campaign_id -> get_campaign_with_associations(campaign_id)
-    end
-  end
-
-  defp get_campaign_for_entity("Party", entity) do
-    case entity.campaign_id do
-      nil -> {:error, "Party has no campaign"}
-      campaign_id -> get_campaign_with_associations(campaign_id)
-    end
-  end
-
-  defp get_campaign_for_entity("Faction", entity) do
-    case entity.campaign_id do
-      nil -> {:error, "Faction has no campaign"}
-      campaign_id -> get_campaign_with_associations(campaign_id)
-    end
-  end
-
-  defp get_campaign_for_entity("Site", entity) do
-    case entity.campaign_id do
-      nil -> {:error, "Site has no campaign"}
-      campaign_id -> get_campaign_with_associations(campaign_id)
-    end
-  end
-
-  defp get_campaign_for_entity("Weapon", entity) do
-    case entity.campaign_id do
-      nil -> {:error, "Weapon has no campaign"}
-      campaign_id -> get_campaign_with_associations(campaign_id)
-    end
-  end
-
-  defp get_campaign_for_entity("Schtick", entity) do
-    case entity.campaign_id do
-      nil -> {:error, "Schtick has no campaign"}
-      campaign_id -> get_campaign_with_associations(campaign_id)
-    end
-  end
-
-  defp get_campaign_for_entity("Fight", entity) do
-    case entity.campaign_id do
-      nil -> {:error, "Fight has no campaign"}
+      nil -> {:error, "#{entity_type} has no campaign"}
       campaign_id -> get_campaign_with_associations(campaign_id)
     end
   end
