@@ -65,6 +65,119 @@ defmodule ShotElixir.Services.ImagekitService do
   end
 
   @doc """
+  Copies a file within ImageKit.
+
+  ## Parameters
+    - source_file_path: Full path to the source file in ImageKit
+    - destination_folder: Folder path to copy to
+
+  ## Returns
+    - {:ok, response_map} on success with new file_id, url, etc.
+    - {:error, reason} on failure
+  """
+  def copy_file(source_file_path, destination_folder) do
+    url = "#{@base_url}/files/copy"
+    headers = build_auth_headers()
+
+    body =
+      Jason.encode!(%{
+        "sourceFilePath" => source_file_path,
+        "destinationPath" => destination_folder,
+        "includeFileVersions" => false
+      })
+
+    case Req.post(url, headers: headers, body: body) do
+      {:ok, %{status: status, body: response}} when status in [200, 201] ->
+        {:ok, parse_upload_response(response)}
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("ImageKit copy failed with status #{status}: #{inspect(body)}")
+        {:error, "Copy failed with status #{status}"}
+
+      {:error, reason} = error ->
+        Logger.error("ImageKit copy request failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  @doc """
+  Deletes multiple files from ImageKit by file IDs.
+
+  ## Parameters
+    - file_ids: List of ImageKit file IDs to delete
+
+  ## Returns
+    - {:ok, deleted_ids} on success with list of deleted file IDs
+    - {:error, reason} on failure (if any file is not found, all fail)
+  """
+  def bulk_delete_files(file_ids) when is_list(file_ids) do
+    url = "#{@base_url}/files/batch/deleteByFileIds"
+    headers = build_auth_headers()
+
+    body = Jason.encode!(%{"fileIds" => file_ids})
+
+    case Req.post(url, headers: headers, body: body) do
+      {:ok, %{status: 200, body: response}} ->
+        {:ok, response["successfullyDeletedFileIds"] || []}
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("ImageKit bulk delete failed with status #{status}: #{inspect(body)}")
+        {:error, "Bulk delete failed with status #{status}"}
+
+      {:error, reason} = error ->
+        Logger.error("ImageKit bulk delete request failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  @doc """
+  Gets file details/metadata from ImageKit.
+
+  ## Parameters
+    - file_id: ImageKit file ID
+
+  ## Returns
+    - {:ok, details_map} on success with file metadata
+    - {:error, reason} on failure
+  """
+  def get_file_details(file_id) when is_binary(file_id) do
+    url = "#{@base_url}/files/#{file_id}/details"
+    headers = build_auth_headers()
+
+    case Req.get(url, headers: headers) do
+      {:ok, %{status: 200, body: response}} ->
+        {:ok, parse_file_details(response)}
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("ImageKit get details failed with status #{status}: #{inspect(body)}")
+        {:error, "Get details failed with status #{status}"}
+
+      {:error, reason} = error ->
+        Logger.error("ImageKit get details request failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  defp parse_file_details(response) do
+    %{
+      file_id: response["fileId"],
+      name: response["name"],
+      file_path: response["filePath"],
+      url: response["url"],
+      thumbnail_url: response["thumbnail"],
+      file_type: response["fileType"],
+      mime: response["mime"],
+      size: response["size"],
+      width: response["width"],
+      height: response["height"],
+      created_at: response["createdAt"],
+      updated_at: response["updatedAt"],
+      tags: response["tags"] || [],
+      metadata: response
+    }
+  end
+
+  @doc """
   Generates a CDN URL for a file with optional transformations.
 
   ## Parameters
