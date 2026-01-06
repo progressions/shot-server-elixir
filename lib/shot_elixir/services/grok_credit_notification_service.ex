@@ -121,7 +121,8 @@ defmodule ShotElixir.Services.GrokCreditNotificationService do
     job_args = %{
       "type" => "grok_credits_exhausted",
       "user_id" => user_id,
-      "campaign_id" => campaign.id
+      "campaign_id" => campaign.id,
+      "provider_name" => "Grok"
     }
 
     case job_args |> EmailWorker.new() |> Oban.insert() do
