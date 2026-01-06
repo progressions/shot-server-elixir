@@ -1,7 +1,12 @@
 defmodule ShotElixirWeb.Api.V2.CampaignView do
+  alias ShotElixir.AiCredentials
+
   def render("index.json", %{campaigns: campaigns, meta: meta}) do
+    # Batch-load credential checks to avoid N+1 queries
+    credential_lookup = build_credential_lookup(campaigns)
+
     %{
-      campaigns: Enum.map(campaigns, &render_campaign/1),
+      campaigns: Enum.map(campaigns, &render_campaign(&1, credential_lookup)),
       meta: meta
     }
   end
@@ -58,8 +63,25 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     }
   end
 
-  # Rails CampaignSerializer format
+  # Build a lookup set of {user_id, provider} pairs that have credentials
+  # Used by index.json to avoid N+1 queries
+  defp build_credential_lookup(campaigns) do
+    pairs =
+      campaigns
+      |> Enum.filter(& &1.ai_provider)
+      |> Enum.map(&{&1.user_id, &1.ai_provider})
+      |> Enum.uniq()
+
+    AiCredentials.check_credentials_batch(pairs)
+  end
+
+  # Rails CampaignSerializer format - single campaign (may do DB query for credential check)
   defp render_campaign(campaign) do
+    render_campaign(campaign, nil)
+  end
+
+  # Rails CampaignSerializer format - with optional precomputed credential lookup
+  defp render_campaign(campaign, credential_lookup) do
     alias ShotElixir.Campaigns.Campaign
 
     %{
@@ -93,8 +115,25 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       grok_credits_exhausted_at: campaign.grok_credits_exhausted_at,
       is_grok_credits_exhausted: Campaign.grok_credits_exhausted?(campaign),
       # AI generation toggle
-      ai_generation_enabled: campaign.ai_generation_enabled
+      ai_generation_enabled: campaign.ai_generation_enabled,
+      # AI provider configuration
+      ai_provider: campaign.ai_provider,
+      ai_provider_connected: has_ai_provider_credential?(campaign, credential_lookup)
     }
+  end
+
+  # Check if the campaign owner has a credential for the selected AI provider
+  # Uses precomputed lookup if available, otherwise queries the database
+  defp has_ai_provider_credential?(%{ai_provider: nil}, _credential_lookup), do: false
+
+  defp has_ai_provider_credential?(%{ai_provider: provider, user_id: user_id}, nil) do
+    # No lookup provided, fall back to database query
+    AiCredentials.has_credential?(user_id, provider)
+  end
+
+  defp has_ai_provider_credential?(%{ai_provider: provider, user_id: user_id}, credential_lookup) do
+    # Use precomputed lookup to avoid N+1 queries
+    MapSet.member?(credential_lookup, {user_id, provider})
   end
 
   defp render_campaign_detail(campaign) do

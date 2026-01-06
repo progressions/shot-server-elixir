@@ -32,6 +32,9 @@ defmodule ShotElixir.Campaigns.Campaign do
     # AI generation toggle
     field :ai_generation_enabled, :boolean, default: true
 
+    # AI provider selection (grok, openai, gemini, or nil)
+    field :ai_provider, :string
+
     belongs_to :user, ShotElixir.Accounts.User
 
     has_many :campaign_memberships, ShotElixir.Campaigns.CampaignMembership
@@ -54,6 +57,8 @@ defmodule ShotElixir.Campaigns.Campaign do
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 
+  @valid_ai_providers ["grok", "openai", "gemini"]
+
   def changeset(campaign, attrs) do
     campaign
     |> cast(attrs, [
@@ -71,9 +76,11 @@ defmodule ShotElixir.Campaigns.Campaign do
       :batch_images_completed,
       :grok_credits_exhausted_at,
       :grok_credits_exhausted_notified_at,
-      :ai_generation_enabled
+      :ai_generation_enabled,
+      :ai_provider
     ])
     |> validate_required([:name, :user_id])
+    |> validate_inclusion(:ai_provider, @valid_ai_providers ++ [nil])
     |> validate_unique_name_per_user()
     |> validate_only_one_master_template()
   end

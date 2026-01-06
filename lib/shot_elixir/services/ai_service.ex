@@ -2,11 +2,22 @@ defmodule ShotElixir.Services.AiService do
   @moduledoc """
   Service for AI-powered operations like image generation and attachment.
   Provides functionality to download and attach images from URLs to entities.
+
+  ## Provider Support
+  This service supports multiple AI providers through the Provider behaviour:
+    - `:grok` - xAI Grok API (default for legacy/fallback)
+    - `:openai` - OpenAI API
+    - `:gemini` - Google Gemini API
+
+  The provider is selected based on the campaign's `ai_provider` setting.
+  Each campaign owner stores their own credentials via the AiCredentials system.
   """
 
   require Logger
   alias ShotElixir.ActiveStorage
-  alias ShotElixir.Services.{ImageUploader, GrokService}
+  alias ShotElixir.Services.ImageUploader
+  alias ShotElixir.AI.Provider
+  alias ShotElixir.AiCredentials
   alias ShotElixir.Characters
   alias ShotElixir.Vehicles
   alias ShotElixir.Parties
@@ -34,8 +45,9 @@ defmodule ShotElixir.Services.AiService do
   """
   def generate_character(description, campaign_id) do
     with {:ok, campaign} <- get_campaign_with_associations(campaign_id),
+         {:ok, credential} <- get_credential_for_campaign(campaign),
          {:ok, prompt} <- build_character_prompt(description, campaign),
-         {:ok, json} <- send_request_with_retry(prompt, 1000, 3) do
+         {:ok, json} <- send_request_with_retry(credential, prompt, 1000, 3) do
       if valid_character_json?(json) do
         {:ok, json}
       else
@@ -56,8 +68,9 @@ defmodule ShotElixir.Services.AiService do
   """
   def extend_character(character_id) do
     with {:ok, character} <- get_character_with_campaign(character_id),
+         {:ok, credential} <- get_credential_for_campaign(character.campaign),
          {:ok, prompt} <- build_extend_character_prompt(character),
-         {:ok, json} <- send_request_with_retry(prompt, 1000, 3) do
+         {:ok, json} <- send_request_with_retry(credential, prompt, 1000, 3) do
       {:ok, json}
     end
   end
@@ -137,11 +150,11 @@ defmodule ShotElixir.Services.AiService do
   end
 
   @doc """
-  Generates AI images for an entity using Grok API.
+  Generates AI images for an entity using the configured AI provider.
   Returns a list of image URLs.
 
   ## Parameters
-    - entity_type: "Character" or "Vehicle"
+    - entity_type: "Character", "Vehicle", etc.
     - entity_id: UUID of the entity
     - num_images: Number of images to generate (default 3)
 
@@ -152,23 +165,41 @@ defmodule ShotElixir.Services.AiService do
   def generate_images_for_entity(entity_type, entity_id, num_images \\ 3) do
     Logger.info("Generating #{num_images} AI images for #{entity_type}:#{entity_id}")
 
+    # Get entity, campaign, credential, and prompt first
     with {:ok, entity} <- get_entity(entity_type, entity_id),
-         {:ok, prompt} <- build_image_prompt(entity),
-         {:ok, urls} <- GrokService.generate_image(prompt, num_images, "url") do
-      Logger.info("Successfully generated #{length(urls)} images")
-      {:ok, urls}
+         {:ok, campaign} <- get_campaign_for_entity(entity_type, entity),
+         {:ok, credential} <- get_credential_for_campaign(campaign),
+         {:ok, prompt} <- build_image_prompt(entity) do
+      # Now call generate_images with credential in scope for error handling
+      case Provider.generate_images(credential, prompt, num_images, response_format: "url") do
+        {:ok, urls} ->
+          # Handle single URL vs list
+          urls_list = if is_list(urls), do: urls, else: [urls]
+          Logger.info("Successfully generated #{length(urls_list)} images")
+          {:ok, urls_list}
+
+        {:error, :credit_exhausted, message} = error ->
+          Logger.error("AI API credits exhausted: #{message}")
+          # Mark the credential as suspended so user knows they need to update billing
+          mark_credential_suspended(credential, message)
+          error
+
+        {:error, :rate_limited, message} ->
+          Logger.warning("AI API rate limited: #{message}")
+          {:error, :rate_limited, message}
+
+        {:error, :server_error, message} ->
+          Logger.error("AI API server error: #{message}")
+          {:error, :server_error, message}
+
+        {:error, reason} = error ->
+          Logger.error("Failed to generate images: #{inspect(reason)}")
+          error
+      end
     else
-      {:error, :credit_exhausted, message} = error ->
-        Logger.error("Grok API credits exhausted: #{message}")
-        error
-
-      {:error, :rate_limited, message} ->
-        Logger.warning("Grok API rate limited: #{message}")
-        {:error, :rate_limited, message}
-
-      {:error, :server_error, message} ->
-        Logger.error("Grok API server error: #{message}")
-        {:error, :server_error, message}
+      {:error, :no_credential} ->
+        Logger.error("No AI credential configured for campaign")
+        {:error, "No AI provider configured for this campaign"}
 
       {:error, reason} = error ->
         Logger.error("Failed to generate images: #{inspect(reason)}")
@@ -318,13 +349,33 @@ defmodule ShotElixir.Services.AiService do
     end
   end
 
-  # Send request with retry logic
-  defp send_request_with_retry(prompt, max_tokens, max_retries) do
-    do_send_request_with_retry(prompt, max_tokens, max_retries, 0)
+  # Get the AI credential for a campaign based on its ai_provider setting
+  defp get_credential_for_campaign(campaign) do
+    AiCredentials.get_credential_for_campaign(campaign)
   end
 
-  defp do_send_request_with_retry(prompt, max_tokens, max_retries, retry_count) do
-    case GrokService.send_request(prompt, max_tokens) do
+  # Get the campaign for an entity (used for image generation)
+  @campaign_entity_types ~w(Character Vehicle Party Faction Site Weapon Schtick Fight)
+
+  defp get_campaign_for_entity(entity_type, entity)
+       when entity_type in @campaign_entity_types do
+    case entity.campaign_id do
+      nil -> {:error, "#{entity_type} has no campaign"}
+      campaign_id -> get_campaign_with_associations(campaign_id)
+    end
+  end
+
+  defp get_campaign_for_entity(entity_type, _entity) do
+    {:error, "Cannot determine campaign for entity type: #{entity_type}"}
+  end
+
+  # Send request with retry logic
+  defp send_request_with_retry(credential, prompt, max_tokens, max_retries) do
+    do_send_request_with_retry(credential, prompt, max_tokens, max_retries, 0)
+  end
+
+  defp do_send_request_with_retry(credential, prompt, max_tokens, max_retries, retry_count) do
+    case Provider.send_chat_request(credential, prompt, max_tokens: max_tokens) do
       {:ok, response} ->
         case parse_character_response(response) do
           {:ok, json} ->
@@ -338,11 +389,28 @@ defmodule ShotElixir.Services.AiService do
 
             new_max_tokens = max_tokens + 1024
             Logger.info("Retrying with increased max_tokens: #{new_max_tokens}")
-            do_send_request_with_retry(prompt, new_max_tokens, max_retries, retry_count + 1)
+
+            do_send_request_with_retry(
+              credential,
+              prompt,
+              new_max_tokens,
+              max_retries,
+              retry_count + 1
+            )
 
           {:error, reason} ->
             {:error, "Failed after #{retry_count + 1} attempts: #{inspect(reason)}"}
         end
+
+      {:error, :credit_exhausted, message} ->
+        Logger.error("AI API credits exhausted: #{message}")
+        # Mark the credential as suspended so user knows they need to update billing
+        mark_credential_suspended(credential, message)
+        {:error, :credit_exhausted, message}
+
+      {:error, :rate_limited, message} ->
+        Logger.warning("AI API rate limited: #{message}")
+        {:error, :rate_limited, message}
 
       {:error, reason} ->
         Logger.warning(
@@ -509,5 +577,18 @@ defmodule ShotElixir.Services.AiService do
     """
 
     {:ok, prompt}
+  end
+
+  # Helper to mark a credential as suspended due to billing issues
+  defp mark_credential_suspended(credential, message) do
+    case AiCredentials.mark_suspended(credential, message) do
+      {:ok, _credential} ->
+        Logger.info("Credential #{credential.id} marked as suspended: #{message}")
+        :ok
+
+      {:error, changeset} ->
+        Logger.error("Failed to mark credential as suspended: #{inspect(changeset)}")
+        :error
+    end
   end
 end
