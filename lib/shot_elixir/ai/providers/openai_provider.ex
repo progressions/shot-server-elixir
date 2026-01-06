@@ -153,7 +153,7 @@ defmodule ShotElixir.AI.Providers.OpenAIProvider do
   end
 
   @impl true
-  def validate_credential(%AiCredential{provider: :openai} = credential) do
+  def validate_credential(%AiCredential{provider: "openai"} = credential) do
     case AiCredentials.get_decrypted_api_key(credential) do
       {:ok, key} when is_binary(key) and byte_size(key) > 0 ->
         {:ok, credential}

@@ -108,7 +108,7 @@ defmodule ShotElixir.AI.Providers.GrokProvider do
   end
 
   @impl true
-  def validate_credential(%AiCredential{provider: :grok} = credential) do
+  def validate_credential(%AiCredential{provider: "grok"} = credential) do
     # For API key providers, check if we can decrypt the key
     case AiCredentials.get_decrypted_api_key(credential) do
       {:ok, key} when is_binary(key) and byte_size(key) > 0 ->

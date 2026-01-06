@@ -115,7 +115,7 @@ defmodule ShotElixir.AI.Providers.GeminiProvider do
   end
 
   @impl true
-  def validate_credential(%AiCredential{provider: :gemini} = credential) do
+  def validate_credential(%AiCredential{provider: "gemini"} = credential) do
     case credential.token_expires_at do
       nil ->
         # No expiration set - check if we have tokens
