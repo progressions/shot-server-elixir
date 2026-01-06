@@ -28,8 +28,21 @@ defmodule ShotElixirWeb.GoogleOAuthController do
   @doc """
   Initiates the Google OAuth flow.
 
-  Requires `user_id` query parameter to associate the credential with the user.
+  Requires `user_id` query parameter (UUID) to associate the credential with the user.
   Redirects to Google's OAuth consent screen.
+
+  ## Security Notes
+
+  This endpoint is exposed as an unauthenticated route so users can start the OAuth
+  flow from the frontend settings page. The `user_id` must be a valid UUID of an
+  existing user in the database.
+
+  The frontend is responsible for ensuring that:
+  - Only authenticated users can trigger this endpoint
+  - The `user_id` comes from the authenticated session, not user input
+
+  The `state` parameter is HMAC-signed with a timestamp to prevent CSRF attacks
+  and replay attacks (valid for 10 minutes).
   """
   def authorize(conn, %{"user_id" => user_id}) do
     state = generate_state(user_id)
@@ -52,11 +65,13 @@ defmodule ShotElixirWeb.GoogleOAuthController do
   end
 
   def authorize(conn, _params) do
-    Logger.warning("GoogleOAuth: Missing user_id parameter")
+    Logger.warning(
+      "GoogleOAuth: Missing or invalid user_id query parameter; expected user_id as a UUID"
+    )
 
     conn
     |> put_status(:bad_request)
-    |> json(%{error: "Missing user_id parameter"})
+    |> json(%{error: "user_id query parameter is required and must be a valid UUID"})
   end
 
   @doc """
@@ -110,7 +125,8 @@ defmodule ShotElixirWeb.GoogleOAuthController do
 
   defp verify_state(state) do
     with {:ok, decoded} <- Base.url_decode64(state),
-         [user_id, timestamp_str, signature] <- String.split(decoded, ":"),
+         # Use parts: 3 to handle user_ids that might contain colons (future-proofing)
+         [user_id, timestamp_str, signature] <- String.split(decoded, ":", parts: 3),
          {timestamp, ""} <- Integer.parse(timestamp_str),
          true <- valid_timestamp?(timestamp),
          true <- valid_signature?(user_id, timestamp_str, signature) do
@@ -205,6 +221,15 @@ defmodule ShotElixirWeb.GoogleOAuthController do
   end
 
   # Configuration helpers
+  #
+  # OAuth credentials are loaded in this order of precedence:
+  # 1. Application config (:shot_elixir, :google_oauth, :client_id/:client_secret)
+  # 2. Environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+  #
+  # For security, client_id and client_secret should always come from environment
+  # variables in production (never committed to source control).
+  # The callback_url and frontend_url can be set in config files since they're
+  # not sensitive.
 
   defp google_client_id do
     config = Application.get_env(:shot_elixir, :google_oauth) || []
