@@ -16,6 +16,7 @@ defmodule ShotElixirWeb.Router do
       origin: [
         "http://localhost:3001",
         "http://localhost:3000",
+        "https://chiwar.net",
         "https://shot-client-phoenix.fly.dev",
         "https://shot-client-next.fly.dev"
       ]
@@ -30,6 +31,14 @@ defmodule ShotElixirWeb.Router do
   scope "/", ShotElixirWeb do
     pipe_through :api
     get "/health", HealthController, :show
+  end
+
+  # Google OAuth endpoints (public - initiates OAuth flow)
+  scope "/auth", ShotElixirWeb do
+    pipe_through :api
+
+    get "/google", GoogleOAuthController, :authorize
+    get "/google/callback", GoogleOAuthController, :callback
   end
 
   # Authentication endpoints (Devise compatible)

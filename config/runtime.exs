@@ -150,4 +150,11 @@ if config_env() == :prod do
 
   # Frontend URL for magic links in production
   config :shot_elixir, :frontend_url, "https://chiwar.net"
+
+  # Google OAuth configuration for Gemini AI provider
+  # Client ID and secret are loaded from environment variables in the controller
+  # This config provides the callback URL and frontend URL for redirects
+  config :shot_elixir, :google_oauth,
+    callback_url: "https://shot-elixir.fly.dev/auth/google/callback",
+    frontend_url: "https://chiwar.net"
 end

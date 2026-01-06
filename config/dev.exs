@@ -101,3 +101,9 @@ config :shot_elixir, :frontend_url, "http://localhost:3001"
 #   and origin differ (localhost vs chiwar.net)
 config :shot_elixir, :webauthn_origin, "http://localhost:3001"
 config :shot_elixir, :webauthn_rp_id, "localhost"
+
+# Google OAuth configuration for Gemini AI provider (development)
+# Client ID and secret are loaded from environment variables (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
+config :shot_elixir, :google_oauth,
+  callback_url: "http://localhost:4002/auth/google/callback",
+  frontend_url: "http://localhost:3001"
