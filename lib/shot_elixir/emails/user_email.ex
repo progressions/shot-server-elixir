@@ -149,18 +149,24 @@ defmodule ShotElixir.Emails.UserEmail do
   end
 
   @doc """
-  Notification email when Grok API credits are exhausted.
+  Notification email when AI provider credits are exhausted.
   Informs the user that AI image generation is temporarily unavailable.
+
+  ## Parameters
+    - user: The user to notify
+    - campaign: The campaign affected
+    - provider_name: The name of the AI provider (e.g., "Grok", "OpenAI")
   """
-  def grok_credits_exhausted(user, campaign) do
+  def grok_credits_exhausted(user, campaign, provider_name \\ "Grok") do
     new()
     |> to({user.first_name || user.email, user.email})
     |> from({@from_name, @from_email})
-    |> subject("AI Image Generation Unavailable - Credits Exhausted")
+    |> subject("AI Image Generation Unavailable - #{provider_name} Credits Exhausted")
     |> html_body(
       render_template("grok_credits_exhausted.html", %{
         user: user,
-        campaign: campaign
+        campaign: campaign,
+        provider_name: provider_name
       })
     )
   end

@@ -7,7 +7,7 @@
       <strong><%= Phoenix.HTML.html_escape(@campaign.name) %></strong> is temporarily unavailable.
     </p>
     <p style="font-size: 16px; line-height: 1.6; color: #444;">
-      The Grok API credits have been exhausted. This affects:
+      The <%= Phoenix.HTML.html_escape(@provider_name) %> API credits have been exhausted. This affects:
     </p>
     <ul style="font-size: 16px; line-height: 1.6; color: #444;">
       <li>Generating images for individual characters, sites, factions, etc.</li>
