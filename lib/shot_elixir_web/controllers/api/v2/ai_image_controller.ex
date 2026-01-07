@@ -3,7 +3,7 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
-  alias ShotElixir.Services.GrokCreditNotificationService
+  alias ShotElixir.Services.AiCreditNotificationService
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -59,6 +59,9 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
 
                       user_id = current_user.id
 
+                      # Capture provider for use in background task
+                      ai_provider = campaign.ai_provider || "grok"
+
                       Task.start(fn ->
                         case ShotElixir.Services.AiService.generate_images_for_entity(
                                entity_class,
@@ -77,10 +80,11 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                             )
 
                           {:error, :credit_exhausted, message} ->
-                            # Handle credit exhaustion - notify user
-                            GrokCreditNotificationService.handle_credit_exhaustion(
+                            # Handle credit exhaustion - notify user with provider info
+                            AiCreditNotificationService.handle_credit_exhaustion(
                               campaign_id,
-                              user_id
+                              user_id,
+                              ai_provider
                             )
 
                             ShotElixirWeb.CampaignChannel.broadcast_ai_image_status(

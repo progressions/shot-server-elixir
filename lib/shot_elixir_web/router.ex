@@ -110,7 +110,7 @@ defmodule ShotElixirWeb.Router do
       post "/members", CampaignController, :add_member
       delete "/members/:user_id", CampaignController, :remove_member
       post "/generate_batch_images", CampaignController, :generate_batch_images
-      post "/reset_grok_credits", CampaignController, :reset_grok_credits
+      post "/reset_ai_credits", CampaignController, :reset_ai_credits
     end
 
     post "/campaigns/current", CampaignController, :set_current
