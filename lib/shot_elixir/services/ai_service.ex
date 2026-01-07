@@ -354,11 +354,37 @@ defmodule ShotElixir.Services.AiService do
     end
   end
 
+  defp get_entity("Campaign", entity_id) do
+    case Campaigns.get_campaign(entity_id) do
+      nil -> {:error, "Campaign not found"}
+      campaign -> {:ok, campaign}
+    end
+  end
+
   defp get_entity(entity_type, _entity_id) do
     {:error, "Unsupported entity type: #{entity_type}"}
   end
 
   # Build image generation prompt from entity
+  # Campaign-specific prompt building
+  defp build_image_prompt(%ShotElixir.Campaigns.Campaign{} = campaign) do
+    prompt =
+      cond do
+        # Use description if available
+        is_binary(campaign.description) && campaign.description != "" ->
+          "Generate a dramatic, cinematic image representing a role-playing game campaign: #{campaign.description}"
+
+        # Fallback to name-based prompt
+        is_binary(campaign.name) && campaign.name != "" ->
+          "Generate a dramatic, cinematic image for a role-playing game campaign called '#{campaign.name}'. The image should evoke action, adventure, and intrigue suitable for a Hong Kong action movie style RPG."
+
+        true ->
+          "Generate a dramatic, cinematic image for a role-playing game campaign with Hong Kong action movie style themes of martial arts, gunfights, and supernatural action."
+      end
+
+    {:ok, prompt}
+  end
+
   defp build_image_prompt(entity) do
     prompt =
       cond do
@@ -453,6 +479,12 @@ defmodule ShotElixir.Services.AiService do
       nil -> {:error, "#{entity_type} has no campaign"}
       campaign_id -> get_campaign_with_associations(campaign_id)
     end
+  end
+
+  # For Campaign entities, the entity IS the campaign
+  defp get_campaign_for_entity("Campaign", campaign) do
+    # Re-fetch with associations to ensure we have the owner for credentials
+    get_campaign_with_associations(campaign.id)
   end
 
   defp get_campaign_for_entity(entity_type, _entity) do

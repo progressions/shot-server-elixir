@@ -416,6 +416,20 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
     end
   end
 
+  defp get_entity("Campaign", entity_id, campaign_id) do
+    import Ecto.Query
+
+    # For Campaign entities, entity_id must match campaign_id
+    query =
+      from c in ShotElixir.Campaigns.Campaign,
+        where: c.id == ^entity_id and c.id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      campaign -> {:ok, campaign}
+    end
+  end
+
   defp get_entity(_, _, _), do: {:error, :not_found}
 
   # Pluralize entity class names for Rails-compatible broadcast keys
@@ -535,6 +549,18 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
       campaign_id: fight.campaign_id,
       created_at: fight.created_at,
       updated_at: fight.updated_at
+    }
+  end
+
+  defp serialize_entity("Campaign", campaign) do
+    %{
+      id: campaign.id,
+      entity_class: "Campaign",
+      active: campaign.active,
+      name: campaign.name,
+      description: campaign.description,
+      created_at: campaign.created_at,
+      updated_at: campaign.updated_at
     }
   end
 
