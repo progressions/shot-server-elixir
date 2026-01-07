@@ -25,9 +25,13 @@ defmodule ShotElixir.Campaigns.Campaign do
     field :batch_images_total, :integer, default: 0
     field :batch_images_completed, :integer, default: 0
 
-    # Grok API credit exhaustion tracking
+    # Grok API credit exhaustion tracking (legacy - kept for backward compatibility)
     field :grok_credits_exhausted_at, :utc_datetime
     field :grok_credits_exhausted_notified_at, :utc_datetime
+
+    # Provider-agnostic AI credit exhaustion tracking
+    field :ai_credits_exhausted_at, :utc_datetime
+    field :ai_credits_exhausted_provider, :string
 
     # AI generation toggle
     field :ai_generation_enabled, :boolean, default: true
@@ -76,6 +80,8 @@ defmodule ShotElixir.Campaigns.Campaign do
       :batch_images_completed,
       :grok_credits_exhausted_at,
       :grok_credits_exhausted_notified_at,
+      :ai_credits_exhausted_at,
+      :ai_credits_exhausted_provider,
       :ai_generation_enabled,
       :ai_provider
     ])
@@ -107,11 +113,22 @@ defmodule ShotElixir.Campaigns.Campaign do
 
   @doc """
   Returns true if Grok API credits were exhausted within the last 24 hours.
+  Legacy function - kept for backward compatibility.
   """
   @credit_exhausted_window_hours 24
   def grok_credits_exhausted?(%__MODULE__{grok_credits_exhausted_at: nil}), do: false
 
   def grok_credits_exhausted?(%__MODULE__{grok_credits_exhausted_at: exhausted_at}) do
+    hours_since = DateTime.diff(DateTime.utc_now(), exhausted_at, :hour)
+    hours_since < @credit_exhausted_window_hours
+  end
+
+  @doc """
+  Returns true if any AI provider's credits were exhausted within the last 24 hours.
+  """
+  def ai_credits_exhausted?(%__MODULE__{ai_credits_exhausted_at: nil}), do: false
+
+  def ai_credits_exhausted?(%__MODULE__{ai_credits_exhausted_at: exhausted_at}) do
     hours_since = DateTime.diff(DateTime.utc_now(), exhausted_at, :hour)
     hours_since < @credit_exhausted_window_hours
   end
