@@ -48,7 +48,7 @@ defmodule ShotElixir.Notion do
         Phoenix.PubSub.broadcast(
           ShotElixir.PubSub,
           "campaign:#{character.campaign_id}",
-          {:campaign_broadcast, %{notion_sync_logs: "reload", character_id: character_id}}
+          {:campaign_broadcast, %{notion_sync_logs: "reload"}}
         )
     end
   end
