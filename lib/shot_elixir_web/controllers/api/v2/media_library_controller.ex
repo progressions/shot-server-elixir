@@ -7,7 +7,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   use ShotElixirWeb, :controller
 
   alias ShotElixir.Media
-  alias ShotElixir.Media.AiGeneratedImage
+  alias ShotElixir.Media.MediaImage
   alias ShotElixir.Guardian
   alias ShotElixir.Campaigns
 
@@ -18,6 +18,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
 
   ## Query Parameters
     - status: "orphan", "attached", or "all" (default: "all")
+    - source: "upload", "ai_generated", or "all" (default: "all")
     - entity_type: Filter by entity type (e.g., "Character")
     - page: Page number (default: 1)
     - per_page: Items per page (default: 50)
@@ -45,7 +46,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   def show(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %AiGeneratedImage{} = image <- Media.get_image(id),
+    with %MediaImage{} = image <- Media.get_image(id),
          :ok <- authorize_image_access(image, current_user) do
       conn
       |> put_view(ShotElixirWeb.Api.V2.MediaLibraryView)
@@ -63,7 +64,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   def delete(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %AiGeneratedImage{} = image <- Media.get_image(id),
+    with %MediaImage{} = image <- Media.get_image(id),
          :ok <- authorize_image_access(image, current_user),
          :ok <- require_gamemaster(current_user, image.campaign_id),
          {:ok, _deleted} <- Media.delete_image(image) do
@@ -114,7 +115,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   def duplicate(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %AiGeneratedImage{} = image <- Media.get_image(id),
+    with %MediaImage{} = image <- Media.get_image(id),
          :ok <- authorize_image_access(image, current_user),
          :ok <- require_gamemaster(current_user, image.campaign_id),
          {:ok, new_image} <- Media.duplicate_image(image) do
@@ -139,7 +140,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   def attach(conn, %{"id" => id, "entity_type" => entity_type, "entity_id" => entity_id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %AiGeneratedImage{} = image <- Media.get_image(id),
+    with %MediaImage{} = image <- Media.get_image(id),
          :ok <- authorize_image_access(image, current_user),
          :ok <- require_gamemaster(current_user, image.campaign_id),
          :ok <- validate_entity_type(entity_type),
@@ -178,7 +179,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   def download(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %AiGeneratedImage{} = image <- Media.get_image(id),
+    with %MediaImage{} = image <- Media.get_image(id),
          :ok <- authorize_image_access(image, current_user) do
       conn
       |> put_status(:ok)
@@ -194,7 +195,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
 
   # Authorization helpers
 
-  defp authorize_image_access(%AiGeneratedImage{campaign_id: campaign_id}, current_user) do
+  defp authorize_image_access(%MediaImage{campaign_id: campaign_id}, current_user) do
     user_campaigns = Campaigns.get_user_campaigns(current_user.id)
 
     if Enum.any?(user_campaigns, fn c -> c.id == campaign_id end) do
@@ -220,7 +221,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
     images = Enum.map(ids, &Media.get_image/1)
 
     if Enum.all?(images, fn
-         %AiGeneratedImage{campaign_id: ^campaign_id} -> true
+         %MediaImage{campaign_id: ^campaign_id} -> true
          _ -> false
        end) do
       :ok
@@ -230,7 +231,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   end
 
   defp validate_entity_type(entity_type) do
-    if entity_type in AiGeneratedImage.valid_entity_types() do
+    if entity_type in MediaImage.valid_entity_types() do
       :ok
     else
       {:error, :invalid_entity_type}

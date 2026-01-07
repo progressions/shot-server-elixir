@@ -1,27 +1,29 @@
 defmodule ShotElixir.Media do
   @moduledoc """
-  The Media context for managing AI-generated images and the media library.
+  The Media context for managing the media library.
+  Tracks all images including manually uploaded and AI-generated images.
   """
 
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
-  alias ShotElixir.Media.AiGeneratedImage
+  alias ShotElixir.Media.MediaImage
   alias ShotElixir.Services.ImagekitService
   alias ShotElixir.ActiveStorage
 
   @doc """
-  Lists all images for a campaign, including both entity-attached images and orphan AI images.
+  Lists all images for a campaign with optional filtering.
 
   ## Parameters
     - campaign_id: UUID of the campaign
     - params: Map with optional filters:
       - "status" - "orphan", "attached", or "all" (default: "all")
+      - "source" - "upload", "ai_generated", or "all" (default: "all")
       - "entity_type" - Filter by entity type (e.g., "Character")
       - "page" - Page number (default: 1)
       - "per_page" - Items per page (default: 50)
 
   ## Returns
-    %{images: [%AiGeneratedImage{}], meta: %{total: n, page: n, per_page: n}}
+    %{images: [%MediaImage{}], meta: %{...}, stats: %{...}}
   """
   def list_campaign_images(campaign_id, params \\ %{}) do
     per_page = get_int_param(params, "per_page", 50)
@@ -30,7 +32,7 @@ defmodule ShotElixir.Media do
 
     # Base query
     query =
-      from i in AiGeneratedImage,
+      from i in MediaImage,
         where: i.campaign_id == ^campaign_id,
         order_by: [desc: i.inserted_at]
 
@@ -39,6 +41,14 @@ defmodule ShotElixir.Media do
       case params["status"] do
         "orphan" -> from i in query, where: i.status == "orphan"
         "attached" -> from i in query, where: i.status == "attached"
+        _ -> query
+      end
+
+    # Apply source filter
+    query =
+      case params["source"] do
+        "upload" -> from i in query, where: i.source == "upload"
+        "ai_generated" -> from i in query, where: i.source == "ai_generated"
         _ -> query
       end
 
@@ -66,7 +76,7 @@ defmodule ShotElixir.Media do
     %{
       images: images,
       meta: %{
-        total: total,
+        total_count: total,
         page: page,
         per_page: per_page,
         total_pages: ceil(total / per_page)
@@ -79,16 +89,24 @@ defmodule ShotElixir.Media do
   Gets stats for all images in a campaign.
   """
   def get_campaign_stats(campaign_id) do
-    query = from i in AiGeneratedImage, where: i.campaign_id == ^campaign_id
+    query = from i in MediaImage, where: i.campaign_id == ^campaign_id
 
-    total_count = Repo.aggregate(query, :count, :id)
+    total = Repo.aggregate(query, :count, :id)
 
-    orphan_count =
+    orphan =
       from(i in query, where: i.status == "orphan")
       |> Repo.aggregate(:count, :id)
 
-    attached_count =
+    attached =
       from(i in query, where: i.status == "attached")
+      |> Repo.aggregate(:count, :id)
+
+    uploaded =
+      from(i in query, where: i.source == "upload")
+      |> Repo.aggregate(:count, :id)
+
+    ai_generated =
+      from(i in query, where: i.source == "ai_generated")
       |> Repo.aggregate(:count, :id)
 
     total_size =
@@ -96,76 +114,106 @@ defmodule ShotElixir.Media do
       |> Repo.aggregate(:sum, :byte_size) || 0
 
     %{
-      total_count: total_count,
-      orphan_count: orphan_count,
-      attached_count: attached_count,
+      total: total,
+      orphan: orphan,
+      attached: attached,
+      uploaded: uploaded,
+      ai_generated: ai_generated,
       total_size_bytes: total_size
     }
   end
 
   @doc """
-  Gets a single AI-generated image by ID.
+  Gets a single media image by ID.
   """
   def get_image(id) do
-    Repo.get(AiGeneratedImage, id)
+    Repo.get(MediaImage, id)
   end
 
   @doc """
-  Gets a single AI-generated image by ID.
+  Gets a single media image by ID.
   Raises if not found.
   """
   def get_image!(id) do
-    Repo.get!(AiGeneratedImage, id)
+    Repo.get!(MediaImage, id)
   end
 
   @doc """
-  Finds an AI-generated image by ImageKit file ID.
+  Finds a media image by ImageKit file ID.
   """
   def get_image_by_imagekit_id(imagekit_file_id) do
-    Repo.get_by(AiGeneratedImage, imagekit_file_id: imagekit_file_id)
+    Repo.get_by(MediaImage, imagekit_file_id: imagekit_file_id)
   end
 
   @doc """
-  Finds an AI-generated image by ImageKit URL.
+  Finds a media image by ImageKit URL.
   """
   def get_image_by_url(imagekit_url) do
-    Repo.get_by(AiGeneratedImage, imagekit_url: imagekit_url)
+    Repo.get_by(MediaImage, imagekit_url: imagekit_url)
   end
 
   @doc """
-  Creates a new AI-generated image record.
-
-  ## Parameters
-    attrs - Map containing:
-      - campaign_id (required)
-      - imagekit_file_id (required)
-      - imagekit_url (required)
-      - imagekit_file_path
-      - filename
-      - content_type
-      - byte_size
-      - width
-      - height
-      - prompt
-      - ai_provider
-      - generated_by_id
+  Finds a media image by ActiveStorage blob ID.
   """
-  def create_ai_image(attrs) do
-    %AiGeneratedImage{}
-    |> AiGeneratedImage.changeset(attrs)
+  def get_image_by_blob_id(blob_id) do
+    Repo.get_by(MediaImage, active_storage_blob_id: blob_id)
+  end
+
+  @doc """
+  Creates a new media image record for an uploaded image.
+  """
+  def create_uploaded_image(attrs) do
+    attrs = Map.put(attrs, :source, "upload")
+
+    %MediaImage{}
+    |> MediaImage.changeset(attrs)
     |> Repo.insert()
   end
 
   @doc """
+  Creates a new media image record for an AI-generated image.
+  """
+  def create_ai_image(attrs) do
+    attrs = Map.put(attrs, :source, "ai_generated")
+
+    %MediaImage{}
+    |> MediaImage.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Creates or updates a media image record (generic, source must be specified in attrs).
+  If an image with the same imagekit_file_id already exists, it will be updated.
+  """
+  def create_image(attrs) do
+    # Check if image already exists by imagekit_file_id
+    imagekit_file_id = attrs[:imagekit_file_id] || attrs["imagekit_file_id"]
+
+    case get_image_by_imagekit_id(imagekit_file_id) do
+      nil ->
+        # Create new record
+        %MediaImage{}
+        |> MediaImage.changeset(attrs)
+        |> Repo.insert()
+
+      existing_image ->
+        # Update existing record (e.g., when attaching an orphan)
+        existing_image
+        |> MediaImage.changeset(attrs)
+        |> Repo.update()
+    end
+  end
+
+  @doc """
   Attaches an orphan image to an entity.
-  Updates the ai_generated_image record and creates ActiveStorage records.
+  Updates the media_image record and creates ActiveStorage records.
 
   ## Parameters
-    - image: AiGeneratedImage struct or ID
+    - image: MediaImage struct or ID
     - entity_type: "Character", "Vehicle", etc.
     - entity_id: UUID of the entity
   """
-  def attach_to_entity(%AiGeneratedImage{} = image, entity_type, entity_id) do
+  def attach_to_entity(%MediaImage{} = image, entity_type, entity_id) do
     # Build upload_result compatible with ActiveStorage.attach_image
     upload_result = %{
       file_id: image.imagekit_file_id,
@@ -177,13 +225,17 @@ defmodule ShotElixir.Media do
       }
     }
 
-    # Create ActiveStorage attachment
-    case ActiveStorage.attach_image(entity_type, entity_id, upload_result) do
+    # Create ActiveStorage attachment - the attach_image function will also
+    # update the existing media_image record via create_image (upsert)
+    opts = [
+      source: image.source,
+      campaign_id: image.campaign_id
+    ]
+
+    case ActiveStorage.attach_image(entity_type, entity_id, upload_result, opts) do
       {:ok, _attachment} ->
-        # Update the ai_generated_image record
-        image
-        |> AiGeneratedImage.attach_changeset(entity_type, entity_id)
-        |> Repo.update()
+        # Return the updated image (re-fetch to get updated blob_id)
+        {:ok, get_image(image.id)}
 
       {:error, _} = error ->
         error
@@ -198,10 +250,10 @@ defmodule ShotElixir.Media do
   end
 
   @doc """
-  Deletes an AI-generated image.
+  Deletes a media image.
   Removes from database, ImageKit, and un-associates from entity if attached.
   """
-  def delete_image(%AiGeneratedImage{} = image) do
+  def delete_image(%MediaImage{} = image) do
     # If attached, delete from ActiveStorage first
     if image.status == "attached" && image.entity_type && image.entity_id do
       ActiveStorage.delete_image(image.entity_type, image.entity_id)
@@ -228,51 +280,66 @@ defmodule ShotElixir.Media do
 
   @doc """
   Bulk deletes multiple images.
-  Returns {:ok, %{deleted: count, failed: count}}
+  Returns {:ok, %{deleted: [ids], failed: [ids]}}
   """
   def bulk_delete_images(image_ids) when is_list(image_ids) do
     results =
       Enum.map(image_ids, fn id ->
         case delete_image(id) do
-          {:ok, _} -> :ok
-          {:error, _} -> :error
+          {:ok, _} -> {:ok, id}
+          {:error, _} -> {:error, id}
         end
       end)
 
-    deleted = Enum.count(results, &(&1 == :ok))
-    failed = Enum.count(results, &(&1 == :error))
+    deleted =
+      Enum.filter(results, fn {status, _} -> status == :ok end) |> Enum.map(fn {_, id} -> id end)
+
+    failed =
+      Enum.filter(results, fn {status, _} -> status == :error end)
+      |> Enum.map(fn {_, id} -> id end)
 
     {:ok, %{deleted: deleted, failed: failed}}
   end
 
   @doc """
   Duplicates an image within ImageKit and creates a new database record.
+  The duplicate is always created as an orphan.
   """
-  def duplicate_image(%AiGeneratedImage{} = image) do
-    # Copy in ImageKit
-    source_path = image.imagekit_file_path || extract_path_from_url(image.imagekit_url)
-    destination_folder = Path.dirname(source_path)
+  def duplicate_image(%MediaImage{} = image) do
+    # Always extract folder from URL since imagekit_file_path may be just the filename
+    source_path = extract_path_from_url(image.imagekit_url)
+    # Upload API expects folder without leading slash
+    folder = Path.dirname(source_path) |> strip_leading_slash()
 
-    case ImagekitService.copy_file(source_path, destination_folder) do
-      {:ok, copy_result} ->
-        # Create new record for the copy
+    # Upload from the original URL to create a copy with a unique filename
+    upload_options = %{
+      folder: folder,
+      file_name: image.filename || "duplicate.jpg",
+      use_unique_file_name: true
+    }
+
+    case ImagekitService.upload_from_url(image.imagekit_url, upload_options) do
+      {:ok, upload_result} ->
+        # Create new record for the copy (always orphan)
         attrs = %{
           campaign_id: image.campaign_id,
+          source: image.source,
           status: "orphan",
-          imagekit_file_id: copy_result.file_id,
-          imagekit_url: copy_result.url,
-          imagekit_file_path: copy_result.name,
-          filename: copy_result.metadata["name"] || image.filename,
+          imagekit_file_id: upload_result.file_id,
+          imagekit_url: upload_result.url,
+          imagekit_file_path: upload_result.name,
+          filename: upload_result.metadata["name"] || image.filename,
           content_type: image.content_type,
-          byte_size: copy_result.size || image.byte_size,
-          width: copy_result.width || image.width,
-          height: copy_result.height || image.height,
+          byte_size: upload_result.size || image.byte_size,
+          width: upload_result.width || image.width,
+          height: upload_result.height || image.height,
           prompt: image.prompt,
           ai_provider: image.ai_provider,
-          generated_by_id: image.generated_by_id
+          generated_by_id: image.generated_by_id,
+          uploaded_by_id: image.uploaded_by_id
         }
 
-        create_ai_image(attrs)
+        create_image(attrs)
 
       {:error, _} = error ->
         error
@@ -289,14 +356,18 @@ defmodule ShotElixir.Media do
   # Helper to extract path from full ImageKit URL
   defp extract_path_from_url(url) when is_binary(url) do
     # URL format: https://ik.imagekit.io/nvqgwnjgv/chi-war-dev/characters/file.jpg
-    # We want: characters/file.jpg
-    case String.split(url, ~r/chi-war-(?:dev|prod|test)\//) do
+    # We want: chi-war-dev/characters/file.jpg
+    case String.split(url, ~r/ik\.imagekit\.io\/[^\/]+\//) do
       [_, path] -> path
       _ -> Path.basename(url)
     end
   end
 
   defp extract_path_from_url(_), do: nil
+
+  # Helper to strip leading slash for ImageKit upload API folder parameter
+  defp strip_leading_slash("/" <> rest), do: rest
+  defp strip_leading_slash(path), do: path
 
   defp get_int_param(params, key, default) do
     case params[key] do

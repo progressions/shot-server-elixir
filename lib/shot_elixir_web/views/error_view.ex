@@ -30,6 +30,10 @@ defmodule ShotElixirWeb.ErrorView do
     }
   end
 
+  def render("error.json", %{error: error}) do
+    %{error: error}
+  end
+
   # Default handler for any other error
   def template_not_found(template, _assigns) do
     %{error: Phoenix.Controller.status_message_from_template(template)}

@@ -44,6 +44,62 @@ defmodule ShotElixir.Services.ImagekitService do
   end
 
   @doc """
+  Uploads a file to ImageKit from a remote URL.
+
+  ## Parameters
+    - url: Remote URL of the file to upload
+    - options: Map with optional keys:
+      - :file_name - Custom filename
+      - :folder - Folder path in ImageKit
+      - :tags - List of tags
+      - :use_unique_file_name - Whether to generate unique filename (default: true)
+
+  ## Returns
+    - {:ok, response_map} on success with file_id, url, etc.
+    - {:error, reason} on failure
+  """
+  def upload_from_url(url, options \\ %{}) do
+    file_name = options[:file_name] || Path.basename(URI.parse(url).path)
+    folder = options[:folder] || build_folder_path()
+
+    # Build multipart form data
+    multipart_data = [
+      {"file", url},
+      {"fileName", file_name},
+      {"folder", folder},
+      {"useUniqueFileName", to_string(Map.get(options, :use_unique_file_name, true))}
+    ]
+
+    # Add tags if provided
+    multipart_data =
+      if options[:tags] && length(options[:tags]) > 0 do
+        multipart_data ++ [{"tags", Enum.join(options[:tags], ",")}]
+      else
+        multipart_data
+      end
+
+    # Build auth headers for form upload
+    auth_token = Base.encode64("#{private_key()}:")
+
+    headers = [
+      {"Authorization", "Basic #{auth_token}"}
+    ]
+
+    case Req.post(@upload_url, form: multipart_data, headers: headers) do
+      {:ok, %{status: 200, body: response}} ->
+        {:ok, parse_upload_response(response)}
+
+      {:ok, %{status: status, body: body}} ->
+        Logger.error("ImageKit upload from URL failed with status #{status}: #{inspect(body)}")
+        {:error, "Upload failed with status #{status}"}
+
+      {:error, reason} = error ->
+        Logger.error("ImageKit upload from URL request failed: #{inspect(reason)}")
+        error
+    end
+  end
+
+  @doc """
   Deletes a file from ImageKit by file ID.
   """
   def delete_file(file_id) when is_binary(file_id) do

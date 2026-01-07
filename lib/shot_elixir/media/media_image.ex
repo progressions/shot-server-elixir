@@ -1,9 +1,10 @@
-defmodule ShotElixir.Media.AiGeneratedImage do
+defmodule ShotElixir.Media.MediaImage do
   @moduledoc """
-  Schema for tracking AI-generated images.
+  Schema for tracking all images in the media library.
 
+  This includes both manually uploaded images and AI-generated images.
   Images can be:
-  - "orphan" - Generated but not yet attached to an entity
+  - "orphan" - Not yet attached to an entity
   - "attached" - Associated with a character, vehicle, or other entity
   """
 
@@ -14,24 +15,39 @@ defmodule ShotElixir.Media.AiGeneratedImage do
   @foreign_key_type :binary_id
 
   @statuses ["orphan", "attached"]
+  @sources ["upload", "ai_generated"]
 
-  schema "ai_generated_images" do
+  schema "media_images" do
+    # Source: "upload" or "ai_generated"
+    field :source, :string
+
+    # Entity attachment
     field :entity_type, :string
     field :entity_id, :binary_id
     field :status, :string, default: "orphan"
+
+    # Link to ActiveStorage blob (when attached)
+    field :active_storage_blob_id, :integer
+
+    # ImageKit data
     field :imagekit_file_id, :string
     field :imagekit_url, :string
     field :imagekit_file_path, :string
+
+    # File metadata
     field :filename, :string
     field :content_type, :string, default: "image/jpeg"
     field :byte_size, :integer
     field :width, :integer
     field :height, :integer
+
+    # AI-specific metadata (optional)
     field :prompt, :string
     field :ai_provider, :string
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :generated_by, ShotElixir.Accounts.User
+    belongs_to :uploaded_by, ShotElixir.Accounts.User
 
     timestamps(type: :utc_datetime)
   end
@@ -41,9 +57,11 @@ defmodule ShotElixir.Media.AiGeneratedImage do
     image
     |> cast(attrs, [
       :campaign_id,
+      :source,
       :entity_type,
       :entity_id,
       :status,
+      :active_storage_blob_id,
       :imagekit_file_id,
       :imagekit_url,
       :imagekit_file_path,
@@ -54,22 +72,52 @@ defmodule ShotElixir.Media.AiGeneratedImage do
       :height,
       :prompt,
       :ai_provider,
-      :generated_by_id
+      :generated_by_id,
+      :uploaded_by_id
     ])
-    |> validate_required([:campaign_id, :imagekit_file_id, :imagekit_url])
+    |> validate_required([:campaign_id, :source, :imagekit_file_id, :imagekit_url])
     |> validate_inclusion(:status, @statuses)
+    |> validate_inclusion(:source, @sources)
     |> foreign_key_constraint(:campaign_id)
     |> unique_constraint(:imagekit_file_id)
   end
 
   @doc """
+  Changeset for creating an uploaded image record.
+  """
+  def upload_changeset(attrs) do
+    %__MODULE__{}
+    |> changeset(Map.put(attrs, :source, "upload"))
+  end
+
+  @doc """
+  Changeset for creating an AI-generated image record.
+  """
+  def ai_generated_changeset(attrs) do
+    %__MODULE__{}
+    |> changeset(Map.put(attrs, :source, "ai_generated"))
+  end
+
+  @doc """
   Changeset for attaching an orphan image to an entity.
   """
-  def attach_changeset(image, entity_type, entity_id) do
+  def attach_changeset(image, entity_type, entity_id, blob_id \\ nil) do
+    changes = %{
+      entity_type: entity_type,
+      entity_id: entity_id,
+      status: "attached"
+    }
+
+    changes =
+      if blob_id do
+        Map.put(changes, :active_storage_blob_id, blob_id)
+      else
+        changes
+      end
+
     image
-    |> cast(%{entity_type: entity_type, entity_id: entity_id}, [:entity_type, :entity_id])
+    |> cast(changes, [:entity_type, :entity_id, :status, :active_storage_blob_id])
     |> validate_required([:entity_type, :entity_id])
-    |> put_change(:status, "attached")
   end
 
   @doc """
@@ -77,6 +125,13 @@ defmodule ShotElixir.Media.AiGeneratedImage do
   """
   def valid_entity_types do
     ["Character", "Vehicle", "Weapon", "Schtick", "Site", "Faction", "Party", "User"]
+  end
+
+  @doc """
+  Returns valid source types.
+  """
+  def valid_sources do
+    @sources
   end
 
   @doc """

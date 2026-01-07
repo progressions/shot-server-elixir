@@ -176,8 +176,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                   # Verify entity exists and belongs to campaign
                   case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
                     {:ok, entity} ->
-                      # First, try to find and update the ai_generated_image record
-                      ai_image = ShotElixir.Media.get_image_by_url(image_url)
+                      # First, try to find and update the media_image record
+                      media_image = ShotElixir.Media.get_image_by_url(image_url)
 
                       # Attach image from URL using AI service
                       case ShotElixir.Services.AiService.attach_image_from_url(
@@ -185,13 +185,14 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                              entity.id,
                              image_url
                            ) do
-                        {:ok, _attachment} ->
-                          # Update the ai_generated_image record to mark as attached
-                          if ai_image do
-                            ShotElixir.Media.AiGeneratedImage.attach_changeset(
-                              ai_image,
+                        {:ok, attachment} ->
+                          # Update the media_image record to mark as attached
+                          if media_image do
+                            ShotElixir.Media.MediaImage.attach_changeset(
+                              media_image,
                               entity_class,
-                              entity.id
+                              entity.id,
+                              attachment.blob_id
                             )
                             |> ShotElixir.Repo.update()
                           end

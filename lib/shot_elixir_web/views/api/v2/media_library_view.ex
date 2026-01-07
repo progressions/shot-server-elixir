@@ -3,7 +3,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryView do
   View for rendering Media Library JSON responses.
   """
 
-  alias ShotElixir.Media.AiGeneratedImage
+  alias ShotElixir.Media.MediaImage
 
   def render("index.json", %{images: images, meta: meta, stats: stats}) do
     %{
@@ -25,16 +25,17 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryView do
   end
 
   # Render image for list view (lighter payload)
-  defp render_image(%AiGeneratedImage{} = image) do
+  defp render_image(%MediaImage{} = image) do
     %{
       id: image.id,
       campaign_id: image.campaign_id,
+      source: image.source,
       entity_type: image.entity_type,
       entity_id: image.entity_id,
       entity_name: get_entity_name(image),
       status: image.status,
       imagekit_url: image.imagekit_url,
-      thumbnail_url: AiGeneratedImage.thumbnail_url(image),
+      thumbnail_url: MediaImage.thumbnail_url(image),
       filename: image.filename,
       byte_size: image.byte_size,
       width: image.width,
@@ -46,18 +47,20 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryView do
   end
 
   # Render full image details for show view
-  defp render_image_full(%AiGeneratedImage{} = image) do
+  defp render_image_full(%MediaImage{} = image) do
     %{
       id: image.id,
       campaign_id: image.campaign_id,
+      source: image.source,
       entity_type: image.entity_type,
       entity_id: image.entity_id,
       entity_name: get_entity_name(image),
       status: image.status,
+      active_storage_blob_id: image.active_storage_blob_id,
       imagekit_file_id: image.imagekit_file_id,
       imagekit_url: image.imagekit_url,
       imagekit_file_path: image.imagekit_file_path,
-      thumbnail_url: AiGeneratedImage.thumbnail_url(image),
+      thumbnail_url: MediaImage.thumbnail_url(image),
       filename: image.filename,
       content_type: image.content_type,
       byte_size: image.byte_size,
@@ -66,13 +69,14 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryView do
       prompt: image.prompt,
       ai_provider: image.ai_provider,
       generated_by_id: image.generated_by_id,
+      uploaded_by_id: image.uploaded_by_id,
       inserted_at: image.inserted_at,
       updated_at: image.updated_at
     }
   end
 
   # Get the name of the associated entity if attached
-  defp get_entity_name(%AiGeneratedImage{status: "attached", entity_type: type, entity_id: id})
+  defp get_entity_name(%MediaImage{status: "attached", entity_type: type, entity_id: id})
        when not is_nil(type) and not is_nil(id) do
     case type do
       "Character" -> get_character_name(id)

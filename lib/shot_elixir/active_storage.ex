@@ -8,6 +8,7 @@ defmodule ShotElixir.ActiveStorage do
   alias ShotElixir.Repo
   alias ShotElixir.ActiveStorage.{Attachment, Blob}
   alias ShotElixir.Services.ImagekitService
+  alias ShotElixir.Media
   alias Ecto.Multi
 
   @doc """
@@ -117,6 +118,7 @@ defmodule ShotElixir.ActiveStorage do
 
   @doc """
   Creates a blob record and attaches it to an entity.
+  Also creates a media_images record for the Media Library.
   Returns {:ok, attachment} or {:error, changeset}.
 
   ## Parameters
@@ -128,12 +130,25 @@ defmodule ShotElixir.ActiveStorage do
       - :url
       - :size
       - :metadata (full ImageKit response)
+    - opts: Optional keyword list with:
+      - :source - "upload" or "ai_generated" (default: "upload")
+      - :uploaded_by_id - UUID of user who uploaded
+      - :campaign_id - UUID of campaign (auto-detected if not provided)
 
   ## Examples
       iex> attach_image("Character", character_id, upload_result)
       {:ok, %Attachment{}}
+
+      iex> attach_image("Character", character_id, upload_result, uploaded_by_id: user_id)
+      {:ok, %Attachment{}}
   """
-  def attach_image(record_type, record_id, upload_result) do
+  def attach_image(record_type, record_id, upload_result, opts \\ []) do
+    source = Keyword.get(opts, :source, "upload")
+    uploaded_by_id = Keyword.get(opts, :uploaded_by_id)
+
+    campaign_id =
+      Keyword.get(opts, :campaign_id) || get_campaign_id_for_entity(record_type, record_id)
+
     Multi.new()
     |> Multi.run(:delete_existing, fn repo, _changes ->
       # Delete existing attachment for this entity if it exists
@@ -196,6 +211,31 @@ defmodule ShotElixir.ActiveStorage do
 
       Attachment.changeset(%Attachment{}, attachment_attrs)
     end)
+    |> Multi.run(:media_image, fn _repo, %{blob: blob} ->
+      # Create media_images record for Media Library
+      if campaign_id do
+        media_attrs = %{
+          campaign_id: campaign_id,
+          source: source,
+          entity_type: record_type,
+          entity_id: record_id,
+          status: "attached",
+          active_storage_blob_id: blob.id,
+          imagekit_file_id: upload_result.file_id,
+          imagekit_url: upload_result.url,
+          imagekit_file_path: upload_result.name,
+          filename: Path.basename(upload_result.name),
+          content_type: upload_result.metadata["fileType"] || "image/jpeg",
+          byte_size: upload_result.size,
+          uploaded_by_id: uploaded_by_id
+        }
+
+        Media.create_image(media_attrs)
+      else
+        # Skip media_images for entities without campaigns (e.g., Users)
+        {:ok, nil}
+      end
+    end)
     |> Repo.transaction()
     |> case do
       {:ok, %{attachment: attachment}} ->
@@ -205,6 +245,63 @@ defmodule ShotElixir.ActiveStorage do
         {:error, changeset}
     end
   end
+
+  # Get campaign_id for an entity by looking it up in the database
+  defp get_campaign_id_for_entity("Character", id) do
+    query_campaign_id("characters", id)
+  end
+
+  defp get_campaign_id_for_entity("Vehicle", id) do
+    query_campaign_id("vehicles", id)
+  end
+
+  defp get_campaign_id_for_entity("Weapon", id) do
+    query_campaign_id("weapons", id)
+  end
+
+  defp get_campaign_id_for_entity("Schtick", id) do
+    query_campaign_id("schticks", id)
+  end
+
+  defp get_campaign_id_for_entity("Site", id) do
+    query_campaign_id("sites", id)
+  end
+
+  defp get_campaign_id_for_entity("Faction", id) do
+    query_campaign_id("factions", id)
+  end
+
+  defp get_campaign_id_for_entity("Party", id) do
+    query_campaign_id("parties", id)
+  end
+
+  defp get_campaign_id_for_entity("Fight", id) do
+    query_campaign_id("fights", id)
+  end
+
+  defp get_campaign_id_for_entity("User", _id) do
+    # Users don't belong to campaigns
+    nil
+  end
+
+  defp get_campaign_id_for_entity(_, _), do: nil
+
+  defp query_campaign_id(table, id) when is_binary(id) do
+    query = "SELECT campaign_id FROM #{table} WHERE id = $1"
+
+    case Repo.query(query, [Ecto.UUID.dump!(id)]) do
+      {:ok, %{rows: [[campaign_id]]}} ->
+        case campaign_id do
+          <<_::binary-size(16)>> -> Ecto.UUID.load!(campaign_id)
+          other -> other
+        end
+
+      _ ->
+        nil
+    end
+  end
+
+  defp query_campaign_id(_, _), do: nil
 
   @doc """
   Deletes an image attachment for an entity.

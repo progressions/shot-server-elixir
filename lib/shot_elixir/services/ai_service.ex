@@ -135,10 +135,19 @@ defmodule ShotElixir.Services.AiService do
       {:ok, %Attachment{}}
   """
   def attach_image_from_url(entity_type, entity_id, image_url) when is_binary(image_url) do
+    alias ShotElixir.Media
+
+    # Check if this URL is already in our media library (e.g., an existing AI-generated orphan)
+    existing_image = Media.get_image_by_url(image_url)
+
+    # Determine the source type - keep existing source if found, otherwise "upload"
+    source = if existing_image, do: existing_image.source, else: "upload"
+
     with {:ok, temp_file} <- ImageUploader.download_image(image_url),
          {:ok, upload_result} <-
            ImageUploader.upload_to_imagekit(temp_file, entity_type, entity_id),
-         {:ok, attachment} <- ActiveStorage.attach_image(entity_type, entity_id, upload_result) do
+         {:ok, attachment} <-
+           ActiveStorage.attach_image(entity_type, entity_id, upload_result, source: source) do
       # Clean up temp file
       File.rm(temp_file)
       {:ok, attachment}
