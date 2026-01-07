@@ -370,4 +370,331 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       assert %{"error" => "Membership not found"} = json_response(conn, 404)
     end
   end
+
+  describe "slot operations" do
+    setup %{campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Party",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Test Character",
+          campaign_id: campaign.id
+        })
+
+      %{party: party, character: character}
+    end
+
+    test "add_slot adds a slot to party", %{conn: conn, party: party} do
+      conn = post(conn, ~p"/api/v2/parties/#{party.id}/slots", role: "featured_foe")
+      assert returned_party = json_response(conn, 201)
+      assert [slot] = returned_party["slots"]
+      assert slot["role"] == "featured_foe"
+    end
+
+    test "update_slot can populate a slot with a character", %{
+      conn: conn,
+      party: party,
+      character: character
+    } do
+      {:ok, slot} = Parties.add_slot(party.id, %{"role" => "featured_foe"})
+
+      conn =
+        patch(conn, ~p"/api/v2/parties/#{party.id}/slots/#{slot.id}", character_id: character.id)
+
+      assert returned_party = json_response(conn, 200)
+      assert [updated_slot] = returned_party["slots"]
+      assert updated_slot["character"]["id"] == character.id
+    end
+
+    test "update_slot can clear a character from a slot by setting character_id to nil", %{
+      conn: conn,
+      party: party,
+      character: character
+    } do
+      # First, create a slot with a character
+      {:ok, slot} =
+        Parties.add_slot(party.id, %{"role" => "featured_foe", "character_id" => character.id})
+
+      # Verify the character is assigned (slots are memberships with roles)
+      slots = Parties.list_slots(party.id)
+      assert [slot_with_char] = slots
+      assert slot_with_char.character_id == character.id
+
+      # Now clear the character by sending nil
+      conn =
+        patch(conn, ~p"/api/v2/parties/#{party.id}/slots/#{slot.id}", character_id: nil)
+
+      assert returned_party = json_response(conn, 200)
+      assert [cleared_slot] = returned_party["slots"]
+      assert cleared_slot["character"] == nil
+    end
+
+    test "remove_slot removes a slot from party", %{conn: conn, party: party} do
+      {:ok, slot} = Parties.add_slot(party.id, %{"role" => "mook"})
+
+      conn = delete(conn, ~p"/api/v2/parties/#{party.id}/slots/#{slot.id}")
+      assert response(conn, 204)
+
+      # Slots are memberships with roles, check they're removed
+      slots = Parties.list_slots(party.id)
+      assert slots == []
+    end
+  end
+
+  describe "list_templates" do
+    test "returns all available templates", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/parties/templates")
+      assert %{"templates" => templates} = json_response(conn, 200)
+
+      assert is_list(templates)
+      assert length(templates) == 8
+
+      # Verify template structure
+      template = hd(templates)
+      assert Map.has_key?(template, "key")
+      assert Map.has_key?(template, "name")
+      assert Map.has_key?(template, "description")
+      assert Map.has_key?(template, "slots")
+    end
+
+    test "templates are sorted by name", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/parties/templates")
+      %{"templates" => templates} = json_response(conn, 200)
+
+      names = Enum.map(templates, & &1["name"])
+      assert names == Enum.sort(names)
+    end
+  end
+
+  describe "apply_template" do
+    setup %{campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Template Test Party",
+          campaign_id: campaign.id
+        })
+
+      %{party: party}
+    end
+
+    test "applies template to party", %{conn: conn, party: party} do
+      conn =
+        post(conn, ~p"/api/v2/parties/#{party.id}/apply_template", template_key: "boss_fight")
+
+      assert returned_party = json_response(conn, 200)
+      assert length(returned_party["slots"]) == 4
+
+      roles = Enum.map(returned_party["slots"], & &1["role"])
+      assert "boss" in roles
+      assert "mook" in roles
+    end
+
+    test "clears existing slots before applying", %{conn: conn, party: party} do
+      # Add existing slots
+      {:ok, _} = Parties.add_slot(party.id, %{"role" => "featured_foe"})
+      {:ok, _} = Parties.add_slot(party.id, %{"role" => "featured_foe"})
+
+      conn =
+        post(conn, ~p"/api/v2/parties/#{party.id}/apply_template",
+          template_key: "simple_encounter"
+        )
+
+      assert returned_party = json_response(conn, 200)
+      # simple_encounter has 2 slots
+      assert length(returned_party["slots"]) == 2
+    end
+
+    test "returns 404 for invalid template key", %{conn: conn, party: party} do
+      conn =
+        post(conn, ~p"/api/v2/parties/#{party.id}/apply_template", template_key: "nonexistent")
+
+      assert %{"error" => "Template not found"} = json_response(conn, 404)
+    end
+
+    test "returns 404 for invalid party", %{conn: conn} do
+      conn =
+        post(conn, ~p"/api/v2/parties/#{Ecto.UUID.generate()}/apply_template",
+          template_key: "boss_fight"
+        )
+
+      assert %{"error" => "Party not found"} = json_response(conn, 404)
+    end
+  end
+
+  describe "reorder_slots" do
+    setup %{campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Reorder Test Party",
+          campaign_id: campaign.id
+        })
+
+      {:ok, slot1} = Parties.add_slot(party.id, %{"role" => "boss"})
+      {:ok, slot2} = Parties.add_slot(party.id, %{"role" => "featured_foe"})
+      {:ok, slot3} = Parties.add_slot(party.id, %{"role" => "mook"})
+
+      %{party: party, slot1: slot1, slot2: slot2, slot3: slot3}
+    end
+
+    test "reorders slots to new positions", %{
+      conn: conn,
+      party: party,
+      slot1: slot1,
+      slot2: slot2,
+      slot3: slot3
+    } do
+      # Reverse order
+      conn =
+        post(conn, ~p"/api/v2/parties/#{party.id}/reorder_slots",
+          slot_ids: [slot3.id, slot2.id, slot1.id]
+        )
+
+      assert returned_party = json_response(conn, 200)
+      slot_ids = Enum.map(returned_party["slots"], & &1["id"])
+      assert slot_ids == [slot3.id, slot2.id, slot1.id]
+    end
+
+    test "returns 404 for invalid party", %{conn: conn, slot1: slot1} do
+      conn =
+        post(conn, ~p"/api/v2/parties/#{Ecto.UUID.generate()}/reorder_slots",
+          slot_ids: [slot1.id]
+        )
+
+      assert %{"error" => "Party not found"} = json_response(conn, 404)
+    end
+  end
+
+  describe "slot authorization" do
+    setup %{campaign: campaign} do
+      # Create a player (non-gamemaster) user
+      {:ok, player} =
+        Accounts.create_user(%{
+          email: "player@test.com",
+          password: "password123",
+          first_name: "Player",
+          last_name: "User",
+          gamemaster: false
+        })
+
+      # Add player to campaign as member
+      {:ok, _} = Campaigns.add_member(campaign, player)
+
+      {:ok, player} = Accounts.update_user(player, %{current_campaign_id: campaign.id})
+
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Auth Test Party",
+          campaign_id: campaign.id
+        })
+
+      %{player: player, party: party}
+    end
+
+    test "non-gamemaster cannot add slots", %{conn: conn, party: party, player: player} do
+      conn =
+        conn
+        |> authenticate(player)
+        |> post(~p"/api/v2/parties/#{party.id}/slots", role: "boss")
+
+      assert %{"error" => "Only gamemaster can modify party composition"} =
+               json_response(conn, 403)
+    end
+
+    test "non-gamemaster cannot apply templates", %{conn: conn, party: party, player: player} do
+      conn =
+        conn
+        |> authenticate(player)
+        |> post(~p"/api/v2/parties/#{party.id}/apply_template", template_key: "boss_fight")
+
+      assert %{"error" => "Only gamemaster can modify party composition"} =
+               json_response(conn, 403)
+    end
+
+    test "non-gamemaster cannot update slots", %{conn: conn, party: party, player: player} do
+      {:ok, slot} = Parties.add_slot(party.id, %{"role" => "boss"})
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> patch(~p"/api/v2/parties/#{party.id}/slots/#{slot.id}", default_mook_count: 10)
+
+      assert %{"error" => "Only gamemaster can modify party composition"} =
+               json_response(conn, 403)
+    end
+
+    test "non-gamemaster cannot remove slots", %{conn: conn, party: party, player: player} do
+      {:ok, slot} = Parties.add_slot(party.id, %{"role" => "mook"})
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> delete(~p"/api/v2/parties/#{party.id}/slots/#{slot.id}")
+
+      assert %{"error" => "Only gamemaster can modify party composition"} =
+               json_response(conn, 403)
+    end
+
+    test "non-gamemaster cannot reorder slots", %{conn: conn, party: party, player: player} do
+      {:ok, slot} = Parties.add_slot(party.id, %{"role" => "boss"})
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> post(~p"/api/v2/parties/#{party.id}/reorder_slots", slot_ids: [slot.id])
+
+      assert %{"error" => "Only gamemaster can modify party composition"} =
+               json_response(conn, 403)
+    end
+  end
+
+  describe "slot security - cross-party protection" do
+    setup %{campaign: campaign} do
+      {:ok, party1} =
+        Parties.create_party(%{
+          name: "Party 1",
+          campaign_id: campaign.id
+        })
+
+      {:ok, party2} =
+        Parties.create_party(%{
+          name: "Party 2",
+          campaign_id: campaign.id
+        })
+
+      {:ok, slot_in_party2} = Parties.add_slot(party2.id, %{"role" => "boss"})
+
+      %{party1: party1, party2: party2, slot_in_party2: slot_in_party2}
+    end
+
+    test "cannot update slot from different party", %{
+      conn: conn,
+      party1: party1,
+      slot_in_party2: slot_in_party2
+    } do
+      conn =
+        patch(conn, ~p"/api/v2/parties/#{party1.id}/slots/#{slot_in_party2.id}",
+          default_mook_count: 99
+        )
+
+      assert %{"error" => "Slot not found"} = json_response(conn, 404)
+    end
+
+    test "cannot remove slot from different party", %{
+      conn: conn,
+      party1: party1,
+      party2: party2,
+      slot_in_party2: slot_in_party2
+    } do
+      conn = delete(conn, ~p"/api/v2/parties/#{party1.id}/slots/#{slot_in_party2.id}")
+      assert %{"error" => "Slot not found"} = json_response(conn, 404)
+
+      # Verify slot still exists in party2
+      slots = Parties.list_slots(party2.id)
+      assert length(slots) == 1
+    end
+  end
 end

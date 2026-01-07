@@ -5,7 +5,7 @@ defmodule ShotElixir.Parties do
 
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
-  alias ShotElixir.Parties.{Party, Membership}
+  alias ShotElixir.Parties.{Party, Membership, PartyTemplate}
   alias ShotElixir.ImageLoader
   alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
@@ -536,5 +536,259 @@ defmodule ShotElixir.Parties do
       false -> new_name
       true -> find_next_available_name(base_name, campaign_id, counter + 1)
     end
+  end
+
+  # =============================================================================
+  # Party Composition / Slot Management
+  # =============================================================================
+
+  @doc """
+  Lists all available party templates.
+  """
+  def list_templates do
+    PartyTemplate.list_templates()
+  end
+
+  @doc """
+  Gets a specific template by key.
+  """
+  def get_template(key) do
+    PartyTemplate.get_template(key)
+  end
+
+  @doc """
+  Applies a template to a party, creating slots based on the template structure.
+  Clears any existing slots before applying the new template.
+  """
+  def apply_template(party_id, template_key) do
+    with {:ok, template} <- PartyTemplate.get_template(template_key),
+         party when not is_nil(party) <- Repo.get(Party, party_id) do
+      Repo.transaction(fn ->
+        # Clear existing slots (memberships with roles)
+        clear_all_slots(party_id)
+
+        # Create new slots from template
+        template.slots
+        |> Enum.with_index()
+        |> Enum.each(fn {slot_def, index} ->
+          attrs = %{
+            "party_id" => party_id,
+            "role" => slot_def.role,
+            "default_mook_count" => Map.get(slot_def, :default_mook_count),
+            "position" => index
+          }
+
+          case create_slot(attrs) do
+            {:ok, _slot} -> :ok
+            {:error, changeset} -> Repo.rollback(changeset)
+          end
+        end)
+
+        # Return the updated party with slots
+        get_party!(party_id)
+      end)
+    else
+      {:error, :not_found} -> {:error, :template_not_found}
+      nil -> {:error, :party_not_found}
+    end
+  end
+
+  @doc """
+  Adds a composition slot to a party.
+  """
+  def add_slot(party_id, attrs) do
+    # Get the next position
+    next_position = get_next_slot_position(party_id)
+
+    slot_attrs =
+      attrs
+      |> Map.put("party_id", party_id)
+      |> Map.put_new("position", next_position)
+
+    create_slot(slot_attrs)
+  end
+
+  defp create_slot(attrs) do
+    %Membership{}
+    |> Membership.slot_changeset(attrs)
+    |> Repo.insert()
+    |> case do
+      {:ok, slot} ->
+        broadcast_party_update(slot.party_id)
+        {:ok, Repo.preload(slot, [:party, :character, :vehicle])}
+
+      error ->
+        error
+    end
+  end
+
+  @doc """
+  Updates a slot (change role, mook count, populate with character, etc.)
+  Requires party_id to verify the slot belongs to the specified party.
+  """
+  def update_slot(party_id, slot_id, attrs) do
+    # Query for slot that belongs to the specified party
+    case Repo.get_by(Membership, id: slot_id, party_id: party_id) do
+      nil ->
+        {:error, :not_found}
+
+      slot ->
+        slot
+        |> Membership.update_slot_changeset(attrs)
+        |> Repo.update()
+        |> case do
+          {:ok, updated_slot} ->
+            broadcast_party_update(updated_slot.party_id)
+            {:ok, Repo.preload(updated_slot, [:party, :character, :vehicle], force: true)}
+
+          error ->
+            error
+        end
+    end
+  end
+
+  @doc """
+  Removes a slot from a party.
+  Requires party_id to verify the slot belongs to the specified party.
+  """
+  def remove_slot(party_id, slot_id) do
+    # Query for slot that belongs to the specified party
+    case Repo.get_by(Membership, id: slot_id, party_id: party_id) do
+      nil ->
+        {:error, :not_found}
+
+      slot ->
+        case Repo.delete(slot) do
+          {:ok, deleted_slot} ->
+            # Reindex remaining slots
+            reindex_slots(deleted_slot.party_id)
+            broadcast_party_update(deleted_slot.party_id)
+            {:ok, deleted_slot}
+
+          error ->
+            error
+        end
+    end
+  end
+
+  @doc """
+  Populates a slot with a character.
+  Requires party_id to verify the slot belongs to the specified party.
+  """
+  def populate_slot(party_id, slot_id, character_id) do
+    update_slot(party_id, slot_id, %{"character_id" => character_id, "vehicle_id" => nil})
+  end
+
+  @doc """
+  Populates a slot with a vehicle.
+  Requires party_id to verify the slot belongs to the specified party.
+  """
+  def populate_slot_with_vehicle(party_id, slot_id, vehicle_id) do
+    update_slot(party_id, slot_id, %{"vehicle_id" => vehicle_id, "character_id" => nil})
+  end
+
+  @doc """
+  Clears a slot (removes character/vehicle but keeps the slot).
+  Requires party_id to verify the slot belongs to the specified party.
+  """
+  def clear_slot(party_id, slot_id) do
+    update_slot(party_id, slot_id, %{"character_id" => nil, "vehicle_id" => nil})
+  end
+
+  @doc """
+  Reorders slots within a party.
+  Expects a list of slot IDs in the desired order.
+  """
+  def reorder_slots(party_id, slot_ids) when is_list(slot_ids) do
+    Repo.transaction(fn ->
+      slot_ids
+      |> Enum.with_index()
+      |> Enum.each(fn {slot_id, index} ->
+        from(m in Membership,
+          where: m.id == ^slot_id and m.party_id == ^party_id
+        )
+        |> Repo.update_all(set: [position: index])
+      end)
+
+      broadcast_party_update(party_id)
+      get_party!(party_id)
+    end)
+  end
+
+  @doc """
+  Lists all slots for a party, ordered by position.
+  """
+  def list_slots(party_id) do
+    from(m in Membership,
+      where: m.party_id == ^party_id and not is_nil(m.role),
+      order_by: [asc: m.position, asc: m.id],
+      preload: [:character, :vehicle]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a specific slot by ID.
+  """
+  def get_slot(slot_id) do
+    Membership
+    |> preload([:party, :character, :vehicle])
+    |> Repo.get(slot_id)
+  end
+
+  @doc """
+  Gets a specific slot by ID, raises if not found.
+  """
+  def get_slot!(slot_id) do
+    Membership
+    |> preload([:party, :character, :vehicle])
+    |> Repo.get!(slot_id)
+  end
+
+  @doc """
+  Checks if a party has any composition slots.
+  """
+  def has_composition?(party_id) do
+    from(m in Membership,
+      where: m.party_id == ^party_id and not is_nil(m.role)
+    )
+    |> Repo.exists?()
+  end
+
+  # Private helper to clear all slots from a party
+  defp clear_all_slots(party_id) do
+    from(m in Membership,
+      where: m.party_id == ^party_id and not is_nil(m.role)
+    )
+    |> Repo.delete_all()
+  end
+
+  # Get the next available position for a new slot
+  defp get_next_slot_position(party_id) do
+    max_position =
+      from(m in Membership,
+        where: m.party_id == ^party_id and not is_nil(m.role),
+        select: max(m.position)
+      )
+      |> Repo.one()
+
+    (max_position || -1) + 1
+  end
+
+  # Reindex slots after removal to maintain sequential positions
+  defp reindex_slots(party_id) do
+    slots =
+      from(m in Membership,
+        where: m.party_id == ^party_id and not is_nil(m.role),
+        order_by: [asc: m.position, asc: m.id]
+      )
+      |> Repo.all()
+
+    slots
+    |> Enum.with_index()
+    |> Enum.each(fn {slot, index} ->
+      from(m in Membership, where: m.id == ^slot.id)
+      |> Repo.update_all(set: [position: index])
+    end)
   end
 end

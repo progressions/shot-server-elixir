@@ -198,11 +198,21 @@ defmodule ShotElixirWeb.Router do
     end
 
     # Parties with membership
+    # Party templates (collection route - must be before resources)
+    get "/parties/templates", PartyController, :list_templates
+
     resources "/parties", PartyController do
       post "/duplicate", PartyController, :duplicate
       post "/members", PartyController, :add_member
       delete "/members/:membership_id", PartyController, :remove_member
       delete "/image", PartyController, :remove_image
+
+      # Party composition / slot management
+      post "/apply_template", PartyController, :apply_template
+      post "/slots", PartyController, :add_slot
+      patch "/slots/:slot_id", PartyController, :update_slot
+      delete "/slots/:slot_id", PartyController, :remove_slot
+      post "/reorder_slots", PartyController, :reorder_slots
     end
 
     resources "/factions", FactionController do

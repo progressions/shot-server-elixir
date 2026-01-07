@@ -555,6 +555,262 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
     end
   end
 
+  # =============================================================================
+  # Party Composition / Slot Endpoints
+  # =============================================================================
+
+  # GET /api/v2/parties/templates
+  def list_templates(conn, _params) do
+    templates = Parties.list_templates()
+
+    conn
+    |> put_view(ShotElixirWeb.Api.V2.PartyView)
+    |> render("templates.json", templates: templates)
+  end
+
+  # POST /api/v2/parties/:id/apply_template
+  def apply_template(conn, %{"party_id" => party_id, "template_key" => template_key}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Parties.get_party(party_id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case Parties.apply_template(party_id, template_key) do
+                {:ok, updated_party} ->
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: updated_party)
+
+                {:error, :template_not_found} ->
+                  conn
+                  |> put_status(:not_found)
+                  |> json(%{error: "Template not found"})
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("error.json", changeset: changeset)
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can modify party composition"})
+            end
+        end
+    end
+  end
+
+  # POST /api/v2/parties/:id/slots
+  def add_slot(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+    party_id = params["party_id"]
+
+    case Parties.get_party(party_id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              slot_attrs = %{
+                "role" => params["role"],
+                "default_mook_count" => params["default_mook_count"],
+                "character_id" => params["character_id"]
+              }
+
+              case Parties.add_slot(party_id, slot_attrs) do
+                {:ok, _slot} ->
+                  updated_party = Parties.get_party!(party_id)
+
+                  conn
+                  |> put_status(:created)
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: updated_party)
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("error.json", changeset: changeset)
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can modify party composition"})
+            end
+        end
+    end
+  end
+
+  # PATCH /api/v2/parties/:id/slots/:slot_id
+  def update_slot(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+    party_id = params["party_id"]
+    slot_id = params["slot_id"]
+
+    case Parties.get_party(party_id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              # Only include fields that are actually provided in params
+              # Use Map.has_key? to distinguish between "not provided" and "explicitly set to null"
+              # This allows clearing character_id/vehicle_id by sending null
+              slot_attrs =
+                Enum.reduce(
+                  ["character_id", "vehicle_id", "default_mook_count"],
+                  %{},
+                  fn key, acc ->
+                    if Map.has_key?(params, key) do
+                      Map.put(acc, key, params[key])
+                    else
+                      acc
+                    end
+                  end
+                )
+
+              case Parties.update_slot(party_id, slot_id, slot_attrs) do
+                {:ok, _slot} ->
+                  updated_party = Parties.get_party!(party_id)
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: updated_party)
+
+                {:error, :not_found} ->
+                  conn
+                  |> put_status(:not_found)
+                  |> json(%{error: "Slot not found"})
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("error.json", changeset: changeset)
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can modify party composition"})
+            end
+        end
+    end
+  end
+
+  # DELETE /api/v2/parties/:id/slots/:slot_id
+  def remove_slot(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+    party_id = params["party_id"]
+    slot_id = params["slot_id"]
+
+    case Parties.get_party(party_id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case Parties.remove_slot(party_id, slot_id) do
+                {:ok, _} ->
+                  send_resp(conn, :no_content, "")
+
+                {:error, :not_found} ->
+                  conn
+                  |> put_status(:not_found)
+                  |> json(%{error: "Slot not found"})
+
+                {:error, _} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to remove slot"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can modify party composition"})
+            end
+        end
+    end
+  end
+
+  # POST /api/v2/parties/:id/reorder_slots
+  def reorder_slots(conn, %{"party_id" => party_id, "slot_ids" => slot_ids}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Parties.get_party(party_id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case Parties.reorder_slots(party_id, slot_ids) do
+                {:ok, updated_party} ->
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: updated_party)
+
+                {:error, _} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to reorder slots"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can modify party composition"})
+            end
+        end
+    end
+  end
+
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||

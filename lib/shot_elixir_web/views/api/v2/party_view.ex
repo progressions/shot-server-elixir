@@ -11,6 +11,12 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     render_party(party)
   end
 
+  def render("templates.json", %{templates: templates}) do
+    %{
+      templates: Enum.map(templates, &render_template/1)
+    }
+  end
+
   def render("error.json", %{changeset: changeset}) do
     %{
       success: false,
@@ -19,6 +25,8 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   end
 
   defp render_party(party) do
+    slots = render_slots_if_loaded(party)
+
     %{
       id: party.id,
       name: party.name,
@@ -37,6 +45,8 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       faction: render_faction_if_loaded(party),
       juncture: render_juncture_if_loaded(party),
       image_positions: render_image_positions_if_loaded(party),
+      slots: slots,
+      has_composition: length(slots) > 0,
       entity_class: "Party"
     }
   end
@@ -217,4 +227,77 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   end
 
   defp get_image_url(_), do: nil
+
+  # =============================================================================
+  # Slot and Template Rendering
+  # =============================================================================
+
+  defp render_slots_if_loaded(party) do
+    case Map.get(party, :memberships) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      memberships ->
+        # Filter to only memberships with roles (composition slots)
+        # and sort by position
+        memberships
+        |> Enum.filter(fn m -> m.role != nil end)
+        |> Enum.sort_by(fn m -> {m.position || 999, m.id} end)
+        |> Enum.map(&render_slot/1)
+    end
+  end
+
+  defp render_slot(membership) do
+    character = membership.character
+
+    character_with_image =
+      if character do
+        ShotElixir.ImageLoader.load_image_url(character, "Character")
+      else
+        nil
+      end
+
+    %{
+      id: membership.id,
+      role: membership.role,
+      character_id: membership.character_id,
+      vehicle_id: membership.vehicle_id,
+      default_mook_count: membership.default_mook_count,
+      position: membership.position,
+      character:
+        if(character_with_image, do: render_character_for_slot(character_with_image), else: nil),
+      vehicle: if(membership.vehicle, do: render_vehicle_lite(membership.vehicle), else: nil)
+    }
+  end
+
+  defp render_character_for_slot(character) do
+    %{
+      id: character.id,
+      name: character.name,
+      image_url: get_image_url(character),
+      action_values: character.action_values,
+      category: "character",
+      entity_class: "Character"
+    }
+  end
+
+  defp render_template(template) do
+    %{
+      key: template.key,
+      name: template.name,
+      description: template.description,
+      slots: Enum.map(template.slots, &render_template_slot/1)
+    }
+  end
+
+  defp render_template_slot(slot) do
+    %{
+      role: slot.role,
+      label: slot.label,
+      default_mook_count: Map.get(slot, :default_mook_count)
+    }
+  end
 end
