@@ -17,7 +17,7 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
     AiService,
     GrokService,
     BatchImageGenerationService,
-    GrokCreditNotificationService
+    AiCreditNotificationService
   }
 
   alias ShotElixir.Characters
@@ -54,16 +54,20 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
               :ok
 
             {:error, :credit_exhausted, message} ->
-              Logger.error("[BatchImageGenerationWorker] Grok API credits exhausted: #{message}")
+              Logger.error("[BatchImageGenerationWorker] AI API credits exhausted: #{message}")
 
               # Notify user about credit exhaustion
               if campaign_id do
                 campaign = ShotElixir.Repo.get(ShotElixir.Campaigns.Campaign, campaign_id)
 
                 if campaign do
-                  GrokCreditNotificationService.handle_credit_exhaustion(
+                  # Use campaign's ai_provider or default to "grok"
+                  ai_provider = campaign.ai_provider || "grok"
+
+                  AiCreditNotificationService.handle_credit_exhaustion(
                     campaign_id,
-                    campaign.user_id
+                    campaign.user_id,
+                    ai_provider
                   )
                 end
 
