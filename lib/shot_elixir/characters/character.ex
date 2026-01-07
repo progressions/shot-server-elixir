@@ -191,17 +191,17 @@ defmodule ShotElixir.Characters.Character do
     base_properties = %{
       "Name" => %{"title" => [%{"type" => "text", "text" => %{"content" => name}}]},
       "Enemy Type" => %{"select" => %{"name" => av["Type"] || "PC"}},
-      "Wounds" => %{"number" => av["Wounds"]},
-      "Defense" => %{"number" => av["Defense"]},
-      "Toughness" => %{"number" => av["Toughness"]},
-      "Speed" => %{"number" => av["Speed"]},
-      "Fortune" => %{"number" => av["Max Fortune"]},
-      "Guns" => %{"number" => av["Guns"]},
-      "Martial Arts" => %{"number" => av["Martial Arts"]},
-      "Sorcery" => %{"number" => av["Sorcery"]},
-      "Mutant" => %{"number" => av["Mutant"]},
-      "Scroungetech" => %{"number" => av["Scroungetech"]},
-      "Creature" => %{"number" => av["Creature"]},
+      "Wounds" => %{"number" => to_number(av["Wounds"])},
+      "Defense" => %{"number" => to_number(av["Defense"])},
+      "Toughness" => %{"number" => to_number(av["Toughness"])},
+      "Speed" => %{"number" => to_number(av["Speed"])},
+      "Fortune" => %{"number" => to_number(av["Max Fortune"])},
+      "Guns" => %{"number" => to_number(av["Guns"])},
+      "Martial Arts" => %{"number" => to_number(av["Martial Arts"])},
+      "Sorcery" => %{"number" => to_number(av["Sorcery"])},
+      "Mutant" => %{"number" => to_number(av["Mutant"])},
+      "Scroungetech" => %{"number" => to_number(av["Scroungetech"])},
+      "Creature" => %{"number" => to_number(av["Creature"])},
       "Inactive" => %{"checkbox" => !character.active},
       "Tags" => %{"multi_select" => tags_for_notion(character)}
     }
@@ -234,6 +234,23 @@ defmodule ShotElixir.Characters.Character do
       "rich_text" => [%{"type" => "text", "text" => %{"content" => value}}]
     })
   end
+
+  # Convert string values to numbers for Notion API
+  # Notion number fields require actual numbers, not strings
+  defp to_number(nil), do: nil
+  defp to_number(""), do: nil
+  defp to_number(value) when is_integer(value), do: value
+  defp to_number(value) when is_float(value), do: value
+
+  defp to_number(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} -> int
+      {_int, _rest} -> nil
+      :error -> nil
+    end
+  end
+
+  defp to_number(_), do: nil
 
   defp tags_for_notion(character) do
     av = character.action_values || @default_action_values

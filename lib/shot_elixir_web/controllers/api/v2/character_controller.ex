@@ -249,7 +249,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
-  def sync(conn, %{"id" => id}) do
+  def sync(conn, %{"character_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
