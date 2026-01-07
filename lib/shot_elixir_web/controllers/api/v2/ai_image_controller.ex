@@ -416,6 +416,18 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
     end
   end
 
+  defp get_entity("Campaign", entity_id, campaign_id) do
+    # For Campaign entities, the entity_id should match the campaign_id
+    if entity_id == campaign_id do
+      case ShotElixir.Campaigns.get_campaign(entity_id) do
+        nil -> {:error, :not_found}
+        campaign -> {:ok, campaign}
+      end
+    else
+      {:error, :not_found}
+    end
+  end
+
   defp get_entity(_, _, _), do: {:error, :not_found}
 
   # Pluralize entity class names for Rails-compatible broadcast keys
@@ -535,6 +547,18 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
       campaign_id: fight.campaign_id,
       created_at: fight.created_at,
       updated_at: fight.updated_at
+    }
+  end
+
+  defp serialize_entity("Campaign", campaign) do
+    %{
+      id: campaign.id,
+      entity_class: "Campaign",
+      active: campaign.active,
+      name: campaign.name,
+      description: campaign.description,
+      created_at: campaign.created_at,
+      updated_at: campaign.updated_at
     }
   end
 
