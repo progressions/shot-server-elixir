@@ -72,8 +72,9 @@ defmodule ShotElixir.Parties.Membership do
 
   # For legacy memberships: require either character or vehicle
   defp validate_either_character_or_vehicle(changeset) do
-    character_id = get_change(changeset, :character_id) || changeset.data.character_id
-    vehicle_id = get_change(changeset, :vehicle_id) || changeset.data.vehicle_id
+    # Use get_field to properly handle nil values when clearing fields
+    character_id = get_field(changeset, :character_id)
+    vehicle_id = get_field(changeset, :vehicle_id)
 
     case {character_id, vehicle_id} do
       {nil, nil} ->
@@ -92,8 +93,9 @@ defmodule ShotElixir.Parties.Membership do
 
   # For slots: don't require character/vehicle but can't have both
   defp validate_no_both_character_and_vehicle(changeset) do
-    character_id = get_change(changeset, :character_id) || changeset.data.character_id
-    vehicle_id = get_change(changeset, :vehicle_id) || changeset.data.vehicle_id
+    # Use get_field to properly handle nil values when clearing fields
+    character_id = get_field(changeset, :character_id)
+    vehicle_id = get_field(changeset, :vehicle_id)
 
     case {character_id, vehicle_id} do
       {_, nil} -> changeset

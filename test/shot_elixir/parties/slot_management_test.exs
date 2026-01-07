@@ -298,7 +298,7 @@ defmodule ShotElixir.Parties.SlotManagementTest do
       assert updated_slot.character_id == character.id
     end
 
-    test "returns error when slot already has vehicle (must clear first)", %{
+    test "populate_slot replaces vehicle with character", %{
       party: party,
       character: character,
       campaign: campaign
@@ -315,17 +315,12 @@ defmodule ShotElixir.Parties.SlotManagementTest do
         Parties.add_slot(party.id, %{"role" => "featured_foe", "vehicle_id" => vehicle.id})
 
       assert slot.vehicle_id == vehicle.id
+      assert slot.character_id == nil
 
-      # Attempting to populate with character when vehicle exists should fail
-      # (validation prevents having both character_id and vehicle_id)
-      assert {:error, _changeset} = Parties.populate_slot(party.id, slot.id, character.id)
-
-      # Clear the slot first, then populate
-      {:ok, cleared_slot} = Parties.clear_slot(party.id, slot.id)
-      assert cleared_slot.vehicle_id == nil
-
+      # populate_slot clears vehicle_id when setting character_id
       {:ok, populated_slot} = Parties.populate_slot(party.id, slot.id, character.id)
       assert populated_slot.character_id == character.id
+      assert populated_slot.vehicle_id == nil
     end
   end
 
