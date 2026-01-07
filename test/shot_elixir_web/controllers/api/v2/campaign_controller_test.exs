@@ -519,14 +519,15 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
     end
   end
 
-  describe "reset_grok_credits" do
+  describe "reset_ai_credits" do
     setup %{gamemaster: gm} do
       {:ok, campaign} =
         Campaigns.create_campaign(%{
           name: "Campaign with Exhausted Credits",
-          description: "Has exhausted grok credits",
+          description: "Has exhausted AI credits",
           user_id: gm.id,
-          grok_credits_exhausted_at: DateTime.utc_now(),
+          ai_credits_exhausted_at: DateTime.utc_now(),
+          ai_credits_exhausted_provider: "grok",
           batch_image_status: "generating",
           batch_images_completed: 43,
           batch_images_total: 65
@@ -535,18 +536,19 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       %{campaign: campaign}
     end
 
-    test "resets grok credits and batch status when owner", %{
+    test "resets AI credits and batch status when owner", %{
       conn: conn,
       gamemaster: gm,
       campaign: campaign
     } do
       conn = authenticate(conn, gm)
-      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_grok_credits")
+      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_ai_credits")
       response = json_response(conn, 200)
 
       assert response["id"] == campaign.id
-      assert response["grok_credits_exhausted_at"] == nil
-      assert response["is_grok_credits_exhausted"] == false
+      assert response["ai_credits_exhausted_at"] == nil
+      assert response["ai_credits_exhausted_provider"] == nil
+      assert response["is_ai_credits_exhausted"] == false
       assert response["batch_image_status"] == nil
       assert response["batch_images_completed"] == 0
       assert response["batch_images_total"] == 0
@@ -559,7 +561,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       campaign: campaign
     } do
       conn = authenticate(conn, player)
-      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_grok_credits")
+      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_ai_credits")
       assert json_response(conn, 403)["error"] == "Forbidden"
     end
 
@@ -569,18 +571,18 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       campaign: campaign
     } do
       conn = authenticate(conn, other_gm)
-      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_grok_credits")
+      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_ai_credits")
       assert json_response(conn, 403)["error"] == "Forbidden"
     end
 
     test "returns not found for invalid campaign id", %{conn: conn, gamemaster: gm} do
       conn = authenticate(conn, gm)
-      conn = post(conn, ~p"/api/v2/campaigns/#{Ecto.UUID.generate()}/reset_grok_credits")
+      conn = post(conn, ~p"/api/v2/campaigns/#{Ecto.UUID.generate()}/reset_ai_credits")
       assert json_response(conn, 404)["error"] == "Campaign not found"
     end
 
     test "returns 401 when not authenticated", %{conn: conn, campaign: campaign} do
-      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_grok_credits")
+      conn = post(conn, ~p"/api/v2/campaigns/#{campaign.id}/reset_ai_credits")
       assert json_response(conn, 401)
     end
   end

@@ -157,13 +157,13 @@ defmodule ShotElixir.Emails.UserEmail do
     - campaign: The campaign affected
     - provider_name: The name of the AI provider (e.g., "Grok", "OpenAI")
   """
-  def grok_credits_exhausted(user, campaign, provider_name \\ "Grok") do
+  def ai_credits_exhausted(user, campaign, provider_name \\ "Unknown") do
     new()
     |> to({user.first_name || user.email, user.email})
     |> from({@from_name, @from_email})
     |> subject("AI Image Generation Unavailable - #{provider_name} Credits Exhausted")
     |> html_body(
-      render_template("grok_credits_exhausted.html", %{
+      render_template("ai_credits_exhausted.html", %{
         user: user,
         campaign: campaign,
         provider_name: provider_name
