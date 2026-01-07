@@ -332,22 +332,18 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
 
   @doc """
   Resets the AI credit exhaustion status for a campaign.
-  Clears both provider-agnostic and legacy Grok-specific fields.
   Also clears any stuck batch image generation status.
   Gamemaster only.
   """
-  def reset_grok_credits(conn, %{"campaign_id" => id}) do
+  def reset_ai_credits(conn, %{"campaign_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Campaign{} = campaign <- Campaigns.get_campaign(id),
          :ok <- authorize_campaign_owner(campaign, current_user),
          {:ok, updated_campaign} <-
            Campaigns.update_campaign(campaign, %{
-             # Provider-agnostic fields
              ai_credits_exhausted_at: nil,
              ai_credits_exhausted_provider: nil,
-             # Legacy Grok-specific fields (for backward compatibility)
-             grok_credits_exhausted_at: nil,
              batch_image_status: nil,
              batch_images_completed: 0,
              batch_images_total: 0
@@ -358,13 +354,9 @@ defmodule ShotElixirWeb.Api.V2.CampaignController do
          %{
            campaign: %{
              id: updated_campaign.id,
-             # Provider-agnostic fields
              is_ai_credits_exhausted: false,
              ai_credits_exhausted_at: nil,
              ai_credits_exhausted_provider: nil,
-             # Legacy fields (for backward compatibility)
-             is_grok_credits_exhausted: false,
-             grok_credits_exhausted_at: nil,
              is_batch_images_in_progress: false,
              batch_image_status: nil,
              batch_images_completed: 0,

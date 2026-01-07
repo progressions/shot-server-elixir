@@ -123,14 +123,6 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
       ai_credits_exhausted_provider: provider
     }
 
-    # Only set legacy grok field when provider is actually grok
-    attrs =
-      if provider == "grok" do
-        Map.put(attrs, :grok_credits_exhausted_at, now)
-      else
-        attrs
-      end
-
     campaign
     |> Ecto.Changeset.change(attrs)
     |> Repo.update()
@@ -151,10 +143,10 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
       from(c in Campaign,
         where: c.id == ^campaign_id,
         where:
-          is_nil(c.grok_credits_exhausted_notified_at) or
-            c.grok_credits_exhausted_notified_at < ^cooldown_threshold
+          is_nil(c.ai_credits_exhausted_notified_at) or
+            c.ai_credits_exhausted_notified_at < ^cooldown_threshold
       )
-      |> Repo.update_all(set: [grok_credits_exhausted_notified_at: now])
+      |> Repo.update_all(set: [ai_credits_exhausted_notified_at: now])
 
     if count > 0 do
       {:ok, :claimed}

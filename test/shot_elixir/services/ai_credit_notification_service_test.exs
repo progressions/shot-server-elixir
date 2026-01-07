@@ -35,8 +35,6 @@ defmodule ShotElixir.Services.AiCreditNotificationServiceTest do
       updated = Repo.get(Campaign, campaign.id)
       assert updated.ai_credits_exhausted_at != nil
       assert updated.ai_credits_exhausted_provider == "grok"
-      # Legacy field should be set for grok
-      assert updated.grok_credits_exhausted_at != nil
     end
 
     test "updates campaign exhaustion fields for openai provider", %{
@@ -53,8 +51,6 @@ defmodule ShotElixir.Services.AiCreditNotificationServiceTest do
       updated = Repo.get(Campaign, campaign.id)
       assert updated.ai_credits_exhausted_at != nil
       assert updated.ai_credits_exhausted_provider == "openai"
-      # Legacy field should NOT be set for openai
-      assert updated.grok_credits_exhausted_at == nil
     end
 
     test "updates campaign exhaustion fields for gemini provider", %{
@@ -71,8 +67,6 @@ defmodule ShotElixir.Services.AiCreditNotificationServiceTest do
       updated = Repo.get(Campaign, campaign.id)
       assert updated.ai_credits_exhausted_at != nil
       assert updated.ai_credits_exhausted_provider == "gemini"
-      # Legacy field should NOT be set for gemini
-      assert updated.grok_credits_exhausted_at == nil
     end
 
     test "returns error when campaign not found", %{user: user} do

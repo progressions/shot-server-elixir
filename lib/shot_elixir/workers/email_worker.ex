@@ -122,7 +122,7 @@ defmodule ShotElixir.Workers.EmailWorker do
     user = Repo.get!(ShotElixir.Accounts.User, user_id)
     campaign = Repo.get!(ShotElixir.Campaigns.Campaign, campaign_id)
     provider_name = Map.get(args, "provider_name", "Unknown")
-    UserEmail.grok_credits_exhausted(user, campaign, provider_name)
+    UserEmail.ai_credits_exhausted(user, campaign, provider_name)
   end
 
   # Build admin error notification email
