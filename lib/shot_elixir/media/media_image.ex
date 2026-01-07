@@ -118,6 +118,9 @@ defmodule ShotElixir.Media.MediaImage do
     image
     |> cast(changes, [:entity_type, :entity_id, :status, :active_storage_blob_id])
     |> validate_required([:entity_type, :entity_id])
+    |> validate_inclusion(:entity_type, valid_entity_types(),
+      message: "must be one of: #{Enum.join(valid_entity_types(), ", ")}"
+    )
   end
 
   @doc """
@@ -141,7 +144,24 @@ defmodule ShotElixir.Media.MediaImage do
     # Insert transformation before the file path
     # Format: https://ik.imagekit.io/id/chi-war-env/folder/file.jpg
     # Becomes: https://ik.imagekit.io/id/chi-war-env/tr:w-200,h-200,fo-auto/folder/file.jpg
-    String.replace(url, "/chi-war-", "/tr:w-200,h-200,fo-auto/chi-war-")
+
+    # Try chi-war- pattern first, then fall back to regex for other formats
+    cond do
+      String.contains?(url, "/chi-war-") ->
+        String.replace(url, "/chi-war-", "/tr:w-200,h-200,fo-auto/chi-war-")
+
+      true ->
+        # Regex pattern to match ImageKit URL format: ik.imagekit.io/ID/path
+        # Insert transformation after the ID segment
+        case Regex.run(~r{^(https?://ik\.imagekit\.io/[^/]+/)(.+)$}, url) do
+          [_full, base, path] ->
+            base <> "tr:w-200,h-200,fo-auto/" <> path
+
+          nil ->
+            # If URL doesn't match expected format, return original URL
+            url
+        end
+    end
   end
 
   def thumbnail_url(_), do: nil

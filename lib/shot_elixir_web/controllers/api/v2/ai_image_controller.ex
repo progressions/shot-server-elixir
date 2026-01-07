@@ -188,13 +188,23 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                         {:ok, attachment} ->
                           # Update the media_image record to mark as attached
                           if media_image do
-                            ShotElixir.Media.MediaImage.attach_changeset(
-                              media_image,
-                              entity_class,
-                              entity.id,
-                              attachment.blob_id
-                            )
-                            |> ShotElixir.Repo.update()
+                            case ShotElixir.Media.MediaImage.attach_changeset(
+                                   media_image,
+                                   entity_class,
+                                   entity.id,
+                                   attachment.blob_id
+                                 )
+                                 |> ShotElixir.Repo.update() do
+                              {:ok, _updated} ->
+                                :ok
+
+                              {:error, changeset} ->
+                                require Logger
+
+                                Logger.warning(
+                                  "Failed to update media_image attachment status: #{inspect(changeset.errors)}"
+                                )
+                            end
                           end
 
                           # Reload entity to get fresh data

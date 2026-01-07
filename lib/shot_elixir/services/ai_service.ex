@@ -271,8 +271,8 @@ defmodule ShotElixir.Services.AiService do
 
         {:error, reason} ->
           Logger.error("Failed to create ai_generated_image record: #{inspect(reason)}")
-          # Still return the URL even if DB record failed
-          {:ok, upload_result.url}
+          # Return error so caller knows the DB record was not created
+          {:error, {:db_record_failed, reason}}
       end
     else
       {:error, reason} ->

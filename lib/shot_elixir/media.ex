@@ -212,8 +212,33 @@ defmodule ShotElixir.Media do
     - image: MediaImage struct or ID
     - entity_type: "Character", "Vehicle", etc.
     - entity_id: UUID of the entity
+
+  ## Security
+  Verifies that the entity belongs to the same campaign as the image to prevent
+  cross-campaign data leaks.
   """
   def attach_to_entity(%MediaImage{} = image, entity_type, entity_id) do
+    # Verify entity belongs to the same campaign as the image (security check)
+    case verify_entity_campaign(entity_type, entity_id, image.campaign_id) do
+      :ok ->
+        do_attach_to_entity(image, entity_type, entity_id)
+
+      {:error, :not_found} ->
+        {:error, :entity_not_found}
+
+      {:error, :campaign_mismatch} ->
+        {:error, :unauthorized}
+    end
+  end
+
+  def attach_to_entity(image_id, entity_type, entity_id) when is_binary(image_id) do
+    case get_image(image_id) do
+      nil -> {:error, :not_found}
+      image -> attach_to_entity(image, entity_type, entity_id)
+    end
+  end
+
+  defp do_attach_to_entity(%MediaImage{} = image, entity_type, entity_id) do
     # Build upload_result compatible with ActiveStorage.attach_image
     upload_result = %{
       file_id: image.imagekit_file_id,
@@ -242,10 +267,67 @@ defmodule ShotElixir.Media do
     end
   end
 
-  def attach_to_entity(image_id, entity_type, entity_id) when is_binary(image_id) do
-    case get_image(image_id) do
-      nil -> {:error, :not_found}
-      image -> attach_to_entity(image, entity_type, entity_id)
+  # Verify that an entity belongs to the specified campaign
+  defp verify_entity_campaign(entity_type, entity_id, campaign_id) do
+    query =
+      case entity_type do
+        "Character" ->
+          from(e in ShotElixir.Characters.Character,
+            where: e.id == ^entity_id,
+            select: e.campaign_id
+          )
+
+        "Vehicle" ->
+          from(e in ShotElixir.Vehicles.Vehicle,
+            where: e.id == ^entity_id,
+            select: e.campaign_id
+          )
+
+        "Weapon" ->
+          from(e in ShotElixir.Weapons.Weapon,
+            where: e.id == ^entity_id,
+            select: e.campaign_id
+          )
+
+        "Schtick" ->
+          from(e in ShotElixir.Schticks.Schtick,
+            where: e.id == ^entity_id,
+            select: e.campaign_id
+          )
+
+        "Site" ->
+          from(e in ShotElixir.Sites.Site, where: e.id == ^entity_id, select: e.campaign_id)
+
+        "Faction" ->
+          from(e in ShotElixir.Factions.Faction,
+            where: e.id == ^entity_id,
+            select: e.campaign_id
+          )
+
+        "Party" ->
+          from(e in ShotElixir.Parties.Party, where: e.id == ^entity_id, select: e.campaign_id)
+
+        "User" ->
+          # Users don't have campaign_id - return :ok for User entity type
+          :skip_check
+
+        _ ->
+          nil
+      end
+
+    case query do
+      :skip_check ->
+        :ok
+
+      nil ->
+        {:error, :not_found}
+
+      query ->
+        case Repo.one(query) do
+          nil -> {:error, :not_found}
+          ^campaign_id -> :ok
+          _other_campaign -> {:error, :campaign_mismatch}
+        end
     end
   end
 
@@ -354,12 +436,29 @@ defmodule ShotElixir.Media do
   end
 
   # Helper to extract path from full ImageKit URL
-  defp extract_path_from_url(url) when is_binary(url) do
+  defp extract_path_from_url(url) when is_binary(url) and url != "" do
     # URL format: https://ik.imagekit.io/nvqgwnjgv/chi-war-dev/characters/file.jpg
     # We want: chi-war-dev/characters/file.jpg
-    case String.split(url, ~r/ik\.imagekit\.io\/[^\/]+\//) do
-      [_, path] -> path
-      _ -> Path.basename(url)
+
+    # Use a more precise regex that captures the path after the ImageKit ID
+    case Regex.run(~r{^https?://ik\.imagekit\.io/[^/]+/(.+)$}, url) do
+      [_full, path] when path != "" ->
+        # Remove any query parameters or fragments
+        path
+        |> String.split("?")
+        |> hd()
+        |> String.split("#")
+        |> hd()
+
+      _ ->
+        # Fallback: try to get basename if URL doesn't match expected format
+        case URI.parse(url) do
+          %URI{path: path} when is_binary(path) and path != "" ->
+            Path.basename(path)
+
+          _ ->
+            nil
+        end
     end
   end
 
@@ -371,9 +470,17 @@ defmodule ShotElixir.Media do
 
   defp get_int_param(params, key, default) do
     case params[key] do
-      nil -> default
-      value when is_integer(value) -> value
-      value when is_binary(value) -> String.to_integer(value)
+      nil ->
+        default
+
+      value when is_integer(value) ->
+        value
+
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {int, ""} -> int
+          _ -> default
+        end
     end
   end
 end

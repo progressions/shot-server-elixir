@@ -25,18 +25,17 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   """
   def index(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
-    campaign_id = current_user.current_campaign_id
 
-    unless campaign_id do
-      conn
-      |> put_status(:bad_request)
-      |> json(%{error: "No current campaign set"})
-    else
-      result = Media.list_campaign_images(campaign_id, params)
-
+    with campaign_id when not is_nil(campaign_id) <- current_user.current_campaign_id,
+         result <- Media.list_campaign_images(campaign_id, params) do
       conn
       |> put_view(ShotElixirWeb.Api.V2.MediaLibraryView)
       |> render("index.json", result)
+    else
+      nil ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "No current campaign set"})
     end
   end
 
@@ -217,13 +216,17 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   end
 
   defp verify_images_in_campaign(ids, campaign_id) do
-    # Check that all image IDs belong to the campaign
-    images = Enum.map(ids, &Media.get_image/1)
+    # Check that all image IDs belong to the campaign with a single query
+    import Ecto.Query
 
-    if Enum.all?(images, fn
-         %MediaImage{campaign_id: ^campaign_id} -> true
-         _ -> false
-       end) do
+    matching_count =
+      from(i in MediaImage,
+        where: i.id in ^ids and i.campaign_id == ^campaign_id,
+        select: count(i.id)
+      )
+      |> ShotElixir.Repo.one()
+
+    if matching_count == length(ids) do
       :ok
     else
       {:error, :unauthorized}
