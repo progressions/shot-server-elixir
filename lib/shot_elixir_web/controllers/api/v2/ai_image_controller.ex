@@ -417,14 +417,16 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
   end
 
   defp get_entity("Campaign", entity_id, campaign_id) do
-    # For Campaign entities, the entity_id should match the campaign_id
-    if entity_id == campaign_id do
-      case ShotElixir.Campaigns.get_campaign(entity_id) do
-        nil -> {:error, :not_found}
-        campaign -> {:ok, campaign}
-      end
-    else
-      {:error, :not_found}
+    import Ecto.Query
+
+    # For Campaign entities, entity_id must match campaign_id
+    query =
+      from c in ShotElixir.Campaigns.Campaign,
+        where: c.id == ^entity_id and c.id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      campaign -> {:ok, campaign}
     end
   end
 

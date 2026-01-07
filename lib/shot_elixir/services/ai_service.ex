@@ -375,7 +375,7 @@ defmodule ShotElixir.Services.AiService do
           "Generate a dramatic, cinematic image representing a role-playing game campaign: #{campaign.description}"
 
         # Fallback to name-based prompt
-        campaign.name && campaign.name != "" ->
+        is_binary(campaign.name) && campaign.name != "" ->
           "Generate a dramatic, cinematic image for a role-playing game campaign called '#{campaign.name}'. The image should evoke action, adventure, and intrigue suitable for a Hong Kong action movie style RPG."
 
         true ->
