@@ -9,6 +9,7 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Services.NotionClient
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
+  alias ShotElixir.Notion
   alias ShotElixir.Repo
 
   # Use runtime config to allow token to be added at runtime without validation errors
@@ -71,11 +72,13 @@ defmodule ShotElixir.Services.NotionService do
 
     Logger.debug("Creating Notion page with database_id: #{database_id()}")
 
-    page =
-      NotionClient.create_page(%{
-        "parent" => %{"database_id" => database_id()},
-        "properties" => properties
-      })
+    # Capture payload for logging
+    payload = %{
+      "parent" => %{"database_id" => database_id()},
+      "properties" => properties
+    }
+
+    page = NotionClient.create_page(payload)
 
     Logger.debug("Notion API response received")
 
@@ -83,6 +86,9 @@ defmodule ShotElixir.Services.NotionService do
     case page do
       %{"id" => page_id} when is_binary(page_id) ->
         Logger.debug("Extracted page ID: #{inspect(page_id)}")
+
+        # Log successful sync
+        Notion.log_success(character.id, payload, page)
 
         # Update character with notion_page_id
         case Characters.update_character(character, %{notion_page_id: page_id}) do
@@ -102,16 +108,28 @@ defmodule ShotElixir.Services.NotionService do
 
       %{"code" => error_code, "message" => message} ->
         Logger.error("Notion API error: #{error_code}")
+        # Log error sync
+        Notion.log_error(
+          character.id,
+          payload,
+          page,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
         Logger.error("Unexpected response from Notion API")
+        # Log error sync
+        Notion.log_error(character.id, payload, page, "Unexpected response from Notion API")
         {:error, :unexpected_notion_response}
     end
   rescue
     error ->
       # Avoid logging potentially sensitive HTTP request metadata
       Logger.error("Failed to create Notion page: #{Exception.message(error)}")
+      # Log error sync (with nil payload since we may not have gotten there)
+      Notion.log_error(character.id, %{}, %{}, "Exception: #{Exception.message(error)}")
       {:error, :notion_request_failed}
   end
 
@@ -132,7 +150,13 @@ defmodule ShotElixir.Services.NotionService do
         properties
       end
 
-    NotionClient.update_page(character.notion_page_id, properties)
+    # Capture payload for logging
+    payload = %{
+      "page_id" => character.notion_page_id,
+      "properties" => properties
+    }
+
+    response = NotionClient.update_page(character.notion_page_id, properties)
 
     # Add image if not present in Notion
     page = NotionClient.get_page(character.notion_page_id)
@@ -142,10 +166,21 @@ defmodule ShotElixir.Services.NotionService do
       add_image_to_notion(character)
     end
 
+    # Log successful sync
+    Notion.log_success(character.id, payload, response || page)
+
     {:ok, page}
   rescue
     error ->
       Logger.error("Failed to update Notion page: #{inspect(error)}")
+      # Log error sync
+      Notion.log_error(
+        character.id,
+        %{"page_id" => character.notion_page_id},
+        %{},
+        "Exception: #{inspect(error)}"
+      )
+
       {:error, error}
   end
 
