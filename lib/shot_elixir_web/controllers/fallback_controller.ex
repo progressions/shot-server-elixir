@@ -28,4 +28,20 @@ defmodule ShotElixirWeb.FallbackController do
     |> put_view(ShotElixirWeb.ErrorView)
     |> render("403.json")
   end
+
+  # Generic error handler for string errors
+  def call(conn, {:error, reason}) when is_binary(reason) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> put_view(ShotElixirWeb.ErrorView)
+    |> render("error.json", error: reason)
+  end
+
+  # Catch-all for other error tuples
+  def call(conn, {:error, reason}) do
+    conn
+    |> put_status(:unprocessable_entity)
+    |> put_view(ShotElixirWeb.ErrorView)
+    |> render("error.json", error: inspect(reason))
+  end
 end

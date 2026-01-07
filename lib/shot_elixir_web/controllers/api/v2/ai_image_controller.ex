@@ -63,7 +63,8 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                         case ShotElixir.Services.AiService.generate_images_for_entity(
                                entity_class,
                                entity_id,
-                               3
+                               3,
+                               user_id: user_id
                              ) do
                           {:ok, urls} when is_list(urls) ->
                             # Broadcast success with image URLs as JSON
@@ -175,13 +176,37 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
                   # Verify entity exists and belongs to campaign
                   case get_entity(entity_class, entity_id, current_user.current_campaign_id) do
                     {:ok, entity} ->
+                      # First, try to find and update the media_image record
+                      media_image = ShotElixir.Media.get_image_by_url(image_url)
+
                       # Attach image from URL using AI service
                       case ShotElixir.Services.AiService.attach_image_from_url(
                              entity_class,
                              entity.id,
                              image_url
                            ) do
-                        {:ok, _attachment} ->
+                        {:ok, attachment} ->
+                          # Update the media_image record to mark as attached
+                          if media_image do
+                            case ShotElixir.Media.MediaImage.attach_changeset(
+                                   media_image,
+                                   entity_class,
+                                   entity.id,
+                                   attachment.blob_id
+                                 )
+                                 |> ShotElixir.Repo.update() do
+                              {:ok, _updated} ->
+                                :ok
+
+                              {:error, changeset} ->
+                                require Logger
+
+                                Logger.warning(
+                                  "Failed to update media_image attachment status: #{inspect(changeset.errors)}"
+                                )
+                            end
+                          end
+
                           # Reload entity to get fresh data
                           case get_entity(
                                  entity_class,

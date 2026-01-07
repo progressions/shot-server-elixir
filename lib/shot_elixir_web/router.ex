@@ -238,6 +238,13 @@ defmodule ShotElixirWeb.Router do
     post "/ai_images", AiImageController, :create
     post "/ai_images/attach", AiImageController, :attach
 
+    # Media Library
+    resources "/media_library", MediaLibraryController, only: [:index, :show, :delete]
+    post "/media_library/bulk_delete", MediaLibraryController, :bulk_delete
+    post "/media_library/:id/duplicate", MediaLibraryController, :duplicate
+    post "/media_library/:id/attach", MediaLibraryController, :attach
+    get "/media_library/:id/download", MediaLibraryController, :download
+
     resources "/chase_relationships", ChaseRelationshipController, except: [:new, :edit]
 
     get "/image_positions/:positionable_type/:positionable_id", ImagePositionController, :show

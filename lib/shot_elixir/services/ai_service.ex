@@ -135,10 +135,19 @@ defmodule ShotElixir.Services.AiService do
       {:ok, %Attachment{}}
   """
   def attach_image_from_url(entity_type, entity_id, image_url) when is_binary(image_url) do
+    alias ShotElixir.Media
+
+    # Check if this URL is already in our media library (e.g., an existing AI-generated orphan)
+    existing_image = Media.get_image_by_url(image_url)
+
+    # Determine the source type - keep existing source if found, otherwise "upload"
+    source = if existing_image, do: existing_image.source, else: "upload"
+
     with {:ok, temp_file} <- ImageUploader.download_image(image_url),
          {:ok, upload_result} <-
            ImageUploader.upload_to_imagekit(temp_file, entity_type, entity_id),
-         {:ok, attachment} <- ActiveStorage.attach_image(entity_type, entity_id, upload_result) do
+         {:ok, attachment} <-
+           ActiveStorage.attach_image(entity_type, entity_id, upload_result, source: source) do
       # Clean up temp file
       File.rm(temp_file)
       {:ok, attachment}
@@ -151,18 +160,20 @@ defmodule ShotElixir.Services.AiService do
 
   @doc """
   Generates AI images for an entity using the configured AI provider.
-  Returns a list of image URLs.
+  Downloads, stores in ImageKit, and creates database records for each image.
+  Returns a list of ImageKit URLs (not temporary AI URLs).
 
   ## Parameters
     - entity_type: "Character", "Vehicle", etc.
     - entity_id: UUID of the entity
     - num_images: Number of images to generate (default 3)
+    - opts: Optional keyword list with :user_id for tracking who generated
 
   ## Returns
-    - {:ok, [urls]} on success
+    - {:ok, [imagekit_urls]} on success
     - {:error, reason} on failure
   """
-  def generate_images_for_entity(entity_type, entity_id, num_images \\ 3) do
+  def generate_images_for_entity(entity_type, entity_id, num_images \\ 3, opts \\ []) do
     Logger.info("Generating #{num_images} AI images for #{entity_type}:#{entity_id}")
 
     # Get entity, campaign, credential, and prompt first
@@ -175,8 +186,26 @@ defmodule ShotElixir.Services.AiService do
         {:ok, urls} ->
           # Handle single URL vs list
           urls_list = if is_list(urls), do: urls, else: [urls]
-          Logger.info("Successfully generated #{length(urls_list)} images")
-          {:ok, urls_list}
+          Logger.info("Successfully generated #{length(urls_list)} images from AI provider")
+
+          # Store each image in ImageKit and create database records
+          user_id = Keyword.get(opts, :user_id)
+
+          stored_urls =
+            urls_list
+            |> Enum.map(fn url ->
+              store_ai_generated_image(url, campaign.id, prompt, credential.provider, user_id)
+            end)
+            |> Enum.filter(&match?({:ok, _}, &1))
+            |> Enum.map(fn {:ok, imagekit_url} -> imagekit_url end)
+
+          if length(stored_urls) > 0 do
+            Logger.info("Stored #{length(stored_urls)} images in ImageKit")
+            {:ok, stored_urls}
+          else
+            Logger.error("Failed to store any generated images")
+            {:error, "Failed to store generated images"}
+          end
 
         {:error, :credit_exhausted, message} = error ->
           Logger.error("AI API credits exhausted: #{message}")
@@ -205,6 +234,67 @@ defmodule ShotElixir.Services.AiService do
         Logger.error("Failed to generate images: #{inspect(reason)}")
         error
     end
+  end
+
+  @doc """
+  Downloads an AI-generated image, uploads to ImageKit, and creates a database record.
+  Returns the ImageKit URL for preview.
+  """
+  def store_ai_generated_image(ai_url, campaign_id, prompt, ai_provider, user_id) do
+    alias ShotElixir.Media
+
+    with {:ok, temp_file} <- ImageUploader.download_image(ai_url),
+         {:ok, upload_result} <- upload_ai_image_to_imagekit(temp_file, campaign_id) do
+      # Clean up temp file
+      File.rm(temp_file)
+
+      # Create database record as orphan
+      attrs = %{
+        campaign_id: campaign_id,
+        status: "orphan",
+        imagekit_file_id: upload_result.file_id,
+        imagekit_url: upload_result.url,
+        imagekit_file_path: upload_result.name,
+        filename: Path.basename(upload_result.name),
+        content_type: upload_result.metadata["fileType"] || "image/jpeg",
+        byte_size: upload_result.size,
+        width: upload_result.width,
+        height: upload_result.height,
+        prompt: prompt,
+        ai_provider: ai_provider,
+        generated_by_id: user_id
+      }
+
+      case Media.create_ai_image(attrs) do
+        {:ok, _image} ->
+          {:ok, upload_result.url}
+
+        {:error, reason} ->
+          Logger.error("Failed to create ai_generated_image record: #{inspect(reason)}")
+          # Return error so caller knows the DB record was not created
+          {:error, {:db_record_failed, reason}}
+      end
+    else
+      {:error, reason} ->
+        Logger.error("Failed to store AI image: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp upload_ai_image_to_imagekit(file_path, campaign_id) do
+    timestamp = DateTime.utc_now() |> DateTime.to_unix()
+    filename = "ai-generated-#{timestamp}-#{:rand.uniform(9999)}.jpg"
+
+    options = %{
+      file_name: filename,
+      folder: "/chi-war-#{environment()}/ai-generated/#{campaign_id}"
+    }
+
+    ShotElixir.Services.ImagekitService.upload_file(file_path, options)
+  end
+
+  defp environment do
+    Application.get_env(:shot_elixir, :environment) || Mix.env() |> to_string()
   end
 
   # Get entity by type and ID
