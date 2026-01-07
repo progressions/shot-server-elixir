@@ -685,16 +685,22 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               # Only include fields that are actually provided in params
-              # to avoid overwriting existing values with nil
+              # Use Map.has_key? to distinguish between "not provided" and "explicitly set to null"
+              # This allows clearing character_id/vehicle_id by sending null
               slot_attrs =
-                %{
-                  "character_id" => params["character_id"],
-                  "vehicle_id" => params["vehicle_id"],
-                  "default_mook_count" => params["default_mook_count"]
-                }
-                |> Map.reject(fn {_k, v} -> is_nil(v) end)
+                Enum.reduce(
+                  ["character_id", "vehicle_id", "default_mook_count"],
+                  %{},
+                  fn key, acc ->
+                    if Map.has_key?(params, key) do
+                      Map.put(acc, key, params[key])
+                    else
+                      acc
+                    end
+                  end
+                )
 
-              case Parties.update_slot(slot_id, slot_attrs) do
+              case Parties.update_slot(party_id, slot_id, slot_attrs) do
                 {:ok, _slot} ->
                   updated_party = Parties.get_party!(party_id)
 
@@ -743,7 +749,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
-              case Parties.remove_slot(slot_id) do
+              case Parties.remove_slot(party_id, slot_id) do
                 {:ok, _} ->
                   send_resp(conn, :no_content, "")
 

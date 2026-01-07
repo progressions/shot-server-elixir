@@ -624,9 +624,11 @@ defmodule ShotElixir.Parties do
 
   @doc """
   Updates a slot (change role, mook count, populate with character, etc.)
+  Requires party_id to verify the slot belongs to the specified party.
   """
-  def update_slot(slot_id, attrs) do
-    case Repo.get(Membership, slot_id) do
+  def update_slot(party_id, slot_id, attrs) do
+    # Query for slot that belongs to the specified party
+    case Repo.get_by(Membership, id: slot_id, party_id: party_id) do
       nil ->
         {:error, :not_found}
 
@@ -647,9 +649,11 @@ defmodule ShotElixir.Parties do
 
   @doc """
   Removes a slot from a party.
+  Requires party_id to verify the slot belongs to the specified party.
   """
-  def remove_slot(slot_id) do
-    case Repo.get(Membership, slot_id) do
+  def remove_slot(party_id, slot_id) do
+    # Query for slot that belongs to the specified party
+    case Repo.get_by(Membership, id: slot_id, party_id: party_id) do
       nil ->
         {:error, :not_found}
 
@@ -669,23 +673,26 @@ defmodule ShotElixir.Parties do
 
   @doc """
   Populates a slot with a character.
+  Requires party_id to verify the slot belongs to the specified party.
   """
-  def populate_slot(slot_id, character_id) do
-    update_slot(slot_id, %{"character_id" => character_id, "vehicle_id" => nil})
+  def populate_slot(party_id, slot_id, character_id) do
+    update_slot(party_id, slot_id, %{"character_id" => character_id, "vehicle_id" => nil})
   end
 
   @doc """
   Populates a slot with a vehicle.
+  Requires party_id to verify the slot belongs to the specified party.
   """
-  def populate_slot_with_vehicle(slot_id, vehicle_id) do
-    update_slot(slot_id, %{"vehicle_id" => vehicle_id, "character_id" => nil})
+  def populate_slot_with_vehicle(party_id, slot_id, vehicle_id) do
+    update_slot(party_id, slot_id, %{"vehicle_id" => vehicle_id, "character_id" => nil})
   end
 
   @doc """
   Clears a slot (removes character/vehicle but keeps the slot).
+  Requires party_id to verify the slot belongs to the specified party.
   """
-  def clear_slot(slot_id) do
-    update_slot(slot_id, %{"character_id" => nil, "vehicle_id" => nil})
+  def clear_slot(party_id, slot_id) do
+    update_slot(party_id, slot_id, %{"character_id" => nil, "vehicle_id" => nil})
   end
 
   @doc """

@@ -370,4 +370,78 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       assert %{"error" => "Membership not found"} = json_response(conn, 404)
     end
   end
+
+  describe "slot operations" do
+    setup %{campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Party",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Test Character",
+          campaign_id: campaign.id
+        })
+
+      %{party: party, character: character}
+    end
+
+    test "add_slot adds a slot to party", %{conn: conn, party: party} do
+      conn = post(conn, ~p"/api/v2/parties/#{party.id}/slots", role: "featured_foe")
+      assert returned_party = json_response(conn, 201)
+      assert [slot] = returned_party["slots"]
+      assert slot["role"] == "featured_foe"
+    end
+
+    test "update_slot can populate a slot with a character", %{
+      conn: conn,
+      party: party,
+      character: character
+    } do
+      {:ok, slot} = Parties.add_slot(party.id, %{"role" => "featured_foe"})
+
+      conn =
+        patch(conn, ~p"/api/v2/parties/#{party.id}/slots/#{slot.id}", character_id: character.id)
+
+      assert returned_party = json_response(conn, 200)
+      assert [updated_slot] = returned_party["slots"]
+      assert updated_slot["character"]["id"] == character.id
+    end
+
+    test "update_slot can clear a character from a slot by setting character_id to nil", %{
+      conn: conn,
+      party: party,
+      character: character
+    } do
+      # First, create a slot with a character
+      {:ok, slot} =
+        Parties.add_slot(party.id, %{"role" => "featured_foe", "character_id" => character.id})
+
+      # Verify the character is assigned (slots are memberships with roles)
+      slots = Parties.list_slots(party.id)
+      assert [slot_with_char] = slots
+      assert slot_with_char.character_id == character.id
+
+      # Now clear the character by sending nil
+      conn =
+        patch(conn, ~p"/api/v2/parties/#{party.id}/slots/#{slot.id}", character_id: nil)
+
+      assert returned_party = json_response(conn, 200)
+      assert [cleared_slot] = returned_party["slots"]
+      assert cleared_slot["character"] == nil
+    end
+
+    test "remove_slot removes a slot from party", %{conn: conn, party: party} do
+      {:ok, slot} = Parties.add_slot(party.id, %{"role" => "mook"})
+
+      conn = delete(conn, ~p"/api/v2/parties/#{party.id}/slots/#{slot.id}")
+      assert response(conn, 204)
+
+      # Slots are memberships with roles, check they're removed
+      slots = Parties.list_slots(party.id)
+      assert slots == []
+    end
+  end
 end
