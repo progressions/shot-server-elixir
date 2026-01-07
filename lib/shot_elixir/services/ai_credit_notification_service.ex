@@ -41,24 +41,40 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
          {:ok, updated_campaign} <- update_exhaustion_timestamp(campaign, provider) do
       # Use atomic check-and-set to prevent race condition
       # Only one worker will successfully claim the notification slot
-      case try_claim_notification_slot(campaign_id) do
-        {:ok, :claimed} ->
-          send_notification_email(updated_campaign, user_id, provider)
+      notification_result =
+        case try_claim_notification_slot(campaign_id) do
+          {:ok, :claimed} ->
+            case send_notification_email(updated_campaign, user_id, provider) do
+              :ok ->
+                Logger.info(
+                  "[AiCreditNotificationService] Notification sent for campaign #{campaign_id} (#{provider})"
+                )
 
-          Logger.info(
-            "[AiCreditNotificationService] Notification sent for campaign #{campaign_id} (#{provider})"
-          )
+                :ok
 
-        {:ok, :cooldown} ->
-          Logger.info(
-            "[AiCreditNotificationService] Within cooldown period for campaign #{campaign_id}"
-          )
-      end
+              {:error, reason} = error ->
+                Logger.error(
+                  "[AiCreditNotificationService] Failed to send notification for campaign #{campaign_id} (#{provider}): #{inspect(reason)}"
+                )
 
-      # Broadcast to WebSocket regardless of notification
+                error
+            end
+
+          {:ok, :cooldown} ->
+            Logger.info(
+              "[AiCreditNotificationService] Within cooldown period for campaign #{campaign_id}"
+            )
+
+            :ok
+        end
+
+      # Broadcast to WebSocket regardless of notification result
       broadcast_credit_status(updated_campaign, provider)
 
-      {:ok, :handled}
+      case notification_result do
+        {:error, _reason} = error -> error
+        _ -> {:ok, :handled}
+      end
     end
   end
 
@@ -102,13 +118,21 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
   defp update_exhaustion_timestamp(campaign, provider) do
     now = DateTime.utc_now() |> DateTime.truncate(:second)
 
-    campaign
-    |> Ecto.Changeset.change(%{
+    attrs = %{
       ai_credits_exhausted_at: now,
-      ai_credits_exhausted_provider: provider,
-      # Also update legacy fields for backward compatibility
-      grok_credits_exhausted_at: now
-    })
+      ai_credits_exhausted_provider: provider
+    }
+
+    # Only set legacy grok field when provider is actually grok
+    attrs =
+      if provider == "grok" do
+        Map.put(attrs, :grok_credits_exhausted_at, now)
+      else
+        attrs
+      end
+
+    campaign
+    |> Ecto.Changeset.change(attrs)
     |> Repo.update()
   end
 
@@ -144,7 +168,7 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
 
     # Queue email - timestamp already updated by try_claim_notification_slot
     job_args = %{
-      "type" => "grok_credits_exhausted",
+      "type" => "ai_credits_exhausted",
       "user_id" => user_id,
       "campaign_id" => campaign.id,
       "provider_name" => provider_name
@@ -166,7 +190,18 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
   defp format_provider_name("grok"), do: "Grok"
   defp format_provider_name("openai"), do: "OpenAI"
   defp format_provider_name("gemini"), do: "Gemini"
-  defp format_provider_name(other), do: other
+
+  defp format_provider_name(other) do
+    Logger.warning("[AiCreditNotificationService] Unknown AI provider: #{inspect(other)}")
+
+    other
+    |> to_string()
+    |> String.trim()
+    |> case do
+      "" -> "Unknown"
+      value -> String.capitalize(value)
+    end
+  end
 
   defp broadcast_credit_status(%Campaign{} = campaign, provider) do
     payload = %{
