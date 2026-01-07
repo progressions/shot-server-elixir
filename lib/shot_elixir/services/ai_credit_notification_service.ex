@@ -203,17 +203,14 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
     end
   end
 
-  defp broadcast_credit_status(%Campaign{} = campaign, provider) do
+  defp broadcast_credit_status(%Campaign{} = campaign, _provider) do
     payload = %{
       campaign: %{
         id: campaign.id,
-        # New provider-agnostic fields
+        # Provider-agnostic fields only
         is_ai_credits_exhausted: true,
         ai_credits_exhausted_at: campaign.ai_credits_exhausted_at,
-        ai_credits_exhausted_provider: provider,
-        # Legacy fields for backward compatibility
-        is_grok_credits_exhausted: true,
-        grok_credits_exhausted_at: campaign.grok_credits_exhausted_at
+        ai_credits_exhausted_provider: campaign.ai_credits_exhausted_provider
       }
     }
 
