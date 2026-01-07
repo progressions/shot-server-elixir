@@ -158,18 +158,34 @@ defmodule ShotElixir.Services.NotionService do
 
     response = NotionClient.update_page(character.notion_page_id, properties)
 
-    # Add image if not present in Notion
-    page = NotionClient.get_page(character.notion_page_id)
-    image = find_image_block(page)
+    # Check if Notion returned an error response
+    case response do
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error on update: #{error_code}")
 
-    unless image do
-      add_image_to_notion(character)
+        Notion.log_error(
+          character.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        # Add image if not present in Notion
+        page = NotionClient.get_page(character.notion_page_id)
+        image = find_image_block(page)
+
+        unless image do
+          add_image_to_notion(character)
+        end
+
+        # Log successful sync
+        Notion.log_success(character.id, payload, response || page)
+
+        {:ok, page}
     end
-
-    # Log successful sync
-    Notion.log_success(character.id, payload, response || page)
-
-    {:ok, page}
   rescue
     error ->
       Logger.error("Failed to update Notion page: #{inspect(error)}")
