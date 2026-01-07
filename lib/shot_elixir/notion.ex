@@ -4,6 +4,7 @@ defmodule ShotElixir.Notion do
   """
 
   import Ecto.Query, warn: false
+  require Logger
   alias ShotElixir.Repo
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.Characters
@@ -39,6 +40,8 @@ defmodule ShotElixir.Notion do
   defp broadcast_sync_log_created(character_id) do
     case Characters.get_character(character_id) do
       nil ->
+        Logger.warning("Cannot broadcast sync log created: character #{character_id} not found")
+
         :ok
 
       character ->
@@ -133,9 +136,17 @@ defmodule ShotElixir.Notion do
   # Private helper for pagination params
   defp get_pagination_param(params, key, default) do
     case params[key] do
-      nil -> default
-      value when is_integer(value) -> value
-      value when is_binary(value) -> String.to_integer(value)
+      nil ->
+        default
+
+      value when is_integer(value) ->
+        value
+
+      value when is_binary(value) ->
+        case Integer.parse(value) do
+          {int, ""} -> int
+          _ -> default
+        end
     end
   end
 end

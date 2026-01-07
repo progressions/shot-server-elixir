@@ -245,7 +245,7 @@ defmodule ShotElixir.Characters.Character do
   defp to_number(value) when is_binary(value) do
     case Integer.parse(value) do
       {int, ""} -> int
-      {int, _rest} -> int
+      {_int, _rest} -> nil
       :error -> nil
     end
   end

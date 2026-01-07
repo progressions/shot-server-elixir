@@ -40,10 +40,20 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
     campaign = Campaigns.get_campaign(character.campaign_id)
 
     cond do
-      user.admin -> :ok
-      campaign.user_id == user.id -> :ok
-      user.gamemaster && Campaigns.is_member?(campaign.id, user.id) -> :ok
-      true -> {:error, :forbidden}
+      user.admin ->
+        :ok
+
+      is_nil(campaign) ->
+        {:error, :not_found}
+
+      campaign.user_id == user.id ->
+        :ok
+
+      user.gamemaster && Campaigns.is_member?(campaign.id, user.id) ->
+        :ok
+
+      true ->
+        {:error, :forbidden}
     end
   end
 end
