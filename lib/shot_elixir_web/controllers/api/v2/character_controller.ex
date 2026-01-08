@@ -276,32 +276,40 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     current_user = Guardian.Plug.current_resource(conn)
 
     with %Character{} = character <- Characters.get_character(id),
-         :ok <- authorize_character_edit(character, current_user) do
-      # Require character to have a linked Notion page
-      if is_nil(character.notion_page_id) do
+         :ok <- authorize_character_edit(character, current_user),
+         :ok <- require_notion_page_linked(character),
+         {:ok, updated_character} <-
+           ShotElixir.Services.NotionService.update_character_from_notion(character) do
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+      |> render("show.json", character: updated_character)
+    else
+      nil ->
+        {:error, :not_found}
+
+      # Authorization errors - delegate to FallbackController
+      {:error, :forbidden} ->
+        {:error, :forbidden}
+
+      {:error, :not_found} ->
+        {:error, :not_found}
+
+      {:error, :no_notion_page} ->
         conn
         |> put_status(:unprocessable_entity)
         |> json(%{error: "Character has no Notion page linked"})
-      else
-        case ShotElixir.Services.NotionService.update_character_from_notion(character) do
-          {:ok, updated_character} ->
-            conn
-            |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-            |> render("show.json", character: updated_character)
 
-          {:error, reason} ->
-            Logger.error("Failed to sync from Notion: #{inspect(reason)}")
+      {:error, reason} ->
+        Logger.error("Failed to sync from Notion: #{inspect(reason)}")
 
-            conn
-            |> put_status(:unprocessable_entity)
-            |> json(%{error: "Failed to sync from Notion"})
-        end
-      end
-    else
-      nil -> {:error, :not_found}
-      {:error, reason} -> {:error, reason}
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "Failed to sync from Notion"})
     end
   end
+
+  defp require_notion_page_linked(%Character{notion_page_id: nil}), do: {:error, :no_notion_page}
+  defp require_notion_page_linked(%Character{}), do: :ok
 
   def create_notion_page(conn, %{"character_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
