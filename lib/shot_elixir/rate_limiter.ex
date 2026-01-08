@@ -120,6 +120,41 @@ defmodule ShotElixir.RateLimiter do
   end
 
   @doc """
+  Check rate limit for CLI auth start endpoint.
+  - Max 10 code generation requests per IP per hour
+  """
+  def check_cli_auth_start_rate_limit(ip_address) do
+    check_rate_limit("cli_auth_start_ip_#{ip_address}", 10, 3600)
+  end
+
+  @doc """
+  Check rate limit for CLI auth poll endpoint.
+  - Max 60 poll requests per IP per minute (allows polling every second)
+  - Max 30 poll requests per code per minute
+  """
+  def check_cli_auth_poll_rate_limit(ip_address, code) do
+    with :ok <- check_rate_limit("cli_auth_poll_ip_#{ip_address}", 60, 60),
+         :ok <- check_rate_limit("cli_auth_poll_code_#{code}", 30, 60) do
+      :ok
+    end
+  end
+
+  @doc """
+  Clear CLI auth rate limits for testing.
+  """
+  def clear_cli_auth_rate_limits(ip_address \\ "127.0.0.1", code \\ nil) do
+    init()
+    :ets.delete(@rate_limit_table, "cli_auth_start_ip_#{ip_address}")
+    :ets.delete(@rate_limit_table, "cli_auth_poll_ip_#{ip_address}")
+
+    if code do
+      :ets.delete(@rate_limit_table, "cli_auth_poll_code_#{code}")
+    end
+
+    :ok
+  end
+
+  @doc """
   Clean up expired rate limit entries.
   Can be called periodically via a scheduled job.
   """

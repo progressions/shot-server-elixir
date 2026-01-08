@@ -587,4 +587,118 @@ defmodule ShotElixir.AccountsTest do
       assert nil == Accounts.get_user_with_current_character("not_an_integer")
     end
   end
+
+  describe "cli_authorization_codes" do
+    @valid_user_attrs %{
+      email: "cli-auth-context-test@example.com",
+      password: "password123",
+      first_name: "CLI",
+      last_name: "User"
+    }
+
+    test "create_cli_auth_code/0 creates a code with expiry" do
+      assert {:ok, auth_code} = Accounts.create_cli_auth_code()
+
+      assert auth_code.code
+      assert String.length(auth_code.code) == 32
+      assert auth_code.approved == false
+      assert auth_code.user_id == nil
+      assert auth_code.expires_at
+
+      # Should expire in the future (approximately 10 minutes)
+      expires_in = DateTime.diff(auth_code.expires_at, DateTime.utc_now())
+      assert expires_in > 590 and expires_in <= 600
+    end
+
+    test "create_cli_auth_code/0 generates unique codes" do
+      {:ok, code1} = Accounts.create_cli_auth_code()
+      {:ok, code2} = Accounts.create_cli_auth_code()
+
+      refute code1.code == code2.code
+    end
+
+    test "get_cli_auth_code/1 returns code when valid and not expired" do
+      {:ok, auth_code} = Accounts.create_cli_auth_code()
+
+      fetched = Accounts.get_cli_auth_code(auth_code.code)
+
+      assert fetched.id == auth_code.id
+      assert fetched.code == auth_code.code
+    end
+
+    test "get_cli_auth_code/1 returns nil for non-existent code" do
+      assert nil == Accounts.get_cli_auth_code("nonexistent")
+    end
+
+    test "get_cli_auth_code/1 returns nil for invalid input" do
+      assert nil == Accounts.get_cli_auth_code(nil)
+      assert nil == Accounts.get_cli_auth_code(123)
+    end
+
+    test "approve_cli_auth_code/2 approves a valid code" do
+      {:ok, auth_code} = Accounts.create_cli_auth_code()
+      {:ok, user} = Accounts.create_user(@valid_user_attrs)
+
+      assert {:ok, approved} = Accounts.approve_cli_auth_code(auth_code.code, user)
+
+      assert approved.approved == true
+      assert approved.user_id == user.id
+    end
+
+    test "approve_cli_auth_code/2 returns error for non-existent code" do
+      {:ok, user} = Accounts.create_user(@valid_user_attrs)
+
+      assert {:error, :not_found} = Accounts.approve_cli_auth_code("nonexistent", user)
+    end
+
+    test "approve_cli_auth_code/2 returns error when already approved" do
+      {:ok, auth_code} = Accounts.create_cli_auth_code()
+      {:ok, user} = Accounts.create_user(@valid_user_attrs)
+
+      # First approval
+      {:ok, _} = Accounts.approve_cli_auth_code(auth_code.code, user)
+
+      # Second approval attempt
+      assert {:error, :already_approved} = Accounts.approve_cli_auth_code(auth_code.code, user)
+    end
+
+    test "poll_cli_auth_code/1 returns pending for unapproved code" do
+      {:ok, auth_code} = Accounts.create_cli_auth_code()
+
+      assert {:pending, expires_in} = Accounts.poll_cli_auth_code(auth_code.code)
+
+      assert expires_in > 0
+    end
+
+    test "poll_cli_auth_code/1 returns approved with user for approved code" do
+      {:ok, auth_code} = Accounts.create_cli_auth_code()
+      {:ok, user} = Accounts.create_user(@valid_user_attrs)
+      {:ok, _} = Accounts.approve_cli_auth_code(auth_code.code, user)
+
+      assert {:approved, returned_user} = Accounts.poll_cli_auth_code(auth_code.code)
+
+      assert returned_user.id == user.id
+      assert returned_user.email == user.email
+    end
+
+    test "poll_cli_auth_code/1 returns expired for non-existent code" do
+      assert {:error, :expired} = Accounts.poll_cli_auth_code("nonexistent")
+    end
+
+    test "poll_cli_auth_code/1 returns expired for invalid input" do
+      assert {:error, :expired} = Accounts.poll_cli_auth_code(nil)
+    end
+
+    test "poll_cli_auth_code/1 returns expired when user no longer exists" do
+      {:ok, auth_code} = Accounts.create_cli_auth_code()
+      {:ok, user} = Accounts.create_user(@valid_user_attrs)
+      {:ok, _} = Accounts.approve_cli_auth_code(auth_code.code, user)
+
+      # Delete the user
+      ShotElixir.Repo.delete!(user)
+
+      # Should return expired since user no longer exists
+      assert {:error, :expired} = Accounts.poll_cli_auth_code(auth_code.code)
+    end
+  end
 end

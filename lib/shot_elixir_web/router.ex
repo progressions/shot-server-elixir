@@ -86,6 +86,10 @@ defmodule ShotElixirWeb.Router do
 
     # Invitation registration (public - creates new user from invitation)
     post "/invitations/:id/register", InvitationController, :register
+
+    # CLI device authorization (public endpoints)
+    post "/cli/auth/start", CliAuthController, :start
+    post "/cli/auth/poll", CliAuthController, :poll
   end
 
   # API V2 endpoints - Authenticated
@@ -268,6 +272,9 @@ defmodule ShotElixirWeb.Router do
       patch "/dismiss_congratulations", OnboardingController, :dismiss_congratulations
       patch "/", OnboardingController, :update
     end
+
+    # CLI device authorization (authenticated - approval)
+    post "/cli/auth/approve", CliAuthController, :approve
 
     # WebAuthn/Passkey management (authenticated endpoints)
     post "/webauthn/register/options", WebauthnController, :registration_options
