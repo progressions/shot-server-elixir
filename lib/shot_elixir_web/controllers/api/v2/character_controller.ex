@@ -405,6 +405,71 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
+  @doc """
+  Create a new character from a Notion page.
+  Fetches the Notion page data and creates a character from it.
+  """
+  def create_from_notion(conn, %{"notion_page_id" => notion_page_id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+    campaign_id = current_user.current_campaign_id
+
+    unless campaign_id do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{error: "No current campaign set"})
+    else
+      # Fetch the Notion page
+      case ShotElixir.Services.NotionClient.get_page(notion_page_id) do
+        nil ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Notion page not found"})
+
+        %{"code" => error_code, "message" => message} ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
+
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed to fetch Notion page: #{message}"})
+
+        page when is_map(page) ->
+          # Create character from Notion page data
+          case ShotElixir.Services.NotionService.find_or_create_character_from_notion(
+                 page,
+                 campaign_id
+               ) do
+            {:ok, character} ->
+              # Set user_id to current user
+              {:ok, character} =
+                Characters.update_character(character, %{user_id: current_user.id})
+
+              # Queue Notion sync to keep it in sync
+              %{"character_id" => character.id}
+              |> SyncCharacterToNotionWorker.new()
+              |> Oban.insert()
+
+              conn
+              |> put_status(:created)
+              |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+              |> render("show.json", character: character)
+
+            {:error, reason} ->
+              Logger.error("Failed to create character from Notion: #{inspect(reason)}")
+
+              conn
+              |> put_status(:unprocessable_entity)
+              |> json(%{error: "Failed to create character from Notion"})
+          end
+      end
+    end
+  end
+
+  def create_from_notion(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "notion_page_id is required"})
+  end
+
   def import(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
     campaign_id = current_user.current_campaign_id
