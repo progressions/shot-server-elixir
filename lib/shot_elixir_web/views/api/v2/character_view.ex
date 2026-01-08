@@ -63,29 +63,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     }
   end
 
-  def render("templates.json", %{templates: templates}) do
-    %{
-      templates: Enum.map(templates, &render_template/1)
-    }
-  end
-
-  def render("from_template.json", %{characters: characters}) do
-    %{
-      characters: Enum.map(characters, &render_character_full/1)
-    }
-  end
-
-  # Template format (compact representation for CLI)
-  defp render_template(character) do
-    %{
-      id: character.id,
-      name: character.name,
-      character_type: get_in(character.action_values, ["Type"]),
-      action_values: character.action_values,
-      image_url: get_image_url(character)
-    }
-  end
-
   # Rails CharacterIndexSerializer format
   defp render_character_index(character) do
     %{
