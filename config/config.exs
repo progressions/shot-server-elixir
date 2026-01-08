@@ -95,7 +95,9 @@ config :shot_elixir, Oban,
        # Clean up expired Discord link codes every 10 minutes
        {"*/10 * * * *", ShotElixir.Workers.LinkCodeCleanupWorker},
        # Clean up expired WebAuthn challenges every hour
-       {"0 * * * *", ShotElixir.Workers.WebauthnChallengeCleanupWorker}
+       {"0 * * * *", ShotElixir.Workers.WebauthnChallengeCleanupWorker},
+       # Clean up expired CLI authorization codes every hour
+       {"0 * * * *", ShotElixir.Workers.CliAuthCodeCleanupWorker}
      ]}
   ]
 

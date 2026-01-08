@@ -732,7 +732,7 @@ defmodule ShotElixir.Accounts do
   """
   def create_cli_auth_code do
     code =
-      :crypto.strong_rand_bytes(4)
+      :crypto.strong_rand_bytes(16)
       |> Base.encode16()
       |> String.downcase()
 
@@ -790,8 +790,10 @@ defmodule ShotElixir.Accounts do
         {:pending, expires_in}
 
       %CliAuthorizationCode{approved: true, user_id: user_id} ->
-        user = get_user!(user_id)
-        {:approved, user}
+        case get_user(user_id) do
+          nil -> {:error, :expired}
+          user -> {:approved, user}
+        end
     end
   end
 

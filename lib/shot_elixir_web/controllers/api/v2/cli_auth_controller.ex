@@ -12,6 +12,7 @@ defmodule ShotElixirWeb.Api.V2.CliAuthController do
   use ShotElixirWeb, :controller
 
   alias ShotElixir.Accounts
+  alias ShotElixir.RateLimiter
   alias ShotElixirWeb.AuthHelpers
 
   action_fallback ShotElixirWeb.FallbackController
@@ -23,23 +24,33 @@ defmodule ShotElixirWeb.Api.V2.CliAuthController do
   Returns a code and URL for the user to approve.
   """
   def start(conn, _params) do
-    case Accounts.create_cli_auth_code() do
-      {:ok, auth_code} ->
-        url = "#{@frontend_url}/cli/auth?code=#{auth_code.code}"
-        expires_in = DateTime.diff(auth_code.expires_at, DateTime.utc_now())
+    ip_address = AuthHelpers.get_client_ip(conn)
 
+    case RateLimiter.check_cli_auth_start_rate_limit(ip_address) do
+      {:error, :rate_limit_exceeded} ->
         conn
-        |> put_status(:ok)
-        |> json(%{
-          code: auth_code.code,
-          url: url,
-          expires_in: expires_in
-        })
+        |> put_status(:too_many_requests)
+        |> json(%{error: "Too many requests. Please try again later."})
 
-      {:error, _changeset} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to create authorization code"})
+      :ok ->
+        case Accounts.create_cli_auth_code() do
+          {:ok, auth_code} ->
+            url = "#{@frontend_url}/cli/auth?code=#{auth_code.code}"
+            expires_in = DateTime.diff(auth_code.expires_at, DateTime.utc_now())
+
+            conn
+            |> put_status(:ok)
+            |> json(%{
+              code: auth_code.code,
+              url: url,
+              expires_in: expires_in
+            })
+
+          {:error, _changeset} ->
+            conn
+            |> put_status(:internal_server_error)
+            |> json(%{error: "Failed to create authorization code"})
+        end
     end
   end
 
@@ -48,27 +59,37 @@ defmodule ShotElixirWeb.Api.V2.CliAuthController do
   Returns pending, approved (with token), or expired.
   """
   def poll(conn, %{"code" => code}) do
-    case Accounts.poll_cli_auth_code(code) do
-      {:pending, expires_in} ->
-        conn
-        |> put_status(:ok)
-        |> json(%{status: "pending", expires_in: expires_in})
+    ip_address = AuthHelpers.get_client_ip(conn)
 
-      {:approved, user} ->
-        {token, _claims} = Accounts.generate_auth_token(user)
-
+    case RateLimiter.check_cli_auth_poll_rate_limit(ip_address, code) do
+      {:error, :rate_limit_exceeded} ->
         conn
-        |> put_status(:ok)
-        |> json(%{
-          status: "approved",
-          token: token,
-          user: AuthHelpers.render_user(user)
-        })
+        |> put_status(:too_many_requests)
+        |> json(%{error: "Too many requests. Please try again later."})
 
-      {:error, :expired} ->
-        conn
-        |> put_status(:gone)
-        |> json(%{status: "expired", error: "Authorization code expired"})
+      :ok ->
+        case Accounts.poll_cli_auth_code(code) do
+          {:pending, expires_in} ->
+            conn
+            |> put_status(:ok)
+            |> json(%{status: "pending", expires_in: expires_in})
+
+          {:approved, user} ->
+            {:ok, token, _claims} = Accounts.generate_auth_token(user)
+
+            conn
+            |> put_status(:ok)
+            |> json(%{
+              status: "approved",
+              token: token,
+              user: AuthHelpers.render_user(user)
+            })
+
+          {:error, :expired} ->
+            conn
+            |> put_status(:gone)
+            |> json(%{status: "expired", error: "Authorization code expired"})
+        end
     end
   end
 
