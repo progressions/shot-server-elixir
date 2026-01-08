@@ -807,8 +807,8 @@ defmodule ShotElixir.Accounts do
   Called when a CLI authorization code is approved and a token is issued.
   """
   def create_cli_session(%User{} = user, attrs \\ %{}) do
-    %CliSession{}
-    |> CliSession.changeset(Map.put(attrs, :user_id, user.id))
+    %CliSession{user_id: user.id}
+    |> CliSession.changeset(attrs)
     |> Repo.insert()
   end
 

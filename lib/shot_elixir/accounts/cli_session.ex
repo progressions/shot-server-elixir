@@ -27,7 +27,7 @@ defmodule ShotElixir.Accounts.CliSession do
   @doc false
   def changeset(cli_session, attrs) do
     cli_session
-    |> cast(attrs, [:ip_address, :user_agent, :last_seen_at, :user_id])
+    |> cast(attrs, [:ip_address, :user_agent, :last_seen_at])
     |> validate_required([:user_id])
   end
 end

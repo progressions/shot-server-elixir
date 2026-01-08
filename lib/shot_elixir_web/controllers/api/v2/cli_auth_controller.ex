@@ -11,6 +11,8 @@ defmodule ShotElixirWeb.Api.V2.CliAuthController do
 
   use ShotElixirWeb, :controller
 
+  require Logger
+
   alias ShotElixir.Accounts
   alias ShotElixir.RateLimiter
   alias ShotElixirWeb.AuthHelpers
@@ -77,13 +79,21 @@ defmodule ShotElixirWeb.Api.V2.CliAuthController do
           {:approved, user} ->
             {:ok, token, _claims} = Accounts.generate_auth_token(user)
 
-            # Create a CLI session record
+            # Create a CLI session record (log errors but don't fail auth)
             user_agent = get_req_header(conn, "user-agent") |> List.first()
 
-            Accounts.create_cli_session(user, %{
-              ip_address: ip_address,
-              user_agent: user_agent
-            })
+            case Accounts.create_cli_session(user, %{
+                   ip_address: ip_address,
+                   user_agent: user_agent
+                 }) do
+              {:ok, _session} ->
+                :ok
+
+              {:error, changeset} ->
+                Logger.warning(
+                  "Failed to create CLI session for user #{user.id}: #{inspect(changeset.errors)}"
+                )
+            end
 
             conn
             |> put_status(:ok)
