@@ -269,18 +269,21 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
-  Search for Notion pages by name.
+  Search for Notion pages by name in the characters database.
 
   ## Parameters
     * `name` - The name to search for
 
   ## Returns
-    * List of matching Notion pages
+    * List of matching Notion pages from the characters database
   """
   def find_page_by_name(name) do
-    response =
-      NotionClient.search(name, %{"filter" => %{"property" => "object", "value" => "page"}})
+    filter = %{
+      "property" => "Name",
+      "title" => %{"contains" => name}
+    }
 
+    response = NotionClient.database_query(database_id(), %{"filter" => filter})
     response["results"]
   end
 
