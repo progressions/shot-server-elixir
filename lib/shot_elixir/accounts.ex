@@ -723,6 +723,7 @@ defmodule ShotElixir.Accounts do
   # CLI Authorization Functions
 
   alias ShotElixir.Accounts.CliAuthorizationCode
+  alias ShotElixir.Accounts.CliSession
 
   @cli_auth_expiry_seconds 600
 
@@ -798,4 +799,38 @@ defmodule ShotElixir.Accounts do
   end
 
   def poll_cli_auth_code(_), do: {:error, :expired}
+
+  # CLI Session Functions
+
+  @doc """
+  Creates a new CLI session record.
+  Called when a CLI authorization code is approved and a token is issued.
+  """
+  def create_cli_session(%User{} = user, attrs \\ %{}) do
+    %CliSession{user_id: user.id}
+    |> CliSession.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Lists all CLI sessions for a user, ordered by most recent first.
+  """
+  def list_cli_sessions(%User{id: user_id}) do
+    from(s in CliSession,
+      where: s.user_id == ^user_id,
+      order_by: [desc: s.inserted_at]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single CLI session by ID for a user.
+  Returns nil if not found or doesn't belong to user.
+  """
+  def get_cli_session(%User{id: user_id}, session_id) do
+    from(s in CliSession,
+      where: s.id == ^session_id and s.user_id == ^user_id
+    )
+    |> Repo.one()
+  end
 end

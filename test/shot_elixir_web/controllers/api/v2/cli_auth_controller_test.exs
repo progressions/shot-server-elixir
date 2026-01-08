@@ -92,6 +92,32 @@ defmodule ShotElixirWeb.Api.V2.CliAuthControllerTest do
       assert response["user"]["email"] == user.email
     end
 
+    test "creates a CLI session when approved", %{conn: conn} do
+      {:ok, auth_code} = Accounts.create_cli_auth_code()
+      {user, _token} = create_user_and_token()
+
+      {:ok, _} = Accounts.approve_cli_auth_code(auth_code.code, user)
+
+      # Verify no sessions exist before polling
+      assert Accounts.list_cli_sessions(user) == []
+
+      conn =
+        conn
+        |> put_req_header("user-agent", "chiwar-cli/1.0.0")
+        |> post(~p"/api/v2/cli/auth/poll", %{code: auth_code.code})
+
+      response = json_response(conn, 200)
+      assert response["status"] == "approved"
+
+      # Verify a session was created
+      sessions = Accounts.list_cli_sessions(user)
+      assert length(sessions) == 1
+
+      session = hd(sessions)
+      assert session.user_id == user.id
+      assert session.user_agent == "chiwar-cli/1.0.0"
+    end
+
     test "returns expired status for invalid code", %{conn: conn} do
       conn = post(conn, ~p"/api/v2/cli/auth/poll", %{code: "nonexistent"})
 
@@ -187,6 +213,72 @@ defmodule ShotElixirWeb.Api.V2.CliAuthControllerTest do
       {:ok, auth_code} = Accounts.create_cli_auth_code()
 
       conn = post(conn, ~p"/api/v2/cli/auth/approve", %{code: auth_code.code})
+
+      assert json_response(conn, 401)["error"] == "Not authenticated"
+    end
+  end
+
+  describe "GET /api/v2/cli/sessions" do
+    test "returns empty list when no sessions exist", %{conn: conn} do
+      {_user, token} = create_user_and_token()
+
+      conn =
+        conn
+        |> authenticated_conn(token)
+        |> get(~p"/api/v2/cli/sessions")
+
+      response = json_response(conn, 200)
+
+      assert response["cli_sessions"] == []
+    end
+
+    test "returns user's CLI sessions", %{conn: conn} do
+      {user, token} = create_user_and_token()
+
+      # Create a CLI session
+      {:ok, _session} =
+        Accounts.create_cli_session(user, %{
+          ip_address: "192.168.1.1",
+          user_agent: "chiwar-cli/1.0.0"
+        })
+
+      conn =
+        conn
+        |> authenticated_conn(token)
+        |> get(~p"/api/v2/cli/sessions")
+
+      response = json_response(conn, 200)
+
+      assert length(response["cli_sessions"]) == 1
+
+      session = hd(response["cli_sessions"])
+      assert session["ip_address"] == "192.168.1.1"
+      assert session["user_agent"] == "chiwar-cli/1.0.0"
+      assert session["id"]
+      assert session["created_at"]
+    end
+
+    test "only returns sessions for authenticated user", %{conn: conn} do
+      {user1, token1} = create_user_and_token(%{email: "user1@example.com"})
+      {user2, _token2} = create_user_and_token(%{email: "user2@example.com"})
+
+      # Create sessions for both users
+      {:ok, _} = Accounts.create_cli_session(user1, %{user_agent: "user1-cli"})
+      {:ok, _} = Accounts.create_cli_session(user2, %{user_agent: "user2-cli"})
+
+      conn =
+        conn
+        |> authenticated_conn(token1)
+        |> get(~p"/api/v2/cli/sessions")
+
+      response = json_response(conn, 200)
+
+      assert length(response["cli_sessions"]) == 1
+      assert hd(response["cli_sessions"])["user_agent"] == "user1-cli"
+    end
+
+    test "returns 401 for unauthenticated request", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/cli/sessions")
 
       assert json_response(conn, 401)["error"] == "Not authenticated"
     end
