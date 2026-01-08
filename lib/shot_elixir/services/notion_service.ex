@@ -241,13 +241,23 @@ defmodule ShotElixir.Services.NotionService do
   def update_character_from_notion(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
 
   def update_character_from_notion(%Character{} = character) do
-    page = NotionClient.get_page(character.notion_page_id)
-    attributes = Character.attributes_from_notion(character, page)
+    case NotionClient.get_page(character.notion_page_id) do
+      nil ->
+        Logger.error("Failed to fetch Notion page: #{character.notion_page_id}")
+        {:error, :notion_page_not_found}
 
-    # Add image if not already present
-    add_image(page, character)
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+        {:error, {:notion_api_error, error_code, message}}
 
-    Characters.update_character(character, attributes)
+      page when is_map(page) ->
+        attributes = Character.attributes_from_notion(character, page)
+
+        # Add image if not already present
+        add_image(page, character)
+
+        Characters.update_character(character, attributes)
+    end
   rescue
     error ->
       Logger.error("Failed to update character from Notion: #{inspect(error)}")

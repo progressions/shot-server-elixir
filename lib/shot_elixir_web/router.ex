@@ -131,6 +131,7 @@ defmodule ShotElixirWeb.Router do
 
     resources "/characters", CharacterController do
       post "/sync", CharacterController, :sync
+      post "/sync_from_notion", CharacterController, :sync_from_notion
       post "/duplicate", CharacterController, :duplicate
       get "/pdf", CharacterController, :pdf
       delete "/image", CharacterController, :remove_image

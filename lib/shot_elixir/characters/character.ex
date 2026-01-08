@@ -367,8 +367,12 @@ defmodule ShotElixir.Characters.Character do
   defp get_select(props, key) do
     props
     |> Map.get(key, %{})
-    |> Map.get("select", %{})
-    |> Map.get("name")
+    |> Map.get("select")
+    |> case do
+      nil -> nil
+      %{"name" => name} -> name
+      _ -> nil
+    end
   end
 
   defp get_number(props, key) do
