@@ -201,12 +201,19 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
-  Find or create a character from Notion page data.
+  Create a new character from Notion page data.
+  Always creates a new character. If a character with the same name exists,
+  generates a unique name (e.g., "Character Name (1)") to avoid conflicts.
   """
   def find_or_create_character_from_notion(page, campaign_id) do
     name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
 
-    {:ok, character} = Characters.find_or_create_by_name_and_campaign(name, campaign_id)
+    # Generate unique name to avoid overwriting existing characters
+    # If "Hero" exists, this will return "Hero (1)"
+    unique_name = Characters.generate_unique_name(name, campaign_id)
+
+    # Always create a new character for imports from Notion
+    {:ok, character} = Characters.create_character(%{name: unique_name, campaign_id: campaign_id})
 
     character = Repo.preload(character, :faction)
     attributes = Character.attributes_from_notion(character, page)
