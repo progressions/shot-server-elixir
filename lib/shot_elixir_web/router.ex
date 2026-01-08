@@ -127,6 +127,8 @@ defmodule ShotElixirWeb.Router do
 
     # Characters
     get "/characters/names", CharacterController, :autocomplete
+    get "/characters/templates", CharacterController, :templates
+    post "/characters/from-template", CharacterController, :create_from_template
     post "/characters/pdf", CharacterController, :import
     post "/characters/from_notion", CharacterController, :create_from_notion
 

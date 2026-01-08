@@ -732,6 +732,172 @@ defmodule ShotElixir.Characters do
     |> Oban.insert()
   end
 
+  @doc """
+  Lists template characters for a campaign.
+  Optionally filters by character type (e.g., "Mook", "Boss").
+
+  ## Options
+    * `:type` - Filter by character type stored in action_values["Type"]
+
+  ## Examples
+
+      iex> list_templates(campaign_id)
+      [%Character{is_template: true}, ...]
+
+      iex> list_templates(campaign_id, type: "Mook")
+      [%Character{is_template: true, action_values: %{"Type" => "Mook"}}]
+  """
+  def list_templates(campaign_id, opts \\ []) do
+    type = Keyword.get(opts, :type)
+
+    query =
+      from c in Character,
+        where: c.campaign_id == ^campaign_id,
+        where: c.is_template == true,
+        where: c.active == true,
+        order_by: [asc: c.name]
+
+    query =
+      if type do
+        from c in query,
+          where: fragment("?->>'Type' = ?", c.action_values, ^type)
+      else
+        query
+      end
+
+    query
+    |> Repo.all()
+    |> ImageLoader.load_image_urls("Character")
+  end
+
+  @doc """
+  Finds a template character by type in a campaign.
+  Returns nil if no template of that type exists.
+
+  ## Examples
+
+      iex> get_template_by_type(campaign_id, "Mook")
+      %Character{is_template: true, action_values: %{"Type" => "Mook"}}
+
+      iex> get_template_by_type(campaign_id, "Unknown")
+      nil
+  """
+  def get_template_by_type(campaign_id, type) do
+    from(c in Character,
+      where: c.campaign_id == ^campaign_id,
+      where: c.is_template == true,
+      where: c.active == true,
+      where: fragment("?->>'Type' = ?", c.action_values, ^type),
+      limit: 1
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Creates one or more characters from a template by type.
+  Applies customizations like name, description, faction, and attack type.
+
+  ## Parameters
+    * `campaign_id` - The campaign to create characters in
+    * `user` - The user creating the characters
+    * `params` - Map with:
+      * `"template_type"` - Character type (e.g., "Mook", "Boss") - required
+      * `"name"` - Name for the new character - required
+      * `"description"` - Optional summary/description
+      * `"faction_id"` - Optional faction UUID
+      * `"main_attack"` - Optional attack type (e.g., "Guns", "Martial Arts")
+      * `"count"` - Number of characters to create (default: 1)
+
+  ## Returns
+    * `{:ok, [%Character{}]}` - List of created characters
+    * `{:error, :template_not_found}` - If no template exists for the type
+    * `{:error, changeset}` - If character creation fails
+
+  ## Examples
+
+      iex> create_from_template(campaign_id, user, %{
+      ...>   "template_type" => "Mook",
+      ...>   "name" => "Triad Gunman",
+      ...>   "main_attack" => "Guns",
+      ...>   "count" => 3
+      ...> })
+      {:ok, [%Character{name: "Triad Gunman"}, %Character{name: "Triad Gunman (1)"}, ...]}
+  """
+  def create_from_template(campaign_id, user, params) do
+    template_type = params["template_type"]
+    name = params["name"]
+    count = params["count"] || 1
+
+    case get_template_by_type(campaign_id, template_type) do
+      nil ->
+        {:error, :template_not_found}
+
+      template ->
+        # Build action_values overrides
+        action_values_overrides =
+          if params["main_attack"] do
+            %{"MainAttack" => params["main_attack"]}
+          else
+            %{}
+          end
+
+        # Create the specified number of characters
+        results =
+          Enum.map(1..count, fn index ->
+            # Generate unique name for each character
+            char_name = if index == 1, do: name, else: "#{name} (#{index - 1})"
+            unique_name = generate_unique_name(char_name, campaign_id)
+
+            # Build character attributes from template
+            attrs =
+              Map.from_struct(template)
+              |> Map.delete(:id)
+              |> Map.delete(:__meta__)
+              |> Map.delete(:created_at)
+              |> Map.delete(:updated_at)
+              |> Map.put(:name, unique_name)
+              |> Map.put(:user_id, user.id)
+              |> Map.put(:is_template, false)
+              |> Map.put(:summary, params["description"] || params["summary"])
+              |> maybe_put(:faction_id, params["faction_id"])
+              |> update_action_values(action_values_overrides)
+
+            create_character(attrs)
+          end)
+
+        # Check if all succeeded
+        {successes, failures} =
+          Enum.split_with(results, fn
+            {:ok, _} -> true
+            {:error, _} -> false
+          end)
+
+        if Enum.empty?(failures) do
+          characters = Enum.map(successes, fn {:ok, char} -> char end)
+
+          # Queue image copies for all characters
+          Enum.each(characters, fn char ->
+            queue_image_copy(template, char)
+          end)
+
+          {:ok, characters}
+        else
+          # Return the first error
+          {:error, elem(hd(failures), 1)}
+        end
+    end
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  defp update_action_values(attrs, overrides) when map_size(overrides) == 0, do: attrs
+
+  defp update_action_values(attrs, overrides) do
+    current_av = attrs[:action_values] || attrs["action_values"] || %{}
+    Map.put(attrs, :action_values, Map.merge(current_av, overrides))
+  end
+
   # Advancement functions
 
   alias ShotElixir.Characters.Advancement

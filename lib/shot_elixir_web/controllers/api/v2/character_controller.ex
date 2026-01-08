@@ -621,6 +621,124 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
+  @doc """
+  List template characters for the current campaign.
+  Optionally filter by character type (e.g., ?type=Mook).
+  Only accessible by gamemasters and admins.
+  """
+  def templates(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+    campaign_id = current_user.current_campaign_id || params["campaign_id"]
+
+    unless campaign_id do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{error: "No current campaign set"})
+    else
+      # Only gamemasters and admins can access templates
+      unless current_user.gamemaster || current_user.admin do
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemasters can access templates"})
+      else
+        opts = if params["type"], do: [type: params["type"]], else: []
+        templates = Characters.list_templates(campaign_id, opts)
+
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+        |> render("templates.json", templates: templates)
+      end
+    end
+  end
+
+  @doc """
+  Create one or more characters from a template.
+  Accepts template_type, name, and optional customizations.
+  Only accessible by gamemasters and admins.
+  """
+  def create_from_template(conn, params) do
+    current_user = Guardian.Plug.current_resource(conn)
+    campaign_id = current_user.current_campaign_id || params["campaign_id"]
+
+    unless campaign_id do
+      conn
+      |> put_status(:bad_request)
+      |> json(%{error: "No current campaign set"})
+    else
+      # Only gamemasters and admins can create from templates
+      unless current_user.gamemaster || current_user.admin do
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemasters can create characters from templates"})
+      else
+        # Validate required params
+        template_type = params["template_type"]
+        name = params["name"]
+
+        cond do
+          is_nil(template_type) || template_type == "" ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "template_type is required"})
+
+          is_nil(name) || name == "" ->
+            conn
+            |> put_status(:bad_request)
+            |> json(%{error: "name is required"})
+
+          true ->
+            # Build params for create_from_template
+            create_params = %{
+              "template_type" => template_type,
+              "name" => name,
+              "description" => params["description"],
+              "faction_id" => params["faction_id"],
+              "main_attack" => params["main_attack"],
+              "count" => parse_count(params["count"])
+            }
+
+            case Characters.create_from_template(campaign_id, current_user, create_params) do
+              {:ok, characters} ->
+                # Queue Notion sync for all characters
+                Enum.each(characters, fn char ->
+                  %{"character_id" => char.id}
+                  |> SyncCharacterToNotionWorker.new()
+                  |> Oban.insert()
+                end)
+
+                conn
+                |> put_status(:created)
+                |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                |> render("from_template.json", characters: characters)
+
+              {:error, :template_not_found} ->
+                conn
+                |> put_status(:not_found)
+                |> json(%{error: "No template found for type '#{template_type}'"})
+
+              {:error, %Ecto.Changeset{} = changeset} ->
+                conn
+                |> put_status(:unprocessable_entity)
+                |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+                |> render("error.json", changeset: changeset)
+            end
+        end
+      end
+    end
+  end
+
+  defp parse_count(nil), do: 1
+  defp parse_count(count) when is_integer(count), do: max(1, min(count, 20))
+
+  defp parse_count(count) when is_binary(count) do
+    case Integer.parse(count) do
+      {n, _} -> max(1, min(n, 20))
+      :error -> 1
+    end
+  end
+
+  defp parse_count(_), do: 1
+
   def remove_image(conn, %{"character_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
