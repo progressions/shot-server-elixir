@@ -9,8 +9,12 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Services.NotionClient
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
+  alias ShotElixir.Factions.Faction
+  alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Notion
   alias ShotElixir.Repo
+
+  import Ecto.Query
 
   # Use runtime config to allow token to be added at runtime without validation errors
   defp database_id do
@@ -204,6 +208,11 @@ defmodule ShotElixir.Services.NotionService do
   Create a new character from Notion page data.
   Always creates a new character. If a character with the same name exists,
   generates a unique name (e.g., "Character Name (1)") to avoid conflicts.
+
+  Also imports:
+  - Faction (from Notion relation, matched by name to local faction)
+  - Juncture (from Notion multi_select, matched by name to local juncture)
+  - Fortune and other action values
   """
   def find_or_create_character_from_notion(page, campaign_id) do
     name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
@@ -232,6 +241,12 @@ defmodule ShotElixir.Services.NotionService do
 
     {:ok, character} = Characters.update_character(character, %{description: merged_description})
 
+    # Look up and set faction from Notion relation
+    {:ok, character} = set_faction_from_notion(character, page, campaign_id)
+
+    # Look up and set juncture from Notion multi_select
+    {:ok, character} = set_juncture_from_notion(character, page, campaign_id)
+
     # Add image if not already present
     add_image(page, character)
 
@@ -240,6 +255,109 @@ defmodule ShotElixir.Services.NotionService do
     error ->
       Logger.error("Failed to find or create character from Notion: #{inspect(error)}")
       {:error, error}
+  end
+
+  # Look up faction from Notion relation and set on character
+  defp set_faction_from_notion(character, page, campaign_id) do
+    case get_faction_name_from_notion(page) do
+      nil ->
+        {:ok, character}
+
+      faction_name ->
+        case find_local_faction_by_name(faction_name, campaign_id) do
+          nil ->
+            Logger.debug("No local faction found for '#{faction_name}'")
+            {:ok, character}
+
+          faction ->
+            Characters.update_character(character, %{faction_id: faction.id})
+        end
+    end
+  end
+
+  # Look up juncture from Notion multi_select and set on character
+  defp set_juncture_from_notion(character, page, campaign_id) do
+    case get_juncture_name_from_notion(page) do
+      nil ->
+        {:ok, character}
+
+      juncture_name ->
+        case find_local_juncture_by_name(juncture_name, campaign_id) do
+          nil ->
+            Logger.debug("No local juncture found for '#{juncture_name}'")
+            {:ok, character}
+
+          juncture ->
+            Characters.update_character(character, %{juncture_id: juncture.id})
+        end
+    end
+  end
+
+  # Get faction name from Notion relation by fetching the related page
+  defp get_faction_name_from_notion(page) do
+    case get_in(page, ["properties", "Faction", "relation"]) do
+      [%{"id" => faction_page_id} | _] ->
+        faction_page = NotionClient.get_page(faction_page_id)
+
+        # Faction pages use rich_text for Name, not title
+        get_in(faction_page, ["properties", "Name", "rich_text", Access.at(0), "plain_text"]) ||
+          get_in(faction_page, ["properties", "Name", "title", Access.at(0), "plain_text"])
+
+      _ ->
+        nil
+    end
+  rescue
+    error ->
+      Logger.warning("Failed to fetch faction from Notion: #{inspect(error)}")
+      nil
+  end
+
+  # Get juncture name from Notion multi_select (takes first value)
+  defp get_juncture_name_from_notion(page) do
+    case get_in(page, ["properties", "Juncture", "multi_select"]) do
+      [%{"name" => juncture_name} | _] -> juncture_name
+      _ -> nil
+    end
+  end
+
+  # Find a local faction by name in the campaign
+  defp find_local_faction_by_name(name, campaign_id) do
+    Repo.one(
+      from(f in Faction,
+        where: f.name == ^name and f.campaign_id == ^campaign_id,
+        limit: 1
+      )
+    )
+  end
+
+  # Find a local juncture by name in the campaign
+  # Uses partial matching - "Past" matches "Past 1870"
+  defp find_local_juncture_by_name(name, campaign_id) do
+    # First try exact match
+    exact_match =
+      Repo.one(
+        from(j in Juncture,
+          where: j.name == ^name and j.campaign_id == ^campaign_id,
+          limit: 1
+        )
+      )
+
+    case exact_match do
+      nil ->
+        # Try partial match - find junctures that start with the Notion name
+        search_pattern = "#{name}%"
+
+        Repo.one(
+          from(j in Juncture,
+            where: ilike(j.name, ^search_pattern) and j.campaign_id == ^campaign_id,
+            order_by: [asc: j.name],
+            limit: 1
+          )
+        )
+
+      juncture ->
+        juncture
+    end
   end
 
   @doc """
