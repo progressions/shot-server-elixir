@@ -418,30 +418,67 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> put_status(:bad_request)
       |> json(%{error: "No current campaign set"})
     else
-      # Fetch the Notion page
-      case ShotElixir.Services.NotionClient.get_page(notion_page_id) do
-        nil ->
+      # Fetch the Notion page with error handling for HTTP exceptions
+      page_result =
+        try do
+          {:ok, ShotElixir.Services.NotionClient.get_page(notion_page_id)}
+        rescue
+          e in Mint.TransportError ->
+            Logger.error("Notion API transport error: #{inspect(e)}")
+            {:error, :request_failed}
+
+          e in RuntimeError ->
+            Logger.error("Notion API runtime error: #{inspect(e)}")
+            {:error, :request_failed}
+
+          e ->
+            Logger.error("Unexpected error fetching Notion page: #{inspect(e)}")
+            {:error, :unexpected_error}
+        end
+
+      case page_result do
+        {:error, :request_failed} ->
+          conn
+          |> put_status(:service_unavailable)
+          |> json(%{error: "Failed to connect to Notion API"})
+
+        {:error, :unexpected_error} ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "An unexpected error occurred"})
+
+        {:ok, nil} ->
           conn
           |> put_status(:not_found)
           |> json(%{error: "Notion page not found"})
 
-        %{"code" => error_code, "message" => message} ->
+        {:ok, %{"code" => error_code, "message" => message}} ->
           Logger.error("Notion API error: #{error_code} - #{message}")
 
           conn
           |> put_status(:unprocessable_entity)
           |> json(%{error: "Failed to fetch Notion page: #{message}"})
 
-        page when is_map(page) ->
+        {:ok, page} when is_map(page) ->
           # Create character from Notion page data
           case ShotElixir.Services.NotionService.find_or_create_character_from_notion(
                  page,
                  campaign_id
                ) do
             {:ok, character} ->
-              # Set user_id to current user
-              {:ok, character} =
-                Characters.update_character(character, %{user_id: current_user.id})
+              # Only set user_id if not already assigned (prevents hijacking existing characters)
+              character =
+                if is_nil(character.user_id) do
+                  {:ok, updated} =
+                    Characters.update_character(character, %{user_id: current_user.id})
+
+                  updated
+                else
+                  character
+                end
+
+              # Reload character with associations for proper JSON rendering
+              character = Characters.get_character!(character.id)
 
               # Queue Notion sync to keep it in sync
               %{"character_id" => character.id}
