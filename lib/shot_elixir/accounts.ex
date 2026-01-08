@@ -719,4 +719,81 @@ defmodule ShotElixir.Accounts do
   end
 
   def get_user_with_current_character(_), do: nil
+
+  # CLI Authorization Functions
+
+  alias ShotElixir.Accounts.CliAuthorizationCode
+
+  @cli_auth_expiry_seconds 600
+
+  @doc """
+  Creates a new CLI authorization code.
+  Returns {:ok, code_record} on success.
+  """
+  def create_cli_auth_code do
+    code =
+      :crypto.strong_rand_bytes(4)
+      |> Base.encode16()
+      |> String.downcase()
+
+    expires_at = DateTime.add(DateTime.utc_now(), @cli_auth_expiry_seconds, :second)
+
+    %CliAuthorizationCode{}
+    |> CliAuthorizationCode.changeset(%{code: code, expires_at: expires_at})
+    |> Repo.insert()
+  end
+
+  @doc """
+  Gets a CLI authorization code by code string.
+  Returns nil if not found or expired.
+  """
+  def get_cli_auth_code(code) when is_binary(code) do
+    from(c in CliAuthorizationCode,
+      where: c.code == ^code and c.expires_at > ^DateTime.utc_now()
+    )
+    |> Repo.one()
+  end
+
+  def get_cli_auth_code(_), do: nil
+
+  @doc """
+  Approves a CLI authorization code for a user.
+  Returns {:ok, code_record} on success, {:error, reason} on failure.
+  """
+  def approve_cli_auth_code(code, %User{} = user) when is_binary(code) do
+    case get_cli_auth_code(code) do
+      nil ->
+        {:error, :not_found}
+
+      %CliAuthorizationCode{approved: true} ->
+        {:error, :already_approved}
+
+      auth_code ->
+        auth_code
+        |> CliAuthorizationCode.changeset(%{approved: true, user_id: user.id})
+        |> Repo.update()
+    end
+  end
+
+  @doc """
+  Polls a CLI authorization code to check if it's been approved.
+  Returns {:approved, user} if approved, {:pending, expires_in} if still waiting,
+  {:error, :expired} if code doesn't exist or has expired.
+  """
+  def poll_cli_auth_code(code) when is_binary(code) do
+    case get_cli_auth_code(code) do
+      nil ->
+        {:error, :expired}
+
+      %CliAuthorizationCode{approved: false, expires_at: expires_at} ->
+        expires_in = DateTime.diff(expires_at, DateTime.utc_now())
+        {:pending, expires_in}
+
+      %CliAuthorizationCode{approved: true, user_id: user_id} ->
+        user = get_user!(user_id)
+        {:approved, user}
+    end
+  end
+
+  def poll_cli_auth_code(_), do: {:error, :expired}
 end
