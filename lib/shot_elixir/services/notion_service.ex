@@ -53,7 +53,7 @@ defmodule ShotElixir.Services.NotionService do
     end
   rescue
     error ->
-      Logger.error("Exception syncing character to Notion: #{inspect(error)}")
+      Logger.error("Exception syncing character to Notion: #{Exception.message(error)}")
       {:error, error}
   end
 
@@ -192,13 +192,13 @@ defmodule ShotElixir.Services.NotionService do
     end
   rescue
     error ->
-      Logger.error("Failed to update Notion page: #{inspect(error)}")
+      Logger.error("Failed to update Notion page: #{Exception.message(error)}")
       # Log error sync
       Notion.log_error(
         character.id,
         %{"page_id" => character.notion_page_id},
         %{},
-        "Exception: #{inspect(error)}"
+        "Exception: #{Exception.message(error)}"
       )
 
       {:error, error}
@@ -214,7 +214,7 @@ defmodule ShotElixir.Services.NotionService do
   - Juncture (from Notion multi_select, matched by name to local juncture)
   - Fortune and other action values
   """
-  def find_or_create_character_from_notion(page, campaign_id) do
+  def create_character_from_notion(page, campaign_id) do
     name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
 
     # Generate unique name to avoid overwriting existing characters
@@ -253,7 +253,7 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, character}
   rescue
     error ->
-      Logger.error("Failed to find or create character from Notion: #{inspect(error)}")
+      Logger.error("Failed to create character from Notion: #{Exception.message(error)}")
       {:error, error}
   end
 
@@ -308,7 +308,7 @@ defmodule ShotElixir.Services.NotionService do
     end
   rescue
     error ->
-      Logger.warning("Failed to fetch faction from Notion: #{inspect(error)}")
+      Logger.warning("Failed to fetch faction from Notion: #{Exception.message(error)}")
       nil
   end
 
@@ -389,7 +389,7 @@ defmodule ShotElixir.Services.NotionService do
     end
   rescue
     error ->
-      Logger.error("Failed to update character from Notion: #{inspect(error)}")
+      Logger.error("Failed to update character from Notion: #{Exception.message(error)}")
       {:error, error}
   end
 
@@ -471,7 +471,7 @@ defmodule ShotElixir.Services.NotionService do
     NotionClient.append_block_children(character.notion_page_id, [child])
   rescue
     error ->
-      Logger.warning("Failed to add image to Notion: #{inspect(error)}")
+      Logger.warning("Failed to add image to Notion: #{Exception.message(error)}")
       nil
   end
 
@@ -619,7 +619,7 @@ defmodule ShotElixir.Services.NotionService do
     end
   rescue
     error ->
-      Logger.error("Exception downloading Notion image: #{inspect(error)}")
+      Logger.error("Exception downloading Notion image: #{Exception.message(error)}")
       {:error, error}
   end
 

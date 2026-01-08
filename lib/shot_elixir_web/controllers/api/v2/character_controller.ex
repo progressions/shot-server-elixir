@@ -424,15 +424,15 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
           {:ok, ShotElixir.Services.NotionClient.get_page(notion_page_id)}
         rescue
           e in Mint.TransportError ->
-            Logger.error("Notion API transport error: #{inspect(e)}")
+            Logger.error("Notion API transport error: #{Exception.message(e)}")
             {:error, :request_failed}
 
           e in RuntimeError ->
-            Logger.error("Notion API runtime error: #{inspect(e)}")
+            Logger.error("Notion API runtime error: #{Exception.message(e)}")
             {:error, :request_failed}
 
           e ->
-            Logger.error("Unexpected error fetching Notion page: #{inspect(e)}")
+            Logger.error("Unexpected error fetching Notion page: #{Exception.message(e)}")
             {:error, :unexpected_error}
         end
 
@@ -461,7 +461,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
         {:ok, page} when is_map(page) ->
           # Create character from Notion page data
-          case ShotElixir.Services.NotionService.find_or_create_character_from_notion(
+          case ShotElixir.Services.NotionService.create_character_from_notion(
                  page,
                  campaign_id
                ) do
@@ -469,10 +469,17 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
               # Only set user_id if not already assigned (prevents hijacking existing characters)
               character =
                 if is_nil(character.user_id) do
-                  {:ok, updated} =
-                    Characters.update_character(character, %{user_id: current_user.id})
+                  case Characters.update_character(character, %{user_id: current_user.id}) do
+                    {:ok, updated} ->
+                      updated
 
-                  updated
+                    {:error, changeset} ->
+                      Logger.error(
+                        "Failed to update character user_id from Notion: #{inspect(changeset.errors)}"
+                      )
+
+                      character
+                  end
                 else
                   character
                 end
