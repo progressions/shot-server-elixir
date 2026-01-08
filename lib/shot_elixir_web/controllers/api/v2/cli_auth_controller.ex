@@ -77,6 +77,14 @@ defmodule ShotElixirWeb.Api.V2.CliAuthController do
           {:approved, user} ->
             {:ok, token, _claims} = Accounts.generate_auth_token(user)
 
+            # Create a CLI session record
+            user_agent = get_req_header(conn, "user-agent") |> List.first()
+
+            Accounts.create_cli_session(user, %{
+              ip_address: ip_address,
+              user_agent: user_agent
+            })
+
             conn
             |> put_status(:ok)
             |> json(%{
@@ -133,5 +141,18 @@ defmodule ShotElixirWeb.Api.V2.CliAuthController do
     conn
     |> put_status(:bad_request)
     |> json(%{error: "Missing code parameter"})
+  end
+
+  @doc """
+  Lists all CLI sessions for the authenticated user.
+  """
+  def list_sessions(conn, _params) do
+    user = Guardian.Plug.current_resource(conn)
+    sessions = Accounts.list_cli_sessions(user)
+
+    conn
+    |> put_status(:ok)
+    |> put_view(ShotElixirWeb.Api.V2.CliAuthView)
+    |> render("sessions.json", sessions: sessions)
   end
 end

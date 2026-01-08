@@ -273,8 +273,9 @@ defmodule ShotElixirWeb.Router do
       patch "/", OnboardingController, :update
     end
 
-    # CLI device authorization (authenticated - approval)
+    # CLI device authorization (authenticated - approval and session management)
     post "/cli/auth/approve", CliAuthController, :approve
+    get "/cli/sessions", CliAuthController, :list_sessions
 
     # WebAuthn/Passkey management (authenticated endpoints)
     post "/webauthn/register/options", WebauthnController, :registration_options
