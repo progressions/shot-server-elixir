@@ -128,6 +128,7 @@ defmodule ShotElixirWeb.Router do
     # Characters
     get "/characters/names", CharacterController, :autocomplete
     post "/characters/pdf", CharacterController, :import
+    post "/characters/from_notion", CharacterController, :create_from_notion
 
     resources "/characters", CharacterController do
       post "/sync", CharacterController, :sync

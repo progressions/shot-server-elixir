@@ -311,6 +311,7 @@ defmodule ShotElixir.Characters.Character do
       "MainAttack" => get_select(props, "MainAttack"),
       "SecondaryAttack" => get_select(props, "SecondaryAttack"),
       "FortuneType" => get_select(props, "FortuneType"),
+      "Fortune" => av_or_new(character, "Fortune", get_number(props, "Fortune")),
       "Wounds" => av_or_new(character, "Wounds", get_number(props, "Wounds")),
       "Defense" => av_or_new(character, "Defense", get_number(props, "Defense")),
       "Toughness" => av_or_new(character, "Toughness", get_number(props, "Toughness")),
