@@ -241,13 +241,27 @@ defmodule ShotElixir.Services.NotionService do
   def update_character_from_notion(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
 
   def update_character_from_notion(%Character{} = character) do
-    page = NotionClient.get_page(character.notion_page_id)
-    attributes = Character.attributes_from_notion(character, page)
+    case NotionClient.get_page(character.notion_page_id) do
+      # Defensive check: Req.get! typically raises on failure, but we handle
+      # the unlikely case of a nil body for robustness
+      nil ->
+        Logger.error("Failed to fetch Notion page: #{character.notion_page_id}")
+        {:error, :notion_page_not_found}
 
-    # Add image if not already present
-    add_image(page, character)
+      # Handle Notion API error responses (e.g., page not found, unauthorized)
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+        {:error, {:notion_api_error, error_code, message}}
 
-    Characters.update_character(character, attributes)
+      # Success case: page data returned as a map
+      page when is_map(page) ->
+        attributes = Character.attributes_from_notion(character, page)
+
+        # Add image if not already present
+        add_image(page, character)
+
+        Characters.update_character(character, attributes)
+    end
   rescue
     error ->
       Logger.error("Failed to update character from Notion: #{inspect(error)}")
@@ -386,6 +400,75 @@ defmodule ShotElixir.Services.NotionService do
   defp extract_image_url_with_type(_), do: {nil, false}
 
   defp download_and_attach_image(url, %Character{} = character) do
+    # Validate URL to prevent SSRF attacks
+    case validate_image_url(url) do
+      :ok ->
+        do_download_with_temp_file(url, character)
+
+      {:error, reason} ->
+        Logger.warning("Rejected image URL for SSRF protection: #{inspect(reason)}")
+        {:error, {:invalid_url, reason}}
+    end
+  end
+
+  # SSRF protection: Only allow downloads from trusted image sources
+  @trusted_image_domains [
+    # Notion's file storage
+    ~r/^prod-files-secure\.s3\.us-west-2\.amazonaws\.com$/,
+    ~r/^s3\.us-west-2\.amazonaws\.com$/,
+    # Notion hosted images
+    ~r/^.*\.notion\.so$/,
+    ~r/^.*\.notion-static\.com$/,
+    # Common image CDNs used in Notion
+    ~r/^images\.unsplash\.com$/,
+    ~r/^.*\.cloudfront\.net$/
+  ]
+
+  defp validate_image_url(url) when is_binary(url) do
+    uri = URI.parse(url)
+
+    cond do
+      # Must be HTTPS
+      uri.scheme != "https" ->
+        {:error, :not_https}
+
+      # Must have a host
+      is_nil(uri.host) ->
+        {:error, :no_host}
+
+      # Host must match trusted domains
+      not trusted_domain?(uri.host) ->
+        {:error, :untrusted_domain}
+
+      # Prevent localhost/internal IPs
+      internal_address?(uri.host) ->
+        {:error, :internal_address}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_image_url(_), do: {:error, :invalid_url}
+
+  defp trusted_domain?(host) do
+    Enum.any?(@trusted_image_domains, fn pattern ->
+      Regex.match?(pattern, host)
+    end)
+  end
+
+  defp internal_address?(host) do
+    # Block localhost and private IP ranges
+    host in ["localhost", "127.0.0.1", "0.0.0.0"] or
+      String.starts_with?(host, "192.168.") or
+      String.starts_with?(host, "10.") or
+      String.starts_with?(host, "172.16.") or
+      String.starts_with?(host, "169.254.") or
+      String.ends_with?(host, ".local") or
+      String.ends_with?(host, ".internal")
+  end
+
+  defp do_download_with_temp_file(url, character) do
     # Create a unique temp file path using erlang unique integer (more robust than rand)
     unique_id = :erlang.unique_integer([:positive])
     temp_path = Path.join(System.tmp_dir!(), "notion_image_#{character.id}_#{unique_id}")
