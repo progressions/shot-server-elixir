@@ -1713,4 +1713,349 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert length(vehicle2_shots) == 1
     end
   end
+
+  describe "add_party" do
+    alias ShotElixir.Parties
+    alias ShotElixir.Fights.Shot
+    import Ecto.Query
+
+    setup %{gamemaster: gm, campaign: campaign, player: player} do
+      # Create a fight
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Add Party Test Fight",
+          campaign_id: campaign.id
+        })
+
+      # Create a party
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Test Party",
+          campaign_id: campaign.id
+        })
+
+      # Create characters for party slots
+      {:ok, boss_char} =
+        Characters.create_character(%{
+          name: "Boss Character",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{"Type" => "Boss"}
+        })
+
+      {:ok, featured_char} =
+        Characters.create_character(%{
+          name: "Featured Character",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{"Type" => "Featured Foe"}
+        })
+
+      {:ok, mook_char} =
+        Characters.create_character(%{
+          name: "Mook Character",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{"Type" => "Mook"}
+        })
+
+      # Create a vehicle
+      {:ok, party_vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Party Vehicle",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{}
+        })
+
+      %{
+        fight: fight,
+        party: party,
+        boss_char: boss_char,
+        featured_char: featured_char,
+        mook_char: mook_char,
+        party_vehicle: party_vehicle
+      }
+    end
+
+    test "adds party characters to fight", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      party: party,
+      boss_char: boss_char,
+      featured_char: featured_char
+    } do
+      # Add slots to party
+      {:ok, _} =
+        Parties.add_slot(party.id, %{"role" => "boss", "character_id" => boss_char.id})
+
+      {:ok, _} =
+        Parties.add_slot(party.id, %{"role" => "featured_foe", "character_id" => featured_char.id})
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      response = json_response(conn, 200)
+
+      assert response["id"] == fight.id
+
+      # Verify shots were created
+      shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id
+        )
+
+      assert length(shots) == 2
+
+      character_ids = Enum.map(shots, & &1.character_id) |> Enum.filter(&(&1 != nil))
+      assert boss_char.id in character_ids
+      assert featured_char.id in character_ids
+    end
+
+    test "adds mook character with default_mook_count as single shot", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      party: party,
+      mook_char: mook_char
+    } do
+      # Add mook slot with count of 5 - this is metadata on the character, not a multiplier
+      {:ok, _} =
+        Parties.add_slot(party.id, %{
+          "role" => "mook",
+          "character_id" => mook_char.id,
+          "default_mook_count" => 5
+        })
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      response = json_response(conn, 200)
+
+      assert response["id"] == fight.id
+
+      # Verify only 1 shot was created - mook count is stored as metadata, not multiple shots
+      shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^mook_char.id
+        )
+
+      assert length(shots) == 1
+    end
+
+    test "adds party vehicles to fight", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      party: party,
+      party_vehicle: party_vehicle
+    } do
+      # Add vehicle slot
+      {:ok, _} =
+        Parties.add_slot(party.id, %{"role" => "featured_foe", "vehicle_id" => party_vehicle.id})
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      response = json_response(conn, 200)
+
+      assert response["id"] == fight.id
+
+      # Verify vehicle shot was created
+      shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.vehicle_id == ^party_vehicle.id
+        )
+
+      assert length(shots) == 1
+    end
+
+    test "preserves existing fight members", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      party: party,
+      character: existing_char,
+      boss_char: boss_char
+    } do
+      # Add existing character to fight
+      {:ok, _} = Fights.create_shot(%{fight_id: fight.id, character_id: existing_char.id})
+
+      # Add slot to party
+      {:ok, _} =
+        Parties.add_slot(party.id, %{"role" => "boss", "character_id" => boss_char.id})
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      response = json_response(conn, 200)
+
+      # Verify both existing and new characters are in fight
+      shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id
+        )
+
+      assert length(shots) == 2
+
+      character_ids = Enum.map(shots, & &1.character_id) |> Enum.filter(&(&1 != nil))
+      assert existing_char.id in character_ids
+      assert boss_char.id in character_ids
+    end
+
+    test "returns 404 when fight not found", %{conn: conn, gamemaster: gm, party: party} do
+      invalid_id = Ecto.UUID.generate()
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{invalid_id}/add_party", party_id: party.id)
+      assert json_response(conn, 404)["error"] == "Fight not found"
+    end
+
+    test "returns 404 when party not found", %{conn: conn, gamemaster: gm, fight: fight} do
+      invalid_id = Ecto.UUID.generate()
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: invalid_id)
+      assert json_response(conn, 404)["error"] == "Party not found"
+    end
+
+    test "returns 404 when party is from different campaign", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight
+    } do
+      # Create another campaign and party
+      {:ok, other_gm} =
+        Accounts.create_user(%{
+          email: "other_gm_party@test.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "GM",
+          gamemaster: true
+        })
+
+      {:ok, other_campaign} =
+        Campaigns.create_campaign(%{
+          name: "Other Campaign",
+          description: "Different campaign",
+          user_id: other_gm.id
+        })
+
+      {:ok, other_party} =
+        Parties.create_party(%{
+          name: "Other Campaign Party",
+          campaign_id: other_campaign.id
+        })
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: other_party.id)
+      # Should return 404 to avoid leaking cross-campaign info
+      assert json_response(conn, 404)["error"] == "Party not found"
+    end
+
+    test "only gamemaster can add parties to fights", %{
+      conn: conn,
+      player: player,
+      fight: fight,
+      party: party
+    } do
+      conn = authenticate(conn, player)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      assert json_response(conn, 403)["error"] == "Only gamemaster can add parties to fights"
+    end
+
+    test "requires authentication", %{conn: conn, fight: fight, party: party} do
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      assert json_response(conn, 401)
+    end
+
+    test "handles mixed slot types", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      party: party,
+      boss_char: boss_char,
+      featured_char: featured_char,
+      mook_char: mook_char,
+      party_vehicle: party_vehicle
+    } do
+      # Add various slot types
+      {:ok, _} =
+        Parties.add_slot(party.id, %{"role" => "boss", "character_id" => boss_char.id})
+
+      {:ok, _} =
+        Parties.add_slot(party.id, %{"role" => "featured_foe", "character_id" => featured_char.id})
+
+      {:ok, _} =
+        Parties.add_slot(party.id, %{
+          "role" => "mook",
+          "character_id" => mook_char.id,
+          "default_mook_count" => 3
+        })
+
+      {:ok, _} =
+        Parties.add_slot(party.id, %{"role" => "featured_foe", "vehicle_id" => party_vehicle.id})
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      response = json_response(conn, 200)
+
+      assert response["id"] == fight.id
+
+      # Verify correct shot counts - each slot adds exactly one shot
+      all_shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id
+        )
+
+      # 1 boss + 1 featured + 1 mook + 1 vehicle = 4 total (mook count is metadata, not multiple shots)
+      assert length(all_shots) == 4
+
+      # Verify specific counts - each character/vehicle has exactly one shot
+      boss_shots =
+        Enum.filter(all_shots, &(&1.character_id == boss_char.id))
+
+      assert length(boss_shots) == 1
+
+      mook_shots =
+        Enum.filter(all_shots, &(&1.character_id == mook_char.id))
+
+      assert length(mook_shots) == 1
+
+      vehicle_shots =
+        Enum.filter(all_shots, &(&1.vehicle_id == party_vehicle.id))
+
+      assert length(vehicle_shots) == 1
+    end
+
+    test "handles mook slot without default_mook_count (defaults to 1)", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      party: party,
+      mook_char: mook_char
+    } do
+      # Add mook slot without default_mook_count
+      {:ok, _} =
+        Parties.add_slot(party.id, %{
+          "role" => "mook",
+          "character_id" => mook_char.id
+        })
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights/#{fight.id}/add_party", party_id: party.id)
+      response = json_response(conn, 200)
+
+      assert response["id"] == fight.id
+
+      # Verify only 1 shot was created (default when no count)
+      shots =
+        ShotElixir.Repo.all(
+          from s in Shot,
+            where: s.fight_id == ^fight.id and s.character_id == ^mook_char.id
+        )
+
+      assert length(shots) == 1
+    end
+  end
 end
