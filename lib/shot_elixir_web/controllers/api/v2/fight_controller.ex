@@ -335,14 +335,16 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   # POST /api/v2/fights/:id/add_party
   @doc """
   Adds all characters from a party to a fight.
-  For mook slots, adds the character multiple times based on default_mook_count.
+  For mook slots, adds the character multiple times based on `default_mook_count`.
+  If `default_mook_count` is not set or is nil, the character is added once.
   """
   def add_party(conn, %{"fight_id" => fight_id, "party_id" => party_id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %Fight{} = fight <- Fights.get_fight(fight_id),
+    with {:fight, %Fight{} = fight} <- {:fight, Fights.get_fight_with_shots(fight_id)},
          :ok <- authorize_fight_edit(fight, current_user),
-         party when not is_nil(party) <- Parties.get_party(party_id) do
+         {:party, party} when not is_nil(party) <- {:party, Parties.get_party(party_id)},
+         :ok <- authorize_party_access(party, fight) do
       # Get party slots
       slots = Parties.list_slots(party_id)
 
@@ -364,16 +366,14 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         |> Enum.filter(& &1.vehicle_id)
         |> Enum.map(& &1.vehicle_id)
 
-      # Get existing character_ids and vehicle_ids from the fight
-      fight_with_shots = Fights.get_fight_with_shots(fight_id)
-
+      # Get existing character_ids and vehicle_ids from the fight (already loaded)
       existing_character_ids =
-        fight_with_shots.shots
+        fight.shots
         |> Enum.filter(& &1.character_id)
         |> Enum.map(& &1.character_id)
 
       existing_vehicle_ids =
-        fight_with_shots.shots
+        fight.shots
         |> Enum.filter(& &1.vehicle_id)
         |> Enum.map(& &1.vehicle_id)
 
@@ -398,10 +398,15 @@ defmodule ShotElixirWeb.Api.V2.FightController do
           |> render("error.json", changeset: changeset)
       end
     else
-      nil ->
+      {:fight, nil} ->
         conn
         |> put_status(:not_found)
-        |> json(%{error: "Fight or party not found"})
+        |> json(%{error: "Fight not found"})
+
+      {:party, nil} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
 
       {:error, :forbidden} ->
         conn
@@ -412,6 +417,20 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "Fight not found"})
+
+      {:error, :party_not_in_campaign} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+    end
+  end
+
+  # Verify party belongs to the same campaign as the fight
+  defp authorize_party_access(party, fight) do
+    if party.campaign_id == fight.campaign_id do
+      :ok
+    else
+      {:error, :party_not_in_campaign}
     end
   end
 
