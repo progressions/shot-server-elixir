@@ -68,6 +68,8 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     end
   end
 
+  # Parameter 'q' is used for search queries following common API conventions (e.g., GitHub, Google).
+  # Parameter 'id' is used for direct page ID lookup, providing explicit intent.
   def sessions(conn, %{"q" => query}) when is_binary(query) and query != "" do
     case NotionService.fetch_session_notes(query) do
       {:ok, session} ->
@@ -77,6 +79,11 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
         conn
         |> put_status(:not_found)
         |> json(%{error: "No session found matching '#{query}'"})
+
+      {:error, {:notion_api_error, code, message}} ->
+        conn
+        |> put_status(:bad_gateway)
+        |> json(%{error: "Notion API error", code: code, message: message})
 
       {:error, _reason} ->
         conn

@@ -746,6 +746,14 @@ defmodule ShotElixir.Services.NotionService do
 
   # Session Notes Functions
 
+  # Extracts the title from a Notion page's properties.
+  # Tries both "title" and "Name" property keys since Notion pages can use either.
+  defp extract_page_title(page) do
+    get_in(page, ["properties", "title", "title", Access.at(0), "plain_text"]) ||
+      get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"]) ||
+      "Untitled"
+  end
+
   @doc """
   Search for session notes pages in Notion.
 
@@ -770,26 +778,12 @@ defmodule ShotElixir.Services.NotionService do
         blocks = NotionClient.get_block_children(page["id"])
         content = parse_blocks_to_text(blocks["results"] || [])
 
-        title =
-          get_in(page, ["properties", "title", "title", Access.at(0), "plain_text"]) ||
-            get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"]) ||
-            "Untitled"
-
         {:ok,
          %{
-           title: title,
+           title: extract_page_title(page),
            page_id: page["id"],
            content: content,
-           pages:
-             Enum.map(pages, fn p ->
-               %{
-                 id: p["id"],
-                 title:
-                   get_in(p, ["properties", "title", "title", Access.at(0), "plain_text"]) ||
-                     get_in(p, ["properties", "Name", "title", Access.at(0), "plain_text"]) ||
-                     "Untitled"
-               }
-             end)
+           pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
          }}
 
       [] ->
@@ -800,7 +794,12 @@ defmodule ShotElixir.Services.NotionService do
     end
   rescue
     error ->
-      Logger.error("Failed to fetch session notes: #{Exception.message(error)}")
+      Logger.error(
+        "Failed to fetch session notes for query=#{inspect(query)} " <>
+          "search_query=#{inspect(search_query)}: " <>
+          Exception.format(:error, error, __STACKTRACE__)
+      )
+
       {:error, error}
   end
 
@@ -814,13 +813,7 @@ defmodule ShotElixir.Services.NotionService do
       %{"id" => _id} ->
         blocks = NotionClient.get_block_children(page_id)
         content = parse_blocks_to_text(blocks["results"] || [])
-
-        title =
-          get_in(page, ["properties", "title", "title", Access.at(0), "plain_text"]) ||
-            get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"]) ||
-            "Untitled"
-
-        {:ok, %{title: title, page_id: page_id, content: content}}
+        {:ok, %{title: extract_page_title(page), page_id: page_id, content: content}}
 
       %{"code" => error_code, "message" => message} ->
         {:error, {:notion_api_error, error_code, message}}
@@ -873,6 +866,8 @@ defmodule ShotElixir.Services.NotionService do
 
   defp parse_block(%{"type" => "numbered_list_item"} = block) do
     text = extract_rich_text(block["numbered_list_item"]["rich_text"])
+    # Intentionally always use "1." to leverage Markdown auto-numbering.
+    # This keeps list numbering correct even if items are inserted or removed.
     "1. #{text}"
   end
 
