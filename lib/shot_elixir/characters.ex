@@ -680,11 +680,54 @@ defmodule ShotElixir.Characters do
   end
 
   def delete_character(%Character{} = character) do
+    alias ShotElixir.Characters.Advancement
+    alias ShotElixir.Sites.Attunement
+    alias ShotElixir.Weapons.Carry
+    alias ShotElixir.Effects.CharacterEffect
+    alias ShotElixir.Schticks.CharacterSchtick
+    alias ShotElixir.Parties.Membership
+    alias ShotElixir.ImagePositions.ImagePosition
+
     # Preload associations for broadcasting before deletion
     character_with_associations =
       Repo.preload(character, [:user, :faction, :juncture, :image_positions])
 
     Multi.new()
+    # Delete related records first (FK constraints are NO ACTION)
+    |> Multi.delete_all(
+      :delete_shots,
+      from(s in Shot, where: s.character_id == ^character.id)
+    )
+    |> Multi.delete_all(
+      :delete_advancements,
+      from(a in Advancement, where: a.character_id == ^character.id)
+    )
+    |> Multi.delete_all(
+      :delete_attunements,
+      from(a in Attunement, where: a.character_id == ^character.id)
+    )
+    |> Multi.delete_all(
+      :delete_carries,
+      from(c in Carry, where: c.character_id == ^character.id)
+    )
+    |> Multi.delete_all(
+      :delete_character_effects,
+      from(ce in CharacterEffect, where: ce.character_id == ^character.id)
+    )
+    |> Multi.delete_all(
+      :delete_character_schticks,
+      from(cs in CharacterSchtick, where: cs.character_id == ^character.id)
+    )
+    |> Multi.delete_all(
+      :delete_memberships,
+      from(m in Membership, where: m.character_id == ^character.id)
+    )
+    |> Multi.delete_all(
+      :delete_image_positions,
+      from(ip in ImagePosition,
+        where: ip.positionable_id == ^character.id and ip.positionable_type == "Character"
+      )
+    )
     |> Multi.delete(:character, character)
     |> Multi.run(:broadcast, fn _repo, %{character: deleted_character} ->
       broadcast_change(character_with_associations, :delete)
