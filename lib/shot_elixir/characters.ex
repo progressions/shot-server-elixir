@@ -680,15 +680,15 @@ defmodule ShotElixir.Characters do
   end
 
   def delete_character(%Character{} = character) do
-    Multi.new()
-    |> Multi.update(:character, Ecto.Changeset.change(character, active: false))
-    |> Multi.run(:broadcast, fn _repo, %{character: character} ->
-      # Preload associations before broadcasting
-      character_with_associations =
-        Repo.preload(character, [:user, :faction, :juncture, :image_positions])
+    # Preload associations for broadcasting before deletion
+    character_with_associations =
+      Repo.preload(character, [:user, :faction, :juncture, :image_positions])
 
+    Multi.new()
+    |> Multi.delete(:character, character)
+    |> Multi.run(:broadcast, fn _repo, %{character: deleted_character} ->
       broadcast_change(character_with_associations, :delete)
-      {:ok, character}
+      {:ok, deleted_character}
     end)
     |> Repo.transaction()
     |> case do
