@@ -120,7 +120,7 @@ defmodule ShotElixirWeb.Router do
     post "/campaigns/current", CampaignController, :set_current
 
     # Notion integration
-    get "/notion/characters", NotionController, :characters
+    get "/notion/search", NotionController, :search
     get "/notion/sessions", NotionController, :sessions
 
     # Suggestions for @ mentions in rich text editors
