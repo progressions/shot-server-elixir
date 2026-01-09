@@ -394,22 +394,45 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
-  Search for Notion pages by name in the characters database.
+  Search for Notion pages by name across all accessible pages.
 
   ## Parameters
     * `name` - The name to search for
 
   ## Returns
-    * List of matching Notion pages from the characters database
+    * List of matching Notion pages with id, title/name, and url
   """
   def find_page_by_name(name) do
-    filter = %{
-      "property" => "Name",
-      "title" => %{"contains" => name}
-    }
+    results =
+      NotionClient.search(name, %{
+        "filter" => %{"property" => "object", "value" => "page"}
+      })
 
-    response = NotionClient.database_query(database_id(), %{"filter" => filter})
-    response["results"]
+    case results do
+      # Handle Notion API error responses
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion search error: #{error_code} - #{message}")
+        []
+
+      # Success case: results map containing a list under "results"
+      %{"results" => pages} when is_list(pages) ->
+        Enum.map(pages, fn page ->
+          %{
+            "id" => page["id"],
+            "title" => extract_page_title(page),
+            "url" => page["url"]
+          }
+        end)
+
+      # Any other response (nil, missing results key, etc.)
+      _ ->
+        Logger.warning("Unexpected response from Notion search: #{inspect(results)}")
+        []
+    end
+  rescue
+    error ->
+      Logger.error("Failed to search Notion pages: #{Exception.message(error)}")
+      []
   end
 
   @doc """
