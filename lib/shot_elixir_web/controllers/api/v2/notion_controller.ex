@@ -16,7 +16,7 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     * 200 - List of matching pages (JSON array)
     * 500 - Internal server error if Notion API fails
   """
-  def characters(conn, params) do
+  def search(conn, params) do
     name = params["name"] || ""
 
     case NotionService.find_page_by_name(name) do
