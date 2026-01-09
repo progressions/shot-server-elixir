@@ -408,8 +408,14 @@ defmodule ShotElixir.Services.NotionService do
         "filter" => %{"property" => "object", "value" => "page"}
       })
 
-    case results["results"] do
-      pages when is_list(pages) ->
+    case results do
+      # Handle Notion API error responses
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion search error: #{error_code} - #{message}")
+        []
+
+      # Success case: results map containing a list under "results"
+      %{"results" => pages} when is_list(pages) ->
         Enum.map(pages, fn page ->
           %{
             "id" => page["id"],
@@ -418,9 +424,15 @@ defmodule ShotElixir.Services.NotionService do
           }
         end)
 
+      # Any other response (nil, missing results key, etc.)
       _ ->
+        Logger.warning("Unexpected response from Notion search: #{inspect(results)}")
         []
     end
+  rescue
+    error ->
+      Logger.error("Failed to search Notion pages: #{Exception.message(error)}")
+      []
   end
 
   @doc """
