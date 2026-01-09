@@ -743,4 +743,217 @@ defmodule ShotElixir.Services.NotionService do
     |> Enum.map(& &1["plain_text"])
     |> Enum.join("")
   end
+
+  # Session Notes Functions
+
+  # Extracts the title from a Notion page's properties.
+  # Tries both "title" and "Name" property keys since Notion pages can use either.
+  defp extract_page_title(page) do
+    get_in(page, ["properties", "title", "title", Access.at(0), "plain_text"]) ||
+      get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"]) ||
+      "Untitled"
+  end
+
+  @doc """
+  Search for session notes pages in Notion.
+
+  ## Parameters
+    * `query` - Search query (e.g., "session 5-10" or "5-10")
+
+  ## Returns
+    * `{:ok, %{pages: [...], content: "..."}}` with matching pages and content of first match
+    * `{:error, :not_found}` if no pages match
+  """
+  def fetch_session_notes(query) do
+    search_query = if String.contains?(query, "session"), do: query, else: "session #{query}"
+
+    results =
+      NotionClient.search(search_query, %{
+        "filter" => %{"property" => "object", "value" => "page"}
+      })
+
+    case results["results"] do
+      [page | _rest] = pages ->
+        # Fetch content of the first (most relevant) match
+        blocks = NotionClient.get_block_children(page["id"])
+        content = parse_blocks_to_text(blocks["results"] || [])
+
+        {:ok,
+         %{
+           title: extract_page_title(page),
+           page_id: page["id"],
+           content: content,
+           pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
+         }}
+
+      [] ->
+        {:error, :not_found}
+
+      nil ->
+        {:error, :not_found}
+    end
+  rescue
+    error ->
+      Logger.error(
+        "Failed to fetch session notes for query=#{inspect(query)} " <>
+          "search_query=#{inspect(search_query)}: " <>
+          Exception.format(:error, error, __STACKTRACE__)
+      )
+
+      {:error, error}
+  end
+
+  @doc """
+  Fetch a specific session page by ID.
+  """
+  def fetch_session_by_id(page_id) do
+    page = NotionClient.get_page(page_id)
+
+    case page do
+      %{"id" => _id} ->
+        blocks = NotionClient.get_block_children(page_id)
+        content = parse_blocks_to_text(blocks["results"] || [])
+        {:ok, %{title: extract_page_title(page), page_id: page_id, content: content}}
+
+      %{"code" => error_code, "message" => message} ->
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        {:error, :not_found}
+    end
+  rescue
+    error ->
+      Logger.error("Failed to fetch session by ID: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  @doc """
+  Parse Notion blocks into plain text/markdown.
+  """
+  def parse_blocks_to_text(blocks) when is_list(blocks) do
+    blocks
+    |> Enum.map(&parse_block/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("\n")
+  end
+
+  def parse_blocks_to_text(_), do: ""
+
+  defp parse_block(%{"type" => "heading_1"} = block) do
+    text = extract_rich_text(block["heading_1"]["rich_text"])
+    "# #{text}\n"
+  end
+
+  defp parse_block(%{"type" => "heading_2"} = block) do
+    text = extract_rich_text(block["heading_2"]["rich_text"])
+    "## #{text}\n"
+  end
+
+  defp parse_block(%{"type" => "heading_3"} = block) do
+    text = extract_rich_text(block["heading_3"]["rich_text"])
+    "### #{text}\n"
+  end
+
+  defp parse_block(%{"type" => "paragraph"} = block) do
+    text = extract_rich_text(block["paragraph"]["rich_text"])
+    if text == "", do: nil, else: "#{text}\n"
+  end
+
+  defp parse_block(%{"type" => "bulleted_list_item"} = block) do
+    text = extract_rich_text(block["bulleted_list_item"]["rich_text"])
+    "- #{text}"
+  end
+
+  defp parse_block(%{"type" => "numbered_list_item"} = block) do
+    text = extract_rich_text(block["numbered_list_item"]["rich_text"])
+    # Intentionally always use "1." to leverage Markdown auto-numbering.
+    # This keeps list numbering correct even if items are inserted or removed.
+    "1. #{text}"
+  end
+
+  defp parse_block(%{"type" => "to_do"} = block) do
+    text = extract_rich_text(block["to_do"]["rich_text"])
+    checked = if block["to_do"]["checked"], do: "x", else: " "
+    "- [#{checked}] #{text}"
+  end
+
+  defp parse_block(%{"type" => "toggle"} = block) do
+    text = extract_rich_text(block["toggle"]["rich_text"])
+    "▸ #{text}"
+  end
+
+  defp parse_block(%{"type" => "quote"} = block) do
+    text = extract_rich_text(block["quote"]["rich_text"])
+    "> #{text}"
+  end
+
+  defp parse_block(%{"type" => "callout"} = block) do
+    text = extract_rich_text(block["callout"]["rich_text"])
+    icon = get_in(block, ["callout", "icon", "emoji"]) || "💡"
+    "> #{icon} #{text}"
+  end
+
+  defp parse_block(%{"type" => "code"} = block) do
+    text = extract_rich_text(block["code"]["rich_text"])
+    lang = block["code"]["language"] || ""
+    "```#{lang}\n#{text}\n```"
+  end
+
+  defp parse_block(%{"type" => "divider"}), do: "\n---\n"
+
+  defp parse_block(%{"type" => "child_page"} = block) do
+    title = block["child_page"]["title"]
+    "📄 #{title}"
+  end
+
+  defp parse_block(%{"type" => "child_database"} = block) do
+    title = block["child_database"]["title"]
+    "📊 #{title}"
+  end
+
+  defp parse_block(%{"type" => "bookmark"} = block) do
+    url = block["bookmark"]["url"]
+    caption = extract_rich_text(block["bookmark"]["caption"] || [])
+    if caption != "", do: "[#{caption}](#{url})", else: "🔗 #{url}"
+  end
+
+  defp parse_block(%{"type" => "link_preview"} = block) do
+    url = block["link_preview"]["url"]
+    "🔗 #{url}"
+  end
+
+  defp parse_block(%{"type" => "table_of_contents"}), do: "[Table of Contents]"
+
+  defp parse_block(%{"type" => "column_list"}), do: nil
+  defp parse_block(%{"type" => "column"}), do: nil
+
+  defp parse_block(_block), do: nil
+
+  defp extract_rich_text(nil), do: ""
+
+  defp extract_rich_text(rich_text) when is_list(rich_text) do
+    rich_text
+    |> Enum.map(fn rt ->
+      text = rt["plain_text"] || ""
+
+      # Handle mentions (linked pages)
+      case rt["type"] do
+        "mention" ->
+          mention = rt["mention"]
+
+          case mention["type"] do
+            "page" -> "@#{text}"
+            "user" -> "@#{text}"
+            "date" -> "📅 #{text}"
+            _ -> text
+          end
+
+        _ ->
+          text
+      end
+    end)
+    |> Enum.join("")
+  end
+
+  defp extract_rich_text(_), do: ""
 end
