@@ -4,6 +4,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
   alias ShotElixir.Fights
   alias ShotElixir.Fights.Fight
   alias ShotElixir.Campaigns
+  alias ShotElixir.Parties
   alias ShotElixir.Guardian
   alias ShotElixir.Discord.Notifications
 
@@ -328,6 +329,89 @@ defmodule ShotElixirWeb.Api.V2.FightController do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  # POST /api/v2/fights/:id/add_party
+  @doc """
+  Adds all characters from a party to a fight.
+  For mook slots, adds the character multiple times based on default_mook_count.
+  """
+  def add_party(conn, %{"fight_id" => fight_id, "party_id" => party_id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Fight{} = fight <- Fights.get_fight(fight_id),
+         :ok <- authorize_fight_edit(fight, current_user),
+         party when not is_nil(party) <- Parties.get_party(party_id) do
+      # Get party slots
+      slots = Parties.list_slots(party_id)
+
+      # Build list of character_ids from slots
+      # For mook slots, repeat the character based on default_mook_count
+      new_character_ids =
+        slots
+        |> Enum.filter(& &1.character_id)
+        |> Enum.flat_map(fn slot ->
+          count =
+            if slot.role == :mook && slot.default_mook_count, do: slot.default_mook_count, else: 1
+
+          List.duplicate(slot.character_id, count)
+        end)
+
+      # Build list of vehicle_ids from slots
+      new_vehicle_ids =
+        slots
+        |> Enum.filter(& &1.vehicle_id)
+        |> Enum.map(& &1.vehicle_id)
+
+      # Get existing character_ids and vehicle_ids from the fight
+      fight_with_shots = Fights.get_fight_with_shots(fight_id)
+
+      existing_character_ids =
+        fight_with_shots.shots
+        |> Enum.filter(& &1.character_id)
+        |> Enum.map(& &1.character_id)
+
+      existing_vehicle_ids =
+        fight_with_shots.shots
+        |> Enum.filter(& &1.vehicle_id)
+        |> Enum.map(& &1.vehicle_id)
+
+      # Combine existing and new IDs
+      combined_character_ids = existing_character_ids ++ new_character_ids
+      combined_vehicle_ids = existing_vehicle_ids ++ new_vehicle_ids
+
+      # Update the fight with the combined character/vehicle IDs
+      case Fights.update_fight(fight, %{
+             "character_ids" => combined_character_ids,
+             "vehicle_ids" => combined_vehicle_ids
+           }) do
+        {:ok, updated_fight} ->
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.FightView)
+          |> render("show.json", fight: updated_fight)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.FightView)
+          |> render("error.json", changeset: changeset)
+      end
+    else
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight or party not found"})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can add parties to fights"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Fight not found"})
     end
   end
 
