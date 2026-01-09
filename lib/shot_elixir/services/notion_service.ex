@@ -795,8 +795,7 @@ defmodule ShotElixir.Services.NotionService do
   rescue
     error ->
       Logger.error(
-        "Failed to fetch session notes for query=#{inspect(query)} " <>
-          "search_query=#{inspect(search_query)}: " <>
+        "Failed to fetch session notes for query=#{inspect(query)}: " <>
           Exception.format(:error, error, __STACKTRACE__)
       )
 
