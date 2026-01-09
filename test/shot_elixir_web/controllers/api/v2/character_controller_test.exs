@@ -341,7 +341,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       %{character: character}
     end
 
-    test "soft deletes character when user is owner", %{
+    test "deletes character when user is owner", %{
       conn: conn,
       gamemaster: gm,
       character: character
@@ -350,24 +350,22 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
       conn = delete(conn, ~p"/api/v2/characters/#{character.id}")
       assert response(conn, 204)
 
-      # Verify character is soft deleted
-      deleted_character = Characters.get_character(character.id)
-      assert deleted_character.active == false
+      # Verify character is actually deleted from database
+      assert Characters.get_character(character.id) == nil
     end
 
     test "broadcasts character deletion via WebSocket", %{
       conn: conn,
       gamemaster: gm,
       character: character,
-      campaign: campaign
+      campaign: _campaign
     } do
       conn = authenticate(conn, gm)
       conn = delete(conn, ~p"/api/v2/characters/#{character.id}")
       assert response(conn, 204)
 
-      # Verify soft deletion occurred
-      deleted_char = Characters.get_character(character.id)
-      assert deleted_char.active == false
+      # Verify character is actually deleted from database
+      assert Characters.get_character(character.id) == nil
       # TODO: Add proper WebSocket testing once Phoenix Channel test infrastructure is complete
     end
 
