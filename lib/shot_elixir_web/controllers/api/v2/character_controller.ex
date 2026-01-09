@@ -60,7 +60,24 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
   def create(conn, %{"character" => character_params}) do
     current_user = Guardian.Plug.current_resource(conn)
-    campaign_id = current_user.current_campaign_id || character_params["campaign_id"]
+
+    # Parse character_params if it's a JSON string (from multipart/form-data)
+    parsed_params =
+      case character_params do
+        params when is_binary(params) ->
+          case Jason.decode(params) do
+            {:ok, decoded} -> decoded
+            {:error, _} -> %{}
+          end
+
+        params when is_map(params) ->
+          params
+
+        _ ->
+          %{}
+      end
+
+    campaign_id = current_user.current_campaign_id || parsed_params["campaign_id"]
 
     unless campaign_id do
       conn
@@ -68,7 +85,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> json(%{error: "No current campaign set"})
     else
       params =
-        character_params
+        parsed_params
         |> Map.put("campaign_id", campaign_id)
         |> Map.put("user_id", current_user.id)
 
