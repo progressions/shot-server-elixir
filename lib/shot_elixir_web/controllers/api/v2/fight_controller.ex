@@ -334,9 +334,10 @@ defmodule ShotElixirWeb.Api.V2.FightController do
 
   # POST /api/v2/fights/:id/add_party
   @doc """
-  Adds all characters from a party to a fight.
-  For mook slots, adds the character multiple times based on `default_mook_count`.
-  If `default_mook_count` is not set or is nil, the character is added once.
+  Adds all characters and vehicles from a party to a fight.
+  Each slot adds exactly one character/vehicle to the fight.
+  For mook characters, the mook count is stored as metadata on the character itself,
+  not as multiple shot entries.
   """
   def add_party(conn, %{"fight_id" => fight_id, "party_id" => party_id}) do
     current_user = Guardian.Plug.current_resource(conn)
@@ -349,16 +350,11 @@ defmodule ShotElixirWeb.Api.V2.FightController do
       slots = Parties.list_slots(party_id)
 
       # Build list of character_ids from slots
-      # For mook slots, repeat the character based on default_mook_count
+      # Each slot adds exactly one character - mook count is metadata on the shot, not a multiplier
       new_character_ids =
         slots
         |> Enum.filter(& &1.character_id)
-        |> Enum.flat_map(fn slot ->
-          count =
-            if slot.role == :mook && slot.default_mook_count, do: slot.default_mook_count, else: 1
-
-          List.duplicate(slot.character_id, count)
-        end)
+        |> Enum.map(& &1.character_id)
 
       # Build list of vehicle_ids from slots
       new_vehicle_ids =

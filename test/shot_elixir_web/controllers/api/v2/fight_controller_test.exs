@@ -1813,14 +1813,14 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert featured_char.id in character_ids
     end
 
-    test "respects mook default_mook_count", %{
+    test "adds mook character with default_mook_count as single shot", %{
       conn: conn,
       gamemaster: gm,
       fight: fight,
       party: party,
       mook_char: mook_char
     } do
-      # Add mook slot with count of 5
+      # Add mook slot with count of 5 - this is metadata on the character, not a multiplier
       {:ok, _} =
         Parties.add_slot(party.id, %{
           "role" => "mook",
@@ -1834,14 +1834,14 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
       assert response["id"] == fight.id
 
-      # Verify 5 shots were created for the mook
+      # Verify only 1 shot was created - mook count is stored as metadata, not multiple shots
       shots =
         ShotElixir.Repo.all(
           from s in Shot,
             where: s.fight_id == ^fight.id and s.character_id == ^mook_char.id
         )
 
-      assert length(shots) == 5
+      assert length(shots) == 1
     end
 
     test "adds party vehicles to fight", %{
@@ -2001,17 +2001,17 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
       assert response["id"] == fight.id
 
-      # Verify correct shot counts
+      # Verify correct shot counts - each slot adds exactly one shot
       all_shots =
         ShotElixir.Repo.all(
           from s in Shot,
             where: s.fight_id == ^fight.id
         )
 
-      # 1 boss + 1 featured + 3 mooks + 1 vehicle = 6 total
-      assert length(all_shots) == 6
+      # 1 boss + 1 featured + 1 mook + 1 vehicle = 4 total (mook count is metadata, not multiple shots)
+      assert length(all_shots) == 4
 
-      # Verify specific counts
+      # Verify specific counts - each character/vehicle has exactly one shot
       boss_shots =
         Enum.filter(all_shots, &(&1.character_id == boss_char.id))
 
@@ -2020,7 +2020,7 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       mook_shots =
         Enum.filter(all_shots, &(&1.character_id == mook_char.id))
 
-      assert length(mook_shots) == 3
+      assert length(mook_shots) == 1
 
       vehicle_shots =
         Enum.filter(all_shots, &(&1.vehicle_id == party_vehicle.id))
