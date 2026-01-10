@@ -24,9 +24,7 @@ defmodule ShotElixirWeb.Api.V2.NotionControllerTest do
         last_name: "User"
       })
 
-    {:ok,
-     conn: put_req_header(conn, "accept", "application/json"),
-     user: user}
+    {:ok, conn: put_req_header(conn, "accept", "application/json"), user: user}
   end
 
   describe "adventures" do
