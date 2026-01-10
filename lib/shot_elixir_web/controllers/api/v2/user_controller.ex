@@ -46,7 +46,7 @@ defmodule ShotElixirWeb.Api.V2.UserController do
 
         conn
         |> put_view(ShotElixirWeb.Api.V2.UserView)
-        |> render("index.json", users: result.users)
+        |> render("index.json", users: result.users, meta: result.meta)
     end
   end
 

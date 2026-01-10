@@ -47,6 +47,13 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
 
       assert is_list(response["users"])
       assert length(response["users"]) >= 2
+
+      # Verify meta pagination info is included
+      assert is_map(response["meta"])
+      assert response["meta"]["current_page"] == 1
+      assert is_integer(response["meta"]["total_count"])
+      assert is_integer(response["meta"]["total_pages"])
+      assert is_integer(response["meta"]["per_page"])
     end
 
     test "returns unauthorized when not authenticated", %{conn: conn} do
