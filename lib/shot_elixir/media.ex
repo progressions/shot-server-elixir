@@ -10,6 +10,8 @@ defmodule ShotElixir.Media do
   alias ShotElixir.Services.ImagekitService
   alias ShotElixir.ActiveStorage
 
+  @valid_sort_fields ~w(inserted_at updated_at filename byte_size entity_type)
+
   @doc """
   Lists all images for a campaign with optional filtering.
 
@@ -19,6 +21,8 @@ defmodule ShotElixir.Media do
       - "status" - "orphan", "attached", or "all" (default: "all")
       - "source" - "upload", "ai_generated", or "all" (default: "all")
       - "entity_type" - Filter by entity type (e.g., "Character")
+      - "sort" - Field to sort by: "inserted_at", "updated_at", "filename", "byte_size", "entity_type" (default: "inserted_at")
+      - "order" - Sort direction: "asc" or "desc" (default: "desc")
       - "page" - Page number (default: 1)
       - "per_page" - Items per page (default: 50)
 
@@ -30,11 +34,17 @@ defmodule ShotElixir.Media do
     page = get_int_param(params, "page", 1)
     offset = (page - 1) * per_page
 
-    # Base query
+    # Parse sort parameters
+    sort_field = get_sort_field(params["sort"])
+    sort_order = if params["order"] == "asc", do: :asc, else: :desc
+
+    # Base query (without ordering - we'll apply it dynamically)
     query =
       from i in MediaImage,
-        where: i.campaign_id == ^campaign_id,
-        order_by: [desc: i.inserted_at]
+        where: i.campaign_id == ^campaign_id
+
+    # Apply dynamic ordering
+    query = apply_sort(query, sort_field, sort_order)
 
     # Apply status filter
     query =
@@ -482,5 +492,26 @@ defmodule ShotElixir.Media do
           _ -> default
         end
     end
+  end
+
+  # Helper to validate and convert sort field
+  defp get_sort_field(nil), do: :inserted_at
+  defp get_sort_field(""), do: :inserted_at
+
+  defp get_sort_field(field) when is_binary(field) do
+    if field in @valid_sort_fields do
+      String.to_atom(field)
+    else
+      :inserted_at
+    end
+  end
+
+  # Apply dynamic ordering to query
+  defp apply_sort(query, field, :asc) do
+    from i in query, order_by: [asc: field(i, ^field)]
+  end
+
+  defp apply_sort(query, field, :desc) do
+    from i in query, order_by: [desc: field(i, ^field)]
   end
 end

@@ -15,12 +15,14 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   action_fallback ShotElixirWeb.FallbackController
 
   @doc """
-  Lists all images for the current campaign with optional filtering.
+  Lists all images for the current campaign with optional filtering and sorting.
 
   ## Query Parameters
     - status: "orphan", "attached", or "all" (default: "all")
     - source: "upload", "ai_generated", or "all" (default: "all")
     - entity_type: Filter by entity type (e.g., "Character")
+    - sort: Sort field - "inserted_at", "updated_at", "filename", "byte_size", "entity_type" (default: "inserted_at")
+    - order: Sort direction - "asc" or "desc" (default: "desc")
     - page: Page number (default: 1)
     - per_page: Items per page (default: 50)
   """
