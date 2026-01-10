@@ -143,9 +143,10 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
-  describe "smart merge logic" do
-    # These tests verify the merge behavior in isolation by testing
-    # the internal merge functions through their effects
+  describe "smart merge logic - character value preservation" do
+    # These tests verify that characters preserve their values correctly
+    # The actual merge_with_notion function requires mocking NotionClient
+    # which is tested via integration tests in the test environment
 
     setup do
       {:ok, user} =
@@ -168,27 +169,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
       {:ok, user: user, campaign: campaign}
     end
 
-    test "blank detection treats nil as blank", %{} do
-      # Testing via the public API behavior
-      # nil is always blank
-      assert is_nil(nil)
-    end
-
-    test "blank detection treats empty string as blank", %{} do
-      # Empty string is always blank
-      assert "" == ""
-    end
-
-    test "blank detection treats 0 as blank for action values", %{} do
-      # 0 should be treated as blank for action values
-      # We verify this through the merge behavior
-      assert 0 == 0
-    end
-
-    test "character with blank action values gets Notion values after merge", %{
-      campaign: campaign
-    } do
-      # Create a character with some 0 action values
+    test "character with 0 action values can receive non-zero values", %{campaign: campaign} do
+      # Create a character with 0 action values (considered blank for merge)
       {:ok, character} =
         Characters.create_character(%{
           name: "Blank Action Values",
@@ -201,13 +183,22 @@ defmodule ShotElixir.Services.NotionServiceTest do
           }
         })
 
-      # The character should have 0 values
+      # Verify 0 values are stored (these would be overwritten in a merge)
       assert character.action_values["Guns"] == 0
       assert character.action_values["Defense"] == 0
       assert character.action_values["Toughness"] == 0
+
+      # Verify that updating with non-zero values works
+      {:ok, updated} =
+        Characters.update_character(character, %{
+          action_values: Map.merge(character.action_values, %{"Guns" => 15, "Defense" => 14})
+        })
+
+      assert updated.action_values["Guns"] == 15
+      assert updated.action_values["Defense"] == 14
     end
 
-    test "character with non-blank values preserves them during merge", %{campaign: campaign} do
+    test "character with non-zero action values preserves them on update", %{campaign: campaign} do
       # Create a character with real values
       {:ok, character} =
         Characters.create_character(%{
@@ -221,14 +212,25 @@ defmodule ShotElixir.Services.NotionServiceTest do
           }
         })
 
-      # The character should keep these values
+      # Verify values are preserved
       assert character.action_values["Guns"] == 15
       assert character.action_values["Defense"] == 14
       assert character.action_values["Toughness"] == 7
+
+      # Verify partial update preserves existing values
+      {:ok, updated} =
+        Characters.update_character(character, %{
+          action_values: %{"Wounds" => 10}
+        })
+
+      # Original values should still be there
+      assert updated.action_values["Guns"] == 15
+      assert updated.action_values["Defense"] == 14
+      assert updated.action_values["Wounds"] == 10
     end
 
-    test "description with blank values gets Notion values after merge", %{campaign: campaign} do
-      # Create a character with some empty description fields
+    test "character with empty description can receive values", %{campaign: campaign} do
+      # Create a character with empty description fields
       {:ok, character} =
         Characters.create_character(%{
           name: "Blank Description",
@@ -240,13 +242,22 @@ defmodule ShotElixir.Services.NotionServiceTest do
           }
         })
 
-      # The character should have blank Age/Height but non-blank Eye Color
+      # Verify blank fields are stored
       assert character.description["Age"] == ""
       assert character.description["Height"] == ""
       assert character.description["Eye Color"] == "Blue"
+
+      # Verify updating works
+      {:ok, updated} =
+        Characters.update_character(character, %{
+          description: Map.merge(character.description, %{"Age" => "35"})
+        })
+
+      assert updated.description["Age"] == "35"
+      assert updated.description["Eye Color"] == "Blue"
     end
 
-    test "description with non-blank values preserves them during merge", %{campaign: campaign} do
+    test "character description preserves existing non-blank values", %{campaign: campaign} do
       # Create a character with real description values
       {:ok, character} =
         Characters.create_character(%{
@@ -260,7 +271,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
           }
         })
 
-      # The character should keep these values
+      # Verify values are preserved
       assert character.description["Age"] == "35"
       assert character.description["Height"] == "6'2\""
       assert character.description["Eye Color"] == "Brown"
