@@ -94,6 +94,11 @@ defmodule ShotElixirWeb.EmailView do
   """
   def render_button(url, text, opts \\ []) do
     style = Keyword.get(opts, :style, :primary)
-    Phoenix.View.render_to_string(__MODULE__, "_button.html", %{url: url, text: text, style: style})
+
+    Phoenix.View.render_to_string(__MODULE__, "_button.html", %{
+      url: url,
+      text: text,
+      style: style
+    })
   end
 end
