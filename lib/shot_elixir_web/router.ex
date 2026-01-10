@@ -198,6 +198,11 @@ defmodule ShotElixirWeb.Router do
       delete "/image", JunctureController, :remove_image
     end
 
+    # Dice rolling
+    post "/dice/swerve", DiceController, :swerve
+    post "/dice/roll", DiceController, :roll
+    post "/dice/exploding", DiceController, :exploding
+
     # Sites with attunement
     resources "/sites", SiteController do
       post "/duplicate", SiteController, :duplicate
