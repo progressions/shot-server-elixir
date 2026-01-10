@@ -8,6 +8,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerNotionTest do
   - sync_from_notion authorization and validation
   - Error handling when character has no notion_page_id
   - create_from_notion (import character from Notion page)
+  - unlink notion page (update character with notion_page_id: nil)
 
   Note: Success case and error case tests require mocking NotionService
   to avoid external API calls. These are documented as follow-up items.
@@ -299,6 +300,100 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerNotionTest do
     #   # 2. Verify response status 200
     #   # 3. Verify character attributes are updated from Notion
     # end
+  end
+
+  describe "unlink notion page" do
+    setup %{gamemaster: gm, campaign: campaign} do
+      # Create character with a notion_page_id
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character With Notion Link",
+          campaign_id: campaign.id,
+          user_id: gm.id,
+          action_values: %{"Type" => "PC"},
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      %{character: character}
+    end
+
+    test "gamemaster can unlink notion page by updating with nil", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character
+    } do
+      # Verify character has notion_page_id
+      assert character.notion_page_id != nil
+
+      conn = authenticate(conn, gm)
+
+      # Update character with notion_page_id set to nil
+      conn =
+        patch(conn, ~p"/api/v2/characters/#{character.id}", character: %{"notion_page_id" => nil})
+
+      response = json_response(conn, 200)
+      assert response["notion_page_id"] == nil
+
+      # Verify in database
+      updated_character = Characters.get_character(character.id)
+      assert updated_character.notion_page_id == nil
+    end
+
+    test "character owner can unlink notion page", %{
+      conn: conn,
+      player: player,
+      campaign: campaign
+    } do
+      # Create character owned by player with notion link
+      {:ok, player_character} =
+        Characters.create_character(%{
+          name: "Player Character With Notion",
+          campaign_id: campaign.id,
+          user_id: player.id,
+          action_values: %{"Type" => "PC"},
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      assert player_character.notion_page_id != nil
+
+      conn = authenticate(conn, player)
+
+      conn =
+        patch(conn, ~p"/api/v2/characters/#{player_character.id}",
+          character: %{"notion_page_id" => nil}
+        )
+
+      response = json_response(conn, 200)
+      assert response["notion_page_id"] == nil
+
+      # Verify in database
+      updated_character = Characters.get_character(player_character.id)
+      assert updated_character.notion_page_id == nil
+    end
+
+    test "unlinking preserves other character data", %{
+      conn: conn,
+      gamemaster: gm,
+      character: character
+    } do
+      # Record original values
+      original_name = character.name
+      original_action_values = character.action_values
+
+      conn = authenticate(conn, gm)
+
+      conn =
+        patch(conn, ~p"/api/v2/characters/#{character.id}", character: %{"notion_page_id" => nil})
+
+      response = json_response(conn, 200)
+
+      # Notion link removed
+      assert response["notion_page_id"] == nil
+
+      # Other data preserved
+      assert response["name"] == original_name
+      assert response["action_values"]["Type"] == original_action_values["Type"]
+    end
   end
 
   describe "create_from_notion" do
