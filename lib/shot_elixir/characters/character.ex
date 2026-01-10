@@ -128,6 +128,7 @@ defmodule ShotElixir.Characters.Character do
     |> validate_number(:impairments, greater_than_or_equal_to: 0)
     |> validate_character_type()
     |> unique_constraint([:name, :campaign_id])
+    |> unique_constraint(:notion_page_id, name: :characters_notion_page_id_index)
     |> merge_partial_action_values()
     |> ensure_default_values()
   end
