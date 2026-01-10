@@ -133,6 +133,29 @@ defmodule ShotElixir.Notion do
     |> Repo.one()
   end
 
+  @doc """
+  Prunes (deletes) old sync logs for a character.
+
+  ## Parameters
+    - character_id: The character's UUID
+    - opts: Keyword list with optional :days_old (default 30)
+
+  ## Returns
+    - {:ok, count} with the number of deleted logs
+  """
+  def prune_sync_logs(character_id, opts \\ []) do
+    days_old = Keyword.get(opts, :days_old, 30)
+    cutoff_date = DateTime.utc_now() |> DateTime.add(-days_old, :day)
+
+    {count, _} =
+      NotionSyncLog
+      |> where([l], l.character_id == ^character_id)
+      |> where([l], l.created_at < ^cutoff_date)
+      |> Repo.delete_all()
+
+    {:ok, count}
+  end
+
   # Private helper for pagination params
   defp get_pagination_param(params, key, default) do
     case params[key] do
