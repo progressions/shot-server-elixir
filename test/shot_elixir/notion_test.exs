@@ -38,24 +38,26 @@ defmodule ShotElixir.NotionTest do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       # Create a log from 40 days ago
-      {:ok, old_log} = Notion.create_sync_log(%{
-        character_id: character.id,
-        status: "success",
-        payload: %{},
-        response: %{}
-      })
+      {:ok, old_log} =
+        Notion.create_sync_log(%{
+          character_id: character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
 
       old_log
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
       |> Repo.update!()
 
       # Create a log from 10 days ago (should not be deleted with default 30 days)
-      {:ok, recent_log} = Notion.create_sync_log(%{
-        character_id: character.id,
-        status: "success",
-        payload: %{},
-        response: %{}
-      })
+      {:ok, recent_log} =
+        Notion.create_sync_log(%{
+          character_id: character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
 
       recent_log
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -10, :day)})
@@ -77,12 +79,13 @@ defmodule ShotElixir.NotionTest do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       # Create a log from 31 days ago
-      {:ok, old_log} = Notion.create_sync_log(%{
-        character_id: character.id,
-        status: "success",
-        payload: %{},
-        response: %{}
-      })
+      {:ok, old_log} =
+        Notion.create_sync_log(%{
+          character_id: character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
 
       old_log
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -31, :day)})
@@ -98,12 +101,13 @@ defmodule ShotElixir.NotionTest do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       # Create a log from 8 days ago
-      {:ok, log} = Notion.create_sync_log(%{
-        character_id: character.id,
-        status: "success",
-        payload: %{},
-        response: %{}
-      })
+      {:ok, log} =
+        Notion.create_sync_log(%{
+          character_id: character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
 
       log
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -8, :day)})
@@ -116,7 +120,11 @@ defmodule ShotElixir.NotionTest do
       assert Repo.get(NotionSyncLog, log.id) == nil
     end
 
-    test "only deletes logs for the specified character", %{character: character, campaign: campaign, user: user} do
+    test "only deletes logs for the specified character", %{
+      character: character,
+      campaign: campaign,
+      user: user
+    } do
       now = DateTime.utc_now() |> DateTime.truncate(:second)
 
       # Create another character
@@ -129,24 +137,26 @@ defmodule ShotElixir.NotionTest do
         })
 
       # Create old log for first character
-      {:ok, log1} = Notion.create_sync_log(%{
-        character_id: character.id,
-        status: "success",
-        payload: %{},
-        response: %{}
-      })
+      {:ok, log1} =
+        Notion.create_sync_log(%{
+          character_id: character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
 
       log1
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
       |> Repo.update!()
 
       # Create old log for second character
-      {:ok, log2} = Notion.create_sync_log(%{
-        character_id: other_character.id,
-        status: "success",
-        payload: %{},
-        response: %{}
-      })
+      {:ok, log2} =
+        Notion.create_sync_log(%{
+          character_id: other_character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
 
       log2
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
@@ -171,12 +181,13 @@ defmodule ShotElixir.NotionTest do
 
     test "returns 0 when all logs are newer than cutoff", %{character: character} do
       # Create a log from today
-      {:ok, _log} = Notion.create_sync_log(%{
-        character_id: character.id,
-        status: "success",
-        payload: %{},
-        response: %{}
-      })
+      {:ok, _log} =
+        Notion.create_sync_log(%{
+          character_id: character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
 
       {:ok, count} = Notion.prune_sync_logs(character.id, days_old: 30)
       assert count == 0

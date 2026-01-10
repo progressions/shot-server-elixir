@@ -152,7 +152,10 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
       |> Repo.update!()
 
       conn = authenticate(conn, gm)
-      conn = delete(conn, ~p"/api/v2/characters/#{character.id}/notion_sync_logs/prune?days_old=7")
+
+      conn =
+        delete(conn, ~p"/api/v2/characters/#{character.id}/notion_sync_logs/prune?days_old=7")
+
       response = json_response(conn, 200)
 
       assert response["pruned_count"] == 1
