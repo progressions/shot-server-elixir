@@ -301,39 +301,50 @@ defmodule ShotElixir.Characters.Character do
   @doc """
   Extract character attributes from Notion page properties.
   Merges Notion data with existing character data, preserving local values > 7.
+  Filters out nil values to avoid overwriting defaults with nil.
   """
   def attributes_from_notion(character, page) do
     props = page["properties"]
 
-    av = %{
-      "Archetype" => get_rich_text(props, "Type"),
-      "Type" => get_select(props, "Enemy Type"),
-      "MainAttack" => get_select(props, "MainAttack"),
-      "SecondaryAttack" => get_select(props, "SecondaryAttack"),
-      "FortuneType" => get_select(props, "FortuneType"),
-      "Fortune" => av_or_new(character, "Fortune", get_number(props, "Fortune")),
-      "Wounds" => av_or_new(character, "Wounds", get_number(props, "Wounds")),
-      "Defense" => av_or_new(character, "Defense", get_number(props, "Defense")),
-      "Toughness" => av_or_new(character, "Toughness", get_number(props, "Toughness")),
-      "Speed" => av_or_new(character, "Speed", get_number(props, "Speed")),
-      "Guns" => av_or_new(character, "Guns", get_number(props, "Guns")),
-      "Martial Arts" => av_or_new(character, "Martial Arts", get_number(props, "Martial Arts")),
-      "Sorcery" => av_or_new(character, "Sorcery", get_number(props, "Sorcery")),
-      "Creature" => av_or_new(character, "Creature", get_number(props, "Creature")),
-      "Scroungetech" => av_or_new(character, "Scroungetech", get_number(props, "Scroungetech")),
-      "Mutant" => av_or_new(character, "Mutant", get_number(props, "Mutant"))
-    }
+    av =
+      %{
+        "Archetype" => get_rich_text(props, "Type"),
+        "Type" => get_select(props, "Enemy Type"),
+        "MainAttack" => get_select(props, "MainAttack"),
+        "SecondaryAttack" => get_select(props, "SecondaryAttack"),
+        "FortuneType" => get_select(props, "FortuneType"),
+        "Fortune" => av_or_new(character, "Fortune", get_number(props, "Fortune")),
+        "Max Fortune" => av_or_new(character, "Max Fortune", get_number(props, "Fortune")),
+        "Wounds" => av_or_new(character, "Wounds", get_number(props, "Wounds")),
+        "Defense" => av_or_new(character, "Defense", get_number(props, "Defense")),
+        "Toughness" => av_or_new(character, "Toughness", get_number(props, "Toughness")),
+        "Speed" => av_or_new(character, "Speed", get_number(props, "Speed")),
+        "Guns" => av_or_new(character, "Guns", get_number(props, "Guns")),
+        "Martial Arts" => av_or_new(character, "Martial Arts", get_number(props, "Martial Arts")),
+        "Sorcery" => av_or_new(character, "Sorcery", get_number(props, "Sorcery")),
+        "Creature" => av_or_new(character, "Creature", get_number(props, "Creature")),
+        "Scroungetech" => av_or_new(character, "Scroungetech", get_number(props, "Scroungetech")),
+        "Mutant" => av_or_new(character, "Mutant", get_number(props, "Mutant")),
+        "Damage" => av_or_new(character, "Damage", get_number(props, "Damage"))
+      }
+      # Filter out nil values to preserve defaults
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
 
-    description = %{
-      "Age" => get_rich_text(props, "Age"),
-      "Height" => get_rich_text(props, "Height"),
-      "Weight" => get_rich_text(props, "Weight"),
-      "Eye Color" => get_rich_text(props, "Eye Color"),
-      "Hair Color" => get_rich_text(props, "Hair Color"),
-      "Appearance" => get_rich_text(props, "Description"),
-      "Style of Dress" => get_rich_text(props, "Style of Dress"),
-      "Melodramatic Hook" => get_rich_text(props, "Melodramatic Hook")
-    }
+    description =
+      %{
+        "Age" => get_rich_text(props, "Age"),
+        "Height" => get_rich_text(props, "Height"),
+        "Weight" => get_rich_text(props, "Weight"),
+        "Eye Color" => get_rich_text(props, "Eye Color"),
+        "Hair Color" => get_rich_text(props, "Hair Color"),
+        "Appearance" => get_rich_text(props, "Description"),
+        "Style of Dress" => get_rich_text(props, "Style of Dress"),
+        "Melodramatic Hook" => get_rich_text(props, "Melodramatic Hook")
+      }
+      # Filter out empty strings to preserve existing description values
+      |> Enum.reject(fn {_k, v} -> is_nil(v) || v == "" end)
+      |> Map.new()
 
     %{
       notion_page_id: page["id"],
