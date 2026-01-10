@@ -1,19 +1,33 @@
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="text-align: center; border-bottom: 2px solid #4CAF50; padding-bottom: 20px; margin-bottom: 30px;">
-    <h1 style="color: #2E7D32; margin: 0;">Welcome to Chi War!</h1>
-  </div>
+<h2>Welcome to the Chi War!</h2>
 
-  <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px;">
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">Hello <%= @user.first_name || @user.email %>,</p>
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">
-      Welcome to Chi War, your campaign and character manager for Feng Shui 2!
-    </p>
-  </div>
+<p>Hello <%= @user.first_name || @user.email %>,</p>
 
-  <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
-    <p style="color: #888; font-size: 14px; margin: 0;">
-      Happy gaming!<br>
-      <strong>The Chi War Team</strong>
-    </p>
-  </div>
+<p>Welcome to Chi War, your campaign and character manager for Feng Shui 2! We're excited to have you join the action.</p>
+
+<div class="callout callout-info">
+  <h4>What you can do with Chi War:</h4>
+  <ul>
+    <li><strong>Create campaigns</strong> - Run your own Feng Shui 2 adventures</li>
+    <li><strong>Build characters</strong> - Design PCs, NPCs, and memorable villains</li>
+    <li><strong>Manage fights</strong> - Track initiative with our shot counter</li>
+    <li><strong>Invite players</strong> - Bring your group together online</li>
+    <li><strong>AI-powered tools</strong> - Generate character images and descriptions</li>
+  </ul>
 </div>
+
+<h3>Getting Started</h3>
+
+<p>Ready to jump in? Here's how to get started:</p>
+
+<ol>
+  <li><strong>Create a campaign</strong> - Set up your first game world</li>
+  <li><strong>Add characters</strong> - Build your cast of heroes and villains</li>
+  <li><strong>Invite players</strong> - Share the adventure with your group</li>
+  <li><strong>Start a fight</strong> - Use the shot counter for combat</li>
+</ol>
+
+<div style="text-align: center; margin: 32px 0;">
+  <%= render "_button.html", url: root_url(), text: "Get Started" %>
+</div>
+
+<p>If you have any questions, don't hesitate to reach out. Happy gaming!</p>

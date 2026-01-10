@@ -1,0 +1,31 @@
+CONFIRM YOUR ACCOUNT
+====================
+<%= if @invitation && @campaign do %>
+Hello <%= @user.first_name || String.split(@user.email, "@") |> List.first() %>!
+
+You're almost ready to join the action! You've been invited to join "<%= @campaign.name %>" and your account has been created successfully.
+
+CAMPAIGN: <%= @campaign.name %>
+You're joining a Feng Shui 2 RPG campaign. Once confirmed, you'll be automatically added to this campaign and can start creating characters!
+
+To complete your registration and join the campaign, please confirm your email address:
+<%= @confirmation_url %>
+
+After confirmation, you'll be automatically logged in and taken to your new campaign dashboard.
+<% else %>
+Welcome <%= @user.first_name || String.split(@user.email, "@") |> List.first() %>!
+
+Thank you for joining the Chi War! Your account has been created successfully.
+
+To complete your registration, please confirm your email address:
+<%= @confirmation_url %>
+
+After confirmation, you'll be able to log in and start creating campaigns and characters.
+<% end %>
+
+If you didn't sign up for this account, you can safely ignore this email.
+This confirmation link will expire in 24 hours.
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>

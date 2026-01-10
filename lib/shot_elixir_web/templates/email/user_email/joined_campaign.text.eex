@@ -1,0 +1,24 @@
+YOU'VE JOINED A CAMPAIGN!
+=========================
+
+Hello <%= @user.first_name || @user.email %>,
+
+Great news! You have successfully joined the campaign "<%= @campaign.name %>".
+<%= if @campaign.description do %>
+ABOUT THIS CAMPAIGN:
+<%= @campaign.description %>
+<% end %>
+
+WHAT YOU CAN DO NOW:
+- Create a character - Build your hero for this adventure
+- Explore the world - Check out sites, factions, and parties
+- Join fights - Participate in combat with the shot counter
+- Connect with players - Meet your fellow adventurers
+
+Go to your campaign: <%= ShotElixirWeb.EmailView.root_url() %>/campaigns
+
+Time to jump into the action. See you in the Chi War!
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>

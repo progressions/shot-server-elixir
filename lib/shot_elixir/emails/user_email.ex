@@ -21,6 +21,7 @@ defmodule ShotElixir.Emails.UserEmail do
     |> from({@from_name, @from_email})
     |> subject("Welcome to the Chi War!")
     |> html_body(render_template("welcome.html", %{user: user}))
+    |> text_body(render_text_template("welcome.text", %{user: user}))
   end
 
   @doc """
@@ -37,6 +38,14 @@ defmodule ShotElixir.Emails.UserEmail do
     |> subject("You have been invited to join #{campaign.name} in the Chi War!")
     |> html_body(
       render_template("invitation.html", %{
+        invitation: invitation,
+        campaign: campaign,
+        invitation_url: invitation_url,
+        root_url: root_url
+      })
+    )
+    |> text_body(
+      render_text_template("invitation.text", %{
         invitation: invitation,
         campaign: campaign,
         invitation_url: invitation_url,
@@ -87,6 +96,15 @@ defmodule ShotElixir.Emails.UserEmail do
         })
       )
     )
+    |> text_body(
+      render_text_template(
+        "confirmation_instructions.text",
+        Map.merge(template_assigns, %{
+          user: user,
+          confirmation_url: confirmation_url
+        })
+      )
+    )
   end
 
   @doc """
@@ -109,7 +127,7 @@ defmodule ShotElixir.Emails.UserEmail do
       })
     )
     |> text_body(
-      render_template("reset_password_instructions.text", %{
+      render_text_template("reset_password_instructions.text", %{
         user: user,
         reset_url: reset_url
       })
@@ -130,6 +148,12 @@ defmodule ShotElixir.Emails.UserEmail do
         campaign: campaign
       })
     )
+    |> text_body(
+      render_text_template("joined_campaign.text", %{
+        user: user,
+        campaign: campaign
+      })
+    )
   end
 
   @doc """
@@ -142,6 +166,12 @@ defmodule ShotElixir.Emails.UserEmail do
     |> subject("You have been removed from the campaign: #{campaign.name}")
     |> html_body(
       render_template("removed_from_campaign.html", %{
+        user: user,
+        campaign: campaign
+      })
+    )
+    |> text_body(
+      render_text_template("removed_from_campaign.text", %{
         user: user,
         campaign: campaign
       })
@@ -164,6 +194,13 @@ defmodule ShotElixir.Emails.UserEmail do
     |> subject("AI Image Generation Unavailable - #{provider_name} Credits Exhausted")
     |> html_body(
       render_template("ai_credits_exhausted.html", %{
+        user: user,
+        campaign: campaign,
+        provider_name: provider_name
+      })
+    )
+    |> text_body(
+      render_text_template("ai_credits_exhausted.text", %{
         user: user,
         campaign: campaign,
         provider_name: provider_name
@@ -192,7 +229,7 @@ defmodule ShotElixir.Emails.UserEmail do
       })
     )
     |> text_body(
-      render_template("otp_login.text", %{
+      render_text_template("otp_login.text", %{
         user: user,
         otp_code: otp_code,
         magic_link_url: magic_link_url
@@ -212,7 +249,13 @@ defmodule ShotElixir.Emails.UserEmail do
     "#{scheme}://#{host}#{port_string}"
   end
 
+  # Renders an HTML email template wrapped in the shared layout
   defp render_template(template_name, assigns) do
+    EmailView.render_with_layout("user_email/#{template_name}", assigns)
+  end
+
+  # Renders a plain text email template (no layout wrapper)
+  defp render_text_template(template_name, assigns) do
     Phoenix.View.render_to_string(
       EmailView,
       "user_email/#{template_name}",

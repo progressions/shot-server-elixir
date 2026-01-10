@@ -1,143 +1,26 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Your Login Code - Chi War</title>
-  <style>
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      line-height: 1.6;
-      color: #333;
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      background-color: #f8f9fa;
-    }
-    .container {
-      background-color: white;
-      padding: 40px;
-      border-radius: 8px;
-      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    }
-    .header {
-      text-align: center;
-      margin-bottom: 30px;
-    }
-    .header h1 {
-      color: #dc3545;
-      font-size: 28px;
-      margin-bottom: 10px;
-    }
-    .code-box {
-      background-color: #f8f9fa;
-      border: 2px solid #dee2e6;
-      border-radius: 8px;
-      padding: 30px;
-      text-align: center;
-      margin: 30px 0;
-    }
-    .code {
-      font-family: 'Courier New', Courier, monospace;
-      font-size: 42px;
-      font-weight: bold;
-      letter-spacing: 8px;
-      color: #dc3545;
-      margin: 0;
-    }
-    .expiry {
-      font-size: 14px;
-      color: #6c757d;
-      margin-top: 15px;
-    }
-    .divider {
-      text-align: center;
-      margin: 30px 0;
-      color: #6c757d;
-    }
-    .divider span {
-      background-color: white;
-      padding: 0 15px;
-    }
-    .divider hr {
-      border: none;
-      border-top: 1px solid #dee2e6;
-      margin-top: -10px;
-    }
-    .button {
-      display: inline-block;
-      background-color: #dc3545;
-      color: white;
-      text-decoration: none;
-      padding: 14px 40px;
-      border-radius: 5px;
-      font-weight: bold;
-      margin: 20px 0;
-      text-align: center;
-      font-size: 16px;
-    }
-    .button:hover {
-      background-color: #c82333;
-    }
-    .magic-link-section {
-      text-align: center;
-      margin: 20px 0;
-    }
-    .security-notice {
-      background-color: #fff3cd;
-      border: 1px solid #ffeaa7;
-      border-left: 4px solid #f39c12;
-      padding: 15px;
-      margin: 20px 0;
-      border-radius: 4px;
-      font-size: 14px;
-    }
-    .footer {
-      margin-top: 30px;
-      padding-top: 20px;
-      border-top: 1px solid #dee2e6;
-      font-size: 14px;
-      color: #6c757d;
-      text-align: center;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      <h1>Your Login Code</h1>
-      <p><strong>Chi War Campaign Manager</strong></p>
-    </div>
+<h2>Your Login Code</h2>
 
-    <p>Hi <%= @user.first_name || "there" %>,</p>
+<p>Hi <%= @user.first_name || "there" %>,</p>
 
-    <p>Use the code below to log in to your Chi War account:</p>
+<p>Use the code below to log in to your Chi War account:</p>
 
-    <div class="code-box">
-      <p class="code"><%= @otp_code %></p>
-      <p class="expiry">This code expires in 10 minutes</p>
-    </div>
+<div class="code-box">
+  <p class="code"><%= @otp_code %></p>
+  <p class="expiry">This code expires in 10 minutes</p>
+</div>
 
-    <div class="divider">
-      <span>or</span>
-      <hr>
-    </div>
+<div class="divider">
+  <span>or</span>
+  <hr>
+</div>
 
-    <div class="magic-link-section">
-      <p>Click the button below to log in automatically:</p>
-      <a href="<%= @magic_link_url %>" class="button">Log In to Chi War</a>
-    </div>
+<p style="text-align: center;">Click the button below to log in automatically:</p>
 
-    <div class="security-notice">
-      <strong>Didn't request this code?</strong><br>
-      If you didn't try to log in, you can safely ignore this email. Your account is secure.
-    </div>
+<div style="text-align: center;">
+  <%= render "_button.html", url: @magic_link_url, text: "Log In to Chi War" %>
+</div>
 
-    <div class="footer">
-      <p>This email was sent to <%= @user.email %></p>
-      <p><strong>Chi War Campaign Manager</strong><br>
-      Secure &bull; Fast &bull; Reliable</p>
-    </div>
-  </div>
-</body>
-</html>
+<div class="callout callout-warning">
+  <h4>Didn't request this code?</h4>
+  <p>If you didn't try to log in, you can safely ignore this email. Your account is secure.</p>
+</div>

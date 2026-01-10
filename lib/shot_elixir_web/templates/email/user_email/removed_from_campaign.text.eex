@@ -1,0 +1,22 @@
+CAMPAIGN MEMBERSHIP UPDATE
+==========================
+
+Hello <%= @user.first_name || @user.email %>,
+
+You have been removed from the campaign "<%= @campaign.name %>".
+
+If you believe this was done in error, please contact the campaign's gamemaster.
+
+WHAT'S NEXT:
+You can still access Chi War and participate in other campaigns:
+- View your campaigns - See other campaigns you're part of
+- Create a new campaign - Start your own adventure as a gamemaster
+- Wait for invitations - Get invited to new campaigns by other gamemasters
+
+View your campaigns: <%= ShotElixirWeb.EmailView.root_url() %>/campaigns
+
+If you have any questions, feel free to reach out to the campaign's gamemaster.
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>
