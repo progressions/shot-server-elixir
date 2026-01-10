@@ -394,7 +394,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         _ -> 7
       end
 
-    speed = (character.action_values["Speed"] || 0) - (character.impairments || 0)
+    speed = to_integer(character.action_values["Speed"]) - (character.impairments || 0)
     name = String.downcase(character.name || "")
 
     {type_order, -speed, name}
@@ -466,4 +466,18 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         end)
     end
   end
+
+  # Helper to safely convert action values to integers
+  # Some values may be stored as strings (e.g., "8" instead of 8)
+  defp to_integer(nil), do: 0
+  defp to_integer(value) when is_integer(value), do: value
+
+  defp to_integer(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _} -> int
+      :error -> 0
+    end
+  end
+
+  defp to_integer(_), do: 0
 end
