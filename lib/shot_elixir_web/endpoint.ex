@@ -48,14 +48,27 @@ defmodule ShotElixirWeb.Endpoint do
   end
 
   # CORS configuration
+  # Localhost origins only in development
+  @localhost_origins if(Mix.env() == :dev,
+                       do: [
+                         "http://localhost:3000",
+                         "http://localhost:3001",
+                         "http://localhost:3011",
+                         "http://localhost:3021",
+                         "http://localhost:3031",
+                         "http://localhost:3041"
+                       ],
+                       else: []
+                     )
+
   plug CORSPlug,
-    origin: [
-      "http://localhost:3001",
-      "http://localhost:3000",
-      "https://chiwar.net",
-      "https://shot-client-phoenix.fly.dev",
-      "https://shot-client-next.fly.dev"
-    ],
+    origin:
+      @localhost_origins ++
+        [
+          "https://chiwar.net",
+          "https://shot-client-phoenix.fly.dev",
+          "https://shot-client-next.fly.dev"
+        ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     headers: [
