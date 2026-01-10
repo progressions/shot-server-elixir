@@ -121,6 +121,7 @@ defmodule ShotElixirWeb.Router do
 
     # Notion integration
     get "/notion/characters", NotionController, :characters
+    get "/notion/adventures", NotionController, :adventures
 
     # Suggestions for @ mentions in rich text editors
     get "/suggestions", SuggestionsController, :index

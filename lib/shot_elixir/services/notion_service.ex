@@ -743,4 +743,245 @@ defmodule ShotElixir.Services.NotionService do
     |> Enum.map(& &1["plain_text"])
     |> Enum.join("")
   end
+
+  # =============================================================================
+  # Adventure Functions
+  # =============================================================================
+
+  @doc """
+  Search for adventure pages in Notion by query.
+  Returns matching pages with their titles and IDs.
+
+  ## Parameters
+    * `query` - The search query string
+
+  ## Returns
+    * `{:ok, %{pages: [...], title: ..., page_id: ..., content: ...}}` on success
+    * `{:error, reason}` on failure
+  """
+  def fetch_adventure(query) do
+    # Search Notion for pages matching the query
+    response =
+      NotionClient.search(query, %{"filter" => %{"property" => "object", "value" => "page"}})
+
+    pages =
+      (response["results"] || [])
+      |> Enum.map(fn page ->
+        title = extract_page_title(page)
+        %{id: page["id"], title: title}
+      end)
+      |> Enum.filter(fn page -> page.title && page.title != "" end)
+
+    case pages do
+      [] ->
+        {:ok, %{pages: [], title: nil, page_id: nil, content: nil}}
+
+      [first | _rest] ->
+        # Fetch content for the first matching page
+        case fetch_page_content(first.id) do
+          {:ok, content} ->
+            {:ok,
+             %{
+               pages: pages,
+               title: first.title,
+               page_id: first.id,
+               content: content
+             }}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+    end
+  rescue
+    error ->
+      Logger.error("Failed to search adventures: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  @doc """
+  Fetch a specific adventure page by its Notion page ID.
+
+  ## Parameters
+    * `page_id` - The Notion page ID
+
+  ## Returns
+    * `{:ok, %{title: ..., page_id: ..., content: ...}}` on success
+    * `{:error, reason}` on failure
+  """
+  def fetch_adventure_by_id(page_id) do
+    page = NotionClient.get_page(page_id)
+
+    case page do
+      %{"code" => error_code, "message" => message} ->
+        {:error, {:notion_api_error, error_code, message}}
+
+      %{"id" => id} ->
+        title = extract_page_title(page)
+
+        case fetch_page_content(id) do
+          {:ok, content} ->
+            {:ok,
+             %{
+               title: title,
+               page_id: id,
+               content: content
+             }}
+
+          {:error, reason} ->
+            {:error, reason}
+        end
+
+      _ ->
+        {:error, :unexpected_notion_response}
+    end
+  rescue
+    error ->
+      Logger.error("Failed to fetch adventure by ID: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  @doc """
+  Fetch page content (blocks) and convert to plain text.
+  """
+  def fetch_page_content(page_id) do
+    response = NotionClient.get_block_children(page_id)
+
+    case response do
+      %{"results" => blocks} when is_list(blocks) ->
+        content = blocks_to_text(blocks)
+        {:ok, content}
+
+      %{"code" => error_code, "message" => message} ->
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        {:error, :unexpected_notion_response}
+    end
+  rescue
+    error ->
+      Logger.error("Failed to fetch page content: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  # Extract title from a Notion page object
+  defp extract_page_title(page) do
+    props = page["properties"] || %{}
+
+    # Try common title property names
+    title_prop =
+      props["Name"] ||
+        props["Title"] ||
+        props["title"] ||
+        Enum.find_value(props, fn {_key, value} ->
+          if value["type"] == "title", do: value
+        end)
+
+    case title_prop do
+      %{"title" => [%{"plain_text" => text} | _]} -> text
+      %{"title" => []} -> nil
+      _ -> nil
+    end
+  end
+
+  # Convert Notion blocks to plain text
+  defp blocks_to_text(blocks) do
+    blocks
+    |> Enum.map(&block_to_text/1)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.join("\n\n")
+  end
+
+  defp block_to_text(%{"type" => type} = block) do
+    case type do
+      "paragraph" ->
+        extract_rich_text(block["paragraph"]["rich_text"])
+
+      "heading_1" ->
+        text = extract_rich_text(block["heading_1"]["rich_text"])
+        "# #{text}"
+
+      "heading_2" ->
+        text = extract_rich_text(block["heading_2"]["rich_text"])
+        "## #{text}"
+
+      "heading_3" ->
+        text = extract_rich_text(block["heading_3"]["rich_text"])
+        "### #{text}"
+
+      "bulleted_list_item" ->
+        text = extract_rich_text(block["bulleted_list_item"]["rich_text"])
+        "• #{text}"
+
+      "numbered_list_item" ->
+        text = extract_rich_text(block["numbered_list_item"]["rich_text"])
+        "- #{text}"
+
+      "to_do" ->
+        text = extract_rich_text(block["to_do"]["rich_text"])
+        checked = if block["to_do"]["checked"], do: "[x]", else: "[ ]"
+        "#{checked} #{text}"
+
+      "toggle" ->
+        extract_rich_text(block["toggle"]["rich_text"])
+
+      "quote" ->
+        text = extract_rich_text(block["quote"]["rich_text"])
+        "> #{text}"
+
+      "callout" ->
+        extract_rich_text(block["callout"]["rich_text"])
+
+      "code" ->
+        text = extract_rich_text(block["code"]["rich_text"])
+        "```\n#{text}\n```"
+
+      "divider" ->
+        "---"
+
+      "table_of_contents" ->
+        nil
+
+      "image" ->
+        "[Image]"
+
+      "video" ->
+        "[Video]"
+
+      "file" ->
+        "[File]"
+
+      "pdf" ->
+        "[PDF]"
+
+      "bookmark" ->
+        url = get_in(block, ["bookmark", "url"])
+        "[Bookmark: #{url}]"
+
+      "link_preview" ->
+        url = get_in(block, ["link_preview", "url"])
+        "[Link: #{url}]"
+
+      "child_page" ->
+        title = block["child_page"]["title"]
+        "[Page: #{title}]"
+
+      "child_database" ->
+        title = block["child_database"]["title"]
+        "[Database: #{title}]"
+
+      _ ->
+        nil
+    end
+  end
+
+  defp block_to_text(_), do: nil
+
+  defp extract_rich_text(nil), do: ""
+  defp extract_rich_text([]), do: ""
+
+  defp extract_rich_text(rich_text) when is_list(rich_text) do
+    rich_text
+    |> Enum.map(fn item -> item["plain_text"] || "" end)
+    |> Enum.join("")
+  end
 end
