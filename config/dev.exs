@@ -20,6 +20,7 @@ config :shot_elixir, ShotElixir.Repo,
 config :shot_elixir, ShotElixirWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
+  # PHX_PORT env var allows running multiple workspaces on different ports
   http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PHX_PORT") || "4002")],
   check_origin: false,
   code_reloader: true,

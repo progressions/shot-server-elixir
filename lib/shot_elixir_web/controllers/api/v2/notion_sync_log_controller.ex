@@ -35,6 +35,43 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
     end
   end
 
+  @doc """
+  DELETE /api/v2/characters/:character_id/notion_sync_logs/prune
+
+  Prunes (deletes) old Notion sync logs for a character.
+  Only accessible to admins or the campaign's gamemaster.
+
+  ## Parameters
+    - days_old: Number of days old logs must be to be deleted (default: 30)
+  """
+  def prune(conn, %{"character_id" => character_id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %{} = character <- Characters.get_character(character_id),
+         :ok <- authorize_admin_access(character, current_user) do
+      days_old = parse_days_old(params["days_old"])
+      {:ok, count} = Notion.prune_sync_logs(character_id, days_old: days_old)
+
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.NotionSyncLogView)
+      |> render("prune.json", count: count, days_old: days_old)
+    else
+      nil -> {:error, :not_found}
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  defp parse_days_old(nil), do: 30
+
+  defp parse_days_old(value) when is_integer(value), do: max(1, value)
+
+  defp parse_days_old(value) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, ""} -> max(1, int)
+      _ -> 30
+    end
+  end
+
   # Private helper to check admin/gamemaster access
   defp authorize_admin_access(character, user) do
     campaign = Campaigns.get_campaign(character.campaign_id)
