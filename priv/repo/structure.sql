@@ -1240,6 +1240,13 @@ CREATE INDEX index_characters_on_lower_name ON public.characters USING btree (lo
 
 
 --
+-- Name: characters_notion_page_id_index; Type: INDEX; Schema: public; Owner: isaacpriestley
+--
+
+CREATE UNIQUE INDEX characters_notion_page_id_index ON public.characters USING btree (notion_page_id) WHERE (notion_page_id IS NOT NULL);
+
+
+--
 -- Name: index_characters_on_status; Type: INDEX; Schema: public; Owner: isaacpriestley
 --
 
@@ -2230,4 +2237,3 @@ ALTER TABLE ONLY public.shots
 --
 
 \unrestrict pntvPIghKlMZYfYh0pfyEYeo71m4bsTN1upBlQW0hmGR4NwcK5v1IgfB5VdOM62
-
