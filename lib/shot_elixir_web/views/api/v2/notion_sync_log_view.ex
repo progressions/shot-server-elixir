@@ -14,6 +14,14 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogView do
     render_log(log)
   end
 
+  def render("prune.json", %{count: count, days_old: days_old}) do
+    %{
+      pruned_count: count,
+      days_old: days_old,
+      message: "Deleted #{count} sync log(s) older than #{days_old} days"
+    }
+  end
+
   defp render_log(log) do
     %{
       id: log.id,

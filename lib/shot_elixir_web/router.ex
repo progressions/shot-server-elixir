@@ -143,6 +143,7 @@ defmodule ShotElixirWeb.Router do
       resources "/weapons", CharacterWeaponController, only: [:index, :create, :delete]
       resources "/schticks", CharacterSchtickController, only: [:index, :create, :delete]
       resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
+      delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
     end
 
     # Vehicles
