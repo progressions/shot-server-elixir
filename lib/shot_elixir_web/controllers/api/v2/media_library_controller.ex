@@ -21,7 +21,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
     - status: "orphan", "attached", or "all" (default: "all")
     - source: "upload", "ai_generated", or "all" (default: "all")
     - entity_type: Filter by entity type (e.g., "Character")
-    - sort: Sort field - "created_at", "updated_at", "filename", "file_size", "entity_type", "entity_name" (default: "created_at")
+    - sort: Sort field - "inserted_at", "updated_at", "filename", "byte_size", "entity_type" (default: "inserted_at")
     - order: Sort direction - "asc" or "desc" (default: "desc")
     - page: Page number (default: 1)
     - per_page: Items per page (default: 50)

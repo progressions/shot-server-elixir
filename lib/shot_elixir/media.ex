@@ -10,7 +10,7 @@ defmodule ShotElixir.Media do
   alias ShotElixir.Services.ImagekitService
   alias ShotElixir.ActiveStorage
 
-  @valid_sort_fields ~w(created_at updated_at filename file_size entity_type entity_name)
+  @valid_sort_fields ~w(inserted_at updated_at filename byte_size entity_type)
 
   @doc """
   Lists all images for a campaign with optional filtering.
@@ -21,7 +21,7 @@ defmodule ShotElixir.Media do
       - "status" - "orphan", "attached", or "all" (default: "all")
       - "source" - "upload", "ai_generated", or "all" (default: "all")
       - "entity_type" - Filter by entity type (e.g., "Character")
-      - "sort" - Field to sort by (default: "created_at")
+      - "sort" - Field to sort by: "inserted_at", "updated_at", "filename", "byte_size", "entity_type" (default: "inserted_at")
       - "order" - Sort direction: "asc" or "desc" (default: "desc")
       - "page" - Page number (default: 1)
       - "per_page" - Items per page (default: 50)
