@@ -1,11 +1,25 @@
 import Config
 
+# Helper to safely parse port environment variables
+parse_port = fn env_var, default ->
+  case System.get_env(env_var) do
+    nil ->
+      default
+
+    port_str ->
+      case Integer.parse(port_str) do
+        {port, ""} -> port
+        _ -> raise "Invalid #{env_var} value: #{port_str}. Must be a valid integer."
+      end
+  end
+end
+
 # Configure your database
 config :shot_elixir, ShotElixir.Repo,
   username: "isaacpriestley",
   password: "",
   hostname: "localhost",
-  port: String.to_integer(System.get_env("SHOT_ELIXIR_DEV_DB_PORT") || "5432"),
+  port: parse_port.("SHOT_ELIXIR_DEV_DB_PORT", 5432),
   database: "shot_counter_local",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
@@ -21,7 +35,7 @@ config :shot_elixir, ShotElixirWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   # PHX_PORT env var allows running multiple workspaces on different ports
-  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PHX_PORT") || "4002")],
+  http: [ip: {127, 0, 0, 1}, port: parse_port.("PHX_PORT", 4002)],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
