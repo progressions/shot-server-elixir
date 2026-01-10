@@ -329,9 +329,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerNotionTest do
 
       # Update character with notion_page_id set to nil
       conn =
-        patch(conn, ~p"/api/v2/characters/#{character.id}", %{
-          "character" => Jason.encode!(%{"notion_page_id" => nil})
-        })
+        patch(conn, ~p"/api/v2/characters/#{character.id}", character: %{"notion_page_id" => nil})
 
       response = json_response(conn, 200)
       assert response["notion_page_id"] == nil
@@ -361,9 +359,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerNotionTest do
       conn = authenticate(conn, player)
 
       conn =
-        patch(conn, ~p"/api/v2/characters/#{player_character.id}", %{
-          "character" => Jason.encode!(%{"notion_page_id" => nil})
-        })
+        patch(conn, ~p"/api/v2/characters/#{player_character.id}",
+          character: %{"notion_page_id" => nil}
+        )
 
       response = json_response(conn, 200)
       assert response["notion_page_id"] == nil
@@ -385,9 +383,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerNotionTest do
       conn = authenticate(conn, gm)
 
       conn =
-        patch(conn, ~p"/api/v2/characters/#{character.id}", %{
-          "character" => Jason.encode!(%{"notion_page_id" => nil})
-        })
+        patch(conn, ~p"/api/v2/characters/#{character.id}", character: %{"notion_page_id" => nil})
 
       response = json_response(conn, 200)
 
