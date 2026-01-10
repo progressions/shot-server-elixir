@@ -122,6 +122,7 @@ defmodule ShotElixirWeb.Router do
     # Notion integration
     get "/notion/search", NotionController, :search
     get "/notion/sessions", NotionController, :sessions
+    get "/notion/adventures", NotionController, :adventures
 
     # Suggestions for @ mentions in rich text editors
     get "/suggestions", SuggestionsController, :index
