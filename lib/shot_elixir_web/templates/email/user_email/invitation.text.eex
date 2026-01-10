@@ -1,0 +1,25 @@
+YOU'VE BEEN INVITED!
+====================
+
+Hello <%= String.split(@invitation.email, "@") |> List.first() %>,
+
+<%= @invitation.user.first_name %> <%= @invitation.user.last_name %> has invited you to join the campaign "<%= @campaign.name %>" in Chi War!
+<%= if @campaign.description do %>
+ABOUT THIS CAMPAIGN:
+<%= @campaign.description %>
+<% end %>
+
+ACCEPT YOUR INVITATION:
+<%= @invitation_url %>
+
+WHAT HAPPENS NEXT:
+- Click the link above to accept the invitation
+- Log in to your Chi War account (or create one if needed)
+- You'll be automatically added to the campaign
+- Start creating characters and joining the adventure!
+
+If you don't want to join this campaign, you can safely ignore this email.
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>

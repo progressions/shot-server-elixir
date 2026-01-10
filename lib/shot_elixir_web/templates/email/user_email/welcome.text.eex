@@ -1,0 +1,27 @@
+WELCOME TO THE CHI WAR!
+========================
+
+Hello <%= @user.first_name || @user.email %>,
+
+Welcome to Chi War, your campaign and character manager for Feng Shui 2! We're excited to have you join the action.
+
+WHAT YOU CAN DO WITH CHI WAR:
+- Create campaigns - Run your own Feng Shui 2 adventures
+- Build characters - Design PCs, NPCs, and memorable villains
+- Manage fights - Track initiative with our shot counter
+- Invite players - Bring your group together online
+- AI-powered tools - Generate character images and descriptions
+
+GETTING STARTED:
+1. Create a campaign - Set up your first game world
+2. Add characters - Build your cast of heroes and villains
+3. Invite players - Share the adventure with your group
+4. Start a fight - Use the shot counter for combat
+
+Get started now: <%= ShotElixirWeb.EmailView.root_url() %>
+
+If you have any questions, don't hesitate to reach out. Happy gaming!
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>

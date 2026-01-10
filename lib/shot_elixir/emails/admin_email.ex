@@ -33,7 +33,7 @@ defmodule ShotElixir.Emails.AdminEmail do
       })
     )
     |> text_body(
-      render_template("blob_sequence_error.text", %{
+      render_text_template("blob_sequence_error.text", %{
         campaign: campaign,
         error_message: error_message,
         timestamp: timestamp
@@ -43,7 +43,13 @@ defmodule ShotElixir.Emails.AdminEmail do
 
   # Private helpers
 
+  # Renders an HTML email template wrapped in the shared layout
   defp render_template(template_name, assigns) do
+    EmailView.render_with_layout("admin_email/#{template_name}", assigns)
+  end
+
+  # Renders a plain text email template (no layout wrapper)
+  defp render_text_template(template_name, assigns) do
     Phoenix.View.render_to_string(
       EmailView,
       "admin_email/#{template_name}",

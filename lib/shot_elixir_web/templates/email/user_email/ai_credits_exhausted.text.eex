@@ -1,0 +1,26 @@
+AI IMAGE GENERATION TEMPORARILY UNAVAILABLE
+============================================
+
+Hello <%= @user.first_name || @user.email %>,
+
+We wanted to let you know that AI image generation for the campaign "<%= @campaign.name %>" is temporarily unavailable.
+
+WHAT HAPPENED:
+The <%= @provider_name %> API credits have been exhausted.
+
+WHAT'S AFFECTED:
+- Generating images for individual characters, sites, factions, etc.
+- Batch image generation for entities without images
+
+WHAT YOU CAN DO:
+- Wait for refresh - Credits usually reset monthly
+- Contact administrator - Request additional credits
+- Upload manually - Add your own images in the meantime
+
+All other Chi War features continue to work normally. Only AI-powered image generation is affected.
+
+Go to Chi War: <%= ShotElixirWeb.EmailView.root_url() %>
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>

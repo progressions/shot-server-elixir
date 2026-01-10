@@ -1,31 +1,33 @@
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; border: 1px solid #ffc107;">
-    <h2 style="color: #856404; margin-top: 0;">AI Image Generation Temporarily Unavailable</h2>
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">Hello <%= Phoenix.HTML.html_escape(@user.first_name || @user.email) %>,</p>
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">
-      We wanted to let you know that AI image generation for the campaign
-      <strong><%= Phoenix.HTML.html_escape(@campaign.name) %></strong> is temporarily unavailable.
-    </p>
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">
-      The <%= Phoenix.HTML.html_escape(@provider_name) %> API credits have been exhausted. This affects:
-    </p>
-    <ul style="font-size: 16px; line-height: 1.6; color: #444;">
-      <li>Generating images for individual characters, sites, factions, etc.</li>
-      <li>Batch image generation for entities without images</li>
-    </ul>
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">
-      <strong>What you can do:</strong>
-    </p>
-    <ul style="font-size: 16px; line-height: 1.6; color: #444;">
-      <li>Wait for the credits to refresh (usually resets monthly)</li>
-      <li>Contact your administrator to add more credits</li>
-      <li>Upload images manually in the meantime</li>
-    </ul>
-  </div>
+<h2>AI Image Generation Temporarily Unavailable</h2>
 
-  <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
-    <p style="color: #888; font-size: 14px; margin: 0;">
-      <strong>The Chi War Team</strong>
-    </p>
-  </div>
+<p>Hello <%= @user.first_name || @user.email %>,</p>
+
+<p>We wanted to let you know that AI image generation for the campaign <strong>"<%= @campaign.name %>"</strong> is temporarily unavailable.</p>
+
+<div class="callout callout-warning">
+  <h4>What happened?</h4>
+  <p>The <%= @provider_name %> API credits have been exhausted.</p>
+</div>
+
+<h3>What's affected:</h3>
+
+<ul>
+  <li>Generating images for individual characters, sites, factions, etc.</li>
+  <li>Batch image generation for entities without images</li>
+</ul>
+
+<h3>What you can do:</h3>
+
+<div class="callout callout-info">
+  <ul>
+    <li><strong>Wait for refresh</strong> - Credits usually reset monthly</li>
+    <li><strong>Contact administrator</strong> - Request additional credits</li>
+    <li><strong>Upload manually</strong> - Add your own images in the meantime</li>
+  </ul>
+</div>
+
+<p>All other Chi War features continue to work normally. Only AI-powered image generation is affected.</p>
+
+<div style="text-align: center; margin: 32px 0;">
+  <%= render "_button.html", url: root_url(), text: "Go to Chi War" %>
 </div>

@@ -1,14 +1,28 @@
-<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px;">
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">Hello <%= @user.first_name || @user.email %>,</p>
-    <p style="font-size: 16px; line-height: 1.6; color: #444;">
-      You have joined the campaign <strong><%= @campaign.name %></strong>
-    </p>
-  </div>
+<h2>You've Joined a Campaign!</h2>
 
-  <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd;">
-    <p style="color: #888; font-size: 14px; margin: 0;">
-      <strong>The Chi War Team</strong>
-    </p>
-  </div>
+<p>Hello <%= @user.first_name || @user.email %>,</p>
+
+<p>Great news! You have successfully joined the campaign <strong>"<%= @campaign.name %>"</strong>.</p>
+
+<%= if @campaign.description do %>
+<div class="callout callout-info">
+  <h4>About This Campaign</h4>
+  <p><%= @campaign.description %></p>
 </div>
+<% end %>
+
+<div class="callout callout-success">
+  <h4>What you can do now:</h4>
+  <ul>
+    <li><strong>Create a character</strong> - Build your hero for this adventure</li>
+    <li><strong>Explore the world</strong> - Check out sites, factions, and parties</li>
+    <li><strong>Join fights</strong> - Participate in combat with the shot counter</li>
+    <li><strong>Connect with players</strong> - Meet your fellow adventurers</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin: 32px 0;">
+  <%= render "_button.html", url: "#{root_url()}/campaigns", text: "Go to Campaign" %>
+</div>
+
+<p>Time to jump into the action. See you in the Chi War!</p>
