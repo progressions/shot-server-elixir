@@ -47,15 +47,9 @@ defmodule ShotElixirWeb.Endpoint do
     plug Tidewave
   end
 
-  # CORS configuration
+  # CORS configuration - origins defined in config/dev.exs and config/runtime.exs
   plug CORSPlug,
-    origin: [
-      "http://localhost:3001",
-      "http://localhost:3000",
-      "https://chiwar.net",
-      "https://shot-client-phoenix.fly.dev",
-      "https://shot-client-next.fly.dev"
-    ],
+    origin: Application.compile_env(:shot_elixir, :cors_origins, ["http://localhost:3001"]),
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     headers: [

@@ -10,6 +10,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
   alias ShotElixir.Media.MediaImage
   alias ShotElixir.Guardian
   alias ShotElixir.Campaigns
+  alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -67,6 +68,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
          :ok <- authorize_image_access(image, current_user),
          :ok <- require_gamemaster(current_user, image.campaign_id),
          {:ok, _deleted} <- Media.delete_image(image) do
+      CampaignChannel.broadcast_entity_reload(image.campaign_id, "Image")
       send_resp(conn, :no_content, "")
     else
       nil -> {:error, :not_found}
@@ -89,6 +91,8 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
     with :ok <- require_gamemaster(current_user, campaign_id),
          :ok <- verify_images_in_campaign(ids, campaign_id),
          {:ok, result} <- Media.bulk_delete_images(ids) do
+      CampaignChannel.broadcast_entity_reload(campaign_id, "Image")
+
       conn
       |> put_status(:ok)
       |> json(%{
@@ -118,6 +122,8 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
          :ok <- authorize_image_access(image, current_user),
          :ok <- require_gamemaster(current_user, image.campaign_id),
          {:ok, new_image} <- Media.duplicate_image(image) do
+      CampaignChannel.broadcast_entity_reload(image.campaign_id, "Image")
+
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.MediaLibraryView)
@@ -144,6 +150,8 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
          :ok <- require_gamemaster(current_user, image.campaign_id),
          :ok <- validate_entity_type(entity_type),
          {:ok, updated_image} <- Media.attach_to_entity(image, entity_type, entity_id) do
+      CampaignChannel.broadcast_entity_reload(image.campaign_id, "Image")
+
       conn
       |> put_status(:ok)
       |> put_view(ShotElixirWeb.Api.V2.MediaLibraryView)

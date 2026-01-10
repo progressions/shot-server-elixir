@@ -20,7 +20,7 @@ config :shot_elixir, ShotElixir.Repo,
 config :shot_elixir, ShotElixirWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}, port: 4002],
+  http: [ip: {127, 0, 0, 1}, port: String.to_integer(System.get_env("PHX_PORT") || "4002")],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -77,6 +77,18 @@ config :shot_elixir, :imagekit,
 # Grok/xAI credentials for development
 config :shot_elixir, :grok,
   api_key: "xai-QtJ1dTm3ooF6gSuTn6H942V2HU7pMD10aDi7Rc88fbqqiPxP5jBxeIazGiCFDhC6xW4GgREQsXI6RdfN"
+
+# CORS origins for development (includes worktree ports)
+config :shot_elixir, :cors_origins, [
+  "http://localhost:3001",
+  "http://localhost:3000",
+  # Worktree ports (offset 10, 20, 30, 40, 50)
+  "http://localhost:3011",
+  "http://localhost:3021",
+  "http://localhost:3031",
+  "http://localhost:3041",
+  "http://localhost:3051"
+]
 
 # Email configuration for development
 # Uses local adapter to preview emails in browser
