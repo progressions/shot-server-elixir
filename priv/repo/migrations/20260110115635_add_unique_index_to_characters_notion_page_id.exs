@@ -23,15 +23,14 @@ defmodule ShotElixir.Repo.Migrations.AddUniqueIndexToCharactersNotionPageId do
       AND ranked.row_number > 1
     """)
 
-    create unique_index(:characters, [:notion_page_id],
-             name: :characters_notion_page_id_index,
-             where: "notion_page_id IS NOT NULL"
-           )
+    execute("""
+    CREATE UNIQUE INDEX IF NOT EXISTS characters_notion_page_id_index
+    ON characters (notion_page_id)
+    WHERE notion_page_id IS NOT NULL
+    """)
   end
 
   def down do
-    drop_if_exists index(:characters, [:notion_page_id],
-                     name: :characters_notion_page_id_index
-                   )
+    drop_if_exists index(:characters, [:notion_page_id], name: :characters_notion_page_id_index)
   end
 end
