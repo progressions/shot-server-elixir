@@ -1,12 +1,12 @@
 <h2>AI Image Generation Temporarily Unavailable</h2>
 
-<p>Hello <%= Phoenix.HTML.html_escape(@user.first_name || @user.email) %>,</p>
+<p>Hello <%= @user.first_name || @user.email %>,</p>
 
-<p>We wanted to let you know that AI image generation for the campaign <strong>"<%= Phoenix.HTML.html_escape(@campaign.name) %>"</strong> is temporarily unavailable.</p>
+<p>We wanted to let you know that AI image generation for the campaign <strong>"<%= @campaign.name %>"</strong> is temporarily unavailable.</p>
 
 <div class="callout callout-warning">
   <h4>What happened?</h4>
-  <p>The <%= Phoenix.HTML.html_escape(@provider_name) %> API credits have been exhausted.</p>
+  <p>The <%= @provider_name %> API credits have been exhausted.</p>
 </div>
 
 <h3>What's affected:</h3>

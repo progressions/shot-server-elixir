@@ -4,7 +4,7 @@
 
 <p>
   <strong><%= @invitation.user.first_name %> <%= @invitation.user.last_name %></strong>
-  has invited you to join the campaign "<strong><%= @campaign.name %></strong>" in Chi War!
+  has invited you to join the campaign <strong>"<%= @campaign.name %>"</strong> in Chi War!
 </p>
 
 <%= if @campaign.description do %>
