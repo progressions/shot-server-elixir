@@ -42,6 +42,10 @@ defmodule ShotElixir.Services.NotionService do
       end
 
     case result do
+      # Unlinked pages should not update the sync timestamp
+      {:ok, :unlinked} ->
+        {:ok, :unlinked}
+
       {:ok, _} ->
         Characters.update_character(character, %{
           last_synced_to_notion_at: DateTime.utc_now()
@@ -164,6 +168,29 @@ defmodule ShotElixir.Services.NotionService do
 
     # Check if Notion returned an error response
     case response do
+      # Handle archived/deleted page - unlink from character
+      %{"code" => "validation_error", "message" => message}
+      when is_binary(message) ->
+        if String.contains?(String.downcase(message), "archived") do
+          handle_archived_page(character, payload, response, message)
+        else
+          # Other validation errors - log and return error
+          Logger.error("Notion API validation error on update: #{message}")
+
+          Notion.log_error(
+            character.id,
+            payload,
+            response,
+            "Notion API error: validation_error - #{message}"
+          )
+
+          {:error, {:notion_api_error, "validation_error", message}}
+        end
+
+      # Handle object_not_found - page was deleted, unlink from character
+      %{"code" => "object_not_found", "message" => message} ->
+        handle_archived_page(character, payload, response, message)
+
       %{"code" => error_code, "message" => message} ->
         Logger.error("Notion API error on update: #{error_code}")
 
@@ -391,6 +418,37 @@ defmodule ShotElixir.Services.NotionService do
     error ->
       Logger.error("Failed to update character from Notion: #{Exception.message(error)}")
       {:error, error}
+  end
+
+  @doc """
+  Handle archived/deleted Notion page by unlinking from character.
+  Clears the notion_page_id so future syncs will create a new page.
+  Returns {:ok, :unlinked} to signal success (so Oban worker doesn't retry).
+  """
+  def handle_archived_page(%Character{} = character, payload, response, message) do
+    Logger.warning(
+      "Notion page #{character.notion_page_id} for character #{character.id} " <>
+        "has been archived/deleted. Unlinking from character."
+    )
+
+    # Log the unlink event (as a special "unlinked" status or error with context)
+    Notion.log_error(
+      character.id,
+      payload,
+      response,
+      "Notion page archived/deleted - unlinking from character: #{message}"
+    )
+
+    # Clear the notion_page_id from the character
+    case Characters.update_character(character, %{notion_page_id: nil}) do
+      {:ok, _updated_character} ->
+        Logger.info("Successfully unlinked Notion page from character #{character.id}")
+        {:ok, :unlinked}
+
+      {:error, changeset} ->
+        Logger.error("Failed to unlink Notion page from character: #{inspect(changeset)}")
+        {:error, {:unlink_failed, changeset}}
+    end
   end
 
   @doc """
