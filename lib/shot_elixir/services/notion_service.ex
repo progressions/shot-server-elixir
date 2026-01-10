@@ -62,6 +62,197 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
+  Perform a smart two-way merge when linking a character to a Notion page.
+
+  Merge rules:
+  - If one side is blank and the other has a value → use the value
+  - If both have values → keep both as-is (no overwrite)
+  - For action values: 0 is treated as blank (can be overwritten by non-zero)
+
+  This updates both the Chi War record and the Notion page with merged values.
+  """
+  def merge_with_notion(%Character{} = character, notion_page_id) do
+    character = Repo.preload(character, :faction)
+
+    # Fetch the Notion page
+    case NotionClient.get_page(notion_page_id) do
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      nil ->
+        {:error, :notion_page_not_found}
+
+      page when is_map(page) ->
+        # Extract RAW values from Notion (not using attributes_from_notion which applies av_or_new)
+        # This ensures we're merging with the actual Notion values, not pre-processed ones
+        raw_notion_action_values = get_raw_action_values_from_notion(page)
+        notion_description = get_description(page)
+        notion_name = get_notion_name(page)
+
+        # Perform smart merge for action_values
+        merged_action_values =
+          smart_merge_action_values(
+            character.action_values || Character.default_action_values(),
+            raw_notion_action_values
+          )
+
+        # Perform smart merge for description
+        merged_description =
+          smart_merge_description(
+            character.description || %{},
+            notion_description
+          )
+
+        # Merge name (Notion wins only if Chi War is blank)
+        merged_name =
+          if blank?(character.name),
+            do: notion_name || character.name,
+            else: character.name
+
+        # Update Chi War record with merged values
+        update_attrs = %{
+          notion_page_id: notion_page_id,
+          name: merged_name,
+          action_values: merged_action_values,
+          description: merged_description
+        }
+
+        case Characters.update_character(character, update_attrs) do
+          {:ok, updated_character} ->
+            # Now sync the merged data back to Notion
+            updated_character = Repo.preload(updated_character, :faction)
+
+            # Log warning if Notion update fails (but don't fail the merge)
+            case update_notion_from_character(updated_character) do
+              {:ok, _} ->
+                :ok
+
+              {:error, reason} ->
+                Logger.warning(
+                  "Failed to update Notion after merge for character #{updated_character.id}: #{inspect(reason)}"
+                )
+
+              other ->
+                Logger.warning(
+                  "Unexpected response when updating Notion after merge for character #{updated_character.id}: #{inspect(other)}"
+                )
+            end
+
+            # Set faction from Notion if not already set
+            updated_character =
+              if is_nil(updated_character.faction_id) do
+                case set_faction_from_notion(
+                       updated_character,
+                       page,
+                       updated_character.campaign_id
+                     ) do
+                  {:ok, char} -> char
+                  {:error, _} -> updated_character
+                end
+              else
+                updated_character
+              end
+
+            # Set juncture from Notion if not already set
+            updated_character =
+              if is_nil(updated_character.juncture_id) do
+                case set_juncture_from_notion(
+                       updated_character,
+                       page,
+                       updated_character.campaign_id
+                     ) do
+                  {:ok, char} -> char
+                  {:error, _} -> updated_character
+                end
+              else
+                updated_character
+              end
+
+            # Add image from Notion if character doesn't have one
+            add_image(page, updated_character)
+
+            # Log successful merge
+            Notion.log_success(updated_character.id, %{action: "merge"}, page)
+
+            {:ok, updated_character}
+
+          {:error, changeset} ->
+            {:error, changeset}
+        end
+    end
+  rescue
+    error ->
+      Logger.error("Exception merging with Notion: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  # Smart merge for action_values - handles 0 as blank
+  defp smart_merge_action_values(local, notion) do
+    all_keys =
+      MapSet.union(
+        MapSet.new(Map.keys(local)),
+        MapSet.new(Map.keys(notion))
+      )
+
+    Enum.reduce(all_keys, %{}, fn key, acc ->
+      local_val = Map.get(local, key)
+      notion_val = Map.get(notion, key)
+
+      merged_val = smart_merge_value(local_val, notion_val, action_value?: true)
+      Map.put(acc, key, merged_val)
+    end)
+  end
+
+  # Smart merge for description - handles empty strings as blank
+  defp smart_merge_description(local, notion) do
+    all_keys =
+      MapSet.union(
+        MapSet.new(Map.keys(local)),
+        MapSet.new(Map.keys(notion))
+      )
+
+    Enum.reduce(all_keys, %{}, fn key, acc ->
+      local_val = Map.get(local, key)
+      notion_val = Map.get(notion, key)
+
+      merged_val = smart_merge_value(local_val, notion_val, action_value?: false)
+      Map.put(acc, key, merged_val)
+    end)
+  end
+
+  # Core merge logic for a single value
+  # Rules:
+  # - If both blank → keep local (nil)
+  # - If local blank, notion has value → use notion
+  # - If notion blank, local has value → keep local
+  # - If both have values → keep local (don't overwrite)
+  defp smart_merge_value(local_val, notion_val, opts) do
+    is_action_value = Keyword.get(opts, :action_value?, false)
+    local_blank = blank?(local_val, is_action_value)
+    notion_blank = blank?(notion_val, is_action_value)
+
+    cond do
+      local_blank and notion_blank -> local_val
+      local_blank and not notion_blank -> notion_val
+      not local_blank and notion_blank -> local_val
+      # Both have values - keep local (no overwrite)
+      true -> local_val
+    end
+  end
+
+  # Check if a value is considered "blank"
+  # For action values: nil, "", or 0 are blank
+  # For other values: nil or "" are blank
+  defp blank?(value, is_action_value \\ false)
+  defp blank?(nil, _), do: true
+  defp blank?("", _), do: true
+  defp blank?(0, true), do: true
+  defp blank?("0", true), do: true
+  defp blank?(value, true) when is_float(value) and value == 0.0, do: true
+  defp blank?(_, _), do: false
+
+  @doc """
   Create a new Notion page from character data.
   """
   def create_notion_from_character(%Character{} = character) do
@@ -785,6 +976,54 @@ defmodule ShotElixir.Services.NotionService do
 
     # Clear process dictionary
     Process.delete(:notion_final_path)
+  end
+
+  # Extract raw action values from Notion page without any merge logic
+  # This gets the actual Notion values for proper two-way merge
+  defp get_raw_action_values_from_notion(page) do
+    props = page["properties"]
+
+    %{
+      "Archetype" => get_rich_text_content(props, "Type"),
+      "Type" => get_select_content(props, "Enemy Type"),
+      "MainAttack" => get_select_content(props, "MainAttack"),
+      "SecondaryAttack" => get_select_content(props, "SecondaryAttack"),
+      "FortuneType" => get_select_content(props, "FortuneType"),
+      "Fortune" => get_number_content(props, "Fortune"),
+      "Max Fortune" => get_number_content(props, "Fortune"),
+      "Wounds" => get_number_content(props, "Wounds"),
+      "Defense" => get_number_content(props, "Defense"),
+      "Toughness" => get_number_content(props, "Toughness"),
+      "Speed" => get_number_content(props, "Speed"),
+      "Guns" => get_number_content(props, "Guns"),
+      "Martial Arts" => get_number_content(props, "Martial Arts"),
+      "Sorcery" => get_number_content(props, "Sorcery"),
+      "Creature" => get_number_content(props, "Creature"),
+      "Scroungetech" => get_number_content(props, "Scroungetech"),
+      "Mutant" => get_number_content(props, "Mutant"),
+      "Damage" => get_number_content(props, "Damage")
+    }
+    # Filter out nil values so they don't interfere with merge
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    |> Map.new()
+  end
+
+  # Extract name from Notion page
+  defp get_notion_name(page) do
+    get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
+  end
+
+  # Get select value from Notion properties
+  defp get_select_content(props, key) do
+    case get_in(props, [key, "select"]) do
+      %{"name" => name} -> name
+      _ -> nil
+    end
+  end
+
+  # Get number value from Notion properties
+  defp get_number_content(props, key) do
+    get_in(props, [key, "number"])
   end
 
   @doc """

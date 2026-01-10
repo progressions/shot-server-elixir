@@ -45,6 +45,11 @@ defmodule ShotElixir.Characters.Character do
 
   @character_types ["PC", "NPC", "Ally", "Mook", "Featured Foe", "Boss", "Uber-Boss"]
 
+  @doc """
+  Returns the default action values map for a new character.
+  """
+  def default_action_values, do: @default_action_values
+
   schema "characters" do
     field :name, :string
     field :active, :boolean, default: true
