@@ -85,7 +85,8 @@ defmodule ShotElixir.MediaTest do
     end
 
     test "sorts by inserted_at ascending", %{campaign: campaign} do
-      result = Media.list_campaign_images(campaign.id, %{"sort" => "inserted_at", "order" => "asc"})
+      result =
+        Media.list_campaign_images(campaign.id, %{"sort" => "inserted_at", "order" => "asc"})
 
       # Verify all 3 images returned in ascending order (oldest first)
       assert length(result.images) == 3
@@ -116,14 +117,16 @@ defmodule ShotElixir.MediaTest do
     end
 
     test "sorts by byte_size descending", %{campaign: campaign, image2: image2} do
-      result = Media.list_campaign_images(campaign.id, %{"sort" => "byte_size", "order" => "desc"})
+      result =
+        Media.list_campaign_images(campaign.id, %{"sort" => "byte_size", "order" => "desc"})
 
       # Largest (5000 bytes) should be first
       assert hd(result.images).id == image2.id
     end
 
     test "sorts by entity_type ascending", %{campaign: campaign} do
-      result = Media.list_campaign_images(campaign.id, %{"sort" => "entity_type", "order" => "asc"})
+      result =
+        Media.list_campaign_images(campaign.id, %{"sort" => "entity_type", "order" => "asc"})
 
       # "Character" should come before "Vehicle"
       first_type = hd(result.images).entity_type
@@ -131,7 +134,8 @@ defmodule ShotElixir.MediaTest do
     end
 
     test "sorts by entity_type descending", %{campaign: campaign} do
-      result = Media.list_campaign_images(campaign.id, %{"sort" => "entity_type", "order" => "desc"})
+      result =
+        Media.list_campaign_images(campaign.id, %{"sort" => "entity_type", "order" => "desc"})
 
       # "Vehicle" should come first
       first_type = hd(result.images).entity_type
@@ -139,7 +143,8 @@ defmodule ShotElixir.MediaTest do
     end
 
     test "falls back to inserted_at for invalid sort field", %{campaign: campaign} do
-      result = Media.list_campaign_images(campaign.id, %{"sort" => "invalid_field", "order" => "desc"})
+      result =
+        Media.list_campaign_images(campaign.id, %{"sort" => "invalid_field", "order" => "desc"})
 
       # Should use default (inserted_at desc), so verify descending order
       assert length(result.images) == 3
@@ -149,7 +154,8 @@ defmodule ShotElixir.MediaTest do
     end
 
     test "defaults to descending order when order is invalid", %{campaign: campaign} do
-      result = Media.list_campaign_images(campaign.id, %{"sort" => "inserted_at", "order" => "invalid"})
+      result =
+        Media.list_campaign_images(campaign.id, %{"sort" => "inserted_at", "order" => "invalid"})
 
       # Should use default desc order
       assert length(result.images) == 3
