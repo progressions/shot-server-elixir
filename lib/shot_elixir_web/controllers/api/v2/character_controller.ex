@@ -204,25 +204,50 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   end
 
   defp update_character_with_params(conn, character, parsed_params) do
-    # Continue with normal update
-    case Characters.update_character(character, parsed_params) do
-      {:ok, final_character} ->
-        # Broadcasting now happens automatically in Characters context
+    # Check if we're linking to Notion for the first time
+    new_notion_page_id = parsed_params["notion_page_id"]
+    is_linking_to_notion = is_nil(character.notion_page_id) and not is_nil(new_notion_page_id) and new_notion_page_id != ""
 
-        # Queue Notion sync
-        %{"character_id" => final_character.id}
-        |> SyncCharacterToNotionWorker.new()
-        |> Oban.insert()
+    if is_linking_to_notion do
+      # Perform smart two-way merge when linking to Notion
+      case ShotElixir.Services.NotionService.merge_with_notion(character, new_notion_page_id) do
+        {:ok, final_character} ->
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("show.json", character: final_character)
 
-        conn
-        |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-        |> render("show.json", character: final_character)
+        {:error, %Ecto.Changeset{} = changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("error.json", changeset: changeset)
 
-      {:error, %Ecto.Changeset{} = changeset} ->
-        conn
-        |> put_status(:unprocessable_entity)
-        |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-        |> render("error.json", changeset: changeset)
+        {:error, reason} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed to merge with Notion: #{inspect(reason)}"})
+      end
+    else
+      # Normal update flow
+      case Characters.update_character(character, parsed_params) do
+        {:ok, final_character} ->
+          # Broadcasting now happens automatically in Characters context
+
+          # Queue Notion sync
+          %{"character_id" => final_character.id}
+          |> SyncCharacterToNotionWorker.new()
+          |> Oban.insert()
+
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("show.json", character: final_character)
+
+        {:error, %Ecto.Changeset{} = changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("error.json", changeset: changeset)
+      end
     end
   end
 
