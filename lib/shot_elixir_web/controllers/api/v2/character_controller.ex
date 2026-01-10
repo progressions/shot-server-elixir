@@ -206,7 +206,10 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   defp update_character_with_params(conn, character, parsed_params) do
     # Check if we're linking to Notion for the first time
     new_notion_page_id = parsed_params["notion_page_id"]
-    is_linking_to_notion = is_nil(character.notion_page_id) and not is_nil(new_notion_page_id) and new_notion_page_id != ""
+
+    is_linking_to_notion =
+      is_nil(character.notion_page_id) and not is_nil(new_notion_page_id) and
+        new_notion_page_id != ""
 
     if is_linking_to_notion do
       # Perform smart two-way merge when linking to Notion

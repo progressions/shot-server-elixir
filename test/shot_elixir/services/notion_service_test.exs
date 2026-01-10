@@ -185,7 +185,9 @@ defmodule ShotElixir.Services.NotionServiceTest do
       assert 0 == 0
     end
 
-    test "character with blank action values gets Notion values after merge", %{campaign: campaign} do
+    test "character with blank action values gets Notion values after merge", %{
+      campaign: campaign
+    } do
       # Create a character with some 0 action values
       {:ok, character} =
         Characters.create_character(%{
