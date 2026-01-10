@@ -5,10 +5,12 @@ defmodule ShotElixir.ActiveStorage do
   """
 
   import Ecto.Query
+  require Logger
   alias ShotElixir.Repo
   alias ShotElixir.ActiveStorage.{Attachment, Blob}
   alias ShotElixir.Services.ImagekitService
   alias ShotElixir.Media
+  alias ShotElixirWeb.CampaignChannel
   alias Ecto.Multi
 
   @doc """
@@ -239,6 +241,12 @@ defmodule ShotElixir.ActiveStorage do
     |> Repo.transaction()
     |> case do
       {:ok, %{attachment: attachment}} ->
+        # Broadcast to media library if campaign context exists
+        if campaign_id do
+          Logger.info("📸 MEDIA: Broadcasting image reload for campaign #{campaign_id}")
+          CampaignChannel.broadcast_entity_reload(campaign_id, "Image")
+        end
+
         {:ok, attachment}
 
       {:error, _failed_operation, changeset, _changes} ->
