@@ -894,45 +894,45 @@ defmodule ShotElixir.Services.NotionService do
   defp block_to_text(%{"type" => type} = block) do
     case type do
       "paragraph" ->
-        extract_rich_text(block["paragraph"]["rich_text"])
+        extract_rich_text(get_in(block, ["paragraph", "rich_text"]))
 
       "heading_1" ->
-        text = extract_rich_text(block["heading_1"]["rich_text"])
+        text = extract_rich_text(get_in(block, ["heading_1", "rich_text"]))
         "# #{text}"
 
       "heading_2" ->
-        text = extract_rich_text(block["heading_2"]["rich_text"])
+        text = extract_rich_text(get_in(block, ["heading_2", "rich_text"]))
         "## #{text}"
 
       "heading_3" ->
-        text = extract_rich_text(block["heading_3"]["rich_text"])
+        text = extract_rich_text(get_in(block, ["heading_3", "rich_text"]))
         "### #{text}"
 
       "bulleted_list_item" ->
-        text = extract_rich_text(block["bulleted_list_item"]["rich_text"])
+        text = extract_rich_text(get_in(block, ["bulleted_list_item", "rich_text"]))
         "• #{text}"
 
       "numbered_list_item" ->
-        text = extract_rich_text(block["numbered_list_item"]["rich_text"])
+        text = extract_rich_text(get_in(block, ["numbered_list_item", "rich_text"]))
         "- #{text}"
 
       "to_do" ->
-        text = extract_rich_text(block["to_do"]["rich_text"])
-        checked = if block["to_do"]["checked"], do: "[x]", else: "[ ]"
+        text = extract_rich_text(get_in(block, ["to_do", "rich_text"]))
+        checked = if get_in(block, ["to_do", "checked"]), do: "[x]", else: "[ ]"
         "#{checked} #{text}"
 
       "toggle" ->
-        extract_rich_text(block["toggle"]["rich_text"])
+        extract_rich_text(get_in(block, ["toggle", "rich_text"]))
 
       "quote" ->
-        text = extract_rich_text(block["quote"]["rich_text"])
+        text = extract_rich_text(get_in(block, ["quote", "rich_text"]))
         "> #{text}"
 
       "callout" ->
-        extract_rich_text(block["callout"]["rich_text"])
+        extract_rich_text(get_in(block, ["callout", "rich_text"]))
 
       "code" ->
-        text = extract_rich_text(block["code"]["rich_text"])
+        text = extract_rich_text(get_in(block, ["code", "rich_text"]))
         "```\n#{text}\n```"
 
       "divider" ->
@@ -962,11 +962,11 @@ defmodule ShotElixir.Services.NotionService do
         "[Link: #{url}]"
 
       "child_page" ->
-        title = block["child_page"]["title"]
+        title = get_in(block, ["child_page", "title"]) || "Untitled page"
         "[Page: #{title}]"
 
       "child_database" ->
-        title = block["child_database"]["title"]
+        title = get_in(block, ["child_database", "title"]) || "Untitled database"
         "[Database: #{title}]"
 
       _ ->
