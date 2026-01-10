@@ -1,7 +1,8 @@
 defmodule ShotElixirWeb.Api.V2.UserView do
-  def render("index.json", %{users: users}) do
+  def render("index.json", %{users: users, meta: meta}) do
     %{
-      users: Enum.map(users, &render_user/1)
+      users: Enum.map(users, &render_user/1),
+      meta: meta
     }
   end
 

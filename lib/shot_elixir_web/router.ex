@@ -120,7 +120,8 @@ defmodule ShotElixirWeb.Router do
     post "/campaigns/current", CampaignController, :set_current
 
     # Notion integration
-    get "/notion/characters", NotionController, :characters
+    get "/notion/search", NotionController, :search
+    get "/notion/sessions", NotionController, :sessions
     get "/notion/adventures", NotionController, :adventures
 
     # Suggestions for @ mentions in rich text editors
@@ -158,6 +159,7 @@ defmodule ShotElixirWeb.Router do
       patch "/touch", FightController, :touch
       patch "/end_fight", FightController, :end_fight
       patch "/reset", FightController, :reset
+      post "/add_party", FightController, :add_party
       delete "/image", FightController, :remove_image
 
       resources "/shots", ShotController, only: [:update, :delete] do
@@ -196,6 +198,11 @@ defmodule ShotElixirWeb.Router do
     resources "/junctures", JunctureController do
       delete "/image", JunctureController, :remove_image
     end
+
+    # Dice rolling
+    post "/dice/swerve", DiceController, :swerve
+    post "/dice/roll", DiceController, :roll
+    post "/dice/exploding", DiceController, :exploding
 
     # Sites with attunement
     resources "/sites", SiteController do
