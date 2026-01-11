@@ -325,6 +325,11 @@ defmodule ShotElixir.Accounts do
          |> User.update_changeset(attrs)
          |> Repo.update() do
       {:ok, updated_user} ->
+        # Sync character ownership if character_ids is provided
+        if Map.has_key?(attrs, "character_ids") do
+          sync_user_characters(updated_user, attrs["character_ids"])
+        end
+
         # Broadcast user updates and return the preloaded user
         preloaded_user = broadcast_user_update(updated_user)
         {:ok, preloaded_user}
@@ -333,6 +338,41 @@ defmodule ShotElixir.Accounts do
         error
     end
   end
+
+  # Syncs user character ownership to match the provided character_ids list.
+  # Removes user ownership from characters not in the list and adds ownership to new ones.
+  defp sync_user_characters(user, character_ids) when is_list(character_ids) do
+    alias ShotElixir.Characters.Character
+
+    # Get current character_ids owned by this user
+    current_character_ids =
+      from(c in Character, where: c.user_id == ^user.id, select: c.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    # Normalize incoming character_ids to strings
+    new_character_ids = Enum.map(character_ids, &to_string/1)
+
+    # Find characters to add and remove
+    to_add = new_character_ids -- current_character_ids
+    to_remove = current_character_ids -- new_character_ids
+
+    # Remove ownership from characters that are no longer in the list
+    if Enum.any?(to_remove) do
+      from(c in Character, where: c.id in ^to_remove)
+      |> Repo.update_all(set: [user_id: nil])
+    end
+
+    # Add ownership to new characters
+    if Enum.any?(to_add) do
+      from(c in Character, where: c.id in ^to_add)
+      |> Repo.update_all(set: [user_id: user.id])
+    end
+
+    user
+  end
+
+  defp sync_user_characters(user, _), do: user
 
   @doc """
   Broadcasts user updates to all campaigns the user is associated with.

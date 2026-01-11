@@ -4,10 +4,12 @@ defmodule ShotElixir.FactionsTest do
   alias ShotElixir.Factions
   alias ShotElixir.Factions.Faction
   alias ShotElixir.Media
-  alias ShotElixir.Campaigns
+  alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Characters
   alias ShotElixir.Sites
   alias ShotElixir.Vehicles
+  alias ShotElixir.Parties
+  alias ShotElixir.Junctures
   alias ShotElixir.Repo
 
   setup do
@@ -20,11 +22,14 @@ defmodule ShotElixir.FactionsTest do
         gamemaster: true
       })
 
+    # Insert campaign directly to bypass CampaignSeederWorker that runs in Oban inline mode
     {:ok, campaign} =
-      Campaigns.create_campaign(%{
+      %Campaign{}
+      |> Ecto.Changeset.change(%{
         name: "Factions Test Campaign",
         user_id: user.id
       })
+      |> Repo.insert()
 
     {:ok, user: user, campaign: campaign}
   end
@@ -143,6 +148,242 @@ defmodule ShotElixir.FactionsTest do
       updated_vehicle = Repo.get(ShotElixir.Vehicles.Vehicle, vehicle.id)
       assert updated_vehicle != nil
       assert updated_vehicle.faction_id == nil
+    end
+  end
+
+  describe "update_faction/2 character_ids sync" do
+    test "removes characters when character_ids is updated without them", %{campaign: campaign} do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Test Faction",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character1} =
+        Characters.create_character(%{
+          name: "Character 1",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      {:ok, character2} =
+        Characters.create_character(%{
+          name: "Character 2",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      # Update faction with only character1 (removing character2)
+      {:ok, _updated_faction} =
+        Factions.update_faction(faction, %{
+          "character_ids" => [character1.id]
+        })
+
+      updated_char1 = Repo.get(ShotElixir.Characters.Character, character1.id)
+      updated_char2 = Repo.get(ShotElixir.Characters.Character, character2.id)
+
+      assert updated_char1.faction_id == faction.id
+      assert updated_char2.faction_id == nil
+    end
+
+    test "adds new characters when character_ids includes new ones", %{campaign: campaign} do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Growing Faction",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "New Character",
+          campaign_id: campaign.id
+        })
+
+      # Update faction to add the character
+      {:ok, _updated_faction} =
+        Factions.update_faction(faction, %{
+          "character_ids" => [character.id]
+        })
+
+      updated_char = Repo.get(ShotElixir.Characters.Character, character.id)
+      assert updated_char.faction_id == faction.id
+    end
+  end
+
+  describe "update_faction/2 vehicle_ids sync" do
+    test "removes vehicles when vehicle_ids is updated without them", %{
+      campaign: campaign,
+      user: user
+    } do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Vehicle Faction",
+          campaign_id: campaign.id
+        })
+
+      {:ok, vehicle1} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle 1",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          faction_id: faction.id,
+          action_values: %{"Type" => "Car"}
+        })
+
+      {:ok, vehicle2} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle 2",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          faction_id: faction.id,
+          action_values: %{"Type" => "Truck"}
+        })
+
+      # Update faction with only vehicle1 (removing vehicle2)
+      {:ok, _updated_faction} =
+        Factions.update_faction(faction, %{
+          "vehicle_ids" => [vehicle1.id]
+        })
+
+      updated_v1 = Repo.get(ShotElixir.Vehicles.Vehicle, vehicle1.id)
+      updated_v2 = Repo.get(ShotElixir.Vehicles.Vehicle, vehicle2.id)
+
+      assert updated_v1.faction_id == faction.id
+      assert updated_v2.faction_id == nil
+    end
+  end
+
+  describe "update_faction/2 site_ids sync" do
+    test "removes sites when site_ids is updated without them", %{campaign: campaign} do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Site Faction",
+          campaign_id: campaign.id
+        })
+
+      {:ok, site1} =
+        Sites.create_site(%{
+          name: "Site 1",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      {:ok, site2} =
+        Sites.create_site(%{
+          name: "Site 2",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      # Update faction with only site1 (removing site2)
+      {:ok, _updated_faction} =
+        Factions.update_faction(faction, %{
+          "site_ids" => [site1.id]
+        })
+
+      updated_s1 = Repo.get(ShotElixir.Sites.Site, site1.id)
+      updated_s2 = Repo.get(ShotElixir.Sites.Site, site2.id)
+
+      assert updated_s1.faction_id == faction.id
+      assert updated_s2.faction_id == nil
+    end
+  end
+
+  describe "update_faction/2 party_ids sync" do
+    test "removes parties when party_ids is updated without them", %{campaign: campaign} do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Party Faction",
+          campaign_id: campaign.id
+        })
+
+      {:ok, party1} =
+        Parties.create_party(%{
+          name: "Party 1",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      {:ok, party2} =
+        Parties.create_party(%{
+          name: "Party 2",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      # Update faction with only party1 (removing party2)
+      {:ok, _updated_faction} =
+        Factions.update_faction(faction, %{
+          "party_ids" => [party1.id]
+        })
+
+      updated_p1 = Repo.get(ShotElixir.Parties.Party, party1.id)
+      updated_p2 = Repo.get(ShotElixir.Parties.Party, party2.id)
+
+      assert updated_p1.faction_id == faction.id
+      assert updated_p2.faction_id == nil
+    end
+  end
+
+  describe "update_faction/2 juncture_ids sync" do
+    test "removes junctures when juncture_ids is updated without them", %{campaign: campaign} do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Juncture Faction",
+          campaign_id: campaign.id
+        })
+
+      {:ok, juncture1} =
+        Junctures.create_juncture(%{
+          name: "1850s",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      {:ok, juncture2} =
+        Junctures.create_juncture(%{
+          name: "Contemporary",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      # Update faction with only juncture1 (removing juncture2)
+      {:ok, _updated_faction} =
+        Factions.update_faction(faction, %{
+          "juncture_ids" => [juncture1.id]
+        })
+
+      updated_j1 = Repo.get(ShotElixir.Junctures.Juncture, juncture1.id)
+      updated_j2 = Repo.get(ShotElixir.Junctures.Juncture, juncture2.id)
+
+      assert updated_j1.faction_id == faction.id
+      assert updated_j2.faction_id == nil
+    end
+  end
+
+  describe "update_faction/2 does not affect relationships when *_ids not provided" do
+    test "character assignments remain unchanged without character_ids", %{campaign: campaign} do
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Stable Faction",
+          campaign_id: campaign.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Stable Character",
+          campaign_id: campaign.id,
+          faction_id: faction.id
+        })
+
+      # Update faction without character_ids (just changing name)
+      {:ok, _updated_faction} =
+        Factions.update_faction(faction, %{
+          "name" => "Renamed Faction"
+        })
+
+      updated_char = Repo.get(ShotElixir.Characters.Character, character.id)
+      assert updated_char.faction_id == faction.id
     end
   end
 end
