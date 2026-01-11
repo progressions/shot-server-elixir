@@ -12,6 +12,7 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
 
   alias ShotElixir.Repo
   alias ShotElixir.Campaigns.Campaign
+  alias ShotElixir.Notifications
   alias ShotElixir.Workers.EmailWorker
   require Logger
 
@@ -44,6 +45,9 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
       notification_result =
         case try_claim_notification_slot(campaign_id) do
           {:ok, :claimed} ->
+            # Create in-app notification for the user
+            create_in_app_notification(user_id, updated_campaign, provider)
+
             case send_notification_email(updated_campaign, user_id, provider) do
               :ok ->
                 Logger.info(
@@ -173,6 +177,43 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
       {:error, reason} ->
         Logger.error(
           "[AiCreditNotificationService] Failed to enqueue email for campaign #{campaign.id}: #{inspect(reason)}"
+        )
+
+        {:error, reason}
+    end
+  end
+
+  defp create_in_app_notification(user_id, campaign, provider) do
+    provider_name = format_provider_name(provider)
+
+    case Notifications.create_notification(%{
+           user_id: user_id,
+           type: "ai_credits_exhausted",
+           title: "AI Credits Exhausted",
+           message: "Your #{provider_name} API credits have been exhausted for campaign \"#{campaign.name}\".",
+           payload: %{
+             provider: provider,
+             campaign_id: campaign.id,
+             campaign_name: campaign.name
+           }
+         }) do
+      {:ok, notification} ->
+        Logger.info(
+          "[AiCreditNotificationService] Created in-app notification #{notification.id} for user #{user_id}"
+        )
+
+        # Broadcast to user channel so badge updates in real-time
+        Phoenix.PubSub.broadcast!(
+          ShotElixir.PubSub,
+          "user:#{user_id}",
+          {:notification_created, notification}
+        )
+
+        {:ok, notification}
+
+      {:error, reason} ->
+        Logger.error(
+          "[AiCreditNotificationService] Failed to create in-app notification for user #{user_id}: #{inspect(reason)}"
         )
 
         {:error, reason}

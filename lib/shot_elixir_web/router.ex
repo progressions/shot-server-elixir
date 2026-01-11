@@ -107,6 +107,11 @@ defmodule ShotElixirWeb.Router do
     delete "/users/:id/image", UserController, :remove_image
     resources "/users", UserController, except: [:create]
 
+    # Notifications
+    get "/notifications/unread_count", NotificationController, :unread_count
+    post "/notifications/dismiss_all", NotificationController, :dismiss_all
+    resources "/notifications", NotificationController, except: [:new, :edit, :create]
+
     # Campaigns
     resources "/campaigns", CampaignController do
       patch "/set", CampaignController, :set
