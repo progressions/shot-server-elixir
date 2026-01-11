@@ -574,12 +574,12 @@ defmodule ShotElixir.Media do
     normalized_terms = Enum.map(search_terms, &String.downcase/1)
 
     # Build query that matches any of the search terms in the ai_tags array
-    # Uses JSONB containment operator to check if any ai_tag name matches
+    # ai_tags is a jsonb[] (PostgreSQL array of JSONB), so we use unnest() not jsonb_array_elements()
     query =
       from i in MediaImage,
         where: i.campaign_id == ^campaign_id,
         where: fragment(
-          "EXISTS (SELECT 1 FROM jsonb_array_elements(?::jsonb) AS tag WHERE LOWER(tag->>'name') LIKE ANY(?))",
+          "EXISTS (SELECT 1 FROM unnest(?) AS tag WHERE LOWER(tag->>'name') LIKE ANY(?))",
           i.ai_tags,
           ^Enum.map(normalized_terms, &"%#{&1}%")
         ),
@@ -613,10 +613,11 @@ defmodule ShotElixir.Media do
     List of unique tag names sorted alphabetically
   """
   def list_ai_tags(campaign_id) do
+    # ai_tags is a jsonb[] (PostgreSQL array of JSONB), so we use unnest() not jsonb_array_elements()
     query = """
     SELECT DISTINCT LOWER(tag->>'name') as tag_name
-    FROM media_images, jsonb_array_elements(ai_tags::jsonb) AS tag
-    WHERE campaign_id = $1 AND ai_tags IS NOT NULL AND ai_tags != '[]'
+    FROM media_images, unnest(ai_tags) AS tag
+    WHERE campaign_id = $1 AND ai_tags IS NOT NULL AND array_length(ai_tags, 1) > 0
     ORDER BY tag_name
     """
 
