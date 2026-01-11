@@ -329,11 +329,33 @@ defmodule ShotElixir.Parties do
   end
 
   def update_party(%Party{} = party, attrs) do
+    require Logger
+    Logger.debug("[Parties.update_party] attrs received: #{inspect(attrs)}")
+    Logger.debug("[Parties.update_party] has character_ids key? #{Map.has_key?(attrs, "character_ids")}")
+
     party
     |> Party.changeset(attrs)
     |> Repo.update()
     |> case do
       {:ok, party} ->
+        # Sync character memberships if character_ids is provided
+        party =
+          if Map.has_key?(attrs, "character_ids") do
+            Logger.debug("[Parties.update_party] Syncing character memberships: #{inspect(attrs["character_ids"])}")
+            sync_character_memberships(party, attrs["character_ids"])
+          else
+            Logger.debug("[Parties.update_party] No character_ids key found, skipping sync")
+            party
+          end
+
+        # Sync vehicle memberships if vehicle_ids is provided
+        party =
+          if Map.has_key?(attrs, "vehicle_ids") do
+            sync_vehicle_memberships(party, attrs["vehicle_ids"])
+          else
+            party
+          end
+
         party =
           Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]],
             force: true
@@ -347,6 +369,59 @@ defmodule ShotElixir.Parties do
         error
     end
   end
+
+  # Syncs party character memberships to match the provided character_ids list.
+  # Removes memberships for characters not in the list (both regular and slot-based).
+  # Does not add new memberships - those should be added via add_member.
+  defp sync_character_memberships(party, character_ids) when is_list(character_ids) do
+    # Get current character memberships (all memberships with a character_id)
+    current_memberships =
+      from(m in Membership,
+        where: m.party_id == ^party.id and not is_nil(m.character_id)
+      )
+      |> Repo.all()
+
+    # Find memberships to remove (characters not in the new list)
+    memberships_to_remove =
+      Enum.filter(current_memberships, fn m ->
+        m.character_id not in character_ids
+      end)
+
+    # Delete memberships for removed characters
+    Enum.each(memberships_to_remove, fn membership ->
+      Repo.delete(membership)
+    end)
+
+    party
+  end
+
+  defp sync_character_memberships(party, _), do: party
+
+  # Syncs party vehicle memberships to match the provided vehicle_ids list.
+  # Removes memberships for vehicles not in the list (both regular and slot-based).
+  defp sync_vehicle_memberships(party, vehicle_ids) when is_list(vehicle_ids) do
+    # Get current vehicle memberships (all memberships with a vehicle_id)
+    current_memberships =
+      from(m in Membership,
+        where: m.party_id == ^party.id and not is_nil(m.vehicle_id)
+      )
+      |> Repo.all()
+
+    # Find memberships to remove (vehicles not in the new list)
+    memberships_to_remove =
+      Enum.filter(current_memberships, fn m ->
+        m.vehicle_id not in vehicle_ids
+      end)
+
+    # Delete memberships for removed vehicles
+    Enum.each(memberships_to_remove, fn membership ->
+      Repo.delete(membership)
+    end)
+
+    party
+  end
+
+  defp sync_vehicle_memberships(party, _), do: party
 
   def delete_party(%Party{} = party) do
     alias Ecto.Multi
