@@ -87,7 +87,8 @@ defmodule ShotElixir.Solo.Combat do
 
   @doc """
   Calculate combat outcome.
-  Returns {outcome, hit?} where outcome is attack_roll - defense.
+  Returns {outcome, hit?, action_result} where outcome is attack_roll - defense
+  and action_result is attack_value + swerve_total.
   """
   def calculate_outcome(attack_value, swerve_total, defense) do
     action_result = attack_value + swerve_total
