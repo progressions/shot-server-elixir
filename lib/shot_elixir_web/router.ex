@@ -189,6 +189,7 @@ defmodule ShotElixirWeb.Router do
       get "/solo/status", SoloController, :status
       post "/solo/advance", SoloController, :advance
       post "/solo/action", SoloController, :player_action
+      post "/solo/roll_initiative", SoloController, :roll_initiative
     end
 
     # Weapons with custom routes

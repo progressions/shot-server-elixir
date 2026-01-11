@@ -33,7 +33,7 @@ defmodule ShotElixir.Solo.SimpleBehavior do
   def find_target(pc_shots) do
     pc_shots
     |> Enum.filter(fn shot -> shot.character != nil end)
-    |> Enum.max_by(fn shot -> shot.current_shot || 0 end, fn -> nil end)
+    |> Enum.max_by(fn shot -> shot.shot || 0 end, fn -> nil end)
   end
 
   @doc """

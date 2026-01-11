@@ -181,7 +181,7 @@ defmodule ShotElixir.Solo.SoloFightServer do
   defp find_next_npc_to_act(state) do
     case load_fight(state.fight_id) do
       {:ok, fight} ->
-        # Find shots ordered by current_shot descending
+        # Find shots ordered by shot descending
         # The highest shot that belongs to an NPC (not in pc_character_ids)
         # and hasn't acted yet this sequence
         npc_shot =
@@ -189,10 +189,10 @@ defmodule ShotElixir.Solo.SoloFightServer do
           |> Enum.filter(fn shot ->
             shot.character_id != nil &&
               shot.character_id not in state.pc_character_ids &&
-              shot.current_shot != nil &&
-              shot.current_shot > 0
+              shot.shot != nil &&
+              shot.shot > 0
           end)
-          |> Enum.sort_by(& &1.current_shot, :desc)
+          |> Enum.sort_by(& &1.shot, :desc)
           |> List.first()
 
         if npc_shot do
@@ -229,6 +229,10 @@ defmodule ShotElixir.Solo.SoloFightServer do
   end
 
   defp apply_action_result(fight, acting_shot, action_result) do
+    # Spend shots for the action (attacks cost 3 shots)
+    shot_cost = get_shot_cost(action_result.action_type)
+    spend_shots(acting_shot, shot_cost)
+
     # Apply damage to target if hit
     if action_result.hit && action_result.target_id && action_result.damage > 0 do
       apply_damage(action_result.target_id, action_result.damage)
@@ -241,6 +245,16 @@ defmodule ShotElixir.Solo.SoloFightServer do
     broadcast_action(fight, action_result)
 
     :ok
+  end
+
+  defp get_shot_cost(:attack), do: 3
+  defp get_shot_cost(:defend), do: 1
+  defp get_shot_cost(_), do: 3
+
+  defp spend_shots(shot, cost) do
+    new_shot_value = max(0, (shot.shot || 0) - cost)
+    Logger.info("[SoloFightServer] Spending #{cost} shots: #{shot.shot} -> #{new_shot_value}")
+    Fights.update_shot(shot, %{"shot" => new_shot_value})
   end
 
   defp apply_damage(target_character_id, damage) do
