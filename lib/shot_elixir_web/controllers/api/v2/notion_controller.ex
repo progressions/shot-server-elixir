@@ -17,21 +17,7 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     * 500 - Internal server error if Notion API fails
   """
   def search(conn, params) do
-    name = params["name"] || ""
-
-    case NotionService.find_page_by_name(name) do
-      pages when is_list(pages) ->
-        json(conn, pages)
-
-      nil ->
-        json(conn, [])
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  rescue
-    error ->
-      {:error, error}
+    search_notion_entities(conn, params, &NotionService.find_page_by_name/1)
   end
 
   @doc """
@@ -158,21 +144,7 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     * 500 - Internal server error if Notion API fails
   """
   def search_sites(conn, params) do
-    name = params["name"] || ""
-
-    case NotionService.find_sites_in_notion(name) do
-      pages when is_list(pages) ->
-        json(conn, pages)
-
-      nil ->
-        json(conn, [])
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  rescue
-    error ->
-      {:error, error}
+    search_notion_entities(conn, params, &NotionService.find_sites_in_notion/1)
   end
 
   @doc """
@@ -186,21 +158,7 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     * 500 - Internal server error if Notion API fails
   """
   def search_parties(conn, params) do
-    name = params["name"] || ""
-
-    case NotionService.find_parties_in_notion(name) do
-      pages when is_list(pages) ->
-        json(conn, pages)
-
-      nil ->
-        json(conn, [])
-
-      {:error, reason} ->
-        {:error, reason}
-    end
-  rescue
-    error ->
-      {:error, error}
+    search_notion_entities(conn, params, &NotionService.find_parties_in_notion/1)
   end
 
   @doc """
@@ -214,9 +172,15 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     * 500 - Internal server error if Notion API fails
   """
   def search_factions(conn, params) do
+    search_notion_entities(conn, params, &NotionService.find_factions_in_notion/1)
+  end
+
+  # Private helper to reduce duplication across Notion search endpoints.
+  # Takes a service function and handles the common response patterns.
+  defp search_notion_entities(conn, params, service_fn) do
     name = params["name"] || ""
 
-    case NotionService.find_factions_in_notion(name) do
+    case service_fn.(name) do
       pages when is_list(pages) ->
         json(conn, pages)
 
