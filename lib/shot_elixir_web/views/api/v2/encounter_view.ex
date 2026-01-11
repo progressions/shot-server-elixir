@@ -32,7 +32,11 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       action_id: fight.action_id,
       shots: render_shots(fight),
       character_effects: get_character_effects_map(fight),
-      vehicle_effects: get_vehicle_effects_map(fight)
+      vehicle_effects: get_vehicle_effects_map(fight),
+      # Solo play fields
+      solo_mode: fight.solo_mode,
+      solo_player_character_ids: fight.solo_player_character_ids || [],
+      solo_behavior_type: fight.solo_behavior_type
     }
   end
 

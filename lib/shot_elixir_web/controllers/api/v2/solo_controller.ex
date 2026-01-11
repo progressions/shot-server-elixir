@@ -145,7 +145,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   POST /api/v2/fights/:fight_id/solo/action
   Player takes an action (attack, defend, stunt).
   """
-  def action(conn, %{"fight_id" => fight_id} = params) do
+  def player_action(conn, %{"fight_id" => fight_id} = params) do
     action_type = Map.get(params, "action_type", "attack")
     target_id = Map.get(params, "target_id")
     character_id = Map.get(params, "character_id")
