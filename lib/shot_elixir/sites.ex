@@ -306,7 +306,15 @@ defmodule ShotElixir.Sites do
     |> Repo.update()
     |> case do
       {:ok, site} ->
-        site = Repo.preload(site, [:faction, :juncture], force: true)
+        # Sync character attunements if character_ids is provided
+        site =
+          if Map.has_key?(attrs, "character_ids") do
+            sync_character_attunements(site, attrs["character_ids"])
+          else
+            site
+          end
+
+        site = Repo.preload(site, [:faction, :juncture, attunements: [:character]], force: true)
         broadcast_change(site, :update)
         maybe_enqueue_notion_sync(site)
         {:ok, site}
@@ -315,6 +323,42 @@ defmodule ShotElixir.Sites do
         error
     end
   end
+
+  # Syncs site character attunements to match the provided character_ids list.
+  # Removes attunements for characters not in the list and adds new ones.
+  defp sync_character_attunements(site, character_ids) when is_list(character_ids) do
+    # Get current character_ids for this site
+    current_character_ids =
+      from(a in Attunement, where: a.site_id == ^site.id, select: a.character_id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    # Normalize incoming character_ids to strings
+    new_character_ids = Enum.map(character_ids, &to_string/1)
+
+    # Find characters to add and remove
+    to_add = new_character_ids -- current_character_ids
+    to_remove = current_character_ids -- new_character_ids
+
+    # Remove attunements that are no longer in the list
+    if Enum.any?(to_remove) do
+      from(a in Attunement,
+        where: a.site_id == ^site.id and a.character_id in ^to_remove
+      )
+      |> Repo.delete_all()
+    end
+
+    # Add new attunements
+    Enum.each(to_add, fn character_id ->
+      %Attunement{}
+      |> Ecto.Changeset.change(%{site_id: site.id, character_id: character_id})
+      |> Repo.insert(on_conflict: :nothing)
+    end)
+
+    site
+  end
+
+  defp sync_character_attunements(site, _), do: site
 
   def delete_site(%Site{} = site) do
     alias Ecto.Multi
