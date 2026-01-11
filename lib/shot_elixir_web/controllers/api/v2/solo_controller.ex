@@ -263,6 +263,14 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
         |> put_status(:forbidden)
         |> json(%{success: false, error: "Not authorized to access this fight"})
 
+      {:error, :forbidden_character} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{
+          success: false,
+          error: "Character is not a player character in this solo fight"
+        })
+
       {:error, :not_found} ->
         conn
         |> put_status(:not_found)
@@ -355,13 +363,20 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
     # Load fight with full associations
     fight = Fights.get_fight!(fight.id) |> Repo.preload(shots: [:character])
 
-    with {:ok, attacker_shot} <- find_shot_by_character(fight, character_id),
-         {:ok, target_shot} <- find_shot_by_character(fight, target_id) do
-      case action_type do
-        "attack" -> execute_attack(fight, attacker_shot, target_shot)
-        "defend" -> execute_defend(fight, attacker_shot)
-        "stunt" -> execute_stunt(fight, attacker_shot, target_shot)
-        _ -> {:error, :unknown_action_type}
+    # Validate that the character_id is in solo_player_character_ids
+    player_character_ids = fight.solo_player_character_ids || []
+
+    if character_id not in player_character_ids do
+      {:error, :forbidden_character}
+    else
+      with {:ok, attacker_shot} <- find_shot_by_character(fight, character_id),
+           {:ok, target_shot} <- find_shot_by_character(fight, target_id) do
+        case action_type do
+          "attack" -> execute_attack(fight, attacker_shot, target_shot)
+          "defend" -> execute_defend(fight, attacker_shot)
+          "stunt" -> execute_stunt(fight, attacker_shot, target_shot)
+          _ -> {:error, :unknown_action_type}
+        end
       end
     end
   end

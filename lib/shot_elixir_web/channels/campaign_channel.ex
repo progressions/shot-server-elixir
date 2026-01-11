@@ -40,6 +40,20 @@ defmodule ShotElixirWeb.CampaignChannel do
     {:noreply, socket}
   end
 
+  # Handle solo initiative broadcasts from PubSub
+  @impl true
+  def handle_info({:solo_initiative, payload}, socket) do
+    Logger.info("📨 CampaignChannel: Solo initiative received")
+    Logger.info("Payload: #{inspect(payload)}")
+
+    # Push to clients with the solo_initiative event
+    push(socket, "message", %{solo_initiative: payload})
+    push(socket, "solo_initiative", payload)
+
+    Logger.info("✅ Solo initiative pushed to socket")
+    {:noreply, socket}
+  end
+
   # Handle solo NPC action broadcasts from PubSub
   @impl true
   def handle_info({:solo_npc_action, payload}, socket) do

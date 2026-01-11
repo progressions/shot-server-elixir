@@ -85,24 +85,45 @@ defmodule ShotElixir.Solo.SimpleBehavior do
     {:ok, result}
   end
 
+  # Convert string or integer values to integer
+  # action_values is stored as JSONB, so values could be strings or integers
+  defp to_integer(value, _default) when is_integer(value), do: value
+
+  defp to_integer(value, default) when is_binary(value) do
+    case Integer.parse(value) do
+      {int, _rest} -> int
+      :error -> default
+    end
+  end
+
+  defp to_integer(_value, default), do: default
+
   defp get_attack_value(character) do
     av = character.action_values || %{}
     main_attack = Map.get(av, "MainAttack", "Guns")
-    Map.get(av, main_attack, 0)
+    av_value = Map.get(av, main_attack, 0)
+    to_integer(av_value, 0)
   end
 
   defp get_defense(character) do
     # Check dedicated defense field first, then action_values
-    character.defense ||
-      Map.get(character.action_values || %{}, "Defense", 0)
+    raw_defense =
+      case character.defense do
+        nil -> Map.get(character.action_values || %{}, "Defense", 0)
+        value -> value
+      end
+
+    to_integer(raw_defense, 0)
   end
 
   defp get_toughness(character) do
-    Map.get(character.action_values || %{}, "Toughness", 0)
+    raw_toughness = Map.get(character.action_values || %{}, "Toughness", 0)
+    to_integer(raw_toughness, 0)
   end
 
   defp get_damage(character) do
-    Map.get(character.action_values || %{}, "Damage", 7)
+    raw_damage = Map.get(character.action_values || %{}, "Damage", 7)
+    to_integer(raw_damage, 7)
   end
 
   defp build_simple_narrative(attacker, target, outcome, damage) do
