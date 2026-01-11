@@ -110,7 +110,7 @@ defmodule ShotElixirWeb.Router do
     # Notifications
     get "/notifications/unread_count", NotificationController, :unread_count
     post "/notifications/dismiss_all", NotificationController, :dismiss_all
-    resources "/notifications", NotificationController, except: [:new, :edit, :create]
+    resources "/notifications", NotificationController, except: [:new, :edit]
 
     # Campaigns
     resources "/campaigns", CampaignController do

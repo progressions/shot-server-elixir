@@ -345,4 +345,192 @@ defmodule ShotElixirWeb.Api.V2.NotificationControllerTest do
       assert other_notification.dismissed_at == nil
     end
   end
+
+  describe "create" do
+    alias ShotElixir.Campaigns
+
+    setup %{user: user, other_user: other_user} do
+      # Create a gamemaster user
+      {:ok, gm_user} =
+        Accounts.create_user(%{
+          email: "gamemaster@test.com",
+          password: "password123",
+          first_name: "Game",
+          last_name: "Master",
+          gamemaster: true
+        })
+
+      # Create a campaign owned by the gamemaster
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Test Campaign",
+          user_id: gm_user.id
+        })
+
+      # Add the target user as a campaign member
+      {:ok, _membership} = Campaigns.add_member(campaign, other_user)
+
+      # Set the GM's current campaign
+      {:ok, gm_user} = Accounts.update_user(gm_user, %{current_campaign_id: campaign.id})
+
+      %{gm_user: gm_user, campaign: campaign}
+    end
+
+    test "gamemaster can send notification to campaign member", %{
+      conn: conn,
+      gm_user: gm_user,
+      other_user: other_user
+    } do
+      conn =
+        conn
+        |> authenticate(gm_user)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: other_user.email,
+            title: "Session Tonight",
+            message: "Game starts at 7pm!"
+          }
+        })
+
+      assert returned = json_response(conn, 201)
+      assert returned["title"] == "Session Tonight"
+      assert returned["message"] == "Game starts at 7pm!"
+      assert returned["type"] == "gm_announcement"
+    end
+
+    test "gamemaster can send notification to themselves (campaign owner)", %{
+      conn: conn,
+      gm_user: gm_user
+    } do
+      conn =
+        conn
+        |> authenticate(gm_user)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: gm_user.email,
+            title: "Self Reminder"
+          }
+        })
+
+      assert returned = json_response(conn, 201)
+      assert returned["title"] == "Self Reminder"
+    end
+
+    test "non-gamemaster cannot send notifications", %{
+      conn: conn,
+      user: user,
+      other_user: other_user
+    } do
+      # Regular user (not gamemaster) tries to send notification
+      conn =
+        conn
+        |> authenticate(user)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: other_user.email,
+            title: "Test"
+          }
+        })
+
+      assert %{"error" => "Only gamemasters can send notifications"} = json_response(conn, 403)
+    end
+
+    test "returns 400 when gamemaster has no current campaign", %{conn: conn} do
+      # Create a GM without a current campaign set
+      {:ok, gm_no_campaign} =
+        Accounts.create_user(%{
+          email: "gm_no_campaign@test.com",
+          password: "password123",
+          first_name: "No",
+          last_name: "Campaign",
+          gamemaster: true
+        })
+
+      conn =
+        conn
+        |> authenticate(gm_no_campaign)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: "someone@test.com",
+            title: "Test"
+          }
+        })
+
+      assert %{"error" => "No current campaign set" <> _} = json_response(conn, 400)
+    end
+
+    test "returns 404 when target user not found", %{conn: conn, gm_user: gm_user} do
+      conn =
+        conn
+        |> authenticate(gm_user)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: "nonexistent@test.com",
+            title: "Test"
+          }
+        })
+
+      assert %{"error" => "Target user not found"} = json_response(conn, 404)
+    end
+
+    test "returns 403 when target is not a campaign member", %{conn: conn, gm_user: gm_user} do
+      # Create a user who is not a member of the campaign
+      {:ok, non_member} =
+        Accounts.create_user(%{
+          email: "non_member@test.com",
+          password: "password123",
+          first_name: "Non",
+          last_name: "Member"
+        })
+
+      conn =
+        conn
+        |> authenticate(gm_user)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: non_member.email,
+            title: "Test"
+          }
+        })
+
+      assert %{"error" => "Target user is not a member of your current campaign"} =
+               json_response(conn, 403)
+    end
+
+    test "returns 400 when title is missing", %{
+      conn: conn,
+      gm_user: gm_user,
+      other_user: other_user
+    } do
+      conn =
+        conn
+        |> authenticate(gm_user)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: other_user.email,
+            message: "No title provided"
+          }
+        })
+
+      assert %{"error" => "Title is required"} = json_response(conn, 400)
+    end
+
+    test "returns 400 when title is empty string", %{
+      conn: conn,
+      gm_user: gm_user,
+      other_user: other_user
+    } do
+      conn =
+        conn
+        |> authenticate(gm_user)
+        |> post(~p"/api/v2/notifications", %{
+          notification: %{
+            user_email: other_user.email,
+            title: ""
+          }
+        })
+
+      assert %{"error" => "Title is required"} = json_response(conn, 400)
+    end
+  end
 end
