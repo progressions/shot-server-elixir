@@ -707,6 +707,94 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
+  Search for pages in a specific Notion database by name.
+
+  ## Parameters
+    * `database_id` - The Notion database ID to search in
+    * `name` - The name to search for (partial match, case-insensitive)
+
+  ## Returns
+    * List of matching Notion pages with id, title, and url
+  """
+  def find_pages_in_database(database_id, name) do
+    filter =
+      if name == "" do
+        %{}
+      else
+        %{
+          "filter" => %{
+            "property" => "Name",
+            "title" => %{"contains" => name}
+          }
+        }
+      end
+
+    response = NotionClient.database_query(database_id, filter)
+
+    case response do
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion database query error: #{error_code} - #{message}")
+        []
+
+      %{"results" => pages} when is_list(pages) ->
+        Enum.map(pages, fn page ->
+          %{
+            "id" => page["id"],
+            "title" => extract_page_title(page),
+            "url" => page["url"]
+          }
+        end)
+
+      _ ->
+        Logger.warning("Unexpected response from Notion database query: #{inspect(response)}")
+        []
+    end
+  rescue
+    error ->
+      Logger.error("Failed to query Notion database: #{Exception.message(error)}")
+      []
+  end
+
+  @doc """
+  Search for sites in the Notion Sites database.
+
+  ## Parameters
+    * `name` - The name to search for (partial match)
+
+  ## Returns
+    * List of matching site pages with id, title, and url
+  """
+  def find_sites_in_notion(name \\ "") do
+    find_pages_in_database(sites_database_id(), name)
+  end
+
+  @doc """
+  Search for parties in the Notion Parties database.
+
+  ## Parameters
+    * `name` - The name to search for (partial match)
+
+  ## Returns
+    * List of matching party pages with id, title, and url
+  """
+  def find_parties_in_notion(name \\ "") do
+    find_pages_in_database(parties_database_id(), name)
+  end
+
+  @doc """
+  Search for factions in the Notion Factions database.
+
+  ## Parameters
+    * `name` - The name to search for (partial match)
+
+  ## Returns
+    * List of matching faction pages with id, title, and url
+  """
+  def find_factions_in_notion(name \\ "") do
+    find_pages_in_database(factions_database_id(), name)
+  end
+
+  @doc """
   Find faction in Notion by name.
 
   ## Parameters

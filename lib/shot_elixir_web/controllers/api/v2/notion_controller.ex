@@ -146,4 +146,49 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     |> put_status(:bad_request)
     |> json(%{error: "Must provide either 'q' (search query) or 'id' (page ID) parameter"})
   end
+
+  @doc """
+  Search for sites in the Notion Sites database.
+
+  ## Parameters
+    * `name` - The name to search for (query parameter, optional)
+
+  ## Response
+    * 200 - List of matching site pages (JSON array)
+  """
+  def search_sites(conn, params) do
+    name = params["name"] || ""
+    pages = NotionService.find_sites_in_notion(name)
+    json(conn, pages)
+  end
+
+  @doc """
+  Search for parties in the Notion Parties database.
+
+  ## Parameters
+    * `name` - The name to search for (query parameter, optional)
+
+  ## Response
+    * 200 - List of matching party pages (JSON array)
+  """
+  def search_parties(conn, params) do
+    name = params["name"] || ""
+    pages = NotionService.find_parties_in_notion(name)
+    json(conn, pages)
+  end
+
+  @doc """
+  Search for factions in the Notion Factions database.
+
+  ## Parameters
+    * `name` - The name to search for (query parameter, optional)
+
+  ## Response
+    * 200 - List of matching faction pages (JSON array)
+  """
+  def search_factions(conn, params) do
+    name = params["name"] || ""
+    pages = NotionService.find_factions_in_notion(name)
+    json(conn, pages)
+  end
 end
