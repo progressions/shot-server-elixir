@@ -8,6 +8,7 @@ defmodule ShotElixir.Factions do
   alias ShotElixir.Factions.Faction
   alias ShotElixir.ImageLoader
   alias ShotElixir.Workers.ImageCopyWorker
+  alias ShotElixir.Workers.SyncFactionToNotionWorker
   use ShotElixir.Models.Broadcastable
 
   def list_factions(campaign_id) do
@@ -305,10 +306,20 @@ defmodule ShotElixir.Factions do
   end
 
   def update_faction(%Faction{} = faction, attrs) do
-    faction
-    |> Faction.changeset(attrs)
-    |> Repo.update()
-    |> broadcast_result(:update)
+    result =
+      faction
+      |> Faction.changeset(attrs)
+      |> Repo.update()
+
+    case result do
+      {:ok, updated_faction} ->
+        maybe_enqueue_notion_sync(updated_faction)
+
+      _ ->
+        :ok
+    end
+
+    broadcast_result(result, :update)
   end
 
   def delete_faction(%Faction{} = faction) do
@@ -456,5 +467,15 @@ defmodule ShotElixir.Factions do
       false -> new_name
       true -> find_next_available_name(base_name, campaign_id, counter + 1)
     end
+  end
+
+  defp maybe_enqueue_notion_sync(%Faction{notion_page_id: nil}), do: :ok
+
+  defp maybe_enqueue_notion_sync(%Faction{id: id, notion_page_id: _page_id}) do
+    %{faction_id: id}
+    |> SyncFactionToNotionWorker.new()
+    |> Oban.insert()
+
+    :ok
   end
 end

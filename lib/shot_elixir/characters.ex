@@ -11,6 +11,7 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Sites.Attunement
   alias ShotElixir.ImageLoader
   alias ShotElixir.Workers.ImageCopyWorker
+  alias ShotElixir.Workers.SyncCharacterToNotionWorker
   alias Ecto.Multi
   use ShotElixir.Models.Broadcastable
 
@@ -518,6 +519,10 @@ defmodule ShotElixir.Characters do
       broadcast_change(character_with_associations, :update)
       {:ok, character}
     end)
+    |> Multi.run(:notion_sync, fn _repo, %{character: character} ->
+      maybe_enqueue_notion_sync(character)
+      {:ok, character}
+    end)
     |> Repo.transaction()
     |> case do
       {:ok, %{character: character}} ->
@@ -885,5 +890,15 @@ defmodule ShotElixir.Characters do
       false -> new_name
       true -> find_next_available_name(base_name, campaign_id, counter + 1)
     end
+  end
+
+  defp maybe_enqueue_notion_sync(%Character{notion_page_id: nil}), do: :ok
+
+  defp maybe_enqueue_notion_sync(%Character{id: id, notion_page_id: _page_id}) do
+    %{character_id: id}
+    |> SyncCharacterToNotionWorker.new()
+    |> Oban.insert()
+
+    :ok
   end
 end
