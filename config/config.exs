@@ -117,9 +117,8 @@ config :shot_elixir, :notion,
   database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
   factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
   # Periodic sync configuration (sync characters FROM Notion)
-  periodic_sync_enabled: true,
-  # Interval in hours between syncs (default: 6 hours)
-  periodic_sync_interval_hours: 6
+  # Schedule is controlled by Oban cron in the plugins config above
+  periodic_sync_enabled: true
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

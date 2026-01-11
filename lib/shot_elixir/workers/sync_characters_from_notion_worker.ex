@@ -2,16 +2,19 @@ defmodule ShotElixir.Workers.SyncCharactersFromNotionWorker do
   @moduledoc """
   Periodic background worker that syncs all Notion-linked characters FROM Notion.
 
-  This worker runs on a configurable schedule (default: every 6 hours) and updates
-  all characters that have a linked Notion page with the latest data from Notion.
+  This worker runs on a schedule configured via Oban cron (default: every 6 hours)
+  and updates all characters that have a linked Notion page with the latest data
+  from Notion.
 
   Configuration:
     config :shot_elixir, :notion,
-      periodic_sync_enabled: true,
-      periodic_sync_interval_hours: 6
+      periodic_sync_enabled: true
 
   Only runs in production environment to avoid unwanted API calls in test/dev.
   """
+
+  # Delay between API calls to avoid hitting Notion rate limits (ms)
+  @api_call_delay_ms 100
 
   use Oban.Worker, queue: :notion, max_attempts: 1
 
@@ -43,8 +46,13 @@ defmodule ShotElixir.Workers.SyncCharactersFromNotionWorker do
 
     Logger.info("Starting periodic Notion sync for #{total} characters")
 
+    # Process characters with delay between API calls to avoid rate limits
     results =
-      Enum.map(characters, fn character ->
+      characters
+      |> Enum.with_index()
+      |> Enum.map(fn {character, index} ->
+        # Add delay between calls (skip delay for first character)
+        if index > 0, do: Process.sleep(@api_call_delay_ms)
         sync_character(character)
       end)
 

@@ -92,6 +92,10 @@ defmodule ShotElixir.Workers.SyncCharactersFromNotionWorkerTest do
       char1_index = Enum.find_index(result, fn c -> c.id == char1.id end)
       char2_index = Enum.find_index(result, fn c -> c.id == char2.id end)
 
+      # Ensure both characters are present in the result before comparing positions
+      refute is_nil(char1_index)
+      refute is_nil(char2_index)
+
       # char1 should come before char2 (ordered by updated_at asc)
       assert char1_index < char2_index
     end
@@ -102,6 +106,26 @@ defmodule ShotElixir.Workers.SyncCharactersFromNotionWorkerTest do
       # In test environment, should skip the sync
       job = %Oban.Job{args: %{}}
       assert :ok = SyncCharactersFromNotionWorker.perform(job)
+    end
+  end
+
+  describe "sync_all_linked_characters/0" do
+    test "returns summary with zero counts when no characters to sync" do
+      # With no notion-linked characters, should return empty summary
+      {:ok, summary} = SyncCharactersFromNotionWorker.sync_all_linked_characters()
+
+      assert summary.total == 0
+      assert summary.success == 0
+      assert summary.errors == 0
+    end
+
+    test "returns {:ok, summary} tuple with expected keys" do
+      {:ok, summary} = SyncCharactersFromNotionWorker.sync_all_linked_characters()
+
+      assert is_map(summary)
+      assert Map.has_key?(summary, :total)
+      assert Map.has_key?(summary, :success)
+      assert Map.has_key?(summary, :errors)
     end
   end
 end
