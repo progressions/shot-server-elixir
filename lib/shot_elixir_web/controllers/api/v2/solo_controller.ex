@@ -28,7 +28,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Start the solo fight server for this fight.
   """
   def start(conn, %{"fight_id" => fight_id}) do
-    user = conn.assigns.current_user
+    user = Guardian.Plug.current_resource(conn)
 
     with {:ok, fight} <- get_fight(fight_id),
          :ok <- authorize_fight_access(fight, user),
@@ -90,7 +90,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Stop the solo fight server for this fight.
   """
   def stop(conn, %{"fight_id" => fight_id}) do
-    user = conn.assigns.current_user
+    user = Guardian.Plug.current_resource(conn)
 
     with {:ok, fight} <- get_fight(fight_id),
          :ok <- authorize_fight_access(fight, user) do
@@ -136,7 +136,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Get the status of the solo fight server.
   """
   def status(conn, %{"fight_id" => fight_id}) do
-    user = conn.assigns.current_user
+    user = Guardian.Plug.current_resource(conn)
 
     with {:ok, fight} <- get_fight(fight_id),
          :ok <- authorize_fight_access(fight, user) do
@@ -190,7 +190,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Process the next NPC turn.
   """
   def advance(conn, %{"fight_id" => fight_id}) do
-    user = conn.assigns.current_user
+    user = Guardian.Plug.current_resource(conn)
 
     with {:ok, fight} <- get_fight(fight_id),
          :ok <- authorize_fight_access(fight, user) do
@@ -234,7 +234,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Player takes an action (attack, defend, stunt).
   """
   def player_action(conn, %{"fight_id" => fight_id} = params) do
-    user = conn.assigns.current_user
+    user = Guardian.Plug.current_resource(conn)
     action_type = Map.get(params, "action_type", "attack")
     target_id = Map.get(params, "target_id")
     character_id = Map.get(params, "character_id")
@@ -284,7 +284,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Each character rolls 1d6 + Speed to determine starting shot.
   """
   def roll_initiative(conn, %{"fight_id" => fight_id}) do
-    user = conn.assigns.current_user
+    user = Guardian.Plug.current_resource(conn)
 
     with {:ok, fight} <- get_fight(fight_id),
          :ok <- authorize_fight_access(fight, user),
