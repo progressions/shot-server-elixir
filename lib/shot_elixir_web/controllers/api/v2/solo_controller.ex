@@ -21,7 +21,19 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   alias ShotElixir.Solo.SoloFightServer
   alias ShotElixir.Services.DiceRoller
 
+  require Logger
+
   action_fallback ShotElixirWeb.FallbackController
+
+  # Format error reasons into user-friendly messages
+  defp format_error(:not_solo_mode), do: "Fight is not in solo mode"
+  defp format_error(:server_not_running), do: "Solo server is not running"
+  defp format_error(:already_running), do: "Solo server is already running"
+  defp format_error(:unknown_action_type), do: "Unknown action type"
+  defp format_error(:shot_not_found), do: "Character not found in fight"
+  defp format_error(:forbidden_character), do: "Character is not a player character in this solo fight"
+  defp format_error(reason) when is_atom(reason), do: reason |> Atom.to_string() |> String.replace("_", " ")
+  defp format_error(_reason), do: "An unexpected error occurred"
 
   @doc """
   POST /api/v2/fights/:fight_id/solo/start
@@ -80,7 +92,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
         |> put_status(:unprocessable_entity)
         |> json(%{
           success: false,
-          error: inspect(reason)
+          error: format_error(reason)
         })
     end
   end
@@ -127,7 +139,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
       {:error, reason} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{success: false, error: inspect(reason)})
+        |> json(%{success: false, error: format_error(reason)})
     end
   end
 
@@ -181,7 +193,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
       {:error, reason} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{success: false, error: inspect(reason)})
+        |> json(%{success: false, error: format_error(reason)})
     end
   end
 
@@ -225,7 +237,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
       {:error, reason} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{success: false, error: inspect(reason)})
+        |> json(%{success: false, error: format_error(reason)})
     end
   end
 
@@ -266,10 +278,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
       {:error, :forbidden_character} ->
         conn
         |> put_status(:forbidden)
-        |> json(%{
-          success: false,
-          error: "Character is not a player character in this solo fight"
-        })
+        |> json(%{success: false, error: format_error(:forbidden_character)})
 
       {:error, :not_found} ->
         conn
@@ -281,7 +290,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
         |> put_status(:unprocessable_entity)
         |> json(%{
           success: false,
-          error: inspect(reason)
+          error: format_error(reason)
         })
     end
   end
@@ -329,7 +338,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
         |> put_status(:unprocessable_entity)
         |> json(%{
           success: false,
-          error: inspect(reason)
+          error: format_error(reason)
         })
     end
   end
@@ -532,15 +541,26 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   defp apply_damage(target_id, damage) do
     case Characters.get_character(target_id) do
       nil ->
-        :ok
+        Logger.warning("[SoloController] Cannot apply damage: character #{target_id} not found")
+        {:error, :character_not_found}
 
       character ->
         current_wounds = Map.get(character.action_values || %{}, "Wounds", 0) |> to_integer()
         new_wounds = current_wounds + damage
 
-        Characters.update_character(character, %{
-          action_values: Map.put(character.action_values || %{}, "Wounds", new_wounds)
-        })
+        case Characters.update_character(character, %{
+               action_values: Map.put(character.action_values || %{}, "Wounds", new_wounds)
+             }) do
+          {:ok, updated} ->
+            {:ok, updated}
+
+          {:error, reason} ->
+            Logger.error(
+              "[SoloController] Failed to apply #{damage} damage to character #{target_id}: #{inspect(reason)}"
+            )
+
+            {:error, reason}
+        end
     end
   end
 

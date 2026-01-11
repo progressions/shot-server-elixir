@@ -229,7 +229,7 @@ defmodule ShotElixir.Solo.SoloFightServer do
   end
 
   defp apply_action_result(fight, acting_shot, action_result) do
-    # Spend shots for the action (attacks cost 3 shots)
+    # Spend shots for the action (cost varies by action type via get_shot_cost/1)
     shot_cost = get_shot_cost(action_result.action_type)
     spend_shots(acting_shot, shot_cost)
 
