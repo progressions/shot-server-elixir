@@ -16,7 +16,7 @@ defmodule ShotElixir.Solo.SoloFightServer do
 
   alias ShotElixir.Repo
   alias ShotElixir.Fights
-  alias ShotElixir.Solo.{Behavior, SimpleBehavior}
+  alias ShotElixir.Solo.{Behavior, Combat, SimpleBehavior}
 
   @registry ShotElixir.Solo.Registry
 
@@ -229,13 +229,21 @@ defmodule ShotElixir.Solo.SoloFightServer do
   end
 
   defp apply_action_result(fight, acting_shot, action_result) do
-    # Spend shots for the action (cost varies by action type via get_shot_cost/1)
-    shot_cost = get_shot_cost(action_result.action_type)
+    # Spend shots for the action (cost varies by action type via Combat.get_shot_cost/1)
+    shot_cost = Combat.get_shot_cost(action_result.action_type)
     spend_shots(acting_shot, shot_cost)
 
     # Apply damage to target if hit
     if action_result.hit && action_result.target_id && action_result.damage > 0 do
-      apply_damage(action_result.target_id, action_result.damage)
+      case apply_damage(action_result.target_id, action_result.damage) do
+        :ok ->
+          :ok
+
+        :error ->
+          Logger.warning(
+            "[SoloFightServer] Damage application failed for target #{action_result.target_id}"
+          )
+      end
     end
 
     # Log the fight event
@@ -246,10 +254,6 @@ defmodule ShotElixir.Solo.SoloFightServer do
 
     :ok
   end
-
-  defp get_shot_cost(:attack), do: 3
-  defp get_shot_cost(:defend), do: 1
-  defp get_shot_cost(_), do: 3
 
   defp spend_shots(shot, cost) do
     new_shot_value = max(0, (shot.shot || 0) - cost)

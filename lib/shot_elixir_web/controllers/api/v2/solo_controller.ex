@@ -19,6 +19,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Solo.Supervisor, as: SoloSupervisor
   alias ShotElixir.Solo.SoloFightServer
+  alias ShotElixir.Solo.Combat
   alias ShotElixir.Services.DiceRoller
 
   require Logger
@@ -408,23 +409,20 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
     swerve = DiceRoller.swerve()
 
     # Get attacker's main attack value
-    attack_value = get_attack_value(attacker)
-    defense = get_defense(target)
+    attack_value = Combat.get_attack_value(attacker)
+    defense = Combat.get_defense(target)
 
     # Calculate outcome
-    action_result = attack_value + swerve.total
-    outcome = action_result - defense
+    {outcome, hit, action_result} = Combat.calculate_outcome(attack_value, swerve.total, defense)
 
     # Calculate damage if hit
-    {damage, smackdown, hit} =
-      if outcome > 0 do
-        base_damage = get_damage(attacker)
-        toughness = get_toughness(target)
-        smackdown = base_damage + outcome - toughness
-        actual_damage = max(0, smackdown)
-        {actual_damage, smackdown, true}
+    {damage, smackdown} =
+      if hit do
+        base_damage = Combat.get_damage(attacker)
+        toughness = Combat.get_toughness(target)
+        Combat.calculate_damage(base_damage, outcome, toughness)
       else
-        {0, 0, false}
+        {0, 0}
       end
 
     # Build narrative
@@ -432,7 +430,13 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
 
     # Apply damage if hit
     if hit && damage > 0 do
-      apply_damage(target.id, damage)
+      case apply_damage(target.id, damage) do
+        {:ok, _} ->
+          :ok
+
+        {:error, reason} ->
+          Logger.warning("[SoloController] Failed to apply damage: #{inspect(reason)}")
+      end
     end
 
     # Spend shots (attacks cost 3 shots)
@@ -512,28 +516,8 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
     {:ok, result}
   end
 
-  defp get_attack_value(character) do
-    av = character.action_values || %{}
-    main_attack = Map.get(av, "MainAttack", "Guns")
-    Map.get(av, main_attack, 0) |> to_integer()
-  end
-
-  defp get_defense(character) do
-    character.defense ||
-      Map.get(character.action_values || %{}, "Defense", 0) |> to_integer()
-  end
-
-  defp get_toughness(character) do
-    Map.get(character.action_values || %{}, "Toughness", 0) |> to_integer()
-  end
-
-  defp get_damage(character) do
-    Map.get(character.action_values || %{}, "Damage", 7) |> to_integer()
-  end
-
-  defp to_integer(val) when is_integer(val), do: val
-  defp to_integer(val) when is_binary(val), do: String.to_integer(val)
-  defp to_integer(_), do: 0
+  # Combat stat helpers delegated to shared Combat module
+  # See ShotElixir.Solo.Combat for implementations
 
   defp build_attack_narrative(attacker, target, outcome, damage) do
     if outcome > 0 do
@@ -550,7 +534,9 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
         {:error, :character_not_found}
 
       character ->
-        current_wounds = Map.get(character.action_values || %{}, "Wounds", 0) |> to_integer()
+        current_wounds =
+          Map.get(character.action_values || %{}, "Wounds", 0) |> Combat.to_integer()
+
         new_wounds = current_wounds + damage
 
         case Characters.update_character(character, %{
@@ -618,7 +604,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
 
         if entity do
           # Get Speed from action_values, default to 0
-          speed = get_speed(entity)
+          speed = Combat.get_speed(entity)
 
           # Roll 1d6 + Speed
           roll = DiceRoller.die_roll()
@@ -657,11 +643,6 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
     broadcast_initiative(fight, results)
 
     {:ok, results}
-  end
-
-  defp get_speed(entity) do
-    av = entity.action_values || %{}
-    Map.get(av, "Speed", 0) |> to_integer()
   end
 
   defp log_initiative_event(fight, results) do

@@ -41,6 +41,9 @@ defmodule ShotElixirWeb.CampaignChannel do
   end
 
   # Handle solo initiative broadcasts from PubSub
+  # Dual push pattern: Push to both "message" (ActionCable compatibility) and named event
+  # (Phoenix Channels). ActionCable clients expect a generic "message" event, while Phoenix
+  # Channels clients can listen for specific event names.
   @impl true
   def handle_info({:solo_initiative, payload}, socket) do
     Logger.info("📨 CampaignChannel: Solo initiative received")
