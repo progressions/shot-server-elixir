@@ -1723,7 +1723,11 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert response["user_id"] == gm.id
     end
 
-    test "returns user_id in fight show response", %{conn: conn, gamemaster: gm, campaign: campaign} do
+    test "returns user_id in fight show response", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
       {:ok, fight} =
         Fights.create_fight(
           Map.merge(@create_attrs, %{
@@ -1739,7 +1743,11 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert response["user_id"] == gm.id
     end
 
-    test "returns user_id in fight index response", %{conn: conn, gamemaster: gm, campaign: campaign} do
+    test "returns user_id in fight index response", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
       {:ok, fight} =
         Fights.create_fight(
           Map.merge(@create_attrs, %{
