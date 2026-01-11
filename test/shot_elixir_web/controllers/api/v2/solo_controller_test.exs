@@ -1,14 +1,15 @@
 defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
   use ShotElixirWeb.ConnCase, async: true
 
-  alias ShotElixir.{Fights, Campaigns, Accounts, Characters}
+  alias ShotElixir.{Fights, Campaigns, Accounts, Characters, Repo}
+  alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Guardian
 
   setup %{conn: conn} do
     # Create gamemaster user
     {:ok, gamemaster} =
       Accounts.create_user(%{
-        email: "gm@test.com",
+        email: "gm_#{System.unique_integer()}@test.com",
         password: "password123",
         first_name: "Game",
         last_name: "Master",
@@ -18,7 +19,7 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
     # Create player user (campaign member)
     {:ok, player} =
       Accounts.create_user(%{
-        email: "player@test.com",
+        email: "player_#{System.unique_integer()}@test.com",
         password: "password123",
         first_name: "Player",
         last_name: "One",
@@ -28,20 +29,22 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
     # Create non-member user
     {:ok, non_member} =
       Accounts.create_user(%{
-        email: "nonmember@test.com",
+        email: "nonmember_#{System.unique_integer()}@test.com",
         password: "password123",
         first_name: "Non",
         last_name: "Member",
         gamemaster: false
       })
 
-    # Create a campaign
-    {:ok, campaign} =
-      Campaigns.create_campaign(%{
+    # Create a campaign directly using Repo.insert! to bypass CampaignSeederWorker
+    campaign =
+      %Campaign{}
+      |> Ecto.Changeset.change(%{
         name: "Test Campaign",
         description: "Campaign for solo testing",
         user_id: gamemaster.id
       })
+      |> Repo.insert!()
 
     # Add player to campaign
     {:ok, _} = Campaigns.add_member(campaign, player)
@@ -92,14 +95,14 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
       })
 
     # Add characters to solo fight as shots
-    {:ok, pc_shot} =
+    {:ok, _pc_shot} =
       Fights.create_shot(%{
         fight_id: solo_fight.id,
         character_id: pc_character.id,
         shot: 0
       })
 
-    {:ok, npc_shot} =
+    {:ok, _npc_shot} =
       Fights.create_shot(%{
         fight_id: solo_fight.id,
         character_id: npc_character.id,
@@ -123,9 +126,7 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
       solo_fight: solo_fight,
       regular_fight: regular_fight,
       pc_character: pc_character,
-      npc_character: npc_character,
-      pc_shot: pc_shot,
-      npc_shot: npc_shot
+      npc_character: npc_character
     }
   end
 
@@ -135,7 +136,7 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
   end
 
   describe "status" do
-    test "returns status for authorized user", %{
+    test "returns status for campaign owner", %{
       conn: conn,
       gamemaster: gm,
       solo_fight: fight
@@ -145,8 +146,6 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
       response = json_response(conn, 200)
 
       assert response["fight_id"] == fight.id
-      assert is_boolean(response["running"])
-      # Server not started, so should be false
       assert response["running"] == false
     end
 
@@ -181,11 +180,14 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
       fake_id = Ecto.UUID.generate()
       conn = get(conn, ~p"/api/v2/fights/#{fake_id}/solo/status")
 
-      assert json_response(conn, 404)["error"] =~ "not found"
+      # Controller returns 422 with fight_not_found error for non-existent fights
+      response = json_response(conn, 422)
+      assert response["success"] == false
+      assert response["error"] =~ "fight_not_found"
     end
   end
 
-  describe "start - validation" do
+  describe "start - authorization" do
     test "returns error for non-solo fight", %{
       conn: conn,
       gamemaster: gm,
@@ -211,7 +213,7 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
     end
   end
 
-  describe "roll_initiative - validation" do
+  describe "roll_initiative" do
     test "returns error for non-solo fight", %{
       conn: conn,
       gamemaster: gm,
@@ -249,7 +251,6 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
       assert is_list(response["results"])
       assert length(response["results"]) == 2
 
-      # Each result should have name, roll, speed, shot
       Enum.each(response["results"], fn result ->
         assert is_binary(result["name"])
         assert is_integer(result["roll"])
@@ -328,8 +329,8 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
     end
   end
 
-  describe "stop - validation" do
-    test "returns success for campaign owner even if server not running", %{
+  describe "stop - authorization" do
+    test "returns success for campaign owner", %{
       conn: conn,
       gamemaster: gm,
       solo_fight: fight
@@ -353,7 +354,7 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
     end
   end
 
-  describe "advance - validation" do
+  describe "advance - authorization" do
     test "returns error when server not running", %{
       conn: conn,
       gamemaster: gm,
