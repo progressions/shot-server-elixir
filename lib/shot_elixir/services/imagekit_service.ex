@@ -59,7 +59,7 @@ defmodule ShotElixir.Services.ImagekitService do
         options_without_autotag = Map.put(options, :auto_tag, false)
         upload_file(path, options_without_autotag)
 
-      {:error, reason} = error ->
+      {:error, _reason} = error ->
         error
     end
   end
