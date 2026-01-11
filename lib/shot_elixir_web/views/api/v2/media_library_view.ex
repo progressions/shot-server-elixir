@@ -223,6 +223,7 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryView do
 
   # Render AI tags for JSON response
   defp render_ai_tags(nil), do: []
+
   defp render_ai_tags(tags) when is_list(tags) do
     Enum.map(tags, fn tag ->
       %{

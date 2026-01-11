@@ -578,11 +578,12 @@ defmodule ShotElixir.Media do
     query =
       from i in MediaImage,
         where: i.campaign_id == ^campaign_id,
-        where: fragment(
-          "EXISTS (SELECT 1 FROM unnest(?) AS tag WHERE LOWER(tag->>'name') LIKE ANY(?))",
-          i.ai_tags,
-          ^Enum.map(normalized_terms, &"%#{&1}%")
-        ),
+        where:
+          fragment(
+            "EXISTS (SELECT 1 FROM unnest(?) AS tag WHERE LOWER(tag->>'name') LIKE ANY(?))",
+            i.ai_tags,
+            ^Enum.map(normalized_terms, &"%#{&1}%")
+          ),
         order_by: [desc: i.inserted_at]
 
     total = Repo.aggregate(query, :count, :id)
