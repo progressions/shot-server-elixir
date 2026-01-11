@@ -42,12 +42,26 @@ defmodule ShotElixir.Services.ImagekitService do
   Uploads a Plug.Upload struct to ImageKit.
 
   Auto-tagging via Google Vision is enabled by default for all uploads.
+  If the extension quota is exceeded, automatically retries without auto-tagging.
   Override with `auto_tag: false` if needed.
   """
   def upload_plug(%Plug.Upload{path: path} = upload, options \\ %{}) do
     default_options = %{auto_tag: true, max_tags: 10, min_confidence: 70}
     options = Map.merge(default_options, Map.put(options, :file_name, upload.filename))
-    upload_file(path, options)
+
+    case upload_file(path, options) do
+      {:ok, result} ->
+        {:ok, result}
+
+      {:error, :extension_quota_exceeded} ->
+        # Retry without auto-tagging when quota is exceeded
+        Logger.warning("ImageKit extension quota exceeded, retrying upload without auto-tagging")
+        options_without_autotag = Map.put(options, :auto_tag, false)
+        upload_file(path, options_without_autotag)
+
+      {:error, reason} = error ->
+        error
+    end
   end
 
   @doc """
@@ -316,7 +330,13 @@ defmodule ShotElixir.Services.ImagekitService do
 
       {:ok, %{status: status, body: body}} ->
         Logger.error("ImageKit upload failed with status #{status}: #{inspect(body)}")
-        {:error, "Upload failed with status #{status}"}
+
+        # Check for extension quota exceeded error
+        if extension_quota_exceeded?(body) do
+          {:error, :extension_quota_exceeded}
+        else
+          {:error, "Upload failed with status #{status}"}
+        end
 
       {:error, reason} = error ->
         Logger.error("ImageKit upload request failed: #{inspect(reason)}")
@@ -371,6 +391,16 @@ defmodule ShotElixir.Services.ImagekitService do
       multipart_data
     end
   end
+
+  defp extension_quota_exceeded?(body) when is_map(body) do
+    message = body["message"] || ""
+    String.contains?(String.downcase(message), "extensions") and
+      (String.contains?(String.downcase(message), "quota") or
+       String.contains?(String.downcase(message), "exceeded") or
+       String.contains?(String.downcase(message), "limit"))
+  end
+
+  defp extension_quota_exceeded?(_), do: false
 
   defp build_auth_headers do
     auth_token = Base.encode64("#{private_key()}:")
