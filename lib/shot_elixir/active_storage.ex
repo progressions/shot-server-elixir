@@ -229,7 +229,8 @@ defmodule ShotElixir.ActiveStorage do
           filename: Path.basename(upload_result.name),
           content_type: upload_result.metadata["fileType"] || "image/jpeg",
           byte_size: upload_result.size,
-          uploaded_by_id: uploaded_by_id
+          uploaded_by_id: uploaded_by_id,
+          ai_tags: upload_result.ai_tags || []
         }
 
         Media.create_image(media_attrs)

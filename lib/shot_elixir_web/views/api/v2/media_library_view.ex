@@ -22,10 +22,50 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryView do
     render_image_full(image)
   end
 
+  def render("search.json", %{images: images, meta: meta}) do
+    # Batch fetch all entity names to avoid N+1 queries
+    entity_names = batch_fetch_entity_names(images)
+
+    %{
+      images: Enum.map(images, fn image -> render_image_with_tags(image, entity_names) end),
+      meta: meta
+    }
+  end
+
   def render("error.json", %{changeset: changeset}) do
     %{
       success: false,
       errors: translate_errors(changeset)
+    }
+  end
+
+  # Render image with AI tags (for search results)
+  defp render_image_with_tags(%MediaImage{} = image, entity_names) do
+    entity_name =
+      if image.status == "attached" && image.entity_type && image.entity_id do
+        Map.get(entity_names, {image.entity_type, image.entity_id})
+      else
+        nil
+      end
+
+    %{
+      id: image.id,
+      campaign_id: image.campaign_id,
+      source: image.source,
+      entity_type: image.entity_type,
+      entity_id: image.entity_id,
+      entity_name: entity_name,
+      status: image.status,
+      imagekit_url: image.imagekit_url,
+      thumbnail_url: MediaImage.thumbnail_url(image),
+      filename: image.filename,
+      byte_size: image.byte_size,
+      width: image.width,
+      height: image.height,
+      ai_provider: image.ai_provider,
+      ai_tags: render_ai_tags(image.ai_tags),
+      inserted_at: image.inserted_at,
+      updated_at: image.updated_at
     }
   end
 
@@ -178,6 +218,18 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryView do
       Enum.reduce(opts, msg, fn {key, value}, acc ->
         String.replace(acc, "%{#{key}}", to_string(value))
       end)
+    end)
+  end
+
+  # Render AI tags for JSON response
+  defp render_ai_tags(nil), do: []
+  defp render_ai_tags(tags) when is_list(tags) do
+    Enum.map(tags, fn tag ->
+      %{
+        name: tag["name"] || tag[:name],
+        confidence: tag["confidence"] || tag[:confidence],
+        source: tag["source"] || tag[:source]
+      }
     end)
   end
 end

@@ -427,6 +427,7 @@ defmodule ShotElixir.Media do
           height: upload_result.height || image.height,
           prompt: image.prompt,
           ai_provider: image.ai_provider,
+          ai_tags: image.ai_tags || [],
           generated_by_id: image.generated_by_id,
           uploaded_by_id: image.uploaded_by_id
         }
@@ -548,5 +549,90 @@ defmodule ShotElixir.Media do
       where: i.entity_type == ^entity_type and i.entity_id == ^entity_id,
       update: [set: [status: "orphan", entity_type: nil, entity_id: nil]]
     )
+  end
+
+  @doc """
+  Searches images by AI-generated tags.
+
+  ## Parameters
+    - campaign_id: UUID of the campaign
+    - search_terms: List of tag names to search for (case-insensitive)
+    - params: Optional pagination params ("page", "per_page")
+
+  ## Returns
+    %{images: [%MediaImage{}], meta: %{...}}
+
+  ## Example
+      search_by_ai_tags(campaign_id, ["warrior", "cartoon"])
+  """
+  def search_by_ai_tags(campaign_id, search_terms, params \\ %{}) when is_list(search_terms) do
+    per_page = get_int_param(params, "per_page", 50)
+    page = get_int_param(params, "page", 1)
+    offset = (page - 1) * per_page
+
+    # Normalize search terms to lowercase
+    normalized_terms = Enum.map(search_terms, &String.downcase/1)
+
+    # Build query that matches any of the search terms in the ai_tags array
+    # Uses JSONB containment operator to check if any ai_tag name matches
+    query =
+      from i in MediaImage,
+        where: i.campaign_id == ^campaign_id,
+        where: fragment(
+          "EXISTS (SELECT 1 FROM jsonb_array_elements(?::jsonb) AS tag WHERE LOWER(tag->>'name') LIKE ANY(?))",
+          i.ai_tags,
+          ^Enum.map(normalized_terms, &"%#{&1}%")
+        ),
+        order_by: [desc: i.inserted_at]
+
+    total = Repo.aggregate(query, :count, :id)
+
+    images =
+      query
+      |> limit(^per_page)
+      |> offset(^offset)
+      |> Repo.all()
+
+    %{
+      images: images,
+      meta: %{
+        total_count: total,
+        page: page,
+        per_page: per_page,
+        total_pages: ceil(max(total, 1) / per_page),
+        search_terms: search_terms
+      }
+    }
+  end
+
+  @doc """
+  Gets all unique AI tag names for a campaign.
+  Useful for building tag autocomplete or tag clouds.
+
+  ## Returns
+    List of unique tag names sorted alphabetically
+  """
+  def list_ai_tags(campaign_id) do
+    query = """
+    SELECT DISTINCT LOWER(tag->>'name') as tag_name
+    FROM media_images, jsonb_array_elements(ai_tags::jsonb) AS tag
+    WHERE campaign_id = $1 AND ai_tags IS NOT NULL AND ai_tags != '[]'
+    ORDER BY tag_name
+    """
+
+    case Repo.query(query, [Ecto.UUID.dump!(campaign_id)]) do
+      {:ok, %{rows: rows}} -> Enum.map(rows, fn [name] -> name end)
+      {:error, _} -> []
+    end
+  end
+
+  @doc """
+  Updates the AI tags for an existing media image.
+  Used when fetching tags from ImageKit for existing images.
+  """
+  def update_ai_tags(%MediaImage{} = image, ai_tags) when is_list(ai_tags) do
+    image
+    |> MediaImage.changeset(%{ai_tags: ai_tags})
+    |> Repo.update()
   end
 end

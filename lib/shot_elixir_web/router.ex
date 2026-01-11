@@ -278,6 +278,8 @@ defmodule ShotElixirWeb.Router do
 
     # Media Library
     resources "/media_library", MediaLibraryController, only: [:index, :show, :delete]
+    get "/media_library/search", MediaLibraryController, :search
+    get "/media_library/ai_tags", MediaLibraryController, :ai_tags
     post "/media_library/bulk_delete", MediaLibraryController, :bulk_delete
     post "/media_library/:id/duplicate", MediaLibraryController, :duplicate
     post "/media_library/:id/attach", MediaLibraryController, :attach
