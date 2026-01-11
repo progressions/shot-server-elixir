@@ -313,14 +313,168 @@ defmodule ShotElixir.Factions do
 
     case result do
       {:ok, updated_faction} ->
+        # Sync relationships if *_ids are provided
+        if Map.has_key?(attrs, "character_ids") do
+          sync_faction_characters(updated_faction, attrs["character_ids"])
+        end
+
+        if Map.has_key?(attrs, "vehicle_ids") do
+          sync_faction_vehicles(updated_faction, attrs["vehicle_ids"])
+        end
+
+        if Map.has_key?(attrs, "site_ids") do
+          sync_faction_sites(updated_faction, attrs["site_ids"])
+        end
+
+        if Map.has_key?(attrs, "party_ids") do
+          sync_faction_parties(updated_faction, attrs["party_ids"])
+        end
+
+        if Map.has_key?(attrs, "juncture_ids") do
+          sync_faction_junctures(updated_faction, attrs["juncture_ids"])
+        end
+
         maybe_enqueue_notion_sync(updated_faction)
 
-      _ ->
-        :ok
+        updated_faction =
+          Repo.preload(updated_faction, [:characters, :vehicles, :sites, :parties, :junctures],
+            force: true
+          )
+
+        broadcast_change(updated_faction, :update)
+        {:ok, updated_faction}
+
+      error ->
+        broadcast_result(result, :update)
+        error
+    end
+  end
+
+  # Sync functions for faction relationships
+  defp sync_faction_characters(faction, character_ids) when is_list(character_ids) do
+    alias ShotElixir.Characters.Character
+
+    current_ids =
+      from(c in Character, where: c.faction_id == ^faction.id, select: c.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    new_ids = Enum.map(character_ids, &to_string/1)
+    to_add = new_ids -- current_ids
+    to_remove = current_ids -- new_ids
+
+    if Enum.any?(to_remove) do
+      from(c in Character, where: c.id in ^to_remove)
+      |> Repo.update_all(set: [faction_id: nil])
     end
 
-    broadcast_result(result, :update)
+    if Enum.any?(to_add) do
+      from(c in Character, where: c.id in ^to_add)
+      |> Repo.update_all(set: [faction_id: faction.id])
+    end
   end
+
+  defp sync_faction_characters(_, _), do: :ok
+
+  defp sync_faction_vehicles(faction, vehicle_ids) when is_list(vehicle_ids) do
+    alias ShotElixir.Vehicles.Vehicle
+
+    current_ids =
+      from(v in Vehicle, where: v.faction_id == ^faction.id, select: v.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    new_ids = Enum.map(vehicle_ids, &to_string/1)
+    to_add = new_ids -- current_ids
+    to_remove = current_ids -- new_ids
+
+    if Enum.any?(to_remove) do
+      from(v in Vehicle, where: v.id in ^to_remove)
+      |> Repo.update_all(set: [faction_id: nil])
+    end
+
+    if Enum.any?(to_add) do
+      from(v in Vehicle, where: v.id in ^to_add)
+      |> Repo.update_all(set: [faction_id: faction.id])
+    end
+  end
+
+  defp sync_faction_vehicles(_, _), do: :ok
+
+  defp sync_faction_sites(faction, site_ids) when is_list(site_ids) do
+    alias ShotElixir.Sites.Site
+
+    current_ids =
+      from(s in Site, where: s.faction_id == ^faction.id, select: s.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    new_ids = Enum.map(site_ids, &to_string/1)
+    to_add = new_ids -- current_ids
+    to_remove = current_ids -- new_ids
+
+    if Enum.any?(to_remove) do
+      from(s in Site, where: s.id in ^to_remove)
+      |> Repo.update_all(set: [faction_id: nil])
+    end
+
+    if Enum.any?(to_add) do
+      from(s in Site, where: s.id in ^to_add)
+      |> Repo.update_all(set: [faction_id: faction.id])
+    end
+  end
+
+  defp sync_faction_sites(_, _), do: :ok
+
+  defp sync_faction_parties(faction, party_ids) when is_list(party_ids) do
+    alias ShotElixir.Parties.Party
+
+    current_ids =
+      from(p in Party, where: p.faction_id == ^faction.id, select: p.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    new_ids = Enum.map(party_ids, &to_string/1)
+    to_add = new_ids -- current_ids
+    to_remove = current_ids -- new_ids
+
+    if Enum.any?(to_remove) do
+      from(p in Party, where: p.id in ^to_remove)
+      |> Repo.update_all(set: [faction_id: nil])
+    end
+
+    if Enum.any?(to_add) do
+      from(p in Party, where: p.id in ^to_add)
+      |> Repo.update_all(set: [faction_id: faction.id])
+    end
+  end
+
+  defp sync_faction_parties(_, _), do: :ok
+
+  defp sync_faction_junctures(faction, juncture_ids) when is_list(juncture_ids) do
+    alias ShotElixir.Junctures.Juncture
+
+    current_ids =
+      from(j in Juncture, where: j.faction_id == ^faction.id, select: j.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    new_ids = Enum.map(juncture_ids, &to_string/1)
+    to_add = new_ids -- current_ids
+    to_remove = current_ids -- new_ids
+
+    if Enum.any?(to_remove) do
+      from(j in Juncture, where: j.id in ^to_remove)
+      |> Repo.update_all(set: [faction_id: nil])
+    end
+
+    if Enum.any?(to_add) do
+      from(j in Juncture, where: j.id in ^to_add)
+      |> Repo.update_all(set: [faction_id: faction.id])
+    end
+  end
+
+  defp sync_faction_junctures(_, _), do: :ok
 
   def delete_faction(%Faction{} = faction) do
     alias Ecto.Multi

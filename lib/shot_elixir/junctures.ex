@@ -302,7 +302,12 @@ defmodule ShotElixir.Junctures do
     |> Repo.update()
     |> case do
       {:ok, juncture} ->
-        juncture = Repo.preload(juncture, :faction, force: true)
+        # Sync character junctures if character_ids is provided
+        if Map.has_key?(attrs, "character_ids") do
+          sync_character_junctures(juncture, attrs["character_ids"])
+        end
+
+        juncture = Repo.preload(juncture, [:faction, :characters], force: true)
         broadcast_change(juncture, :update)
         {:ok, juncture}
 
@@ -310,6 +315,41 @@ defmodule ShotElixir.Junctures do
         error
     end
   end
+
+  # Syncs juncture character assignments to match the provided character_ids list.
+  # Removes juncture from characters not in the list and adds juncture to new ones.
+  defp sync_character_junctures(juncture, character_ids) when is_list(character_ids) do
+    alias ShotElixir.Characters.Character
+
+    # Get current character_ids for this juncture
+    current_character_ids =
+      from(c in Character, where: c.juncture_id == ^juncture.id, select: c.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    # Normalize incoming character_ids to strings
+    new_character_ids = Enum.map(character_ids, &to_string/1)
+
+    # Find characters to add and remove
+    to_add = new_character_ids -- current_character_ids
+    to_remove = current_character_ids -- new_character_ids
+
+    # Remove juncture from characters that are no longer in the list
+    if Enum.any?(to_remove) do
+      from(c in Character, where: c.id in ^to_remove)
+      |> Repo.update_all(set: [juncture_id: nil])
+    end
+
+    # Add juncture to new characters
+    if Enum.any?(to_add) do
+      from(c in Character, where: c.id in ^to_add)
+      |> Repo.update_all(set: [juncture_id: juncture.id])
+    end
+
+    juncture
+  end
+
+  defp sync_character_junctures(juncture, _), do: juncture
 
   def delete_juncture(%Juncture{} = juncture) do
     juncture
