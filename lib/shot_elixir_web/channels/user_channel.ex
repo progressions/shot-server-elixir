@@ -36,4 +36,24 @@ defmodule ShotElixirWeb.UserChannel do
     push(socket, "message", payload)
     {:noreply, socket}
   end
+
+  # Handle notification created broadcasts from NotificationController
+  @impl true
+  def handle_info({:notification_created, notification}, socket) do
+    Logger.info("🔔 UserChannel: Pushing notification_created to client")
+    Logger.info("Notification: #{inspect(notification.id)} - #{notification.title}")
+
+    # Push notification event to client
+    push(socket, "notification_created", %{
+      notification: %{
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        created_at: notification.inserted_at
+      }
+    })
+
+    {:noreply, socket}
+  end
 end
