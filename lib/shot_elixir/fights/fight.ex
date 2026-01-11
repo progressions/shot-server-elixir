@@ -22,6 +22,7 @@ defmodule ShotElixir.Fights.Fight do
     field :action_id, Ecto.UUID
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
+    belongs_to :user, ShotElixir.Accounts.User
 
     has_many :shots, ShotElixir.Fights.Shot
     has_many :fight_events, ShotElixir.Fights.FightEvent
@@ -54,7 +55,8 @@ defmodule ShotElixir.Fights.Fight do
       :channel_id,
       :fight_message_id,
       :action_id,
-      :campaign_id
+      :campaign_id,
+      :user_id
     ])
     |> validate_required([:name, :campaign_id])
     |> validate_number(:sequence, greater_than_or_equal_to: 0)

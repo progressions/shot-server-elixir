@@ -1714,6 +1714,94 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
     end
   end
 
+  describe "user ownership" do
+    test "creates fight with user_id set to current user", %{conn: conn, gamemaster: gm} do
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights", fight: @create_attrs)
+      response = json_response(conn, 201)
+
+      assert response["user_id"] == gm.id
+    end
+
+    test "returns user_id in fight show response", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gm.id
+          })
+        )
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights/#{fight.id}")
+      response = json_response(conn, 200)
+
+      assert response["user_id"] == gm.id
+    end
+
+    test "returns user_id in fight index response", %{
+      conn: conn,
+      gamemaster: gm,
+      campaign: campaign
+    } do
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gm.id
+          })
+        )
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights")
+      response = json_response(conn, 200)
+
+      fight_response = Enum.find(response["fights"], fn f -> f["id"] == fight.id end)
+      assert fight_response["user_id"] == gm.id
+    end
+
+    test "allows updating user_id on fight", %{
+      conn: conn,
+      gamemaster: gm,
+      player: player,
+      campaign: campaign
+    } do
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gm.id
+          })
+        )
+
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: %{user_id: player.id})
+      response = json_response(conn, 200)
+
+      assert response["user_id"] == player.id
+    end
+
+    test "allows clearing user_id on fight", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, fight} =
+        Fights.create_fight(
+          Map.merge(@create_attrs, %{
+            campaign_id: campaign.id,
+            user_id: gm.id
+          })
+        )
+
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: %{user_id: nil})
+      response = json_response(conn, 200)
+
+      assert response["user_id"] == nil
+    end
+  end
+
   describe "add_party" do
     alias ShotElixir.Parties
     alias ShotElixir.Fights.Shot

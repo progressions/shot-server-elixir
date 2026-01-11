@@ -76,6 +76,7 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       season: fight.season,
       session: fight.session,
       campaign_id: fight.campaign_id,
+      user_id: fight.user_id,
       image_positions: []
     }
   end
