@@ -394,10 +394,11 @@ defmodule ShotElixir.Services.ImagekitService do
 
   defp extension_quota_exceeded?(body) when is_map(body) do
     message = body["message"] || ""
+
     String.contains?(String.downcase(message), "extensions") and
       (String.contains?(String.downcase(message), "quota") or
-       String.contains?(String.downcase(message), "exceeded") or
-       String.contains?(String.downcase(message), "limit"))
+         String.contains?(String.downcase(message), "exceeded") or
+         String.contains?(String.downcase(message), "limit"))
   end
 
   defp extension_quota_exceeded?(_), do: false
