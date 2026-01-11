@@ -77,6 +77,7 @@ defmodule ShotElixirWeb.Api.V2.FightController do
         params =
           parsed_params
           |> Map.put("campaign_id", campaign_id)
+          |> Map.put("user_id", current_user.id)
 
         case Fights.create_fight(params) do
           {:ok, fight} ->
