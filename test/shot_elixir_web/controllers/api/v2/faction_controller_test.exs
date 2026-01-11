@@ -265,13 +265,12 @@ defmodule ShotElixirWeb.Api.V2.FactionControllerTest do
       %{faction: faction}
     end
 
-    test "soft deletes faction (sets active to false)", %{conn: conn, faction: faction} do
+    test "hard deletes faction", %{conn: conn, faction: faction} do
       conn = delete(conn, ~p"/api/v2/factions/#{faction.id}")
       assert response(conn, 204)
 
-      # Verify faction still exists but is inactive
-      updated_faction = Factions.get_faction(faction.id)
-      assert updated_faction.active == false
+      # Verify faction is completely removed from database
+      assert Factions.get_faction(faction.id) == nil
     end
 
     test "returns 404 when faction not found", %{conn: conn} do

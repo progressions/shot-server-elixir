@@ -342,7 +342,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
       {:ok, vehicle: vehicle}
     end
 
-    test "soft deletes vehicle (sets active to false)", %{
+    test "hard deletes vehicle", %{
       conn: conn,
       gamemaster: gamemaster,
       vehicle: vehicle
@@ -354,9 +354,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerTest do
 
       assert response(conn, 204)
 
-      # Verify vehicle is soft deleted
-      updated_vehicle = Vehicles.get_vehicle(vehicle.id)
-      assert updated_vehicle.active == false
+      # Verify vehicle is completely removed from database
+      assert Vehicles.get_vehicle(vehicle.id) == nil
     end
 
     test "returns 404 for non-existent vehicle", %{conn: conn, gamemaster: gamemaster} do
