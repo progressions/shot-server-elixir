@@ -11,8 +11,8 @@ defmodule ShotElixir.Uploaders.ImageUploader do
   # Versions for image transformations
   # @versions [:original, :thumb, :medium]
   @extension_whitelist ~w(.jpg .jpeg .gif .png .webp .svg)
-  # 10MB in bytes
-  @max_file_size 10_485_760
+  # 50MB in bytes
+  @max_file_size 50_000_000
 
   # Override Arc's default __storage implementation
   def __storage, do: ShotElixir.Uploaders.ImageUploader
@@ -72,7 +72,10 @@ defmodule ShotElixir.Uploaders.ImageUploader do
     case ImagekitService.upload_file(path, %{
            file_name: file_name,
            folder: folder,
-           tags: tags
+           tags: tags,
+           auto_tag: true,
+           max_tags: 10,
+           min_confidence: 70
          }) do
       {:ok, response} ->
         # Return the ImageKit file name for Arc to store

@@ -45,6 +45,10 @@ defmodule ShotElixir.Media.MediaImage do
     field :prompt, :string
     field :ai_provider, :string
 
+    # AI-generated tags from ImageKit (Google Vision / AWS Rekognition)
+    # Format: [%{"name" => "warrior", "confidence" => 95.5, "source" => "google-auto-tagging"}, ...]
+    field :ai_tags, {:array, :map}, default: []
+
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :generated_by, ShotElixir.Accounts.User
     belongs_to :uploaded_by, ShotElixir.Accounts.User
@@ -72,6 +76,7 @@ defmodule ShotElixir.Media.MediaImage do
       :height,
       :prompt,
       :ai_provider,
+      :ai_tags,
       :generated_by_id,
       :uploaded_by_id
     ])
