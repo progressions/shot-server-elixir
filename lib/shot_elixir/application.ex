@@ -25,6 +25,8 @@ defmodule ShotElixir.Application do
         {Cachex, name: :image_cache},
         # Finch HTTP client for Swoosh email delivery
         {Finch, name: Swoosh.Finch},
+        # Solo play supervisor (Registry + DynamicSupervisor)
+        ShotElixir.Solo.Supervisor,
         # Start to serve requests, typically the last entry
         ShotElixirWeb.Endpoint
       ] ++ discord_children()
