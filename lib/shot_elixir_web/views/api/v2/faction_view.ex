@@ -38,6 +38,8 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       juncture_ids: get_juncture_ids(faction),
       junctures: render_junctures_if_loaded(faction),
       image_positions: render_image_positions_if_loaded(faction),
+      notion_page_id: faction.notion_page_id,
+      last_synced_to_notion_at: faction.last_synced_to_notion_at,
       entity_class: "Faction"
     }
   end

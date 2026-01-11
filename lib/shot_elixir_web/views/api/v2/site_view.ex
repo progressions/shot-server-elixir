@@ -36,6 +36,8 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       juncture: render_juncture_if_loaded(site),
       image_positions: render_image_positions_if_loaded(site),
       attunements: render_attunements_if_loaded(site),
+      notion_page_id: site.notion_page_id,
+      last_synced_to_notion_at: site.last_synced_to_notion_at,
       entity_class: "Site"
     }
   end

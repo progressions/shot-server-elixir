@@ -1,9 +1,12 @@
 defmodule ShotElixirWeb.Api.V2.PartyController do
   use ShotElixirWeb, :controller
 
+  require Logger
+
   alias ShotElixir.Parties
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Services.NotionService
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -806,6 +809,62 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
               conn
               |> put_status(:forbidden)
               |> json(%{error: "Only gamemaster can modify party composition"})
+            end
+        end
+    end
+  end
+
+  # POST /api/v2/parties/:party_id/sync
+  def sync(conn, %{"party_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Parties.get_party(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case NotionService.sync_party(party) do
+                {:ok, :unlinked} ->
+                  # Page was deleted in Notion, reload party to get cleared notion_page_id
+                  updated_party = Parties.get_party(id)
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: updated_party)
+
+                {:ok, updated_party} ->
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                  |> render("show.json", party: updated_party)
+
+                {:error, {:notion_api_error, code, message}} ->
+                  Logger.error("Notion API error syncing party: #{code} - #{message}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion: #{message}"})
+
+                {:error, reason} ->
+                  Logger.error("Failed to sync party to Notion: #{inspect(reason)}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can sync parties"})
             end
         end
     end

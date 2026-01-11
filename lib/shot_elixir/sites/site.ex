@@ -13,6 +13,8 @@ defmodule ShotElixir.Sites.Site do
     field :description, :string
     field :active, :boolean, default: true
     field :image_url, :string, virtual: true
+    field :notion_page_id, :string
+    field :last_synced_to_notion_at, :utc_datetime
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction
@@ -28,12 +30,32 @@ defmodule ShotElixir.Sites.Site do
 
   def changeset(site, attrs) do
     site
-    |> cast(attrs, [:name, :description, :active, :campaign_id, :faction_id, :juncture_id])
+    |> cast(attrs, [
+      :name,
+      :description,
+      :active,
+      :campaign_id,
+      :faction_id,
+      :juncture_id,
+      :notion_page_id,
+      :last_synced_to_notion_at
+    ])
     |> validate_required([:name, :campaign_id])
     |> validate_length(:name, min: 1, max: 255)
     |> foreign_key_constraint(:campaign_id)
     |> foreign_key_constraint(:faction_id)
     |> foreign_key_constraint(:juncture_id)
+    |> unique_constraint(:notion_page_id, name: :sites_notion_page_id_index)
+  end
+
+  @doc """
+  Convert site to Notion page properties format.
+  """
+  def as_notion(%__MODULE__{} = site) do
+    %{
+      "Name" => %{"title" => [%{"text" => %{"content" => site.name || ""}}]},
+      "Description" => %{"rich_text" => [%{"text" => %{"content" => site.description || ""}}]}
+    }
   end
 
   @doc """

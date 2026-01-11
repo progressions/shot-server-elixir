@@ -18,6 +18,8 @@ defmodule ShotElixir.Factions.Faction do
     field :description, :string
     field :active, :boolean, default: true
     field :image_url, :string, virtual: true
+    field :notion_page_id, :string
+    field :last_synced_to_notion_at, :utc_datetime
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
 
@@ -36,9 +38,28 @@ defmodule ShotElixir.Factions.Faction do
 
   def changeset(faction, attrs) do
     faction
-    |> cast(attrs, [:name, :description, :active, :campaign_id])
+    |> cast(attrs, [
+      :name,
+      :description,
+      :active,
+      :campaign_id,
+      :notion_page_id,
+      :last_synced_to_notion_at
+    ])
     |> validate_required([:name, :campaign_id])
     |> validate_length(:name, min: 1, max: 255)
+    |> unique_constraint(:notion_page_id, name: :factions_notion_page_id_index)
+  end
+
+  @doc """
+  Convert faction to Notion page properties format.
+  Note: Factions in Notion use rich_text for Name, not title.
+  """
+  def as_notion(%__MODULE__{} = faction) do
+    %{
+      "Name" => %{"rich_text" => [%{"text" => %{"content" => faction.name || ""}}]},
+      "Description" => %{"rich_text" => [%{"text" => %{"content" => faction.description || ""}}]}
+    }
   end
 
   @doc """

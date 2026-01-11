@@ -217,6 +217,7 @@ defmodule ShotElixirWeb.Router do
       post "/attune", SiteController, :attune
       delete "/attune/:character_id", SiteController, :unattune
       delete "/image", SiteController, :remove_image
+      post "/sync", SiteController, :sync
     end
 
     # Parties with membership
@@ -228,6 +229,7 @@ defmodule ShotElixirWeb.Router do
       post "/members", PartyController, :add_member
       delete "/members/:membership_id", PartyController, :remove_member
       delete "/image", PartyController, :remove_image
+      post "/sync", PartyController, :sync
 
       # Party composition / slot management
       post "/apply_template", PartyController, :apply_template
@@ -240,6 +242,7 @@ defmodule ShotElixirWeb.Router do
     resources "/factions", FactionController do
       post "/duplicate", FactionController, :duplicate
       delete "/image", FactionController, :remove_image
+      post "/sync", FactionController, :sync
     end
 
     resources "/invitations", InvitationController, except: [:show] do
