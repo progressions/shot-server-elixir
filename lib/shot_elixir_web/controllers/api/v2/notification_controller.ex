@@ -54,7 +54,8 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
   def create(conn, %{"notification" => params}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with :ok <- verify_gamemaster(current_user),
+    with :ok <- validate_title(params),
+         :ok <- verify_gamemaster(current_user),
          {:ok, campaign} <- get_current_campaign(current_user),
          {:ok, target_user} <- get_target_user(params),
          :ok <- verify_campaign_member(campaign.id, target_user.id) do
@@ -109,6 +110,11 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
         conn
         |> put_status(:forbidden)
         |> json(%{error: "Target user is not a member of your current campaign"})
+
+      {:error, :title_required} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Title is required"})
     end
   end
 
@@ -201,6 +207,12 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
     end
   end
 
+  defp validate_title(%{"title" => title}) when is_binary(title) and byte_size(title) > 0 do
+    :ok
+  end
+
+  defp validate_title(_params), do: {:error, :title_required}
+
   defp verify_gamemaster(user) do
     if user.gamemaster do
       :ok
@@ -239,10 +251,22 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
   defp get_target_user(_params), do: {:error, :user_not_found}
 
   defp verify_campaign_member(campaign_id, user_id) do
-    if Campaigns.is_campaign_member?(campaign_id, user_id) do
-      :ok
-    else
-      {:error, :not_campaign_member}
+    campaign = Campaigns.get_campaign(campaign_id)
+
+    cond do
+      is_nil(campaign) ->
+        {:error, :not_campaign_member}
+
+      # Campaign owner (GM) is always a valid target
+      campaign.user_id == user_id ->
+        :ok
+
+      # Check campaign membership table
+      Campaigns.is_campaign_member?(campaign_id, user_id) ->
+        :ok
+
+      true ->
+        {:error, :not_campaign_member}
     end
   end
 end
