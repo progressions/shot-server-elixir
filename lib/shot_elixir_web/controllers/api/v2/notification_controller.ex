@@ -8,6 +8,8 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
 
   alias ShotElixir.Notifications
   alias ShotElixir.Guardian
+  alias ShotElixir.Accounts
+  alias ShotElixir.Campaigns
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -40,6 +42,73 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
 
       notification ->
         render(conn, :show, notification: notification)
+    end
+  end
+
+  @doc """
+  POST /api/v2/notifications
+
+  Creates a notification for a campaign member.
+  Only gamemasters can create notifications, and only for members of their current campaign.
+  """
+  def create(conn, %{"notification" => params}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with :ok <- verify_gamemaster(current_user),
+         {:ok, campaign} <- get_current_campaign(current_user),
+         {:ok, target_user} <- get_target_user(params),
+         :ok <- verify_campaign_member(campaign.id, target_user.id) do
+      notification_params = %{
+        user_id: target_user.id,
+        type: params["type"] || "gm_announcement",
+        title: params["title"],
+        message: params["message"],
+        payload: %{
+          campaign_id: campaign.id,
+          campaign_name: campaign.name,
+          from_user_id: current_user.id
+        }
+      }
+
+      case Notifications.create_notification(notification_params) do
+        {:ok, notification} ->
+          # Broadcast for real-time badge update
+          Phoenix.PubSub.broadcast!(
+            ShotElixir.PubSub,
+            "user:#{target_user.id}",
+            {:notification_created, notification}
+          )
+
+          conn
+          |> put_status(:created)
+          |> render(:show, notification: notification)
+
+        {:error, changeset} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> put_view(ShotElixirWeb.ChangesetView)
+          |> render(:error, changeset: changeset)
+      end
+    else
+      {:error, :not_gamemaster} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemasters can send notifications"})
+
+      {:error, :no_current_campaign} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "No current campaign set. Use campaign set command first."})
+
+      {:error, :user_not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Target user not found"})
+
+      {:error, :not_campaign_member} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Target user is not a member of your current campaign"})
     end
   end
 
@@ -129,6 +198,51 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
       nil -> nil
       notification when notification.user_id == user_id -> notification
       _notification -> nil
+    end
+  end
+
+  defp verify_gamemaster(user) do
+    if user.gamemaster do
+      :ok
+    else
+      {:error, :not_gamemaster}
+    end
+  end
+
+  defp get_current_campaign(user) do
+    case user.current_campaign_id do
+      nil ->
+        {:error, :no_current_campaign}
+
+      campaign_id ->
+        case Campaigns.get_campaign(campaign_id) do
+          nil -> {:error, :no_current_campaign}
+          campaign -> {:ok, campaign}
+        end
+    end
+  end
+
+  defp get_target_user(%{"user_email" => email}) when is_binary(email) do
+    case Accounts.get_user_by_email(email) do
+      nil -> {:error, :user_not_found}
+      user -> {:ok, user}
+    end
+  end
+
+  defp get_target_user(%{"user_id" => user_id}) when is_binary(user_id) do
+    case Accounts.get_user(user_id) do
+      nil -> {:error, :user_not_found}
+      user -> {:ok, user}
+    end
+  end
+
+  defp get_target_user(_params), do: {:error, :user_not_found}
+
+  defp verify_campaign_member(campaign_id, user_id) do
+    if Campaigns.is_campaign_member?(campaign_id, user_id) do
+      :ok
+    else
+      {:error, :not_campaign_member}
     end
   end
 end
