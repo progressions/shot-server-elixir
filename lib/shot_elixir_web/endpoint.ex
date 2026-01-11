@@ -48,16 +48,19 @@ defmodule ShotElixirWeb.Endpoint do
   end
 
   # CORS configuration
-  # Localhost origins only in development
+  # Localhost origins only in development (includes worktree ports)
   @localhost_origins if(Mix.env() == :dev,
                        do: [
                          "http://localhost:3000",
                          "http://localhost:3001",
+                         # Worktree ports (3011, 3021, 3031, etc.)
                          "http://localhost:3011",
                          "http://localhost:3021",
                          "http://localhost:3031",
                          "http://localhost:3041",
-                         "http://localhost:3061"
+                         "http://localhost:3051",
+                         "http://localhost:3061",
+                         "http://localhost:3071"
                        ],
                        else: []
                      )
