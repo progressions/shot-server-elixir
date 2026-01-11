@@ -757,6 +757,8 @@ defmodule ShotElixir.Characters do
       |> Map.delete(:__meta__)
       |> Map.delete(:created_at)
       |> Map.delete(:updated_at)
+      |> Map.delete(:notion_page_id)
+      |> Map.delete(:last_synced_to_notion_at)
       |> Map.put(:name, unique_name)
       |> Map.put(:user_id, user.id)
       |> Map.put(:is_template, false)
