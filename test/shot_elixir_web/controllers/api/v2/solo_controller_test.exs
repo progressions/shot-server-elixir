@@ -180,10 +180,10 @@ defmodule ShotElixirWeb.Api.V2.SoloControllerTest do
       fake_id = Ecto.UUID.generate()
       conn = get(conn, ~p"/api/v2/fights/#{fake_id}/solo/status")
 
-      # Controller returns 422 with fight_not_found error for non-existent fights
-      response = json_response(conn, 422)
+      # Controller returns 404 with "Fight not found" error for non-existent fights
+      response = json_response(conn, 404)
       assert response["success"] == false
-      assert response["error"] =~ "fight_not_found"
+      assert response["error"] =~ "Fight not found"
     end
   end
 

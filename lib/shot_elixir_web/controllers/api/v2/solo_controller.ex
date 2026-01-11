@@ -338,7 +338,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
 
   defp get_fight(fight_id) do
     case Fights.get_fight(fight_id) do
-      nil -> {:error, :fight_not_found}
+      nil -> {:error, :not_found}
       fight -> {:ok, fight}
     end
   end
