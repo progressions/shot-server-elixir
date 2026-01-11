@@ -31,8 +31,13 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   defp format_error(:already_running), do: "Solo server is already running"
   defp format_error(:unknown_action_type), do: "Unknown action type"
   defp format_error(:shot_not_found), do: "Character not found in fight"
-  defp format_error(:forbidden_character), do: "Character is not a player character in this solo fight"
-  defp format_error(reason) when is_atom(reason), do: reason |> Atom.to_string() |> String.replace("_", " ")
+
+  defp format_error(:forbidden_character),
+    do: "Character is not a player character in this solo fight"
+
+  defp format_error(reason) when is_atom(reason),
+    do: reason |> Atom.to_string() |> String.replace("_", " ")
+
   defp format_error(_reason), do: "An unexpected error occurred"
 
   @doc """
