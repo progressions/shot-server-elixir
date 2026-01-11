@@ -8,6 +8,7 @@ defmodule ShotElixir.Parties do
   alias ShotElixir.Parties.{Party, Membership, PartyTemplate}
   alias ShotElixir.ImageLoader
   alias ShotElixir.Workers.ImageCopyWorker
+  alias ShotElixir.Workers.SyncPartyToNotionWorker
   use ShotElixir.Models.Broadcastable
 
   def list_parties(campaign_id) do
@@ -339,6 +340,7 @@ defmodule ShotElixir.Parties do
           )
 
         broadcast_change(party, :update)
+        maybe_enqueue_notion_sync(party)
         {:ok, party}
 
       error ->
@@ -815,5 +817,15 @@ defmodule ShotElixir.Parties do
       from(m in Membership, where: m.id == ^slot.id)
       |> Repo.update_all(set: [position: index])
     end)
+  end
+
+  defp maybe_enqueue_notion_sync(%Party{notion_page_id: nil}), do: :ok
+
+  defp maybe_enqueue_notion_sync(%Party{id: id, notion_page_id: _page_id}) do
+    %{party_id: id}
+    |> SyncPartyToNotionWorker.new()
+    |> Oban.insert()
+
+    :ok
   end
 end

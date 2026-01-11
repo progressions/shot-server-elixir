@@ -1,21 +1,21 @@
-defmodule ShotElixir.Workers.SyncCharacterToNotionWorker do
+defmodule ShotElixir.Workers.SyncPartyToNotionWorker do
   @moduledoc """
-  Background worker for syncing characters to Notion.
+  Background worker for syncing parties to Notion.
   Only runs in production environment.
   """
 
   use Oban.Worker, queue: :notion, max_attempts: 3, unique: [period: 60, fields: [:args]]
 
-  alias ShotElixir.Characters
+  alias ShotElixir.Parties
   alias ShotElixir.Services.NotionService
 
   @impl Oban.Worker
-  def perform(%Oban.Job{args: %{"character_id" => character_id}}) do
+  def perform(%Oban.Job{args: %{"party_id" => party_id}}) do
     # Only run in production to avoid unwanted API calls in test/dev
     if Application.get_env(:shot_elixir, :environment) == :prod do
-      character = Characters.get_character!(character_id)
+      party = Parties.get_party!(party_id)
 
-      case NotionService.sync_character(character) do
+      case NotionService.sync_party(party) do
         {:ok, _} -> :ok
         {:error, reason} -> {:error, reason}
       end

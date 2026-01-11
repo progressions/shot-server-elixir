@@ -8,6 +8,7 @@ defmodule ShotElixir.Sites do
   alias ShotElixir.Sites.{Site, Attunement}
   alias ShotElixir.ImageLoader
   alias ShotElixir.Workers.ImageCopyWorker
+  alias ShotElixir.Workers.SyncSiteToNotionWorker
   use ShotElixir.Models.Broadcastable
 
   def list_sites(campaign_id) do
@@ -307,6 +308,7 @@ defmodule ShotElixir.Sites do
       {:ok, site} ->
         site = Repo.preload(site, [:faction, :juncture], force: true)
         broadcast_change(site, :update)
+        maybe_enqueue_notion_sync(site)
         {:ok, site}
 
       error ->
@@ -519,5 +521,15 @@ defmodule ShotElixir.Sites do
       false -> new_name
       true -> find_next_available_name(base_name, campaign_id, counter + 1)
     end
+  end
+
+  defp maybe_enqueue_notion_sync(%Site{notion_page_id: nil}), do: :ok
+
+  defp maybe_enqueue_notion_sync(%Site{id: id, notion_page_id: _page_id}) do
+    %{site_id: id}
+    |> SyncSiteToNotionWorker.new()
+    |> Oban.insert()
+
+    :ok
   end
 end
