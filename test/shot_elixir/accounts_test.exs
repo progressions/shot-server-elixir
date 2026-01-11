@@ -588,6 +588,135 @@ defmodule ShotElixir.AccountsTest do
     end
   end
 
+  describe "update_user/2 character_ids sync" do
+    alias ShotElixir.Campaigns.Campaign
+    alias ShotElixir.Characters
+
+    # Use setup to create user/campaign directly to avoid Oban async issues
+    setup do
+      # Insert user directly to bypass Oban jobs triggered by create_user
+      {:ok, user} =
+        %User{}
+        |> User.registration_changeset(%{
+          email: "char_sync_test@example.com",
+          password: "password123",
+          first_name: "Char",
+          last_name: "Sync"
+        })
+        |> ShotElixir.Repo.insert()
+
+      {:ok, campaign} =
+        %Campaign{}
+        |> Ecto.Changeset.change(%{name: "Char Sync Test Campaign", user_id: user.id})
+        |> ShotElixir.Repo.insert()
+
+      {:ok, user: user, campaign: campaign}
+    end
+
+    test "removes characters when character_ids is updated without them", %{
+      user: user,
+      campaign: campaign
+    } do
+      {:ok, character1} =
+        Characters.create_character(%{
+          name: "Character 1",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, character2} =
+        Characters.create_character(%{
+          name: "Character 2",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      # Update user with only character1 (removing character2)
+      {:ok, _updated_user} =
+        Accounts.update_user(user, %{
+          "character_ids" => [character1.id]
+        })
+
+      updated_char1 = ShotElixir.Repo.get(ShotElixir.Characters.Character, character1.id)
+      updated_char2 = ShotElixir.Repo.get(ShotElixir.Characters.Character, character2.id)
+
+      assert updated_char1.user_id == user.id
+      assert updated_char2.user_id == nil
+    end
+
+    test "removes all characters when character_ids is empty list", %{
+      user: user,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Character to Remove",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      # Update user with empty character_ids
+      {:ok, _updated_user} =
+        Accounts.update_user(user, %{
+          "character_ids" => []
+        })
+
+      updated_char = ShotElixir.Repo.get(ShotElixir.Characters.Character, character.id)
+      assert updated_char.user_id == nil
+    end
+
+    test "does not affect characters when character_ids is not provided", %{
+      user: user,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Stable Character",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      # Update user without character_ids (just changing name)
+      {:ok, _updated_user} =
+        Accounts.update_user(user, %{
+          "first_name" => "NewName"
+        })
+
+      updated_char = ShotElixir.Repo.get(ShotElixir.Characters.Character, character.id)
+      assert updated_char.user_id == user.id
+    end
+
+    test "adds new characters when character_ids includes new ones", %{
+      user: user,
+      campaign: campaign
+    } do
+      {:ok, character1} =
+        Characters.create_character(%{
+          name: "Existing Character",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, character2} =
+        Characters.create_character(%{
+          name: "New Character",
+          campaign_id: campaign.id
+        })
+
+      # Update user with both characters (adding character2)
+      {:ok, _updated_user} =
+        Accounts.update_user(user, %{
+          "character_ids" => [character1.id, character2.id]
+        })
+
+      updated_char1 = ShotElixir.Repo.get(ShotElixir.Characters.Character, character1.id)
+      updated_char2 = ShotElixir.Repo.get(ShotElixir.Characters.Character, character2.id)
+
+      assert updated_char1.user_id == user.id
+      assert updated_char2.user_id == user.id
+    end
+  end
+
   describe "cli_authorization_codes" do
     @valid_user_attrs %{
       email: "cli-auth-context-test@example.com",

@@ -40,9 +40,13 @@ defmodule ShotElixir.Services.ImagekitService do
 
   @doc """
   Uploads a Plug.Upload struct to ImageKit.
+
+  Auto-tagging via Google Vision is enabled by default for all uploads.
+  Override with `auto_tag: false` if needed.
   """
   def upload_plug(%Plug.Upload{path: path} = upload, options \\ %{}) do
-    options = Map.put(options, :file_name, upload.filename)
+    default_options = %{auto_tag: true, max_tags: 10, min_confidence: 70}
+    options = Map.merge(default_options, Map.put(options, :file_name, upload.filename))
     upload_file(path, options)
   end
 
