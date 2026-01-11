@@ -1535,267 +1535,60 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # =============================================================================
-  # Site Sync Functions
+  # Site, Party, Faction Sync Functions
   # =============================================================================
+  # These use generic helpers to reduce code duplication
 
   @doc """
   Sync a site to Notion. Creates a new page if no notion_page_id exists,
   otherwise updates the existing page.
   """
   def sync_site(%Site{} = site) do
-    result =
-      if site.notion_page_id do
-        update_notion_from_site(site)
-      else
-        create_notion_from_site(site)
-      end
-
-    case result do
-      {:ok, :unlinked} ->
-        {:ok, :unlinked}
-
-      {:ok, _} ->
-        Sites.update_site(site, %{last_synced_to_notion_at: DateTime.utc_now()})
-
-      {:error, reason} ->
-        Logger.error("Failed to sync site to Notion: #{inspect(reason)}")
-        {:error, reason}
-    end
-  rescue
-    error ->
-      Logger.error("Exception syncing site to Notion: #{Exception.message(error)}")
-      {:error, error}
+    sync_entity(site, %{
+      entity_type: "site",
+      database_id: sites_database_id(),
+      update_fn: &Sites.update_site/2,
+      as_notion_fn: &Site.as_notion/1
+    })
   end
-
-  @doc """
-  Create a new Notion page from site data.
-  """
-  def create_notion_from_site(%Site{} = site) do
-    properties = Site.as_notion(site)
-
-    payload = %{
-      "parent" => %{"database_id" => sites_database_id()},
-      "properties" => properties
-    }
-
-    page = NotionClient.create_page(payload)
-
-    case page do
-      %{"id" => page_id} when is_binary(page_id) ->
-        case Sites.update_site(site, %{notion_page_id: page_id}) do
-          {:ok, updated_site} ->
-            Logger.info("Created Notion page for site #{updated_site.id}: #{page_id}")
-            {:ok, page}
-
-          {:error, changeset} ->
-            Logger.error("Failed to update site with notion_page_id")
-            {:error, changeset}
-        end
-
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error creating site: #{error_code} - #{message}")
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        Logger.error("Unexpected response from Notion API when creating site")
-        {:error, :unexpected_notion_response}
-    end
-  rescue
-    error ->
-      Logger.error("Failed to create Notion page for site: #{Exception.message(error)}")
-      {:error, :notion_request_failed}
-  end
-
-  @doc """
-  Update existing Notion page with site data.
-  """
-  def update_notion_from_site(%Site{notion_page_id: nil}), do: {:error, :no_page_id}
-
-  def update_notion_from_site(%Site{} = site) do
-    properties = Site.as_notion(site)
-    response = NotionClient.update_page(site.notion_page_id, properties)
-
-    case response do
-      %{"code" => "validation_error", "message" => message}
-      when is_binary(message) ->
-        if String.contains?(String.downcase(message), "archived") do
-          handle_archived_site(site, message)
-        else
-          Logger.error("Notion API validation error on site update: #{message}")
-          {:error, {:notion_api_error, "validation_error", message}}
-        end
-
-      %{"code" => "object_not_found", "message" => message} ->
-        handle_archived_site(site, message)
-
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error on site update: #{error_code}")
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        {:ok, response}
-    end
-  rescue
-    error ->
-      Logger.error("Failed to update Notion page for site: #{Exception.message(error)}")
-      {:error, error}
-  end
-
-  defp handle_archived_site(%Site{} = site, _message) do
-    Logger.warning(
-      "Notion page #{site.notion_page_id} for site #{site.id} " <>
-        "has been archived/deleted. Unlinking from site."
-    )
-
-    case Sites.update_site(site, %{notion_page_id: nil}) do
-      {:ok, _} ->
-        Logger.info("Successfully unlinked Notion page from site #{site.id}")
-        {:ok, :unlinked}
-
-      {:error, changeset} ->
-        Logger.error("Failed to unlink Notion page from site: #{inspect(changeset)}")
-        {:error, {:unlink_failed, changeset}}
-    end
-  end
-
-  # =============================================================================
-  # Party Sync Functions
-  # =============================================================================
 
   @doc """
   Sync a party to Notion. Creates a new page if no notion_page_id exists,
   otherwise updates the existing page.
   """
   def sync_party(%Party{} = party) do
-    result =
-      if party.notion_page_id do
-        update_notion_from_party(party)
-      else
-        create_notion_from_party(party)
-      end
-
-    case result do
-      {:ok, :unlinked} ->
-        {:ok, :unlinked}
-
-      {:ok, _} ->
-        Parties.update_party(party, %{last_synced_to_notion_at: DateTime.utc_now()})
-
-      {:error, reason} ->
-        Logger.error("Failed to sync party to Notion: #{inspect(reason)}")
-        {:error, reason}
-    end
-  rescue
-    error ->
-      Logger.error("Exception syncing party to Notion: #{Exception.message(error)}")
-      {:error, error}
+    sync_entity(party, %{
+      entity_type: "party",
+      database_id: parties_database_id(),
+      update_fn: &Parties.update_party/2,
+      as_notion_fn: &Party.as_notion/1
+    })
   end
-
-  @doc """
-  Create a new Notion page from party data.
-  """
-  def create_notion_from_party(%Party{} = party) do
-    properties = Party.as_notion(party)
-
-    payload = %{
-      "parent" => %{"database_id" => parties_database_id()},
-      "properties" => properties
-    }
-
-    page = NotionClient.create_page(payload)
-
-    case page do
-      %{"id" => page_id} when is_binary(page_id) ->
-        case Parties.update_party(party, %{notion_page_id: page_id}) do
-          {:ok, updated_party} ->
-            Logger.info("Created Notion page for party #{updated_party.id}: #{page_id}")
-            {:ok, page}
-
-          {:error, changeset} ->
-            Logger.error("Failed to update party with notion_page_id")
-            {:error, changeset}
-        end
-
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error creating party: #{error_code} - #{message}")
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        Logger.error("Unexpected response from Notion API when creating party")
-        {:error, :unexpected_notion_response}
-    end
-  rescue
-    error ->
-      Logger.error("Failed to create Notion page for party: #{Exception.message(error)}")
-      {:error, :notion_request_failed}
-  end
-
-  @doc """
-  Update existing Notion page with party data.
-  """
-  def update_notion_from_party(%Party{notion_page_id: nil}), do: {:error, :no_page_id}
-
-  def update_notion_from_party(%Party{} = party) do
-    properties = Party.as_notion(party)
-    response = NotionClient.update_page(party.notion_page_id, properties)
-
-    case response do
-      %{"code" => "validation_error", "message" => message}
-      when is_binary(message) ->
-        if String.contains?(String.downcase(message), "archived") do
-          handle_archived_party(party, message)
-        else
-          Logger.error("Notion API validation error on party update: #{message}")
-          {:error, {:notion_api_error, "validation_error", message}}
-        end
-
-      %{"code" => "object_not_found", "message" => message} ->
-        handle_archived_party(party, message)
-
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error on party update: #{error_code}")
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        {:ok, response}
-    end
-  rescue
-    error ->
-      Logger.error("Failed to update Notion page for party: #{Exception.message(error)}")
-      {:error, error}
-  end
-
-  defp handle_archived_party(%Party{} = party, _message) do
-    Logger.warning(
-      "Notion page #{party.notion_page_id} for party #{party.id} " <>
-        "has been archived/deleted. Unlinking from party."
-    )
-
-    case Parties.update_party(party, %{notion_page_id: nil}) do
-      {:ok, _} ->
-        Logger.info("Successfully unlinked Notion page from party #{party.id}")
-        {:ok, :unlinked}
-
-      {:error, changeset} ->
-        Logger.error("Failed to unlink Notion page from party: #{inspect(changeset)}")
-        {:error, {:unlink_failed, changeset}}
-    end
-  end
-
-  # =============================================================================
-  # Faction Sync Functions
-  # =============================================================================
 
   @doc """
   Sync a faction to Notion. Creates a new page if no notion_page_id exists,
   otherwise updates the existing page.
   """
   def sync_faction(%Faction{} = faction) do
+    sync_entity(faction, %{
+      entity_type: "faction",
+      database_id: factions_database_id(),
+      update_fn: &Factions.update_faction/2,
+      as_notion_fn: &Faction.as_notion/1
+    })
+  end
+
+  # =============================================================================
+  # Generic Entity Sync Helpers
+  # =============================================================================
+
+  # Generic sync function for any entity type (site, party, faction)
+  defp sync_entity(entity, %{entity_type: entity_type} = opts) do
     result =
-      if faction.notion_page_id do
-        update_notion_from_faction(faction)
+      if entity.notion_page_id do
+        update_notion_page(entity, opts)
       else
-        create_notion_from_faction(faction)
+        create_notion_page(entity, opts)
       end
 
     case result do
@@ -1803,26 +1596,24 @@ defmodule ShotElixir.Services.NotionService do
         {:ok, :unlinked}
 
       {:ok, _} ->
-        Factions.update_faction(faction, %{last_synced_to_notion_at: DateTime.utc_now()})
+        opts.update_fn.(entity, %{last_synced_to_notion_at: DateTime.utc_now()})
 
       {:error, reason} ->
-        Logger.error("Failed to sync faction to Notion: #{inspect(reason)}")
+        Logger.error("Failed to sync #{entity_type} to Notion: #{inspect(reason)}")
         {:error, reason}
     end
   rescue
     error ->
-      Logger.error("Exception syncing faction to Notion: #{Exception.message(error)}")
+      Logger.error("Exception syncing #{entity_type} to Notion: #{Exception.message(error)}")
       {:error, error}
   end
 
-  @doc """
-  Create a new Notion page from faction data.
-  """
-  def create_notion_from_faction(%Faction{} = faction) do
-    properties = Faction.as_notion(faction)
+  # Generic create function for any entity type
+  defp create_notion_page(entity, %{entity_type: entity_type} = opts) do
+    properties = opts.as_notion_fn.(entity)
 
     payload = %{
-      "parent" => %{"database_id" => factions_database_id()},
+      "parent" => %{"database_id" => opts.database_id},
       "properties" => properties
     }
 
@@ -1830,54 +1621,52 @@ defmodule ShotElixir.Services.NotionService do
 
     case page do
       %{"id" => page_id} when is_binary(page_id) ->
-        case Factions.update_faction(faction, %{notion_page_id: page_id}) do
-          {:ok, updated_faction} ->
-            Logger.info("Created Notion page for faction #{updated_faction.id}: #{page_id}")
+        case opts.update_fn.(entity, %{notion_page_id: page_id}) do
+          {:ok, updated_entity} ->
+            Logger.info("Created Notion page for #{entity_type} #{updated_entity.id}: #{page_id}")
             {:ok, page}
 
           {:error, changeset} ->
-            Logger.error("Failed to update faction with notion_page_id")
+            Logger.error("Failed to update #{entity_type} with notion_page_id")
             {:error, changeset}
         end
 
       %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error creating faction: #{error_code} - #{message}")
+        Logger.error("Notion API error creating #{entity_type}: #{error_code} - #{message}")
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
-        Logger.error("Unexpected response from Notion API when creating faction")
+        Logger.error("Unexpected response from Notion API when creating #{entity_type}")
         {:error, :unexpected_notion_response}
     end
   rescue
     error ->
-      Logger.error("Failed to create Notion page for faction: #{Exception.message(error)}")
+      Logger.error("Failed to create Notion page for #{entity_type}: #{Exception.message(error)}")
       {:error, :notion_request_failed}
   end
 
-  @doc """
-  Update existing Notion page with faction data.
-  """
-  def update_notion_from_faction(%Faction{notion_page_id: nil}), do: {:error, :no_page_id}
+  # Generic update function for any entity type
+  defp update_notion_page(%{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
 
-  def update_notion_from_faction(%Faction{} = faction) do
-    properties = Faction.as_notion(faction)
-    response = NotionClient.update_page(faction.notion_page_id, properties)
+  defp update_notion_page(entity, %{entity_type: entity_type} = opts) do
+    properties = opts.as_notion_fn.(entity)
+    response = NotionClient.update_page(entity.notion_page_id, properties)
 
     case response do
       %{"code" => "validation_error", "message" => message}
       when is_binary(message) ->
         if String.contains?(String.downcase(message), "archived") do
-          handle_archived_faction(faction, message)
+          handle_archived_entity(entity, opts)
         else
-          Logger.error("Notion API validation error on faction update: #{message}")
+          Logger.error("Notion API validation error on #{entity_type} update: #{message}")
           {:error, {:notion_api_error, "validation_error", message}}
         end
 
-      %{"code" => "object_not_found", "message" => message} ->
-        handle_archived_faction(faction, message)
+      %{"code" => "object_not_found", "message" => _message} ->
+        handle_archived_entity(entity, opts)
 
       %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error on faction update: #{error_code}")
+        Logger.error("Notion API error on #{entity_type} update: #{error_code}")
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
@@ -1885,23 +1674,27 @@ defmodule ShotElixir.Services.NotionService do
     end
   rescue
     error ->
-      Logger.error("Failed to update Notion page for faction: #{Exception.message(error)}")
+      Logger.error("Failed to update Notion page for #{entity_type}: #{Exception.message(error)}")
+
       {:error, error}
   end
 
-  defp handle_archived_faction(%Faction{} = faction, _message) do
+  # Generic handler for archived/deleted Notion pages
+  defp handle_archived_entity(entity, opts) do
+    entity_type = opts.entity_type
+
     Logger.warning(
-      "Notion page #{faction.notion_page_id} for faction #{faction.id} " <>
-        "has been archived/deleted. Unlinking from faction."
+      "Notion page #{entity.notion_page_id} for #{entity_type} #{entity.id} " <>
+        "has been archived/deleted. Unlinking from #{entity_type}."
     )
 
-    case Factions.update_faction(faction, %{notion_page_id: nil}) do
+    case opts.update_fn.(entity, %{notion_page_id: nil}) do
       {:ok, _} ->
-        Logger.info("Successfully unlinked Notion page from faction #{faction.id}")
+        Logger.info("Successfully unlinked Notion page from #{entity_type} #{entity.id}")
         {:ok, :unlinked}
 
       {:error, changeset} ->
-        Logger.error("Failed to unlink Notion page from faction: #{inspect(changeset)}")
+        Logger.error("Failed to unlink Notion page from #{entity_type}: #{inspect(changeset)}")
         {:error, {:unlink_failed, changeset}}
     end
   end
