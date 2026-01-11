@@ -190,7 +190,8 @@ defmodule ShotElixir.Services.AiCreditNotificationService do
            user_id: user_id,
            type: "ai_credits_exhausted",
            title: "AI Credits Exhausted",
-           message: "Your #{provider_name} API credits have been exhausted for campaign \"#{campaign.name}\".",
+           message:
+             "Your #{provider_name} API credits have been exhausted for campaign \"#{campaign.name}\".",
            payload: %{
              provider: provider,
              campaign_id: campaign.id,
