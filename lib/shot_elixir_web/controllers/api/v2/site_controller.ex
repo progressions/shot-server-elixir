@@ -552,7 +552,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
             else
               conn
               |> put_status(:forbidden)
-              |> json(%{error: "Only gamemaster can sync sites"})
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync sites"})
             end
         end
     end

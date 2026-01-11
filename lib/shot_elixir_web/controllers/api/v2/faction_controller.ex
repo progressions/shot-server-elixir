@@ -469,7 +469,7 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
             else
               conn
               |> put_status(:forbidden)
-              |> json(%{error: "Only gamemaster can sync factions"})
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync factions"})
             end
         end
     end

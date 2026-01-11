@@ -864,7 +864,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
             else
               conn
               |> put_status(:forbidden)
-              |> json(%{error: "Only gamemaster can sync parties"})
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync parties"})
             end
         end
     end
