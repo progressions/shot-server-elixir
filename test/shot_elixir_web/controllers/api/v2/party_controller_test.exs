@@ -249,12 +249,12 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
       %{party: party}
     end
 
-    test "soft deletes the party", %{conn: conn, party: party} do
+    test "hard deletes the party", %{conn: conn, party: party} do
       conn = delete(conn, ~p"/api/v2/parties/#{party.id}")
       assert response(conn, 204)
 
-      updated_party = Parties.get_party(party.id)
-      assert updated_party.active == false
+      # Party should be completely removed from database
+      assert Parties.get_party(party.id) == nil
     end
 
     test "returns 404 when party not found", %{conn: conn} do

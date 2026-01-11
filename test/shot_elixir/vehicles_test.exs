@@ -4,6 +4,8 @@ defmodule ShotElixir.VehiclesTest do
   alias ShotElixir.Vehicles
   alias ShotElixir.Factions
   alias ShotElixir.Campaigns
+  alias ShotElixir.Media
+  alias ShotElixir.Repo
 
   # Helper to convert binary UUID to string for comparison
   defp uuid_to_string(uuid) when is_binary(uuid) and byte_size(uuid) == 16 do
@@ -353,6 +355,111 @@ defmodule ShotElixir.VehiclesTest do
       # Faction should appear in factions array (it has at least one active vehicle)
       faction_ids = Enum.map(result.factions, &uuid_to_string(&1.id))
       assert faction.id in faction_ids
+    end
+  end
+
+  describe "delete_vehicle/1" do
+    test "hard deletes the vehicle from the database", %{campaign: campaign, user: user} do
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle to Delete",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "Car"}
+        })
+
+      assert {:ok, _} = Vehicles.delete_vehicle(vehicle)
+
+      # Vehicle should be completely gone from the database
+      assert Repo.get(ShotElixir.Vehicles.Vehicle, vehicle.id) == nil
+    end
+
+    test "orphans associated images when vehicle is deleted", %{campaign: campaign, user: user} do
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle with Image",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "Car"}
+        })
+
+      # Create an attached image for the vehicle
+      {:ok, image} =
+        Media.create_image(%{
+          campaign_id: campaign.id,
+          source: "upload",
+          status: "attached",
+          entity_type: "Vehicle",
+          entity_id: vehicle.id,
+          imagekit_file_id: "vehicle_delete_test",
+          imagekit_url: "https://example.com/vehicle.jpg",
+          uploaded_by_id: user.id
+        })
+
+      assert {:ok, _} = Vehicles.delete_vehicle(vehicle)
+
+      # Image should be orphaned, not deleted
+      updated_image = Media.get_image!(image.id)
+      assert updated_image.status == "orphan"
+      assert updated_image.entity_type == nil
+      assert updated_image.entity_id == nil
+    end
+
+    test "deletes related shots when vehicle is deleted", %{campaign: campaign, user: user} do
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle with Shot",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "Car"}
+        })
+
+      {:ok, fight} =
+        ShotElixir.Fights.create_fight(%{
+          name: "Test Fight",
+          campaign_id: campaign.id
+        })
+
+      # Create a shot for the vehicle
+      {:ok, shot} =
+        Repo.insert(%ShotElixir.Fights.Shot{
+          fight_id: fight.id,
+          vehicle_id: vehicle.id,
+          shot: 10
+        })
+
+      assert {:ok, _} = Vehicles.delete_vehicle(vehicle)
+
+      # Shot should be deleted
+      assert Repo.get(ShotElixir.Fights.Shot, shot.id) == nil
+    end
+
+    test "deletes party memberships when vehicle is deleted", %{campaign: campaign, user: user} do
+      {:ok, vehicle} =
+        Vehicles.create_vehicle(%{
+          name: "Vehicle in Party",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "Car"}
+        })
+
+      {:ok, party} =
+        ShotElixir.Parties.create_party(%{
+          name: "Test Party",
+          campaign_id: campaign.id
+        })
+
+      # Create a party membership for the vehicle
+      {:ok, membership} =
+        Repo.insert(%ShotElixir.Parties.Membership{
+          party_id: party.id,
+          vehicle_id: vehicle.id
+        })
+
+      assert {:ok, _} = Vehicles.delete_vehicle(vehicle)
+
+      # Membership should be deleted
+      assert Repo.get(ShotElixir.Parties.Membership, membership.id) == nil
     end
   end
 end

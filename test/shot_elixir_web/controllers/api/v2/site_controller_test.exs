@@ -238,12 +238,12 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
       %{site: site}
     end
 
-    test "soft deletes the site", %{conn: conn, site: site} do
+    test "hard deletes the site", %{conn: conn, site: site} do
       conn = delete(conn, ~p"/api/v2/sites/#{site.id}")
       assert response(conn, 204)
 
-      updated_site = Sites.get_site(site.id)
-      assert updated_site.active == false
+      # Site should be completely removed from database
+      assert Sites.get_site(site.id) == nil
     end
 
     test "returns 404 when site not found", %{conn: conn} do
