@@ -4,7 +4,7 @@ defmodule ShotElixir.Workers.SyncCharacterToNotionWorker do
   Only runs in production environment.
   """
 
-  use Oban.Worker, queue: :notion, max_attempts: 3
+  use Oban.Worker, queue: :notion, max_attempts: 3, unique: [period: 60, fields: [:args]]
 
   alias ShotElixir.Characters
   alias ShotElixir.Services.NotionService
