@@ -123,10 +123,32 @@ defmodule ShotElixir.Weapons do
   end
 
   def delete_weapon(%Weapon{} = weapon) do
-    weapon
-    |> Ecto.Changeset.change(active: false)
-    |> Repo.update()
-    |> broadcast_result(:delete)
+    alias Ecto.Multi
+    alias ShotElixir.Weapons.Carry
+    alias ShotElixir.Media
+
+    Multi.new()
+    # Delete related records first
+    |> Multi.delete_all(
+      :delete_carries,
+      from(c in Carry, where: c.weapon_id == ^weapon.id)
+    )
+    # Orphan associated images instead of deleting them
+    |> Multi.update_all(
+      :orphan_images,
+      Media.orphan_images_query("Weapon", weapon.id),
+      []
+    )
+    |> Multi.delete(:weapon, weapon)
+    |> Multi.run(:broadcast, fn _repo, %{weapon: deleted_weapon} ->
+      broadcast_change(deleted_weapon, :delete)
+      {:ok, deleted_weapon}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{weapon: weapon}} -> {:ok, weapon}
+      {:error, :weapon, changeset, _} -> {:error, changeset}
+    end
   end
 
   def weapon_categories do

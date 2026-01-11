@@ -687,6 +687,7 @@ defmodule ShotElixir.Characters do
     alias ShotElixir.Schticks.CharacterSchtick
     alias ShotElixir.Parties.Membership
     alias ShotElixir.ImagePositions.ImagePosition
+    alias ShotElixir.Media
 
     # Preload associations for broadcasting before deletion
     character_with_associations =
@@ -727,6 +728,12 @@ defmodule ShotElixir.Characters do
       from(ip in ImagePosition,
         where: ip.positionable_id == ^character.id and ip.positionable_type == "Character"
       )
+    )
+    # Orphan associated images instead of deleting them
+    |> Multi.update_all(
+      :orphan_images,
+      Media.orphan_images_query("Character", character.id),
+      []
     )
     |> Multi.delete(:character, character)
     |> Multi.run(:broadcast, fn _repo, %{character: deleted_character} ->

@@ -360,30 +360,43 @@ defmodule ShotElixir.Schticks do
   end
 
   def delete_schtick(%Schtick{} = schtick) do
+    alias Ecto.Multi
+    alias ShotElixir.Schticks.CharacterSchtick
+    alias ShotElixir.Media
+
     # Check if any schticks depend on this one as a prerequisite
     dependent_count =
       from(s in Schtick,
-        where: s.prerequisite_id == ^schtick.id and s.active == true,
+        where: s.prerequisite_id == ^schtick.id,
         select: count(s.id)
       )
       |> Repo.one()
 
-    cond do
-      dependent_count > 0 ->
-        {:error, :has_dependents}
-
-      true ->
-        schtick
-        |> Ecto.Changeset.change(active: false)
-        |> Repo.update()
-        |> case do
-          {:ok, schtick} = result ->
-            broadcast_change(schtick, :delete)
-            result
-
-          error ->
-            error
-        end
+    if dependent_count > 0 do
+      {:error, :has_dependents}
+    else
+      Multi.new()
+      # Delete related records first
+      |> Multi.delete_all(
+        :delete_character_schticks,
+        from(cs in CharacterSchtick, where: cs.schtick_id == ^schtick.id)
+      )
+      # Orphan associated images instead of deleting them
+      |> Multi.update_all(
+        :orphan_images,
+        Media.orphan_images_query("Schtick", schtick.id),
+        []
+      )
+      |> Multi.delete(:schtick, schtick)
+      |> Multi.run(:broadcast, fn _repo, %{schtick: deleted_schtick} ->
+        broadcast_change(deleted_schtick, :delete)
+        {:ok, deleted_schtick}
+      end)
+      |> Repo.transaction()
+      |> case do
+        {:ok, %{schtick: schtick}} -> {:ok, schtick}
+        {:error, :schtick, changeset, _} -> {:error, changeset}
+      end
     end
   end
 

@@ -448,10 +448,48 @@ defmodule ShotElixir.Vehicles do
   end
 
   def delete_vehicle(%Vehicle{} = vehicle) do
-    vehicle
-    |> Ecto.Changeset.change(active: false)
-    |> Repo.update()
-    |> broadcast_result(:delete)
+    alias Ecto.Multi
+    alias ShotElixir.Fights.Shot
+    alias ShotElixir.Parties.Membership
+    alias ShotElixir.ImagePositions.ImagePosition
+    alias ShotElixir.Media
+
+    # Preload associations for broadcasting before deletion
+    vehicle_with_associations =
+      Repo.preload(vehicle, [:user, :faction, :juncture, :image_positions])
+
+    Multi.new()
+    # Delete related records first
+    |> Multi.delete_all(
+      :delete_shots,
+      from(s in Shot, where: s.vehicle_id == ^vehicle.id)
+    )
+    |> Multi.delete_all(
+      :delete_memberships,
+      from(m in Membership, where: m.vehicle_id == ^vehicle.id)
+    )
+    |> Multi.delete_all(
+      :delete_image_positions,
+      from(ip in ImagePosition,
+        where: ip.positionable_id == ^vehicle.id and ip.positionable_type == "Vehicle"
+      )
+    )
+    # Orphan associated images instead of deleting them
+    |> Multi.update_all(
+      :orphan_images,
+      Media.orphan_images_query("Vehicle", vehicle.id),
+      []
+    )
+    |> Multi.delete(:vehicle, vehicle)
+    |> Multi.run(:broadcast, fn _repo, %{vehicle: deleted_vehicle} ->
+      broadcast_change(vehicle_with_associations, :delete)
+      {:ok, deleted_vehicle}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{vehicle: vehicle}} -> {:ok, vehicle}
+      {:error, :vehicle, changeset, _} -> {:error, changeset}
+    end
   end
 
   def update_chase_state(%Vehicle{} = vehicle, chase_params) do

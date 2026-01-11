@@ -312,10 +312,68 @@ defmodule ShotElixir.Factions do
   end
 
   def delete_faction(%Faction{} = faction) do
-    faction
-    |> Ecto.Changeset.change(active: false)
-    |> Repo.update()
-    |> broadcast_result(:delete)
+    alias Ecto.Multi
+    alias ShotElixir.Characters.Character
+    alias ShotElixir.Vehicles.Vehicle
+    alias ShotElixir.Sites.Site
+    alias ShotElixir.Parties.Party
+    alias ShotElixir.Junctures.Juncture
+    alias ShotElixir.ImagePositions.ImagePosition
+    alias ShotElixir.Media
+
+    # Preload associations for broadcasting before deletion
+    faction_with_associations =
+      Repo.preload(faction, [:campaign, :image_positions])
+
+    Multi.new()
+    # Nullify faction_id on related entities instead of deleting them
+    |> Multi.update_all(
+      :nullify_characters,
+      from(c in Character, where: c.faction_id == ^faction.id),
+      set: [faction_id: nil]
+    )
+    |> Multi.update_all(
+      :nullify_vehicles,
+      from(v in Vehicle, where: v.faction_id == ^faction.id),
+      set: [faction_id: nil]
+    )
+    |> Multi.update_all(
+      :nullify_sites,
+      from(s in Site, where: s.faction_id == ^faction.id),
+      set: [faction_id: nil]
+    )
+    |> Multi.update_all(
+      :nullify_parties,
+      from(p in Party, where: p.faction_id == ^faction.id),
+      set: [faction_id: nil]
+    )
+    |> Multi.update_all(
+      :nullify_junctures,
+      from(j in Juncture, where: j.faction_id == ^faction.id),
+      set: [faction_id: nil]
+    )
+    |> Multi.delete_all(
+      :delete_image_positions,
+      from(ip in ImagePosition,
+        where: ip.positionable_id == ^faction.id and ip.positionable_type == "Faction"
+      )
+    )
+    # Orphan associated images instead of deleting them
+    |> Multi.update_all(
+      :orphan_images,
+      Media.orphan_images_query("Faction", faction.id),
+      []
+    )
+    |> Multi.delete(:faction, faction)
+    |> Multi.run(:broadcast, fn _repo, %{faction: deleted_faction} ->
+      broadcast_change(faction_with_associations, :delete)
+      {:ok, deleted_faction}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{faction: faction}} -> {:ok, faction}
+      {:error, :faction, changeset, _} -> {:error, changeset}
+    end
   end
 
   @doc """

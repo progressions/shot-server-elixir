@@ -347,16 +347,41 @@ defmodule ShotElixir.Parties do
   end
 
   def delete_party(%Party{} = party) do
-    party
-    |> Ecto.Changeset.change(active: false)
-    |> Repo.update()
-    |> case do
-      {:ok, party} = result ->
-        broadcast_change(party, :delete)
-        result
+    alias Ecto.Multi
+    alias ShotElixir.ImagePositions.ImagePosition
+    alias ShotElixir.Media
 
-      error ->
-        error
+    # Preload associations for broadcasting before deletion
+    party_with_associations =
+      Repo.preload(party, [:faction, :juncture, :image_positions])
+
+    Multi.new()
+    # Delete related records first (memberships include slots)
+    |> Multi.delete_all(
+      :delete_memberships,
+      from(m in Membership, where: m.party_id == ^party.id)
+    )
+    |> Multi.delete_all(
+      :delete_image_positions,
+      from(ip in ImagePosition,
+        where: ip.positionable_id == ^party.id and ip.positionable_type == "Party"
+      )
+    )
+    # Orphan associated images instead of deleting them
+    |> Multi.update_all(
+      :orphan_images,
+      Media.orphan_images_query("Party", party.id),
+      []
+    )
+    |> Multi.delete(:party, party)
+    |> Multi.run(:broadcast, fn _repo, %{party: deleted_party} ->
+      broadcast_change(party_with_associations, :delete)
+      {:ok, deleted_party}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{party: party}} -> {:ok, party}
+      {:error, :party, changeset, _} -> {:error, changeset}
     end
   end
 
