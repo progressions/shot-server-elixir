@@ -16,6 +16,7 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   alias ShotElixir.Repo
   alias ShotElixir.Fights
   alias ShotElixir.Characters
+  alias ShotElixir.Campaigns
   alias ShotElixir.Solo.Supervisor, as: SoloSupervisor
   alias ShotElixir.Solo.SoloFightServer
   alias ShotElixir.Services.DiceRoller
@@ -27,7 +28,10 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Start the solo fight server for this fight.
   """
   def start(conn, %{"fight_id" => fight_id}) do
+    user = conn.assigns.current_user
+
     with {:ok, fight} <- get_fight(fight_id),
+         :ok <- authorize_fight_access(fight, user),
          :ok <- validate_solo_mode(fight),
          {:ok, _pid} <- SoloSupervisor.start_solo_fight(fight_id) do
       conn
@@ -55,6 +59,22 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
           error: "Fight is not in solo mode"
         })
 
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{
+          success: false,
+          error: "Not authorized to access this fight"
+        })
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{
+          success: false,
+          error: "Fight not found"
+        })
+
       {:error, reason} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -70,24 +90,44 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Stop the solo fight server for this fight.
   """
   def stop(conn, %{"fight_id" => fight_id}) do
-    case SoloSupervisor.stop_solo_fight(fight_id) do
-      :ok ->
-        conn
-        |> put_status(:ok)
-        |> json(%{
-          success: true,
-          message: "Solo server stopped",
-          fight_id: fight_id
-        })
+    user = conn.assigns.current_user
 
-      {:error, :not_running} ->
+    with {:ok, fight} <- get_fight(fight_id),
+         :ok <- authorize_fight_access(fight, user) do
+      case SoloSupervisor.stop_solo_fight(fight_id) do
+        :ok ->
+          conn
+          |> put_status(:ok)
+          |> json(%{
+            success: true,
+            message: "Solo server stopped",
+            fight_id: fight_id
+          })
+
+        {:error, :not_running} ->
+          conn
+          |> put_status(:ok)
+          |> json(%{
+            success: true,
+            message: "Solo server was not running",
+            fight_id: fight_id
+          })
+      end
+    else
+      {:error, :forbidden} ->
         conn
-        |> put_status(:ok)
-        |> json(%{
-          success: true,
-          message: "Solo server was not running",
-          fight_id: fight_id
-        })
+        |> put_status(:forbidden)
+        |> json(%{success: false, error: "Not authorized to access this fight"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{success: false, error: "Fight not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{success: false, error: inspect(reason)})
     end
   end
 
@@ -96,29 +136,53 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Get the status of the solo fight server.
   """
   def status(conn, %{"fight_id" => fight_id}) do
-    running = SoloSupervisor.solo_fight_running?(fight_id)
+    user = conn.assigns.current_user
 
-    state =
-      if running do
-        case SoloFightServer.get_state(fight_id) do
-          {:ok, state} -> state
-          _ -> nil
+    with {:ok, fight} <- get_fight(fight_id),
+         :ok <- authorize_fight_access(fight, user) do
+      running = SoloSupervisor.solo_fight_running?(fight_id)
+
+      state =
+        if running do
+          case SoloFightServer.get_state(fight_id) do
+            {:ok, state} -> state
+            _ -> nil
+          end
+        else
+          nil
         end
-      else
-        nil
-      end
 
-    conn
-    |> put_status(:ok)
-    |> json(%{
-      fight_id: fight_id,
-      running: running,
-      state: if(state, do: %{
-        processing: state.processing,
-        pc_character_ids: state.pc_character_ids,
-        behavior_module: inspect(state.behavior_module)
-      }, else: nil)
-    })
+      conn
+      |> put_status(:ok)
+      |> json(%{
+        fight_id: fight_id,
+        running: running,
+        state:
+          if(state,
+            do: %{
+              processing: state.processing,
+              pc_character_ids: state.pc_character_ids,
+              behavior_module: inspect(state.behavior_module)
+            },
+            else: nil
+          )
+      })
+    else
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{success: false, error: "Not authorized to access this fight"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{success: false, error: "Fight not found"})
+
+      {:error, reason} ->
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{success: false, error: inspect(reason)})
+    end
   end
 
   @doc """
@@ -126,22 +190,42 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Process the next NPC turn.
   """
   def advance(conn, %{"fight_id" => fight_id}) do
-    case SoloFightServer.process_next_npc_turn(fight_id) do
-      :ok ->
-        conn
-        |> put_status(:ok)
-        |> json(%{
-          success: true,
-          message: "NPC turn processing triggered"
-        })
+    user = conn.assigns.current_user
 
-      {:error, :not_running} ->
+    with {:ok, fight} <- get_fight(fight_id),
+         :ok <- authorize_fight_access(fight, user) do
+      case SoloFightServer.process_next_npc_turn(fight_id) do
+        :ok ->
+          conn
+          |> put_status(:ok)
+          |> json(%{
+            success: true,
+            message: "NPC turn processing triggered"
+          })
+
+        {:error, :not_running} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{
+            success: false,
+            error: "Solo server not running"
+          })
+      end
+    else
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{success: false, error: "Not authorized to access this fight"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{success: false, error: "Fight not found"})
+
+      {:error, reason} ->
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{
-          success: false,
-          error: "Solo server not running"
-        })
+        |> json(%{success: false, error: inspect(reason)})
     end
   end
 
@@ -150,11 +234,13 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Player takes an action (attack, defend, stunt).
   """
   def player_action(conn, %{"fight_id" => fight_id} = params) do
+    user = conn.assigns.current_user
     action_type = Map.get(params, "action_type", "attack")
     target_id = Map.get(params, "target_id")
     character_id = Map.get(params, "character_id")
 
     with {:ok, fight} <- get_fight(fight_id),
+         :ok <- authorize_fight_access(fight, user),
          {:ok, result} <- execute_player_action(fight, character_id, action_type, target_id) do
       conn
       |> put_status(:ok)
@@ -172,6 +258,16 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
         }
       })
     else
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{success: false, error: "Not authorized to access this fight"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{success: false, error: "Fight not found"})
+
       {:error, reason} ->
         conn
         |> put_status(:unprocessable_entity)
@@ -188,7 +284,10 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
   Each character rolls 1d6 + Speed to determine starting shot.
   """
   def roll_initiative(conn, %{"fight_id" => fight_id}) do
+    user = conn.assigns.current_user
+
     with {:ok, fight} <- get_fight(fight_id),
+         :ok <- authorize_fight_access(fight, user),
          :ok <- validate_solo_mode(fight),
          {:ok, results} <- do_roll_initiative(fight) do
       conn
@@ -206,6 +305,16 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
           success: false,
           error: "Fight is not in solo mode"
         })
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{success: false, error: "Not authorized to access this fight"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{success: false, error: "Fight not found"})
 
       {:error, reason} ->
         conn
@@ -228,6 +337,19 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
 
   defp validate_solo_mode(%{solo_mode: true}), do: :ok
   defp validate_solo_mode(_), do: {:error, :not_solo_mode}
+
+  defp authorize_fight_access(fight, user) do
+    campaign = Campaigns.get_campaign(fight.campaign_id)
+
+    cond do
+      is_nil(campaign) -> {:error, :not_found}
+      campaign.user_id == user.id -> :ok
+      user.admin -> :ok
+      user.gamemaster && Campaigns.is_campaign_member?(campaign.id, user.id) -> :ok
+      Campaigns.is_campaign_member?(campaign.id, user.id) -> :ok
+      true -> {:error, :forbidden}
+    end
+  end
 
   defp execute_player_action(fight, character_id, action_type, target_id) do
     # Load fight with full associations
@@ -437,10 +559,11 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
     Phoenix.PubSub.broadcast(
       ShotElixir.PubSub,
       "campaign:#{fight.campaign_id}",
-      {:solo_player_action, %{
-        fight_id: fight.id,
-        action: result
-      }}
+      {:solo_player_action,
+       %{
+         fight_id: fight.id,
+         action: result
+       }}
     )
   end
 
@@ -523,10 +646,11 @@ defmodule ShotElixirWeb.Api.V2.SoloController do
     Phoenix.PubSub.broadcast(
       ShotElixir.PubSub,
       "campaign:#{fight.campaign_id}",
-      {:solo_initiative, %{
-        fight_id: fight.id,
-        results: results
-      }}
+      {:solo_initiative,
+       %{
+         fight_id: fight.id,
+         results: results
+       }}
     )
   end
 end

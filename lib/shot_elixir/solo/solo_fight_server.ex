@@ -261,14 +261,27 @@ defmodule ShotElixir.Solo.SoloFightServer do
     case ShotElixir.Characters.get_character(target_character_id) do
       nil ->
         Logger.warning("[SoloFightServer] Target character not found: #{target_character_id}")
+        :error
 
       character ->
         current_wounds = Map.get(character.action_values || %{}, "Wounds", 0)
         new_wounds = current_wounds + damage
 
-        ShotElixir.Characters.update_character(character, %{
+        attrs = %{
           action_values: Map.put(character.action_values || %{}, "Wounds", new_wounds)
-        })
+        }
+
+        case ShotElixir.Characters.update_character(character, attrs) do
+          {:ok, _updated_character} ->
+            :ok
+
+          {:error, reason} ->
+            Logger.error(
+              "[SoloFightServer] Failed to apply damage to character #{character.id}: #{inspect(reason)}"
+            )
+
+            :error
+        end
     end
   end
 
@@ -296,10 +309,11 @@ defmodule ShotElixir.Solo.SoloFightServer do
     Phoenix.PubSub.broadcast(
       ShotElixir.PubSub,
       "campaign:#{fight.campaign_id}",
-      {:solo_npc_action, %{
-        fight_id: fight.id,
-        action: action_result
-      }}
+      {:solo_npc_action,
+       %{
+         fight_id: fight.id,
+         action: action_result
+       }}
     )
   end
 end
