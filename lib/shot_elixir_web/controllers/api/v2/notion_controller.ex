@@ -155,11 +155,24 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
 
   ## Response
     * 200 - List of matching site pages (JSON array)
+    * 500 - Internal server error if Notion API fails
   """
   def search_sites(conn, params) do
     name = params["name"] || ""
-    pages = NotionService.find_sites_in_notion(name)
-    json(conn, pages)
+
+    case NotionService.find_sites_in_notion(name) do
+      pages when is_list(pages) ->
+        json(conn, pages)
+
+      nil ->
+        json(conn, [])
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  rescue
+    error ->
+      {:error, error}
   end
 
   @doc """
@@ -170,11 +183,24 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
 
   ## Response
     * 200 - List of matching party pages (JSON array)
+    * 500 - Internal server error if Notion API fails
   """
   def search_parties(conn, params) do
     name = params["name"] || ""
-    pages = NotionService.find_parties_in_notion(name)
-    json(conn, pages)
+
+    case NotionService.find_parties_in_notion(name) do
+      pages when is_list(pages) ->
+        json(conn, pages)
+
+      nil ->
+        json(conn, [])
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  rescue
+    error ->
+      {:error, error}
   end
 
   @doc """
@@ -185,10 +211,23 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
 
   ## Response
     * 200 - List of matching faction pages (JSON array)
+    * 500 - Internal server error if Notion API fails
   """
   def search_factions(conn, params) do
     name = params["name"] || ""
-    pages = NotionService.find_factions_in_notion(name)
-    json(conn, pages)
+
+    case NotionService.find_factions_in_notion(name) do
+      pages when is_list(pages) ->
+        json(conn, pages)
+
+      nil ->
+        json(conn, [])
+
+      {:error, reason} ->
+        {:error, reason}
+    end
+  rescue
+    error ->
+      {:error, error}
   end
 end
