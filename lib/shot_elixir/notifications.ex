@@ -83,11 +83,21 @@ defmodule ShotElixir.Notifications do
   end
 
   @doc """
-  Updates a notification.
+  Updates a notification (for internal use, allows all fields).
   """
   def update_notification(%Notification{} = notification, attrs) do
     notification
     |> Notification.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Updates a notification with user-safe changeset (only read_at and dismissed_at).
+  Use this for user-initiated updates to prevent modification of content or ownership.
+  """
+  def update_notification_by_user(%Notification{} = notification, attrs) do
+    notification
+    |> Notification.update_changeset(attrs)
     |> Repo.update()
   end
 

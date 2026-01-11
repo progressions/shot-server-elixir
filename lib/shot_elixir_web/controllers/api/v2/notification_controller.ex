@@ -47,6 +47,7 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
   PATCH /api/v2/notifications/:id
 
   Updates a notification (mark as read or dismiss).
+  Only allows updating read_at and dismissed_at fields for security.
   """
   def update(conn, %{"id" => id, "notification" => notification_params}) do
     current_user = Guardian.Plug.current_resource(conn)
@@ -58,7 +59,8 @@ defmodule ShotElixirWeb.Api.V2.NotificationController do
         |> json(%{error: "Notification not found"})
 
       notification ->
-        case Notifications.update_notification(notification, notification_params) do
+        # Use the user-safe update function that only allows read_at and dismissed_at
+        case Notifications.update_notification_by_user(notification, notification_params) do
           {:ok, updated_notification} ->
             render(conn, :show, notification: updated_notification)
 

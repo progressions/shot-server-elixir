@@ -3,6 +3,13 @@ defmodule ShotElixirWeb.Api.V2.NotificationView do
   View for rendering notification responses.
   """
 
+  def render("index.json", %{notifications: notifications, meta: meta}) do
+    %{
+      notifications: Enum.map(notifications, &render_notification/1),
+      meta: meta
+    }
+  end
+
   def render("index.json", %{notifications: notifications}) do
     %{notifications: Enum.map(notifications, &render_notification/1)}
   end
