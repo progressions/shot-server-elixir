@@ -10,6 +10,7 @@ defmodule ShotElixir.Solo.SimpleBehavior do
   @behaviour ShotElixir.Solo.Behavior
 
   alias ShotElixir.Services.DiceRoller
+  alias ShotElixir.Solo.Combat
 
   @impl true
   def behavior_type, do: :simple
@@ -45,23 +46,20 @@ defmodule ShotElixir.Solo.SimpleBehavior do
     swerve = DiceRoller.swerve()
 
     # Get attacker's main attack value
-    attack_value = get_attack_value(attacker)
+    attack_value = Combat.get_attack_value(attacker)
 
     # Get target's defense
-    defense = get_defense(target)
+    defense = Combat.get_defense(target)
 
     # Calculate outcome
-    action_result = attack_value + swerve.total
-    outcome = action_result - defense
+    {outcome, hit, action_result} = Combat.calculate_outcome(attack_value, swerve.total, defense)
 
     # Calculate damage if hit
     {damage, smackdown} =
-      if outcome > 0 do
-        base_damage = get_damage(attacker)
-        toughness = get_toughness(target)
-        smackdown = base_damage + outcome - toughness
-        actual_damage = max(0, smackdown)
-        {actual_damage, smackdown}
+      if hit do
+        base_damage = Combat.get_damage(attacker)
+        toughness = Combat.get_toughness(target)
+        Combat.calculate_damage(base_damage, outcome, toughness)
       else
         {0, 0}
       end
@@ -79,51 +77,10 @@ defmodule ShotElixir.Solo.SimpleBehavior do
       damage: damage,
       outcome: outcome,
       smackdown: smackdown,
-      hit: outcome > 0
+      hit: hit
     }
 
     {:ok, result}
-  end
-
-  # Convert string or integer values to integer
-  # action_values is stored as JSONB, so values could be strings or integers
-  defp to_integer(value, _default) when is_integer(value), do: value
-
-  defp to_integer(value, default) when is_binary(value) do
-    case Integer.parse(value) do
-      {int, _rest} -> int
-      :error -> default
-    end
-  end
-
-  defp to_integer(_value, default), do: default
-
-  defp get_attack_value(character) do
-    av = character.action_values || %{}
-    main_attack = Map.get(av, "MainAttack", "Guns")
-    av_value = Map.get(av, main_attack, 0)
-    to_integer(av_value, 0)
-  end
-
-  defp get_defense(character) do
-    # Check dedicated defense field first, then action_values
-    raw_defense =
-      case character.defense do
-        nil -> Map.get(character.action_values || %{}, "Defense", 0)
-        value -> value
-      end
-
-    to_integer(raw_defense, 0)
-  end
-
-  defp get_toughness(character) do
-    raw_toughness = Map.get(character.action_values || %{}, "Toughness", 0)
-    to_integer(raw_toughness, 0)
-  end
-
-  defp get_damage(character) do
-    raw_damage = Map.get(character.action_values || %{}, "Damage", 7)
-    to_integer(raw_damage, 7)
   end
 
   defp build_simple_narrative(attacker, target, outcome, damage) do
