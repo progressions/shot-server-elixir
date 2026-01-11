@@ -19,9 +19,12 @@ defmodule ShotElixir.Services.ImagekitService do
       - :folder - Folder path in ImageKit
       - :tags - List of tags
       - :use_unique_file_name - Whether to generate unique filename (default: true)
+      - :auto_tag - Enable AI auto-tagging via Google Vision (default: false)
+      - :max_tags - Maximum number of AI tags to generate (default: 10)
+      - :min_confidence - Minimum confidence threshold 0-100 (default: 80)
 
   ## Returns
-    - {:ok, response_map} on success with file_id, url, etc.
+    - {:ok, response_map} on success with file_id, url, ai_tags, etc.
     - {:error, reason} on failure
   """
   def upload_file(file_path, options \\ %{}) do
@@ -53,9 +56,12 @@ defmodule ShotElixir.Services.ImagekitService do
       - :folder - Folder path in ImageKit
       - :tags - List of tags
       - :use_unique_file_name - Whether to generate unique filename (default: true)
+      - :auto_tag - Enable AI auto-tagging via Google Vision (default: false)
+      - :max_tags - Maximum number of AI tags to generate (default: 10)
+      - :min_confidence - Minimum confidence threshold 0-100 (default: 80)
 
   ## Returns
-    - {:ok, response_map} on success with file_id, url, etc.
+    - {:ok, response_map} on success with file_id, url, ai_tags, etc.
     - {:error, reason} on failure
   """
   def upload_from_url(url, options \\ %{}) do
@@ -77,6 +83,9 @@ defmodule ShotElixir.Services.ImagekitService do
       else
         multipart_data
       end
+
+    # Add extensions for AI auto-tagging if enabled
+    multipart_data = maybe_add_extensions(multipart_data, options)
 
     # Build auth headers for form upload
     auth_token = Base.encode64("#{private_key()}:")
@@ -287,6 +296,9 @@ defmodule ShotElixir.Services.ImagekitService do
         multipart_data
       end
 
+    # Add extensions for AI auto-tagging if enabled
+    multipart_data = maybe_add_extensions(multipart_data, options)
+
     # Build auth headers for form upload
     auth_token = Base.encode64("#{private_key()}:")
 
@@ -318,8 +330,42 @@ defmodule ShotElixir.Services.ImagekitService do
       size: response["size"],
       width: response["width"],
       height: response["height"],
+      ai_tags: parse_ai_tags(response["AITags"]),
       metadata: response
     }
+  end
+
+  defp parse_ai_tags(nil), do: []
+
+  defp parse_ai_tags(ai_tags) when is_list(ai_tags) do
+    Enum.map(ai_tags, fn tag ->
+      %{
+        name: tag["name"],
+        confidence: tag["confidence"],
+        source: tag["source"]
+      }
+    end)
+  end
+
+  defp parse_ai_tags(_), do: []
+
+  defp maybe_add_extensions(multipart_data, options) do
+    if options[:auto_tag] do
+      max_tags = Map.get(options, :max_tags, 10)
+      min_confidence = Map.get(options, :min_confidence, 80)
+
+      extensions = [
+        %{
+          "name" => "google-auto-tagging",
+          "maxTags" => max_tags,
+          "minConfidence" => min_confidence
+        }
+      ]
+
+      multipart_data ++ [{"extensions", Jason.encode!(extensions)}]
+    else
+      multipart_data
+    end
   end
 
   defp build_auth_headers do

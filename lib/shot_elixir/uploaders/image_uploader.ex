@@ -72,7 +72,10 @@ defmodule ShotElixir.Uploaders.ImageUploader do
     case ImagekitService.upload_file(path, %{
            file_name: file_name,
            folder: folder,
-           tags: tags
+           tags: tags,
+           auto_tag: true,
+           max_tags: 10,
+           min_confidence: 70
          }) do
       {:ok, response} ->
         # Return the ImageKit file name for Arc to store

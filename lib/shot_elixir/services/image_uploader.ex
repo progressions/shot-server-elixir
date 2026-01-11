@@ -112,7 +112,10 @@ defmodule ShotElixir.Services.ImageUploader do
     options = %{
       file_name:
         "#{String.downcase(entity_type)}_#{entity_id}_#{:os.system_time(:millisecond)}.jpg",
-      folder: "/chi-war-#{environment()}/#{plural_folder}"
+      folder: "/chi-war-#{environment()}/#{plural_folder}",
+      auto_tag: true,
+      max_tags: 10,
+      min_confidence: 70
     }
 
     ImagekitService.upload_file(file_path, options)

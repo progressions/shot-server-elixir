@@ -1051,10 +1051,13 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   defp upload_and_attach(final_path, extension, character) do
-    # Upload to ImageKit
+    # Upload to ImageKit with AI auto-tagging
     case ShotElixir.Services.ImagekitService.upload_file(final_path, %{
            folder: "/chi-war-#{Mix.env()}/characters",
-           file_name: "#{character.id}#{extension}"
+           file_name: "#{character.id}#{extension}",
+           auto_tag: true,
+           max_tags: 10,
+           min_confidence: 70
          }) do
       {:ok, upload_result} ->
         # Attach to character via ActiveStorage

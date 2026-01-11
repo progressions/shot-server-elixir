@@ -262,7 +262,8 @@ defmodule ShotElixir.Services.AiService do
         height: upload_result.height,
         prompt: prompt,
         ai_provider: ai_provider,
-        generated_by_id: user_id
+        generated_by_id: user_id,
+        ai_tags: upload_result.ai_tags || []
       }
 
       case Media.create_ai_image(attrs) do
@@ -287,7 +288,10 @@ defmodule ShotElixir.Services.AiService do
 
     options = %{
       file_name: filename,
-      folder: "/chi-war-#{environment()}/ai-generated/#{campaign_id}"
+      folder: "/chi-war-#{environment()}/ai-generated/#{campaign_id}",
+      auto_tag: true,
+      max_tags: 10,
+      min_confidence: 70
     }
 
     ShotElixir.Services.ImagekitService.upload_file(file_path, options)

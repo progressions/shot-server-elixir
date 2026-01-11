@@ -202,6 +202,68 @@ defmodule ShotElixirWeb.Api.V2.MediaLibraryController do
     end
   end
 
+  @doc """
+  Searches images by AI-generated tags.
+
+  ## Query Parameters
+    - q: Search query (comma-separated terms)
+    - page: Page number (default: 1)
+    - per_page: Items per page (default: 50)
+
+  ## Example
+    GET /api/v2/media_library/search?q=warrior,cartoon
+  """
+  def search(conn, %{"q" => query} = params) when is_binary(query) and query != "" do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with campaign_id when not is_nil(campaign_id) <- current_user.current_campaign_id do
+      # Parse search terms (comma or space separated)
+      search_terms =
+        query
+        |> String.split(~r/[,\s]+/)
+        |> Enum.map(&String.trim/1)
+        |> Enum.filter(&(&1 != ""))
+
+      result = Media.search_by_ai_tags(campaign_id, search_terms, params)
+
+      conn
+      |> put_view(ShotElixirWeb.Api.V2.MediaLibraryView)
+      |> render("search.json", result)
+    else
+      nil ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "No current campaign set"})
+    end
+  end
+
+  def search(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing required 'q' parameter"})
+  end
+
+  @doc """
+  Returns all unique AI tag names for the current campaign.
+  Useful for autocomplete or tag clouds.
+  """
+  def ai_tags(conn, _params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with campaign_id when not is_nil(campaign_id) <- current_user.current_campaign_id do
+      tags = Media.list_ai_tags(campaign_id)
+
+      conn
+      |> put_status(:ok)
+      |> json(%{tags: tags})
+    else
+      nil ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "No current campaign set"})
+    end
+  end
+
   # Authorization helpers
 
   defp authorize_image_access(%MediaImage{campaign_id: campaign_id}, current_user) do
