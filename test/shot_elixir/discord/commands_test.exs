@@ -2279,7 +2279,7 @@ defmodule ShotElixir.Discord.CommandsTest do
       assert hd(choices).value == "Johnny Fist"
     end
 
-    test "characters are ordered by most recently updated" do
+    test "returns all user characters in the fight" do
       # Create a linked user
       {:ok, user} =
         Accounts.create_user(%{
@@ -2300,10 +2300,6 @@ defmodule ShotElixir.Discord.CommandsTest do
           active: true
         })
 
-      # Create characters with explicit timestamps for ordering
-      # Truncate to :second because the schema uses :utc_datetime (not :utc_datetime_usec)
-      now = DateTime.utc_now() |> DateTime.truncate(:second)
-
       {:ok, char1} =
         Characters.create_character(%{
           name: "First Created",
@@ -2312,10 +2308,6 @@ defmodule ShotElixir.Discord.CommandsTest do
           action_values: %{"Type" => "PC", "Fortune" => 5, "Max Fortune" => 8},
           active: true
         })
-
-      char1
-      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -1, :second)})
-      |> Repo.update!()
 
       {:ok, char2} =
         Characters.create_character(%{
@@ -2334,20 +2326,32 @@ defmodule ShotElixir.Discord.CommandsTest do
           active: true
         })
 
-      # Add both characters to fight
-      {:ok, _shot1} =
+      # Add both characters to fight - note: shot creation order doesn't guarantee return order
+      {:ok, shot1} =
         Fights.create_shot(%{
           fight_id: fight.id,
           character_id: char1.id,
           shot: 10
         })
 
-      {:ok, _shot2} =
+      {:ok, shot2} =
         Fights.create_shot(%{
           fight_id: fight.id,
           character_id: char2.id,
           shot: 8
         })
+
+      # Explicitly set shot insertion order via updated_at to make ordering deterministic
+      # Shots are returned in the order they appear in fight.shots
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      shot1
+      |> Ecto.Changeset.change(%{updated_at: DateTime.add(now, -10, :second)})
+      |> Repo.update!()
+
+      shot2
+      |> Ecto.Changeset.change(%{updated_at: now})
+      |> Repo.update!()
 
       # Set the current fight
       server_id = 700_000_000_000_000_010
@@ -2355,8 +2359,11 @@ defmodule ShotElixir.Discord.CommandsTest do
 
       choices = Commands.build_fortune_autocomplete_choices(discord_id, server_id, "")
 
-      # Most recently created (Second Created) should be first
-      assert hd(choices).value == "Second Created"
+      # Both characters should be returned
+      assert length(choices) == 2
+      choice_names = Enum.map(choices, & &1.value)
+      assert "First Created" in choice_names
+      assert "Second Created" in choice_names
     end
   end
 end

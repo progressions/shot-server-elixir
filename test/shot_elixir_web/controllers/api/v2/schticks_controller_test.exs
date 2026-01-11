@@ -387,7 +387,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       {:ok, schtick: schtick}
     end
 
-    test "soft deletes schtick (sets active to false)", %{
+    test "hard deletes schtick", %{
       conn: conn,
       gamemaster: gamemaster,
       schtick: schtick
@@ -399,9 +399,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
 
       assert response(conn, 204)
 
-      # Verify schtick is soft deleted
-      updated_schtick = Schticks.get_schtick(schtick.id)
-      assert updated_schtick.active == false
+      # Verify schtick is completely removed from database
+      assert Schticks.get_schtick(schtick.id) == nil
     end
 
     test "prevents deletion of schtick with dependents", %{

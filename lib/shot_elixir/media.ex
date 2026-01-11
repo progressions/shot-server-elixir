@@ -514,4 +514,39 @@ defmodule ShotElixir.Media do
   defp apply_sort(query, field, :desc) do
     from i in query, order_by: [desc: field(i, ^field)]
   end
+
+  @doc """
+  Marks all images associated with an entity as orphaned.
+  Used when an entity is deleted to preserve images for potential reuse or cleanup.
+
+  ## Parameters
+    - entity_type: "Character", "Vehicle", etc.
+    - entity_id: UUID of the entity being deleted
+
+  ## Returns
+    {:ok, count} where count is the number of images orphaned
+  """
+  def orphan_images_for_entity(entity_type, entity_id) do
+    {count, _} =
+      from(i in MediaImage,
+        where: i.entity_type == ^entity_type and i.entity_id == ^entity_id
+      )
+      |> Repo.update_all(set: [status: "orphan", entity_type: nil, entity_id: nil])
+
+    {:ok, count}
+  end
+
+  @doc """
+  Returns a query for orphaning images, suitable for use with Ecto.Multi.update_all.
+
+  ## Example
+      Multi.new()
+      |> Multi.update_all(:orphan_images, Media.orphan_images_query("Character", character_id), [])
+  """
+  def orphan_images_query(entity_type, entity_id) do
+    from(i in MediaImage,
+      where: i.entity_type == ^entity_type and i.entity_id == ^entity_id,
+      update: [set: [status: "orphan", entity_type: nil, entity_id: nil]]
+    )
+  end
 end

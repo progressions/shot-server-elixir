@@ -164,4 +164,120 @@ defmodule ShotElixir.MediaTest do
       assert DateTime.compare(second.inserted_at, third.inserted_at) in [:gt, :eq]
     end
   end
+
+  describe "orphan_images_for_entity/2" do
+    test "marks images as orphaned for a specific entity", %{campaign: campaign, user: user} do
+      entity_id = Ecto.UUID.generate()
+
+      # Create attached images for the entity
+      {:ok, image1} =
+        Media.create_image(%{
+          campaign_id: campaign.id,
+          source: "upload",
+          status: "attached",
+          entity_type: "Character",
+          entity_id: entity_id,
+          imagekit_file_id: "orphan_test_1",
+          imagekit_url: "https://example.com/orphan1.jpg",
+          uploaded_by_id: user.id
+        })
+
+      {:ok, image2} =
+        Media.create_image(%{
+          campaign_id: campaign.id,
+          source: "ai_generated",
+          status: "attached",
+          entity_type: "Character",
+          entity_id: entity_id,
+          imagekit_file_id: "orphan_test_2",
+          imagekit_url: "https://example.com/orphan2.jpg",
+          generated_by_id: user.id
+        })
+
+      # Create an image for a different entity (should not be affected)
+      other_entity_id = Ecto.UUID.generate()
+
+      {:ok, image3} =
+        Media.create_image(%{
+          campaign_id: campaign.id,
+          source: "upload",
+          status: "attached",
+          entity_type: "Character",
+          entity_id: other_entity_id,
+          imagekit_file_id: "orphan_test_3",
+          imagekit_url: "https://example.com/orphan3.jpg",
+          uploaded_by_id: user.id
+        })
+
+      # Orphan images for the first entity
+      assert {:ok, 2} = Media.orphan_images_for_entity("Character", entity_id)
+
+      # Verify the images were orphaned
+      updated_image1 = Media.get_image!(image1.id)
+      assert updated_image1.status == "orphan"
+      assert updated_image1.entity_type == nil
+      assert updated_image1.entity_id == nil
+
+      updated_image2 = Media.get_image!(image2.id)
+      assert updated_image2.status == "orphan"
+      assert updated_image2.entity_type == nil
+      assert updated_image2.entity_id == nil
+
+      # Verify the other entity's image was not affected
+      updated_image3 = Media.get_image!(image3.id)
+      assert updated_image3.status == "attached"
+      assert updated_image3.entity_type == "Character"
+      assert updated_image3.entity_id == other_entity_id
+    end
+
+    test "returns count of 0 when no images exist for entity", %{campaign: _campaign} do
+      non_existent_entity_id = Ecto.UUID.generate()
+      assert {:ok, 0} = Media.orphan_images_for_entity("Character", non_existent_entity_id)
+    end
+
+    test "only affects images matching both entity_type and entity_id", %{
+      campaign: campaign,
+      user: user
+    } do
+      entity_id = Ecto.UUID.generate()
+
+      # Create a Character image
+      {:ok, character_image} =
+        Media.create_image(%{
+          campaign_id: campaign.id,
+          source: "upload",
+          status: "attached",
+          entity_type: "Character",
+          entity_id: entity_id,
+          imagekit_file_id: "entity_type_test_1",
+          imagekit_url: "https://example.com/char.jpg",
+          uploaded_by_id: user.id
+        })
+
+      # Create a Vehicle image with the same entity_id (different type)
+      {:ok, vehicle_image} =
+        Media.create_image(%{
+          campaign_id: campaign.id,
+          source: "upload",
+          status: "attached",
+          entity_type: "Vehicle",
+          entity_id: entity_id,
+          imagekit_file_id: "entity_type_test_2",
+          imagekit_url: "https://example.com/vehicle.jpg",
+          uploaded_by_id: user.id
+        })
+
+      # Orphan only Character images
+      assert {:ok, 1} = Media.orphan_images_for_entity("Character", entity_id)
+
+      # Character image should be orphaned
+      updated_character = Media.get_image!(character_image.id)
+      assert updated_character.status == "orphan"
+
+      # Vehicle image should still be attached
+      updated_vehicle = Media.get_image!(vehicle_image.id)
+      assert updated_vehicle.status == "attached"
+      assert updated_vehicle.entity_type == "Vehicle"
+    end
+  end
 end

@@ -501,7 +501,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
       {:ok, weapon: weapon}
     end
 
-    test "soft deletes weapon (sets active to false)", %{
+    test "hard deletes weapon", %{
       conn: conn,
       gamemaster: gamemaster,
       weapon: weapon
@@ -513,9 +513,8 @@ defmodule ShotElixirWeb.Api.V2.WeaponControllerTest do
 
       assert response(conn, 204)
 
-      # Verify weapon is soft deleted
-      updated_weapon = Weapons.get_weapon(weapon.id)
-      assert updated_weapon.active == false
+      # Verify weapon is completely removed from database
+      assert Weapons.get_weapon(weapon.id) == nil
     end
 
     test "returns 404 for non-existent weapon", %{conn: conn, gamemaster: gamemaster} do

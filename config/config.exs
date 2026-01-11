@@ -99,7 +99,9 @@ config :shot_elixir, Oban,
        # Clean up expired CLI authorization codes every hour
        {"0 * * * *", ShotElixir.Workers.CliAuthCodeCleanupWorker},
        # Sync characters FROM Notion every 6 hours (at midnight, 6am, noon, 6pm)
-       {"0 */6 * * *", ShotElixir.Workers.SyncCharactersFromNotionWorker}
+       {"0 */6 * * *", ShotElixir.Workers.SyncCharactersFromNotionWorker},
+       # Clean up orphaned images every 6 hours
+       {"0 */6 * * *", ShotElixir.Workers.OrphanedImageCleanupWorker}
      ]}
   ]
 

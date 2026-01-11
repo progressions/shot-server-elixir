@@ -315,10 +315,43 @@ defmodule ShotElixir.Sites do
   end
 
   def delete_site(%Site{} = site) do
-    site
-    |> Ecto.Changeset.change(active: false)
-    |> Repo.update()
-    |> broadcast_result(:delete)
+    alias Ecto.Multi
+    alias ShotElixir.Sites.Attunement
+    alias ShotElixir.ImagePositions.ImagePosition
+    alias ShotElixir.Media
+
+    # Preload associations for broadcasting before deletion
+    site_with_associations =
+      Repo.preload(site, [:faction, :juncture, :image_positions])
+
+    Multi.new()
+    # Delete related records first
+    |> Multi.delete_all(
+      :delete_attunements,
+      from(a in Attunement, where: a.site_id == ^site.id)
+    )
+    |> Multi.delete_all(
+      :delete_image_positions,
+      from(ip in ImagePosition,
+        where: ip.positionable_id == ^site.id and ip.positionable_type == "Site"
+      )
+    )
+    # Orphan associated images instead of deleting them
+    |> Multi.update_all(
+      :orphan_images,
+      Media.orphan_images_query("Site", site.id),
+      []
+    )
+    |> Multi.delete(:site, site)
+    |> Multi.run(:broadcast, fn _repo, %{site: deleted_site} ->
+      broadcast_change(site_with_associations, :delete)
+      {:ok, deleted_site}
+    end)
+    |> Repo.transaction()
+    |> case do
+      {:ok, %{site: site}} -> {:ok, site}
+      {:error, :site, changeset, _} -> {:error, changeset}
+    end
   end
 
   def create_attunement(attrs \\ %{}) do
