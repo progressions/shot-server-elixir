@@ -201,7 +201,9 @@ defmodule ShotElixir.PartiesTest do
       assert Repo.get(Membership, membership.id) != nil
     end
 
-    test "removes slot-based memberships (with role) when character_ids is updated", %{campaign: campaign} do
+    test "removes slot-based memberships (with role) when character_ids is updated", %{
+      campaign: campaign
+    } do
       {:ok, party} =
         Parties.create_party(%{
           name: "Party with Slots",

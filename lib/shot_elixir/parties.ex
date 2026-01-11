@@ -331,7 +331,10 @@ defmodule ShotElixir.Parties do
   def update_party(%Party{} = party, attrs) do
     require Logger
     Logger.debug("[Parties.update_party] attrs received: #{inspect(attrs)}")
-    Logger.debug("[Parties.update_party] has character_ids key? #{Map.has_key?(attrs, "character_ids")}")
+
+    Logger.debug(
+      "[Parties.update_party] has character_ids key? #{Map.has_key?(attrs, "character_ids")}"
+    )
 
     party
     |> Party.changeset(attrs)
@@ -341,7 +344,10 @@ defmodule ShotElixir.Parties do
         # Sync character memberships if character_ids is provided
         party =
           if Map.has_key?(attrs, "character_ids") do
-            Logger.debug("[Parties.update_party] Syncing character memberships: #{inspect(attrs["character_ids"])}")
+            Logger.debug(
+              "[Parties.update_party] Syncing character memberships: #{inspect(attrs["character_ids"])}"
+            )
+
             sync_character_memberships(party, attrs["character_ids"])
           else
             Logger.debug("[Parties.update_party] No character_ids key found, skipping sync")
