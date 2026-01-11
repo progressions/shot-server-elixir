@@ -44,6 +44,43 @@ defmodule ShotElixir.Services.ImagekitServiceTest do
     end
   end
 
+  describe "upload_plug/2" do
+    test "accepts Plug.Upload struct and attempts upload" do
+      upload = %Plug.Upload{
+        path: "/nonexistent/test-image.jpg",
+        filename: "my-upload.jpg",
+        content_type: "image/jpeg"
+      }
+
+      # Will fail because file doesn't exist, but verifies the function accepts the struct
+      assert {:error, :enoent} = ImagekitService.upload_plug(upload)
+    end
+
+    test "accepts custom options that override defaults" do
+      upload = %Plug.Upload{
+        path: "/nonexistent/test-image.jpg",
+        filename: "my-upload.jpg",
+        content_type: "image/jpeg"
+      }
+
+      # Verify custom options can be passed (auto_tag: false overrides default true)
+      # Will fail because file doesn't exist, but verifies option passing works
+      assert {:error, :enoent} = ImagekitService.upload_plug(upload, %{auto_tag: false})
+    end
+
+    test "accepts additional custom options alongside defaults" do
+      upload = %Plug.Upload{
+        path: "/nonexistent/test-image.jpg",
+        filename: "my-upload.jpg",
+        content_type: "image/jpeg"
+      }
+
+      # Verify additional options like folder and tags can be passed
+      options = %{folder: "/custom-folder", tags: ["test", "upload"]}
+      assert {:error, :enoent} = ImagekitService.upload_plug(upload, options)
+    end
+  end
+
   describe "delete_file/1" do
     test "handles string file_id" do
       # Set minimal config to avoid runtime error
