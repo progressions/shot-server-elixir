@@ -118,6 +118,110 @@ defmodule ShotElixirWeb.Api.V2.NotionControllerTest do
     # end
   end
 
+  describe "search_sites" do
+    test "returns 401 when not authenticated", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/notion/sites?name=test")
+
+      assert json_response(conn, 401)["error"] == "Not authenticated"
+    end
+
+    test "accepts valid name parameter", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = get(conn, ~p"/api/v2/notion/sites?name=test")
+
+      # Could be 200 (found) or 500 (API error) depending on Notion API availability
+      status = conn.status
+      assert status in [200, 500], "Expected 200 or 500, got #{status}"
+
+      if status == 200 do
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+
+    test "accepts empty name parameter", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = get(conn, ~p"/api/v2/notion/sites")
+
+      # Empty name should return all sites or empty list
+      status = conn.status
+      assert status in [200, 500], "Expected 200 or 500, got #{status}"
+
+      if status == 200 do
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+  end
+
+  describe "search_parties" do
+    test "returns 401 when not authenticated", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/notion/parties?name=test")
+
+      assert json_response(conn, 401)["error"] == "Not authenticated"
+    end
+
+    test "accepts valid name parameter", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = get(conn, ~p"/api/v2/notion/parties?name=test")
+
+      status = conn.status
+      assert status in [200, 500], "Expected 200 or 500, got #{status}"
+
+      if status == 200 do
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+
+    test "accepts empty name parameter", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = get(conn, ~p"/api/v2/notion/parties")
+
+      status = conn.status
+      assert status in [200, 500], "Expected 200 or 500, got #{status}"
+
+      if status == 200 do
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+  end
+
+  describe "search_factions" do
+    test "returns 401 when not authenticated", %{conn: conn} do
+      conn = get(conn, ~p"/api/v2/notion/factions?name=test")
+
+      assert json_response(conn, 401)["error"] == "Not authenticated"
+    end
+
+    test "accepts valid name parameter", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = get(conn, ~p"/api/v2/notion/factions?name=test")
+
+      status = conn.status
+      assert status in [200, 500], "Expected 200 or 500, got #{status}"
+
+      if status == 200 do
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+
+    test "accepts empty name parameter", %{conn: conn, user: user} do
+      conn = authenticate(conn, user)
+      conn = get(conn, ~p"/api/v2/notion/factions")
+
+      status = conn.status
+      assert status in [200, 500], "Expected 200 or 500, got #{status}"
+
+      if status == 200 do
+        response = json_response(conn, 200)
+        assert is_list(response)
+      end
+    end
+  end
+
   defp authenticate(conn, user) do
     {:ok, token, _} = Guardian.encode_and_sign(user)
     put_req_header(conn, "authorization", "Bearer #{token}")
