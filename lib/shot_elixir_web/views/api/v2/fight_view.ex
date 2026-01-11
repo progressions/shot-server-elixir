@@ -77,6 +77,9 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       session: fight.session,
       campaign_id: fight.campaign_id,
       user_id: fight.user_id,
+      solo_mode: fight.solo_mode,
+      solo_player_character_ids: fight.solo_player_character_ids || [],
+      solo_behavior_type: fight.solo_behavior_type,
       image_positions: []
     }
   end

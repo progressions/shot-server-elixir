@@ -182,6 +182,13 @@ defmodule ShotElixirWeb.Router do
 
       # Fight events - combat action log
       resources "/fight_events", FightEventController, only: [:index]
+
+      # Solo play endpoints
+      post "/solo/start", SoloController, :start
+      post "/solo/stop", SoloController, :stop
+      get "/solo/status", SoloController, :status
+      post "/solo/advance", SoloController, :advance
+      post "/solo/action", SoloController, :action
     end
 
     # Weapons with custom routes

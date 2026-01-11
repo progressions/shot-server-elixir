@@ -21,6 +21,11 @@ defmodule ShotElixir.Fights.Fight do
     field :fight_message_id, :string
     field :action_id, Ecto.UUID
 
+    # Solo play fields
+    field :solo_mode, :boolean, default: false
+    field :solo_player_character_ids, {:array, :binary_id}, default: []
+    field :solo_behavior_type, :string, default: "simple"
+
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :user, ShotElixir.Accounts.User
 
@@ -56,7 +61,10 @@ defmodule ShotElixir.Fights.Fight do
       :fight_message_id,
       :action_id,
       :campaign_id,
-      :user_id
+      :user_id,
+      :solo_mode,
+      :solo_player_character_ids,
+      :solo_behavior_type
     ])
     |> validate_required([:name, :campaign_id])
     |> validate_number(:sequence, greater_than_or_equal_to: 0)
