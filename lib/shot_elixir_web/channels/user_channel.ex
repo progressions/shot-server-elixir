@@ -50,7 +50,8 @@ defmodule ShotElixirWeb.UserChannel do
         type: notification.type,
         title: notification.title,
         message: notification.message,
-        created_at: notification.inserted_at
+        created_at: notification.inserted_at,
+        payload: notification.payload || %{}
       }
     })
 
