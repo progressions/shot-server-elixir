@@ -1,9 +1,12 @@
 defmodule ShotElixirWeb.Api.V2.SiteController do
   use ShotElixirWeb, :controller
 
+  require Logger
+
   alias ShotElixir.Sites
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Services.NotionService
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -496,6 +499,62 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
         |> put_status(:unprocessable_entity)
         |> put_view(ShotElixirWeb.Api.V2.SiteView)
         |> render("error.json", changeset: changeset)
+    end
+  end
+
+  # POST /api/v2/sites/:site_id/sync
+  def sync(conn, %{"site_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Sites.get_site(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Site not found"})
+
+      site ->
+        case Campaigns.get_campaign(site.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Site not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case NotionService.sync_site(site) do
+                {:ok, :unlinked} ->
+                  # Page was deleted in Notion, reload site to get cleared notion_page_id
+                  updated_site = Sites.get_site(id)
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                  |> render("show.json", site: updated_site)
+
+                {:ok, updated_site} ->
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                  |> render("show.json", site: updated_site)
+
+                {:error, {:notion_api_error, code, message}} ->
+                  Logger.error("Notion API error syncing site: #{code} - #{message}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion: #{message}"})
+
+                {:error, reason} ->
+                  Logger.error("Failed to sync site to Notion: #{inspect(reason)}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync sites"})
+            end
+        end
     end
   end
 

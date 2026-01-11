@@ -1,8 +1,11 @@
 defmodule ShotElixirWeb.Api.V2.FactionController do
   use ShotElixirWeb, :controller
 
+  require Logger
+
   alias ShotElixir.Factions
   alias ShotElixir.Campaigns
+  alias ShotElixir.Services.NotionService
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -413,6 +416,62 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
         |> put_status(:unprocessable_entity)
         |> put_view(ShotElixirWeb.Api.V2.FactionView)
         |> render("error.json", changeset: changeset)
+    end
+  end
+
+  # POST /api/v2/factions/:faction_id/sync
+  def sync(conn, %{"faction_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Factions.get_faction(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Faction not found"})
+
+      faction ->
+        case Campaigns.get_campaign(faction.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Faction not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case NotionService.sync_faction(faction) do
+                {:ok, :unlinked} ->
+                  # Page was deleted in Notion, reload faction to get cleared notion_page_id
+                  updated_faction = Factions.get_faction(id)
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                  |> render("show.json", faction: updated_faction)
+
+                {:ok, updated_faction} ->
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                  |> render("show.json", faction: updated_faction)
+
+                {:error, {:notion_api_error, code, message}} ->
+                  Logger.error("Notion API error syncing faction: #{code} - #{message}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion: #{message}"})
+
+                {:error, reason} ->
+                  Logger.error("Failed to sync faction to Notion: #{inspect(reason)}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync factions"})
+            end
+        end
     end
   end
 

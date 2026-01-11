@@ -47,6 +47,8 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       image_positions: render_image_positions_if_loaded(party),
       slots: slots,
       has_composition: length(slots) > 0,
+      notion_page_id: party.notion_page_id,
+      last_synced_to_notion_at: party.last_synced_to_notion_at,
       entity_class: "Party"
     }
   end

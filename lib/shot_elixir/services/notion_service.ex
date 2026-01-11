@@ -1,7 +1,7 @@
 defmodule ShotElixir.Services.NotionService do
   @moduledoc """
   Business logic layer for Notion API integration.
-  Handles character synchronization with Notion database.
+  Handles synchronization of characters, sites, parties, and factions with Notion databases.
   """
 
   require Logger
@@ -9,22 +9,44 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Services.NotionClient
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
+  alias ShotElixir.Factions
   alias ShotElixir.Factions.Faction
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Notion
+  alias ShotElixir.Parties
+  alias ShotElixir.Parties.Party
   alias ShotElixir.Repo
+  alias ShotElixir.Sites
+  alias ShotElixir.Sites.Site
 
   import Ecto.Query
 
-  # Use runtime config to allow token to be added at runtime without validation errors
+  # =============================================================================
+  # Database ID Helpers
+  # =============================================================================
+
+  # Characters database (main database)
   defp database_id do
     Application.get_env(:shot_elixir, :notion)[:database_id] ||
       "f6fa27ac-19cd-4b17-b218-55acc6d077be"
   end
 
+  # Factions database
   defp factions_database_id do
     Application.get_env(:shot_elixir, :notion)[:factions_database_id] ||
       "0ae94bfa1a754c8fbda28ea50afa5fd5"
+  end
+
+  # Parties database
+  defp parties_database_id do
+    Application.get_env(:shot_elixir, :notion)[:parties_database_id] ||
+      "2e5e0b55d4178083bd93e8a60280209b"
+  end
+
+  # Sites/Locations database
+  defp sites_database_id do
+    Application.get_env(:shot_elixir, :notion)[:sites_database_id] ||
+      "8ac4e657c540499c977f79b0643b7070"
   end
 
   @doc """
@@ -1510,5 +1532,170 @@ defmodule ShotElixir.Services.NotionService do
     rich_text
     |> Enum.map(fn item -> item["plain_text"] || "" end)
     |> Enum.join("")
+  end
+
+  # =============================================================================
+  # Site, Party, Faction Sync Functions
+  # =============================================================================
+  # These use generic helpers to reduce code duplication
+
+  @doc """
+  Sync a site to Notion. Creates a new page if no notion_page_id exists,
+  otherwise updates the existing page.
+  """
+  def sync_site(%Site{} = site) do
+    sync_entity(site, %{
+      entity_type: "site",
+      database_id: sites_database_id(),
+      update_fn: &Sites.update_site/2,
+      as_notion_fn: &Site.as_notion/1
+    })
+  end
+
+  @doc """
+  Sync a party to Notion. Creates a new page if no notion_page_id exists,
+  otherwise updates the existing page.
+  """
+  def sync_party(%Party{} = party) do
+    sync_entity(party, %{
+      entity_type: "party",
+      database_id: parties_database_id(),
+      update_fn: &Parties.update_party/2,
+      as_notion_fn: &Party.as_notion/1
+    })
+  end
+
+  @doc """
+  Sync a faction to Notion. Creates a new page if no notion_page_id exists,
+  otherwise updates the existing page.
+  """
+  def sync_faction(%Faction{} = faction) do
+    sync_entity(faction, %{
+      entity_type: "faction",
+      database_id: factions_database_id(),
+      update_fn: &Factions.update_faction/2,
+      as_notion_fn: &Faction.as_notion/1
+    })
+  end
+
+  # =============================================================================
+  # Generic Entity Sync Helpers
+  # =============================================================================
+
+  # Generic sync function for any entity type (site, party, faction)
+  defp sync_entity(entity, %{entity_type: entity_type} = opts) do
+    result =
+      if entity.notion_page_id do
+        update_notion_page(entity, opts)
+      else
+        create_notion_page(entity, opts)
+      end
+
+    case result do
+      {:ok, :unlinked} ->
+        {:ok, :unlinked}
+
+      {:ok, _} ->
+        opts.update_fn.(entity, %{last_synced_to_notion_at: DateTime.utc_now()})
+
+      {:error, reason} ->
+        Logger.error("Failed to sync #{entity_type} to Notion: #{inspect(reason)}")
+        {:error, reason}
+    end
+  rescue
+    error ->
+      Logger.error("Exception syncing #{entity_type} to Notion: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  # Generic create function for any entity type
+  defp create_notion_page(entity, %{entity_type: entity_type} = opts) do
+    properties = opts.as_notion_fn.(entity)
+
+    payload = %{
+      "parent" => %{"database_id" => opts.database_id},
+      "properties" => properties
+    }
+
+    page = NotionClient.create_page(payload)
+
+    case page do
+      %{"id" => page_id} when is_binary(page_id) ->
+        case opts.update_fn.(entity, %{notion_page_id: page_id}) do
+          {:ok, updated_entity} ->
+            Logger.info("Created Notion page for #{entity_type} #{updated_entity.id}: #{page_id}")
+            {:ok, page}
+
+          {:error, changeset} ->
+            Logger.error("Failed to update #{entity_type} with notion_page_id")
+            {:error, changeset}
+        end
+
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error creating #{entity_type}: #{error_code} - #{message}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        Logger.error("Unexpected response from Notion API when creating #{entity_type}")
+        {:error, :unexpected_notion_response}
+    end
+  rescue
+    error ->
+      Logger.error("Failed to create Notion page for #{entity_type}: #{Exception.message(error)}")
+      {:error, :notion_request_failed}
+  end
+
+  # Generic update function for any entity type
+  defp update_notion_page(%{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
+
+  defp update_notion_page(entity, %{entity_type: entity_type} = opts) do
+    properties = opts.as_notion_fn.(entity)
+    response = NotionClient.update_page(entity.notion_page_id, properties)
+
+    case response do
+      %{"code" => "validation_error", "message" => message}
+      when is_binary(message) ->
+        if String.contains?(String.downcase(message), "archived") do
+          handle_archived_entity(entity, opts)
+        else
+          Logger.error("Notion API validation error on #{entity_type} update: #{message}")
+          {:error, {:notion_api_error, "validation_error", message}}
+        end
+
+      %{"code" => "object_not_found", "message" => _message} ->
+        handle_archived_entity(entity, opts)
+
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error on #{entity_type} update: #{error_code}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        {:ok, response}
+    end
+  rescue
+    error ->
+      Logger.error("Failed to update Notion page for #{entity_type}: #{Exception.message(error)}")
+
+      {:error, error}
+  end
+
+  # Generic handler for archived/deleted Notion pages
+  defp handle_archived_entity(entity, opts) do
+    entity_type = opts.entity_type
+
+    Logger.warning(
+      "Notion page #{entity.notion_page_id} for #{entity_type} #{entity.id} " <>
+        "has been archived/deleted. Unlinking from #{entity_type}."
+    )
+
+    case opts.update_fn.(entity, %{notion_page_id: nil}) do
+      {:ok, _} ->
+        Logger.info("Successfully unlinked Notion page from #{entity_type} #{entity.id}")
+        {:ok, :unlinked}
+
+      {:error, changeset} ->
+        Logger.error("Failed to unlink Notion page from #{entity_type}: #{inspect(changeset)}")
+        {:error, {:unlink_failed, changeset}}
+    end
   end
 end

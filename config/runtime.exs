@@ -29,8 +29,14 @@ end
 # No longer using compile_env, so runtime config can differ
 if notion_token = System.get_env("NOTION_TOKEN") do
   config :shot_elixir, :notion,
+    # Characters database (main database)
     database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
+    # Factions database
     factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
+    # Parties database
+    parties_database_id: "2e5e0b55d4178083bd93e8a60280209b",
+    # Sites/Locations database
+    sites_database_id: "8ac4e657c540499c977f79b0643b7070",
     periodic_sync_enabled: true,
     token: notion_token
 end
