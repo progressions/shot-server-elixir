@@ -97,7 +97,9 @@ config :shot_elixir, Oban,
        # Clean up expired WebAuthn challenges every hour
        {"0 * * * *", ShotElixir.Workers.WebauthnChallengeCleanupWorker},
        # Clean up expired CLI authorization codes every hour
-       {"0 * * * *", ShotElixir.Workers.CliAuthCodeCleanupWorker}
+       {"0 * * * *", ShotElixir.Workers.CliAuthCodeCleanupWorker},
+       # Sync characters FROM Notion every 6 hours (at midnight, 6am, noon, 6pm)
+       {"0 */6 * * *", ShotElixir.Workers.SyncCharactersFromNotionWorker}
      ]}
   ]
 
@@ -113,7 +115,11 @@ config :nostrum,
 # to ensure Dotenvy has loaded the .env file first
 config :shot_elixir, :notion,
   database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
-  factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5"
+  factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
+  # Periodic sync configuration (sync characters FROM Notion)
+  periodic_sync_enabled: true,
+  # Interval in hours between syncs (default: 6 hours)
+  periodic_sync_interval_hours: 6
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
