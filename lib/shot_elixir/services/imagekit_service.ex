@@ -98,47 +98,47 @@ defmodule ShotElixir.Services.ImagekitService do
       folder = options[:folder] || build_folder_path()
       return_stub_upload(file_name, folder)
     else
-    file_name = options[:file_name] || Path.basename(URI.parse(url).path)
-    folder = options[:folder] || build_folder_path()
+      file_name = options[:file_name] || Path.basename(URI.parse(url).path)
+      folder = options[:folder] || build_folder_path()
 
-    # Build multipart form data
-    multipart_data = [
-      {"file", url},
-      {"fileName", file_name},
-      {"folder", folder},
-      {"useUniqueFileName", to_string(Map.get(options, :use_unique_file_name, true))}
-    ]
+      # Build multipart form data
+      multipart_data = [
+        {"file", url},
+        {"fileName", file_name},
+        {"folder", folder},
+        {"useUniqueFileName", to_string(Map.get(options, :use_unique_file_name, true))}
+      ]
 
-    # Add tags if provided
-    multipart_data =
-      if options[:tags] && length(options[:tags]) > 0 do
-        multipart_data ++ [{"tags", Enum.join(options[:tags], ",")}]
-      else
-        multipart_data
+      # Add tags if provided
+      multipart_data =
+        if options[:tags] && length(options[:tags]) > 0 do
+          multipart_data ++ [{"tags", Enum.join(options[:tags], ",")}]
+        else
+          multipart_data
+        end
+
+      # Add extensions for AI auto-tagging if enabled
+      multipart_data = maybe_add_extensions(multipart_data, options)
+
+      # Build auth headers for form upload
+      auth_token = Base.encode64("#{private_key()}:")
+
+      headers = [
+        {"Authorization", "Basic #{auth_token}"}
+      ]
+
+      case Req.post(@upload_url, form: multipart_data, headers: headers) do
+        {:ok, %{status: 200, body: response}} ->
+          {:ok, parse_upload_response(response)}
+
+        {:ok, %{status: status, body: body}} ->
+          Logger.error("ImageKit upload from URL failed with status #{status}: #{inspect(body)}")
+          {:error, "Upload failed with status #{status}"}
+
+        {:error, reason} = error ->
+          Logger.error("ImageKit upload from URL request failed: #{inspect(reason)}")
+          error
       end
-
-    # Add extensions for AI auto-tagging if enabled
-    multipart_data = maybe_add_extensions(multipart_data, options)
-
-    # Build auth headers for form upload
-    auth_token = Base.encode64("#{private_key()}:")
-
-    headers = [
-      {"Authorization", "Basic #{auth_token}"}
-    ]
-
-    case Req.post(@upload_url, form: multipart_data, headers: headers) do
-      {:ok, %{status: 200, body: response}} ->
-        {:ok, parse_upload_response(response)}
-
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("ImageKit upload from URL failed with status #{status}: #{inspect(body)}")
-        {:error, "Upload failed with status #{status}"}
-
-      {:error, reason} = error ->
-        Logger.error("ImageKit upload from URL request failed: #{inspect(reason)}")
-        error
-    end
     end
   end
 
@@ -149,21 +149,21 @@ defmodule ShotElixir.Services.ImagekitService do
     if imagekit_disabled?() do
       {:ok, :deleted}
     else
-    url = "#{@base_url}/files/#{file_id}"
-    headers = build_auth_headers()
+      url = "#{@base_url}/files/#{file_id}"
+      headers = build_auth_headers()
 
-    case Req.delete(url, headers: headers) do
-      {:ok, %{status: 204}} ->
-        {:ok, :deleted}
+      case Req.delete(url, headers: headers) do
+        {:ok, %{status: 204}} ->
+          {:ok, :deleted}
 
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("ImageKit delete failed with status #{status}: #{inspect(body)}")
-        {:error, "Delete failed with status #{status}"}
+        {:ok, %{status: status, body: body}} ->
+          Logger.error("ImageKit delete failed with status #{status}: #{inspect(body)}")
+          {:error, "Delete failed with status #{status}"}
 
-      {:error, reason} = error ->
-        Logger.error("ImageKit delete request failed: #{inspect(reason)}")
-        error
-    end
+        {:error, reason} = error ->
+          Logger.error("ImageKit delete request failed: #{inspect(reason)}")
+          error
+      end
     end
   end
 
@@ -184,28 +184,28 @@ defmodule ShotElixir.Services.ImagekitService do
       folder = destination_folder || build_folder_path()
       return_stub_upload(file_name, folder)
     else
-    url = "#{@base_url}/files/copy"
-    headers = build_auth_headers()
+      url = "#{@base_url}/files/copy"
+      headers = build_auth_headers()
 
-    body =
-      Jason.encode!(%{
-        "sourceFilePath" => source_file_path,
-        "destinationPath" => destination_folder,
-        "includeFileVersions" => false
-      })
+      body =
+        Jason.encode!(%{
+          "sourceFilePath" => source_file_path,
+          "destinationPath" => destination_folder,
+          "includeFileVersions" => false
+        })
 
-    case Req.post(url, headers: headers, body: body) do
-      {:ok, %{status: status, body: response}} when status in [200, 201] ->
-        {:ok, parse_upload_response(response)}
+      case Req.post(url, headers: headers, body: body) do
+        {:ok, %{status: status, body: response}} when status in [200, 201] ->
+          {:ok, parse_upload_response(response)}
 
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("ImageKit copy failed with status #{status}: #{inspect(body)}")
-        {:error, "Copy failed with status #{status}"}
+        {:ok, %{status: status, body: body}} ->
+          Logger.error("ImageKit copy failed with status #{status}: #{inspect(body)}")
+          {:error, "Copy failed with status #{status}"}
 
-      {:error, reason} = error ->
-        Logger.error("ImageKit copy request failed: #{inspect(reason)}")
-        error
-    end
+        {:error, reason} = error ->
+          Logger.error("ImageKit copy request failed: #{inspect(reason)}")
+          error
+      end
     end
   end
 
@@ -223,23 +223,23 @@ defmodule ShotElixir.Services.ImagekitService do
     if imagekit_disabled?() do
       {:ok, file_ids}
     else
-    url = "#{@base_url}/files/batch/deleteByFileIds"
-    headers = build_auth_headers()
+      url = "#{@base_url}/files/batch/deleteByFileIds"
+      headers = build_auth_headers()
 
-    body = Jason.encode!(%{"fileIds" => file_ids})
+      body = Jason.encode!(%{"fileIds" => file_ids})
 
-    case Req.post(url, headers: headers, body: body) do
-      {:ok, %{status: 200, body: response}} ->
-        {:ok, response["successfullyDeletedFileIds"] || []}
+      case Req.post(url, headers: headers, body: body) do
+        {:ok, %{status: 200, body: response}} ->
+          {:ok, response["successfullyDeletedFileIds"] || []}
 
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("ImageKit bulk delete failed with status #{status}: #{inspect(body)}")
-        {:error, "Bulk delete failed with status #{status}"}
+        {:ok, %{status: status, body: body}} ->
+          Logger.error("ImageKit bulk delete failed with status #{status}: #{inspect(body)}")
+          {:error, "Bulk delete failed with status #{status}"}
 
-      {:error, reason} = error ->
-        Logger.error("ImageKit bulk delete request failed: #{inspect(reason)}")
-        error
-    end
+        {:error, reason} = error ->
+          Logger.error("ImageKit bulk delete request failed: #{inspect(reason)}")
+          error
+      end
     end
   end
 
@@ -273,21 +273,21 @@ defmodule ShotElixir.Services.ImagekitService do
          metadata: %{}
        }}
     else
-    url = "#{@base_url}/files/#{file_id}/details"
-    headers = build_auth_headers()
+      url = "#{@base_url}/files/#{file_id}/details"
+      headers = build_auth_headers()
 
-    case Req.get(url, headers: headers) do
-      {:ok, %{status: 200, body: response}} ->
-        {:ok, parse_file_details(response)}
+      case Req.get(url, headers: headers) do
+        {:ok, %{status: 200, body: response}} ->
+          {:ok, parse_file_details(response)}
 
-      {:ok, %{status: status, body: body}} ->
-        Logger.error("ImageKit get details failed with status #{status}: #{inspect(body)}")
-        {:error, "Get details failed with status #{status}"}
+        {:ok, %{status: status, body: body}} ->
+          Logger.error("ImageKit get details failed with status #{status}: #{inspect(body)}")
+          {:error, "Get details failed with status #{status}"}
 
-      {:error, reason} = error ->
-        Logger.error("ImageKit get details request failed: #{inspect(reason)}")
-        error
-    end
+        {:error, reason} = error ->
+          Logger.error("ImageKit get details request failed: #{inspect(reason)}")
+          error
+      end
     end
   end
 
