@@ -340,7 +340,9 @@ defmodule ShotElixir.Factions do
         updated_faction =
           Repo.preload(
             updated_faction,
-            [:characters, :vehicles, :sites, :parties, :junctures, :image_positions], force: true)
+            [:characters, :vehicles, :sites, :parties, :junctures, :image_positions],
+            force: true
+          )
 
         broadcast_change(updated_faction, :update)
         {:ok, updated_faction}
