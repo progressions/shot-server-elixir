@@ -9,7 +9,9 @@ defmodule ShotElixir.Accounts do
   alias ShotElixir.ImageLoader
 
   def list_users do
-    Repo.all(User)
+    User
+    |> Repo.all()
+    |> Repo.preload([:image_positions])
   end
 
   def list_campaign_users(params \\ %{}, _current_user \\ nil) do
@@ -181,6 +183,7 @@ defmodule ShotElixir.Accounts do
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
+      |> Repo.preload([:image_positions])
 
     # Load image URLs for all users efficiently
     users_with_images = ImageLoader.load_image_urls(users, "User")
@@ -267,6 +270,7 @@ defmodule ShotElixir.Accounts do
 
   def get_user!(id) do
     Repo.get!(User, id)
+    |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("User")
   end
 

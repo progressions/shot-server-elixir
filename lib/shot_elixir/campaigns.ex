@@ -11,18 +11,20 @@ defmodule ShotElixir.Campaigns do
   use ShotElixir.Models.Broadcastable
 
   def list_campaigns do
-    Repo.all(Campaign)
+    Campaign
+    |> Repo.all()
+    |> Repo.preload([:image_positions])
   end
 
   def get_campaign!(id) do
     Repo.get!(Campaign, id)
-    |> Repo.preload(:user)
+    |> Repo.preload([:user, :image_positions])
     |> ImageLoader.load_image_url("Campaign")
   end
 
   def get_campaign(id) do
     Repo.get(Campaign, id)
-    |> Repo.preload([:user, :members])
+    |> Repo.preload([:user, :members, :image_positions])
     |> ImageLoader.load_image_url("Campaign")
   end
 
@@ -35,6 +37,7 @@ defmodule ShotElixir.Campaigns do
         distinct: true
 
     Repo.all(query)
+    |> Repo.preload([:image_positions])
   end
 
   @doc """
@@ -183,6 +186,7 @@ defmodule ShotElixir.Campaigns do
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
+      |> Repo.preload([:image_positions])
 
     # Load image URLs for all campaigns efficiently
     campaigns_with_images = ImageLoader.load_image_urls(campaigns, "Campaign")
@@ -248,7 +252,7 @@ defmodule ShotElixir.Campaigns do
       %Campaign{}
       |> Campaign.changeset(attrs)
       |> Repo.insert()
-      |> broadcast_result(:insert)
+      |> broadcast_result(:insert, &Repo.preload(&1, [:user, :members, :image_positions]))
 
     # Track onboarding milestone and queue seeding job
     case result do
@@ -287,13 +291,13 @@ defmodule ShotElixir.Campaigns do
       campaign
       |> Campaign.changeset(campaign_attrs)
       |> Repo.update()
-      |> broadcast_result(:update)
+      |> broadcast_result(:update, &Repo.preload(&1, [:user, :members, :image_positions]))
 
     # Sync memberships if user_ids provided
     case {result, user_ids} do
       {{:ok, updated_campaign}, user_ids} when is_list(user_ids) ->
         sync_campaign_members(updated_campaign, user_ids)
-        {:ok, Repo.preload(updated_campaign, [:user, :members], force: true)}
+        {:ok, Repo.preload(updated_campaign, [:user, :members, :image_positions], force: true)}
 
       _ ->
         result

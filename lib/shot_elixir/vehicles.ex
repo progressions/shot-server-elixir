@@ -14,7 +14,8 @@ defmodule ShotElixir.Vehicles do
     query =
       from v in Vehicle,
         where: v.campaign_id == ^campaign_id and v.active == true,
-        order_by: [asc: fragment("lower(?)", v.name)]
+        order_by: [asc: fragment("lower(?)", v.name)],
+        preload: [:image_positions]
 
     Repo.all(query)
   end
@@ -319,6 +320,7 @@ defmodule ShotElixir.Vehicles do
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
+      |> Repo.preload([:image_positions])
 
     # Load image URLs for all vehicles efficiently
     vehicles_with_images = ImageLoader.load_image_urls(vehicles, "Vehicle")
@@ -403,11 +405,13 @@ defmodule ShotElixir.Vehicles do
 
   def get_vehicle!(id) do
     Repo.get!(Vehicle, id)
+    |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("Vehicle")
   end
 
   def get_vehicle(id) do
     Repo.get(Vehicle, id)
+    |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("Vehicle")
   end
 
@@ -423,6 +427,7 @@ defmodule ShotElixir.Vehicles do
     else
       from(v in Vehicle, where: v.id in ^ids)
       |> Repo.all()
+      |> Repo.preload([:image_positions])
       |> ImageLoader.load_image_urls("Vehicle")
     end
   end
@@ -430,21 +435,21 @@ defmodule ShotElixir.Vehicles do
   def get_vehicle_with_preloads(id) do
     Vehicle
     |> Repo.get(id)
-    |> Repo.preload([:user, :faction])
+    |> Repo.preload([:user, :faction, :image_positions])
   end
 
   def create_vehicle(attrs \\ %{}) do
     %Vehicle{}
     |> Vehicle.changeset(attrs)
     |> Repo.insert()
-    |> broadcast_result(:insert, &Repo.preload(&1, [:user, :faction]))
+    |> broadcast_result(:insert, &Repo.preload(&1, [:user, :faction, :image_positions]))
   end
 
   def update_vehicle(%Vehicle{} = vehicle, attrs) do
     vehicle
     |> Vehicle.changeset(attrs)
     |> Repo.update()
-    |> broadcast_result(:update, &Repo.preload(&1, [:user, :faction]))
+    |> broadcast_result(:update, &Repo.preload(&1, [:user, :faction, :image_positions]))
   end
 
   def delete_vehicle(%Vehicle{} = vehicle) do

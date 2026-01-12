@@ -14,7 +14,7 @@ defmodule ShotElixir.Junctures do
       from j in Juncture,
         where: j.campaign_id == ^campaign_id and j.active == true,
         order_by: [asc: fragment("lower(?)", j.name)],
-        preload: [:faction]
+        preload: [:faction, :image_positions]
 
     Repo.all(query)
   end
@@ -265,13 +265,13 @@ defmodule ShotElixir.Junctures do
 
   def get_juncture!(id) do
     Juncture
-    |> preload(:faction)
+    |> preload([:faction, :image_positions])
     |> Repo.get!(id)
   end
 
   def get_juncture(id) do
     Juncture
-    |> preload(:faction)
+    |> preload([:faction, :image_positions])
     |> Repo.get(id)
   end
 
@@ -287,7 +287,7 @@ defmodule ShotElixir.Junctures do
     |> Repo.insert()
     |> case do
       {:ok, juncture} ->
-        juncture = Repo.preload(juncture, :faction)
+        juncture = Repo.preload(juncture, [:faction, :image_positions])
         broadcast_change(juncture, :insert)
         {:ok, juncture}
 
@@ -307,7 +307,7 @@ defmodule ShotElixir.Junctures do
           sync_character_junctures(juncture, attrs["character_ids"])
         end
 
-        juncture = Repo.preload(juncture, [:faction, :characters], force: true)
+        juncture = Repo.preload(juncture, [:faction, :characters, :image_positions], force: true)
         broadcast_change(juncture, :update)
         {:ok, juncture}
 
