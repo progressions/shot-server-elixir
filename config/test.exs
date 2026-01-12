@@ -56,3 +56,6 @@ config :nostrum, :token, nil
 
 # Environment identifier for services like ImageUploader
 config :shot_elixir, :environment, :test
+
+# Avoid external ImageKit calls during tests
+config :shot_elixir, :imagekit, disabled: true

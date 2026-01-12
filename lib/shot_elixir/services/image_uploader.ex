@@ -50,40 +50,44 @@ defmodule ShotElixir.Services.ImageUploader do
   def download_image(url) do
     Logger.debug("[ImageUploader] Downloading image from: #{url}")
 
-    case Req.get(url,
-           redirect: true,
-           max_redirects: @max_redirects,
-           receive_timeout: @default_timeout
-         ) do
-      {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
-        extension = extract_extension(url)
+    if ImagekitService.imagekit_disabled?() and imagekit_url?(url) do
+      create_stub_file(url)
+    else
+      case Req.get(url,
+             redirect: true,
+             max_redirects: @max_redirects,
+             receive_timeout: @default_timeout
+           ) do
+        {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
+          extension = extract_extension(url)
 
-        temp_path =
-          Path.join(
-            System.tmp_dir!(),
-            "image_download_#{:os.system_time(:millisecond)}#{extension}"
-          )
+          temp_path =
+            Path.join(
+              System.tmp_dir!(),
+              "image_download_#{:os.system_time(:millisecond)}#{extension}"
+            )
 
-        case File.write(temp_path, body) do
-          :ok ->
-            Logger.debug("[ImageUploader] Image downloaded to: #{temp_path}")
-            {:ok, temp_path}
+          case File.write(temp_path, body) do
+            :ok ->
+              Logger.debug("[ImageUploader] Image downloaded to: #{temp_path}")
+              {:ok, temp_path}
 
-          {:error, reason} ->
-            {:error, "Failed to write temp file: #{inspect(reason)}"}
-        end
+            {:error, reason} ->
+              {:error, "Failed to write temp file: #{inspect(reason)}"}
+          end
 
-      {:ok, %{status: 200, body: body}} ->
-        {:error, "Empty response body: #{inspect(body)}"}
+        {:ok, %{status: 200, body: body}} ->
+          {:error, "Empty response body: #{inspect(body)}"}
 
-      {:ok, %{status: status}} ->
-        {:error, "HTTP request failed with status #{status}"}
+        {:ok, %{status: status}} ->
+          {:error, "HTTP request failed with status #{status}"}
 
-      {:error, %Req.TransportError{reason: reason}} ->
-        {:error, "Transport error: #{inspect(reason)}"}
+        {:error, %Req.TransportError{reason: reason}} ->
+          {:error, "Transport error: #{inspect(reason)}"}
 
-      {:error, reason} ->
-        {:error, "Failed to download image: #{inspect(reason)}"}
+        {:error, reason} ->
+          {:error, "Failed to download image: #{inspect(reason)}"}
+      end
     end
   end
 
@@ -183,6 +187,32 @@ defmodule ShotElixir.Services.ImageUploader do
     case Path.extname(path) do
       "" -> ".jpg"
       ext -> ext
+    end
+  end
+
+  defp imagekit_url?(url) do
+    case URI.parse(url) do
+      %URI{host: host} when is_binary(host) ->
+        String.contains?(host, "ik.imagekit.io")
+
+      _ ->
+        false
+    end
+  end
+
+  defp create_stub_file(url) do
+    extension = extract_extension(url)
+
+    temp_path =
+      Path.join(System.tmp_dir!(), "image_download_#{:os.system_time(:millisecond)}#{extension}")
+
+    case File.write(temp_path, "") do
+      :ok ->
+        Logger.debug("[ImageUploader] ImageKit disabled, stub file: #{temp_path}")
+        {:ok, temp_path}
+
+      {:error, reason} ->
+        {:error, "Failed to write temp file: #{inspect(reason)}"}
     end
   end
 

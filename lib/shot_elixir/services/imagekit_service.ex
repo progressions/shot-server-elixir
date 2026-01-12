@@ -28,9 +28,19 @@ defmodule ShotElixir.Services.ImagekitService do
     - {:error, reason} on failure
   """
   def upload_file(file_path, options \\ %{}) do
-    with {:ok, file_content} <- File.read(file_path),
-         {:ok, response} <- perform_upload(file_content, file_path, options) do
-      {:ok, parse_upload_response(response)}
+    with {:ok, file_content} <- File.read(file_path) do
+      if imagekit_disabled?() do
+        {:ok, build_stub_upload_result(file_content, file_path, options)}
+      else
+        case perform_upload(file_content, file_path, options) do
+          {:ok, response} ->
+            {:ok, parse_upload_response(response)}
+
+          {:error, reason} = error ->
+            Logger.error("ImageKit upload failed: #{inspect(reason)}")
+            error
+        end
+      end
     else
       {:error, reason} = error ->
         Logger.error("ImageKit upload failed: #{inspect(reason)}")
@@ -83,6 +93,11 @@ defmodule ShotElixir.Services.ImagekitService do
     - {:error, reason} on failure
   """
   def upload_from_url(url, options \\ %{}) do
+    if imagekit_disabled?() do
+      file_name = options[:file_name] || file_name_from_url(url)
+      folder = options[:folder] || build_folder_path()
+      return_stub_upload(file_name, folder)
+    else
     file_name = options[:file_name] || Path.basename(URI.parse(url).path)
     folder = options[:folder] || build_folder_path()
 
@@ -124,12 +139,16 @@ defmodule ShotElixir.Services.ImagekitService do
         Logger.error("ImageKit upload from URL request failed: #{inspect(reason)}")
         error
     end
+    end
   end
 
   @doc """
   Deletes a file from ImageKit by file ID.
   """
   def delete_file(file_id) when is_binary(file_id) do
+    if imagekit_disabled?() do
+      {:ok, :deleted}
+    else
     url = "#{@base_url}/files/#{file_id}"
     headers = build_auth_headers()
 
@@ -145,6 +164,7 @@ defmodule ShotElixir.Services.ImagekitService do
         Logger.error("ImageKit delete request failed: #{inspect(reason)}")
         error
     end
+    end
   end
 
   @doc """
@@ -159,6 +179,11 @@ defmodule ShotElixir.Services.ImagekitService do
     - {:error, reason} on failure
   """
   def copy_file(source_file_path, destination_folder) do
+    if imagekit_disabled?() do
+      file_name = Path.basename(source_file_path)
+      folder = destination_folder || build_folder_path()
+      return_stub_upload(file_name, folder)
+    else
     url = "#{@base_url}/files/copy"
     headers = build_auth_headers()
 
@@ -181,6 +206,7 @@ defmodule ShotElixir.Services.ImagekitService do
         Logger.error("ImageKit copy request failed: #{inspect(reason)}")
         error
     end
+    end
   end
 
   @doc """
@@ -194,6 +220,9 @@ defmodule ShotElixir.Services.ImagekitService do
     - {:error, reason} on failure (if any file is not found, all fail)
   """
   def bulk_delete_files(file_ids) when is_list(file_ids) do
+    if imagekit_disabled?() do
+      {:ok, file_ids}
+    else
     url = "#{@base_url}/files/batch/deleteByFileIds"
     headers = build_auth_headers()
 
@@ -211,6 +240,7 @@ defmodule ShotElixir.Services.ImagekitService do
         Logger.error("ImageKit bulk delete request failed: #{inspect(reason)}")
         error
     end
+    end
   end
 
   @doc """
@@ -224,6 +254,25 @@ defmodule ShotElixir.Services.ImagekitService do
     - {:error, reason} on failure
   """
   def get_file_details(file_id) when is_binary(file_id) do
+    if imagekit_disabled?() do
+      {:ok,
+       %{
+         file_id: file_id,
+         name: nil,
+         file_path: nil,
+         url: nil,
+         thumbnail_url: nil,
+         file_type: nil,
+         mime: nil,
+         size: 0,
+         width: nil,
+         height: nil,
+         created_at: nil,
+         updated_at: nil,
+         tags: [],
+         metadata: %{}
+       }}
+    else
     url = "#{@base_url}/files/#{file_id}/details"
     headers = build_auth_headers()
 
@@ -238,6 +287,7 @@ defmodule ShotElixir.Services.ImagekitService do
       {:error, reason} = error ->
         Logger.error("ImageKit get details request failed: #{inspect(reason)}")
         error
+    end
     end
   end
 
@@ -341,6 +391,65 @@ defmodule ShotElixir.Services.ImagekitService do
       {:error, reason} = error ->
         Logger.error("ImageKit upload request failed: #{inspect(reason)}")
         error
+    end
+  end
+
+  defp return_stub_upload(file_name, folder) do
+    {:ok, build_stub_upload_result("", file_name, folder)}
+  end
+
+  defp build_stub_upload_result(file_content, file_path, options) when is_map(options) do
+    file_name = options[:file_name] || Path.basename(file_path)
+    folder = options[:folder] || build_folder_path()
+    build_stub_upload_result(file_content, file_name, folder)
+  end
+
+  defp build_stub_upload_result(file_content, file_name, folder) do
+    name = Path.join(folder, file_name)
+    url = build_stub_url(name)
+    file_type = file_type_from_name(file_name)
+
+    %{
+      file_id: "test_#{System.unique_integer([:positive])}",
+      name: name,
+      url: url,
+      thumbnail_url: nil,
+      file_type: file_type,
+      size: byte_size(file_content),
+      width: nil,
+      height: nil,
+      ai_tags: [],
+      metadata: %{"fileType" => file_type}
+    }
+  end
+
+  defp build_stub_url(name) do
+    endpoint = url_endpoint() || ""
+    endpoint = String.trim_trailing(endpoint, "/")
+    path = String.trim_leading(name, "/")
+
+    if endpoint == "" do
+      path
+    else
+      "#{endpoint}/#{path}"
+    end
+  end
+
+  defp file_name_from_url(url) do
+    url
+    |> URI.parse()
+    |> Map.get(:path)
+    |> case do
+      nil -> "image.jpg"
+      "" -> "image.jpg"
+      path -> Path.basename(path)
+    end
+  end
+
+  defp file_type_from_name(file_name) do
+    case Path.extname(file_name) do
+      "" -> "jpg"
+      ext -> String.trim_leading(ext, ".")
     end
   end
 
@@ -480,5 +589,17 @@ defmodule ShotElixir.Services.ImagekitService do
 
   defp config do
     Application.get_env(:shot_elixir, :imagekit, [])
+  end
+
+  @doc false
+  def imagekit_disabled? do
+    case System.get_env("IMAGEKIT_DISABLED") do
+      nil ->
+        config()[:disabled] == true
+
+      value ->
+        value = String.downcase(value)
+        value in ["1", "true", "yes", "on"]
+    end
   end
 end
