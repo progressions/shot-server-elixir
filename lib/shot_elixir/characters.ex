@@ -20,7 +20,8 @@ defmodule ShotElixir.Characters do
   def list_characters(campaign_id) do
     query =
       from c in Character,
-        where: c.campaign_id == ^campaign_id and c.active == true
+        where: c.campaign_id == ^campaign_id and c.active == true,
+        preload: [:image_positions]
 
     Repo.all(query)
   end
@@ -207,6 +208,7 @@ defmodule ShotElixir.Characters do
       query
       |> limit(^per_page)
       |> offset(^offset)
+      |> preload([:image_positions])
       |> Repo.all()
 
     Logger.debug("Characters returned after pagination: #{length(characters)}")
@@ -406,7 +408,8 @@ defmodule ShotElixir.Characters do
         where: c.campaign_id == ^campaign_id and c.active == true,
         where: ilike(c.name, ^"%#{search_term}%"),
         limit: 10,
-        order_by: [asc: c.name]
+        order_by: [asc: c.name],
+        preload: [:image_positions]
 
     Repo.all(query)
   end

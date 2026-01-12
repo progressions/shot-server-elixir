@@ -16,7 +16,7 @@ defmodule ShotElixir.Sites do
       from s in Site,
         where: s.campaign_id == ^campaign_id and s.active == true,
         order_by: [asc: fragment("lower(?)", s.name)],
-        preload: [:faction, :juncture]
+        preload: [:faction, :juncture, :image_positions]
 
     query
     |> Repo.all()
@@ -184,7 +184,7 @@ defmodule ShotElixir.Sites do
       query
       |> limit(^per_page)
       |> offset(^offset)
-      |> preload([:faction, :juncture, attunements: [:character]])
+      |> preload([:faction, :juncture, :image_positions, attunements: [:character]])
       |> Repo.all()
 
     # Load image URLs for all sites efficiently
@@ -271,14 +271,14 @@ defmodule ShotElixir.Sites do
 
   def get_site!(id) do
     Site
-    |> preload([:faction, :juncture, attunements: [:character]])
+    |> preload([:faction, :juncture, :image_positions, attunements: [:character]])
     |> Repo.get!(id)
     |> ImageLoader.load_image_url("Site")
   end
 
   def get_site(id) do
     Site
-    |> preload([:faction, :juncture, attunements: [:character]])
+    |> preload([:faction, :juncture, :image_positions, attunements: [:character]])
     |> Repo.get(id)
     |> ImageLoader.load_image_url("Site")
   end
@@ -314,7 +314,11 @@ defmodule ShotElixir.Sites do
             site
           end
 
-        site = Repo.preload(site, [:faction, :juncture, attunements: [:character]], force: true)
+        site =
+          Repo.preload(site, [:faction, :juncture, :image_positions, attunements: [:character]],
+            force: true
+          )
+
         broadcast_change(site, :update)
         maybe_enqueue_notion_sync(site)
         {:ok, site}

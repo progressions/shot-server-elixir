@@ -16,7 +16,7 @@ defmodule ShotElixir.Parties do
       from p in Party,
         where: p.campaign_id == ^campaign_id and p.active == true,
         order_by: [asc: fragment("lower(?)", p.name)],
-        preload: [:faction, :juncture, memberships: [:character, :vehicle]]
+        preload: [:faction, :juncture, :image_positions, memberships: [:character, :vehicle]]
 
     query
     |> Repo.all()
@@ -211,7 +211,7 @@ defmodule ShotElixir.Parties do
       query
       |> limit(^per_page)
       |> offset(^offset)
-      |> preload(memberships: [:character, :vehicle])
+      |> preload([:image_positions, memberships: [:character, :vehicle]])
       |> Repo.all()
 
     # Load image URLs for all parties efficiently
@@ -299,14 +299,14 @@ defmodule ShotElixir.Parties do
 
   def get_party!(id) do
     Party
-    |> preload([:faction, :juncture, memberships: [:character, :vehicle]])
+    |> preload([:faction, :juncture, :image_positions, memberships: [:character, :vehicle]])
     |> Repo.get!(id)
     |> ImageLoader.load_image_url("Party")
   end
 
   def get_party(id) do
     Party
-    |> preload([:faction, :juncture, memberships: [:character, :vehicle]])
+    |> preload([:faction, :juncture, :image_positions, memberships: [:character, :vehicle]])
     |> Repo.get(id)
     |> ImageLoader.load_image_url("Party")
   end
@@ -317,7 +317,14 @@ defmodule ShotElixir.Parties do
     |> Repo.insert()
     |> case do
       {:ok, party} ->
-        party = Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]])
+        party =
+          Repo.preload(party, [
+            :faction,
+            :juncture,
+            :image_positions,
+            memberships: [:character, :vehicle]
+          ])
+
         broadcast_change(party, :insert)
         # Track onboarding milestone
         ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(party)
@@ -351,7 +358,9 @@ defmodule ShotElixir.Parties do
           end
 
         party =
-          Repo.preload(party, [:faction, :juncture, memberships: [:character, :vehicle]],
+          Repo.preload(
+            party,
+            [:faction, :juncture, :image_positions, memberships: [:character, :vehicle]],
             force: true
           )
 

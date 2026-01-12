@@ -15,7 +15,8 @@ defmodule ShotElixir.Factions do
     query =
       from f in Faction,
         where: f.campaign_id == ^campaign_id and f.active == true,
-        order_by: [asc: fragment("lower(?)", f.name)]
+        order_by: [asc: fragment("lower(?)", f.name)],
+        preload: [:image_positions]
 
     Repo.all(query)
   end
@@ -186,7 +187,7 @@ defmodule ShotElixir.Factions do
       query
       |> limit(^per_page)
       |> offset(^offset)
-      |> preload([:characters, :vehicles, :sites, :parties, :junctures])
+      |> preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
       |> Repo.all()
 
     # Load image URLs for all factions efficiently
@@ -292,7 +293,7 @@ defmodule ShotElixir.Factions do
       %Faction{}
       |> Faction.changeset(attrs)
       |> Repo.insert()
-      |> broadcast_result(:insert)
+      |> broadcast_result(:insert, &Repo.preload(&1, [:image_positions]))
 
     # Track onboarding milestone
     case result do
@@ -337,7 +338,9 @@ defmodule ShotElixir.Factions do
         maybe_enqueue_notion_sync(updated_faction)
 
         updated_faction =
-          Repo.preload(updated_faction, [:characters, :vehicles, :sites, :parties, :junctures],
+          Repo.preload(
+            updated_faction,
+            [:characters, :vehicles, :sites, :parties, :junctures, :image_positions],
             force: true
           )
 

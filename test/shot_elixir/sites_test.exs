@@ -3,6 +3,7 @@ defmodule ShotElixir.SitesTest do
 
   alias ShotElixir.Sites
   alias ShotElixir.Sites.{Site, Attunement}
+  alias ShotElixir.ImagePositions
   alias ShotElixir.Media
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Characters
@@ -287,6 +288,30 @@ defmodule ShotElixir.SitesTest do
       assert new_character.id in character_ids
       refute old_character.id in character_ids
       assert length(attunements) == 1
+    end
+  end
+
+  describe "get_site/1" do
+    test "preloads image positions", %{campaign: campaign} do
+      {:ok, site} =
+        Sites.create_site(%{
+          name: "Site with Image Position",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _image_position} =
+        ImagePositions.create(%{
+          positionable_type: "Site",
+          positionable_id: site.id,
+          context: "desktop_entity",
+          x_position: 12,
+          y_position: -8
+        })
+
+      site_with_positions = Sites.get_site(site.id)
+
+      assert is_list(site_with_positions.image_positions)
+      assert Enum.any?(site_with_positions.image_positions, &(&1.context == "desktop_entity"))
     end
   end
 end
