@@ -93,14 +93,12 @@ defmodule ShotElixir.Services.ImagekitService do
     - {:error, reason} on failure
   """
   def upload_from_url(url, options \\ %{}) do
+    file_name = options[:file_name] || file_name_from_url(url)
+    folder = options[:folder] || build_folder_path()
+
     if imagekit_disabled?() do
-      file_name = options[:file_name] || file_name_from_url(url)
-      folder = options[:folder] || build_folder_path()
       return_stub_upload(file_name, folder)
     else
-      file_name = options[:file_name] || Path.basename(URI.parse(url).path)
-      folder = options[:folder] || build_folder_path()
-
       # Build multipart form data
       multipart_data = [
         {"file", url},
@@ -591,7 +589,11 @@ defmodule ShotElixir.Services.ImagekitService do
     Application.get_env(:shot_elixir, :imagekit, [])
   end
 
-  @doc false
+  @doc """
+  Returns true when ImageKit network calls should be skipped.
+
+  Checks `IMAGEKIT_DISABLED` or the `:imagekit` config.
+  """
   def imagekit_disabled? do
     case System.get_env("IMAGEKIT_DISABLED") do
       nil ->

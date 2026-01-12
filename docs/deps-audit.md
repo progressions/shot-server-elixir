@@ -23,7 +23,7 @@ This report covers direct dependencies listed in `mix.exs` and their current loc
 | swoosh | 1.19.8 | 1.20.0 | update possible | all |
 | req | 0.5.15 | 0.5.17 | update possible | all |
 | image | 0.62.0 | 0.62.1 | update possible | all |
-| tidewave | 0.5.2 | 0.5.4 | update possible | dev |
+| tidewave | 0.5.3 | 0.5.4 | update possible | dev |
 | bandit | 1.5.7 | 1.10.1 | blocked by mix.exs | all |
 | cachex | 3.6.0 | 4.1.1 | blocked by mix.exs | all |
 | dotenvy | 0.9.0 | 1.1.1 | blocked by mix.exs | dev,test |

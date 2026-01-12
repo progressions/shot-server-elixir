@@ -34,6 +34,9 @@ defmodule ShotElixir.Services.ImageUploader do
 
   ## Parameters
     - url: The URL to download the image from
+    - opts: Optional keyword list
+      - :validate_host - when true (default), enforce allowlist/SSRF checks
+      - :allowed_hosts - override allowlisted hosts/patterns for this call
 
   ## Returns
     - `{:ok, temp_path}` on success with the path to the temporary file
@@ -47,46 +50,48 @@ defmodule ShotElixir.Services.ImageUploader do
       iex> ImageUploader.download_image("https://invalid.url/404.jpg")
       {:error, "HTTP request failed with status 404"}
   """
-  def download_image(url) do
+  def download_image(url, opts \\ []) do
     Logger.debug("[ImageUploader] Downloading image from: #{url}")
 
     if ImagekitService.imagekit_disabled?() and imagekit_url?(url) do
       create_stub_file(url)
     else
-      case Req.get(url,
-             redirect: true,
-             max_redirects: @max_redirects,
-             receive_timeout: @default_timeout
-           ) do
-        {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
-          extension = extract_extension(url)
+      with :ok <- validate_download_url(url, opts) do
+        case Req.get(url,
+               redirect: true,
+               max_redirects: @max_redirects,
+               receive_timeout: @default_timeout
+             ) do
+          {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
+            extension = extract_extension(url)
 
-          temp_path =
-            Path.join(
-              System.tmp_dir!(),
-              "image_download_#{:os.system_time(:millisecond)}#{extension}"
-            )
+            temp_path =
+              Path.join(
+                System.tmp_dir!(),
+                "image_download_#{:os.system_time(:millisecond)}#{extension}"
+              )
 
-          case File.write(temp_path, body) do
-            :ok ->
-              Logger.debug("[ImageUploader] Image downloaded to: #{temp_path}")
-              {:ok, temp_path}
+            case File.write(temp_path, body) do
+              :ok ->
+                Logger.debug("[ImageUploader] Image downloaded to: #{temp_path}")
+                {:ok, temp_path}
 
-            {:error, reason} ->
-              {:error, "Failed to write temp file: #{inspect(reason)}"}
-          end
+              {:error, reason} ->
+                {:error, "Failed to write temp file: #{inspect(reason)}"}
+            end
 
-        {:ok, %{status: 200, body: body}} ->
-          {:error, "Empty response body: #{inspect(body)}"}
+          {:ok, %{status: 200, body: body}} ->
+            {:error, "Empty response body: #{inspect(body)}"}
 
-        {:ok, %{status: status}} ->
-          {:error, "HTTP request failed with status #{status}"}
+          {:ok, %{status: status}} ->
+            {:error, "HTTP request failed with status #{status}"}
 
-        {:error, %Req.TransportError{reason: reason}} ->
-          {:error, "Transport error: #{inspect(reason)}"}
+          {:error, %Req.TransportError{reason: reason}} ->
+            {:error, "Transport error: #{inspect(reason)}"}
 
-        {:error, reason} ->
-          {:error, "Failed to download image: #{inspect(reason)}"}
+          {:error, reason} ->
+            {:error, "Failed to download image: #{inspect(reason)}"}
+        end
       end
     end
   end
@@ -194,6 +199,90 @@ defmodule ShotElixir.Services.ImageUploader do
     case URI.parse(url) do
       %URI{host: host} when is_binary(host) ->
         String.contains?(host, "ik.imagekit.io")
+
+      _ ->
+        false
+    end
+  end
+
+  defp validate_download_url(url, opts) do
+    validate_host = Keyword.get(opts, :validate_host, true)
+
+    if validate_host do
+      uri = URI.parse(url)
+
+      cond do
+        uri.scheme not in ["http", "https"] ->
+          {:error, :invalid_scheme}
+
+        is_nil(uri.host) ->
+          {:error, :no_host}
+
+        internal_address?(uri.host) ->
+          {:error, :internal_address}
+
+        not allowed_host?(uri.host, opts) ->
+          {:error, :untrusted_host}
+
+        true ->
+          :ok
+      end
+    else
+      :ok
+    end
+  end
+
+  defp allowed_host?(host, opts) do
+    allowed_hosts = Keyword.get(opts, :allowed_hosts, configured_allowed_hosts())
+
+    if Enum.empty?(allowed_hosts) do
+      true
+    else
+      Enum.any?(allowed_hosts, fn
+        %Regex{} = pattern ->
+          Regex.match?(pattern, host)
+
+        pattern when is_binary(pattern) ->
+          host == pattern or String.ends_with?(host, ".#{pattern}")
+
+        _ ->
+          false
+      end)
+    end
+  end
+
+  defp configured_allowed_hosts do
+    :shot_elixir
+    |> Application.get_env(:image_download, [])
+    |> Keyword.get(:allowed_hosts, [])
+  end
+
+  defp internal_address?(host) do
+    host in ["localhost", "127.0.0.1", "0.0.0.0"] or
+      String.ends_with?(host, ".local") or
+      String.ends_with?(host, ".internal") or
+      private_ip?(host)
+  end
+
+  defp private_ip?(host) do
+    case :inet.parse_address(String.to_charlist(host)) do
+      {:ok, {10, _, _, _}} ->
+        true
+
+      {:ok, {127, _, _, _}} ->
+        true
+
+      {:ok, {169, 254, _, _}} ->
+        true
+
+      {:ok, {172, second, _, _}} when second in 16..31 ->
+        true
+
+      {:ok, {192, 168, _, _}} ->
+        true
+
+      {:ok, {0, _, _, _}} ->
+        true
 
       _ ->
         false

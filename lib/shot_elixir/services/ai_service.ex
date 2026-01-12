@@ -243,7 +243,7 @@ defmodule ShotElixir.Services.AiService do
   def store_ai_generated_image(ai_url, campaign_id, prompt, ai_provider, user_id) do
     alias ShotElixir.Media
 
-    with {:ok, temp_file} <- ImageUploader.download_image(ai_url),
+    with {:ok, temp_file} <- ImageUploader.download_image(ai_url, validate_host: false),
          {:ok, upload_result} <- upload_ai_image_to_imagekit(temp_file, campaign_id) do
       # Clean up temp file
       File.rm(temp_file)
