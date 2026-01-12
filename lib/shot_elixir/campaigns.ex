@@ -260,7 +260,7 @@ defmodule ShotElixir.Campaigns do
         ShotElixir.Models.Concerns.OnboardingTrackable.track_milestone(campaign)
 
         # Queue campaign seeding job (unless this is the master template)
-        unless campaign.is_master_template do
+        if campaign_seeding_enabled?() and not campaign.is_master_template do
           case %{"campaign_id" => campaign.id}
                |> ShotElixir.Workers.CampaignSeederWorker.new()
                |> Oban.insert() do
@@ -302,6 +302,11 @@ defmodule ShotElixir.Campaigns do
       _ ->
         result
     end
+  end
+
+  defp campaign_seeding_enabled? do
+    config = Application.get_env(:shot_elixir, :campaign_seeding, enabled: true)
+    Keyword.get(config, :enabled, true)
   end
 
   defp sync_campaign_members(campaign, user_ids) do
