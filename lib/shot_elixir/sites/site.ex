@@ -1,7 +1,7 @@
 defmodule ShotElixir.Sites.Site do
   use Ecto.Schema
   import Ecto.Changeset
-  use Arc.Ecto.Schema
+  use Waffle.Ecto.Schema
 
   alias ShotElixir.ImagePositions.ImagePosition
 

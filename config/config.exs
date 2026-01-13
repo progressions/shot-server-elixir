@@ -62,9 +62,9 @@ config :shot_elixir, :imagekit,
 # Remote image download allowlist (SSRF protection)
 config :shot_elixir, :image_download, allowed_hosts: [~r/\.imagekit\.io$/]
 
-# Arc configuration for file uploads
-config :arc,
-  storage: Arc.Storage.Local
+# Waffle configuration for file uploads
+config :waffle,
+  storage: Waffle.Storage.Local
 
 # Cachex configuration for image URL caching
 config :shot_elixir, :cachex,

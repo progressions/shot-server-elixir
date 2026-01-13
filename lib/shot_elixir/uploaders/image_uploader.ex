@@ -1,10 +1,10 @@
 defmodule ShotElixir.Uploaders.ImageUploader do
   @moduledoc """
-  Arc uploader definition for handling image uploads to ImageKit.
+  Waffle uploader definition for handling image uploads to ImageKit.
   Validates file types and delegates storage to ImageKit service.
   """
 
-  # Not using Arc.Definition as we're implementing custom storage with ImageKit
+  # Not using Waffle.Definition as we're implementing custom storage with ImageKit
 
   alias ShotElixir.Services.ImagekitService
 
@@ -14,7 +14,7 @@ defmodule ShotElixir.Uploaders.ImageUploader do
   # 50MB in bytes
   @max_file_size 50_000_000
 
-  # Override Arc's default __storage implementation
+  # Override Waffle's default __storage implementation
   def __storage, do: ShotElixir.Uploaders.ImageUploader
 
   @doc """
@@ -62,7 +62,7 @@ defmodule ShotElixir.Uploaders.ImageUploader do
   @doc """
   Override storage to use ImageKit instead of local/S3.
   """
-  # Override Arc's default store/1
+  # Override Waffle's default store/1
   def store(definition)
 
   def store({%{file_name: file_name, path: path} = _file, scope}) do
@@ -78,7 +78,7 @@ defmodule ShotElixir.Uploaders.ImageUploader do
            min_confidence: 70
          }) do
       {:ok, response} ->
-        # Return the ImageKit file name for Arc to store
+        # Return the ImageKit file name for Waffle to store
         {:ok, response.name}
 
       {:error, reason} ->
@@ -88,7 +88,7 @@ defmodule ShotElixir.Uploaders.ImageUploader do
 
   @doc """
   Generate URL for the stored file.
-  This will be called by Arc when accessing the file.
+  This will be called by Waffle when accessing the file.
   """
   def url(file, version \\ :original)
 
@@ -105,7 +105,7 @@ defmodule ShotElixir.Uploaders.ImageUploader do
   @doc """
   Delete file from ImageKit when record is deleted.
   """
-  # Override Arc's default delete/1
+  # Override Waffle's default delete/1
   def delete(definition)
 
   def delete({_file_name, _scope}) do

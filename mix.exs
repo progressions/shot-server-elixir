@@ -54,8 +54,8 @@ defmodule ShotElixir.MixProject do
       {:cors_plug, "~> 3.0"},
 
       # File upload and ImageKit integration
-      {:arc, "~> 0.11.0"},
-      {:arc_ecto, "~> 0.11.3"},
+      {:waffle, "~> 1.1"},
+      {:waffle_ecto, "~> 0.0.12"},
       {:sweet_xml, "~> 0.7"},
 
       # HTTP client for ImageKit API
