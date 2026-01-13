@@ -263,6 +263,61 @@ defmodule ShotElixirWeb.Api.V2.PartyControllerTest do
     end
   end
 
+  describe "sync_from_notion" do
+    test "returns 422 when party has no notion_page_id", %{conn: conn, campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "No Notion Party",
+          campaign_id: campaign.id
+        })
+
+      conn = post(conn, ~p"/api/v2/parties/#{party.id}/sync_from_notion")
+      assert json_response(conn, 422)["error"] == "Party has no Notion page linked"
+    end
+
+    test "returns 403 for unauthorized player", %{conn: conn, campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Restricted Party",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok, player} =
+        Accounts.create_user(%{
+          email: "player-party-sync@example.com",
+          password: "password123",
+          first_name: "Player",
+          last_name: "User"
+        })
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> post(~p"/api/v2/parties/#{party.id}/sync_from_notion")
+
+      assert json_response(conn, 403)["error"] ==
+               "Only campaign owners, admins, or gamemasters can sync parties"
+    end
+
+    test "returns 404 for invalid party id", %{conn: conn} do
+      conn = post(conn, ~p"/api/v2/parties/#{Ecto.UUID.generate()}/sync_from_notion")
+      assert json_response(conn, 404)["error"] == "Party not found"
+    end
+
+    test "gamemaster can access sync_from_notion endpoint", %{conn: conn, campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Notion Party",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      conn = post(conn, ~p"/api/v2/parties/#{party.id}/sync_from_notion")
+      assert conn.status in [200, 422]
+    end
+  end
+
   describe "add_member" do
     setup %{campaign: campaign} do
       {:ok, party} =

@@ -6,51 +6,55 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
 
   use ShotElixirWeb, :controller
 
-  alias ShotElixir.Characters
   alias ShotElixir.Campaigns
+  alias ShotElixir.Characters
+  alias ShotElixir.Factions
+  alias ShotElixir.Junctures
+  alias ShotElixir.Parties
+  alias ShotElixir.Sites
   alias ShotElixir.Notion
   alias ShotElixir.Guardian
 
   action_fallback ShotElixirWeb.FallbackController
 
   @doc """
-  GET /api/v2/characters/:character_id/notion_sync_logs
+  GET /api/v2/:entity/:id/notion_sync_logs
 
-  Lists Notion sync logs for a character.
+  Lists Notion sync logs for an entity.
   Only accessible to admins or the campaign's gamemaster.
   """
-  def index(conn, %{"character_id" => character_id} = params) do
+  def index(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %{} = character <- Characters.get_character(character_id),
-         :ok <- authorize_admin_access(character, current_user) do
-      %{logs: logs, meta: meta} = Notion.list_sync_logs_for_character(character_id, params)
+    with {:ok, entity_type, entity} <- fetch_entity(params),
+         :ok <- authorize_admin_access(entity, current_user) do
+      %{logs: logs, meta: meta} = Notion.list_sync_logs(entity_type, entity.id, params)
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.NotionSyncLogView)
       |> render("index.json", logs: logs, meta: meta)
     else
-      nil -> {:error, :not_found}
+      {:error, :not_found} -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
     end
   end
 
   @doc """
-  DELETE /api/v2/characters/:character_id/notion_sync_logs/prune
+  DELETE /api/v2/:entity/:id/notion_sync_logs/prune
 
-  Prunes (deletes) old Notion sync logs for a character.
+  Prunes (deletes) old Notion sync logs for an entity.
   Only accessible to admins or the campaign's gamemaster.
 
   ## Parameters
     - days_old: Number of days old logs must be to be deleted (default: 30)
   """
-  def prune(conn, %{"character_id" => character_id} = params) do
+  def prune(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %{} = character <- Characters.get_character(character_id),
-         :ok <- authorize_admin_access(character, current_user) do
+    with {:ok, entity_type, entity} <- fetch_entity(params),
+         :ok <- authorize_admin_access(entity, current_user) do
       days_old = parse_days_old(params["days_old"])
-      {:ok, count} = Notion.prune_sync_logs("character", character_id, days_old: days_old)
+      {:ok, count} = Notion.prune_sync_logs(entity_type, entity.id, days_old: days_old)
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.NotionSyncLogView)
@@ -73,8 +77,8 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
   end
 
   # Private helper to check admin/gamemaster access
-  defp authorize_admin_access(character, user) do
-    campaign = Campaigns.get_campaign(character.campaign_id)
+  defp authorize_admin_access(entity, user) do
+    campaign = Campaigns.get_campaign(entity.campaign_id)
 
     cond do
       user.admin ->
@@ -93,4 +97,41 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
         {:error, :forbidden}
     end
   end
+
+  defp fetch_entity(%{"character_id" => character_id}) do
+    case Characters.get_character(character_id) do
+      nil -> {:error, :not_found}
+      character -> {:ok, "character", character}
+    end
+  end
+
+  defp fetch_entity(%{"site_id" => site_id}) do
+    case Sites.get_site(site_id) do
+      nil -> {:error, :not_found}
+      site -> {:ok, "site", site}
+    end
+  end
+
+  defp fetch_entity(%{"party_id" => party_id}) do
+    case Parties.get_party(party_id) do
+      nil -> {:error, :not_found}
+      party -> {:ok, "party", party}
+    end
+  end
+
+  defp fetch_entity(%{"faction_id" => faction_id}) do
+    case Factions.get_faction(faction_id) do
+      nil -> {:error, :not_found}
+      faction -> {:ok, "faction", faction}
+    end
+  end
+
+  defp fetch_entity(%{"juncture_id" => juncture_id}) do
+    case Junctures.get_juncture(juncture_id) do
+      nil -> {:error, :not_found}
+      juncture -> {:ok, "juncture", juncture}
+    end
+  end
+
+  defp fetch_entity(_params), do: {:error, :not_found}
 end

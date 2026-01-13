@@ -1,7 +1,18 @@
 defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
   use ShotElixirWeb.ConnCase, async: true
 
-  alias ShotElixir.{Accounts, Campaigns, Characters, Notion, Repo}
+  alias ShotElixir.{
+    Accounts,
+    Campaigns,
+    Characters,
+    Factions,
+    Junctures,
+    Notion,
+    Parties,
+    Repo,
+    Sites
+  }
+
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.Guardian
 
@@ -41,12 +52,40 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
         action_values: %{"Type" => "PC"}
       })
 
+    {:ok, site} =
+      Sites.create_site(%{
+        name: "Test Site",
+        campaign_id: campaign.id
+      })
+
+    {:ok, party} =
+      Parties.create_party(%{
+        name: "Test Party",
+        campaign_id: campaign.id
+      })
+
+    {:ok, faction} =
+      Factions.create_faction(%{
+        name: "Test Faction",
+        campaign_id: campaign.id
+      })
+
+    {:ok, juncture} =
+      Junctures.create_juncture(%{
+        name: "Test Juncture",
+        campaign_id: campaign.id
+      })
+
     {:ok,
      conn: put_req_header(conn, "accept", "application/json"),
      gamemaster: gamemaster,
      player: player,
      campaign: campaign,
-     character: character}
+     character: character,
+     site: site,
+     party: party,
+     faction: faction,
+     juncture: juncture}
   end
 
   describe "index" do
@@ -63,6 +102,78 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
 
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/characters/#{character.id}/notion_sync_logs")
+      response = json_response(conn, 200)
+
+      assert length(response["notion_sync_logs"]) == 1
+      assert response["meta"]["total_count"] == 1
+    end
+
+    test "lists sync logs for a site", %{conn: conn, gamemaster: gm, site: site} do
+      {:ok, _log} =
+        Notion.create_sync_log(%{
+          entity_type: "site",
+          entity_id: site.id,
+          status: "success",
+          payload: %{test: "data"},
+          response: %{notion_id: "123"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/sites/#{site.id}/notion_sync_logs")
+      response = json_response(conn, 200)
+
+      assert length(response["notion_sync_logs"]) == 1
+      assert response["meta"]["total_count"] == 1
+    end
+
+    test "lists sync logs for a party", %{conn: conn, gamemaster: gm, party: party} do
+      {:ok, _log} =
+        Notion.create_sync_log(%{
+          entity_type: "party",
+          entity_id: party.id,
+          status: "success",
+          payload: %{test: "data"},
+          response: %{notion_id: "123"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/parties/#{party.id}/notion_sync_logs")
+      response = json_response(conn, 200)
+
+      assert length(response["notion_sync_logs"]) == 1
+      assert response["meta"]["total_count"] == 1
+    end
+
+    test "lists sync logs for a faction", %{conn: conn, gamemaster: gm, faction: faction} do
+      {:ok, _log} =
+        Notion.create_sync_log(%{
+          entity_type: "faction",
+          entity_id: faction.id,
+          status: "success",
+          payload: %{test: "data"},
+          response: %{notion_id: "123"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/factions/#{faction.id}/notion_sync_logs")
+      response = json_response(conn, 200)
+
+      assert length(response["notion_sync_logs"]) == 1
+      assert response["meta"]["total_count"] == 1
+    end
+
+    test "lists sync logs for a juncture", %{conn: conn, gamemaster: gm, juncture: juncture} do
+      {:ok, _log} =
+        Notion.create_sync_log(%{
+          entity_type: "juncture",
+          entity_id: juncture.id,
+          status: "success",
+          payload: %{test: "data"},
+          response: %{notion_id: "123"}
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/junctures/#{juncture.id}/notion_sync_logs")
       response = json_response(conn, 200)
 
       assert length(response["notion_sync_logs"]) == 1
@@ -135,6 +246,102 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
       assert Repo.get(NotionSyncLog, old_log.id) == nil
       # Verify recent log still exists
       assert Repo.get(NotionSyncLog, recent_log.id) != nil
+    end
+
+    test "prunes old sync logs for a site", %{conn: conn, gamemaster: gm, site: site} do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, old_log} =
+        Notion.create_sync_log(%{
+          entity_type: "site",
+          entity_id: site.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
+
+      old_log
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
+      |> Repo.update!()
+
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/sites/#{site.id}/notion_sync_logs/prune")
+      response = json_response(conn, 200)
+
+      assert response["pruned_count"] == 1
+      assert Repo.get(NotionSyncLog, old_log.id) == nil
+    end
+
+    test "prunes old sync logs for a party", %{conn: conn, gamemaster: gm, party: party} do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, old_log} =
+        Notion.create_sync_log(%{
+          entity_type: "party",
+          entity_id: party.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
+
+      old_log
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
+      |> Repo.update!()
+
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/parties/#{party.id}/notion_sync_logs/prune")
+      response = json_response(conn, 200)
+
+      assert response["pruned_count"] == 1
+      assert Repo.get(NotionSyncLog, old_log.id) == nil
+    end
+
+    test "prunes old sync logs for a faction", %{conn: conn, gamemaster: gm, faction: faction} do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, old_log} =
+        Notion.create_sync_log(%{
+          entity_type: "faction",
+          entity_id: faction.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
+
+      old_log
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
+      |> Repo.update!()
+
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/factions/#{faction.id}/notion_sync_logs/prune")
+      response = json_response(conn, 200)
+
+      assert response["pruned_count"] == 1
+      assert Repo.get(NotionSyncLog, old_log.id) == nil
+    end
+
+    test "prunes old sync logs for a juncture", %{conn: conn, gamemaster: gm, juncture: juncture} do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      {:ok, old_log} =
+        Notion.create_sync_log(%{
+          entity_type: "juncture",
+          entity_id: juncture.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
+
+      old_log
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
+      |> Repo.update!()
+
+      conn = authenticate(conn, gm)
+      conn = delete(conn, ~p"/api/v2/junctures/#{juncture.id}/notion_sync_logs/prune")
+      response = json_response(conn, 200)
+
+      assert response["pruned_count"] == 1
+      assert Repo.get(NotionSyncLog, old_log.id) == nil
     end
 
     test "prunes with custom days_old parameter", %{

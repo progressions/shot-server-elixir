@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.SyncFromNotion
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -557,6 +558,42 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
         end
     end
   end
+
+  # POST /api/v2/sites/:site_id/sync_from_notion
+  def sync_from_notion(conn, %{"site_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Sites.get_site(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Site not found"})
+
+      site ->
+        case Campaigns.get_campaign(site.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Site not found"})
+
+          campaign ->
+            SyncFromNotion.sync(conn, current_user, site, campaign,
+              assign_key: :site,
+              authorize: &authorize_campaign_modification/2,
+              forbidden_error: "Only campaign owners, admins, or gamemasters can sync sites",
+              no_page_error: "Site has no Notion page linked",
+              require_page: &require_notion_page_linked/1,
+              update: &NotionService.update_site_from_notion/1,
+              view: ShotElixirWeb.Api.V2.SiteView
+            )
+        end
+    end
+  end
+
+  defp require_notion_page_linked(%Sites.Site{notion_page_id: nil}),
+    do: {:error, :no_notion_page}
+
+  defp require_notion_page_linked(%Sites.Site{}), do: :ok
 
   defp ensure_campaign(user) do
     if user.current_campaign_id do

@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.SyncFromNotion
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -869,6 +870,42 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
         end
     end
   end
+
+  # POST /api/v2/parties/:party_id/sync_from_notion
+  def sync_from_notion(conn, %{"party_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Parties.get_party(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            SyncFromNotion.sync(conn, current_user, party, campaign,
+              assign_key: :party,
+              authorize: &authorize_campaign_modification/2,
+              forbidden_error: "Only campaign owners, admins, or gamemasters can sync parties",
+              no_page_error: "Party has no Notion page linked",
+              require_page: &require_notion_page_linked/1,
+              update: &NotionService.update_party_from_notion/1,
+              view: ShotElixirWeb.Api.V2.PartyView
+            )
+        end
+    end
+  end
+
+  defp require_notion_page_linked(%Parties.Party{notion_page_id: nil}),
+    do: {:error, :no_notion_page}
+
+  defp require_notion_page_linked(%Parties.Party{}), do: :ok
 
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do

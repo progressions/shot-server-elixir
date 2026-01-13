@@ -9,6 +9,7 @@ defmodule ShotElixir.Notion do
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.Characters
   alias ShotElixir.Factions
+  alias ShotElixir.Junctures
   alias ShotElixir.Parties
   alias ShotElixir.Sites
 
@@ -73,6 +74,12 @@ defmodule ShotElixir.Notion do
           case Factions.get_faction(entity_id) do
             nil -> nil
             faction -> faction.campaign_id
+          end
+
+        "juncture" ->
+          case Junctures.get_juncture(entity_id) do
+            nil -> nil
+            juncture -> juncture.campaign_id
           end
 
         _ ->

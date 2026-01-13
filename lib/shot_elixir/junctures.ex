@@ -322,8 +322,27 @@ defmodule ShotElixir.Junctures do
     |> case do
       {:ok, juncture} ->
         # Sync character junctures if character_ids is provided
-        if Map.has_key?(attrs, "character_ids") do
-          sync_character_junctures(juncture, attrs["character_ids"])
+        character_ids =
+          cond do
+            Map.has_key?(attrs, "character_ids") -> Map.get(attrs, "character_ids")
+            Map.has_key?(attrs, :character_ids) -> Map.get(attrs, :character_ids)
+            true -> :no_update
+          end
+
+        if character_ids != :no_update do
+          sync_character_junctures(juncture, character_ids)
+        end
+
+        # Sync site junctures if site_ids is provided
+        site_ids =
+          cond do
+            Map.has_key?(attrs, "site_ids") -> Map.get(attrs, "site_ids")
+            Map.has_key?(attrs, :site_ids) -> Map.get(attrs, :site_ids)
+            true -> :no_update
+          end
+
+        if site_ids != :no_update do
+          sync_site_junctures(juncture, site_ids)
         end
 
         juncture = Repo.preload(juncture, [:faction, :characters, :image_positions], force: true)
@@ -369,6 +388,36 @@ defmodule ShotElixir.Junctures do
   end
 
   defp sync_character_junctures(juncture, _), do: juncture
+
+  # Syncs juncture site assignments to match the provided site_ids list.
+  # Removes juncture from sites not in the list and adds juncture to new ones.
+  defp sync_site_junctures(juncture, site_ids) when is_list(site_ids) do
+    alias ShotElixir.Sites.Site
+
+    current_site_ids =
+      from(s in Site, where: s.juncture_id == ^juncture.id, select: s.id)
+      |> Repo.all()
+      |> Enum.map(&to_string/1)
+
+    new_site_ids = Enum.map(site_ids, &to_string/1)
+
+    to_add = new_site_ids -- current_site_ids
+    to_remove = current_site_ids -- new_site_ids
+
+    if Enum.any?(to_remove) do
+      from(s in Site, where: s.id in ^to_remove)
+      |> Repo.update_all(set: [juncture_id: nil])
+    end
+
+    if Enum.any?(to_add) do
+      from(s in Site, where: s.id in ^to_add)
+      |> Repo.update_all(set: [juncture_id: juncture.id])
+    end
+
+    juncture
+  end
+
+  defp sync_site_junctures(juncture, _), do: juncture
 
   def delete_juncture(%Juncture{} = juncture) do
     juncture

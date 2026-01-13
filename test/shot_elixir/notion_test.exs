@@ -5,7 +5,7 @@ defmodule ShotElixir.NotionTest do
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.{Accounts, Campaigns, Characters, Repo}
 
-  describe "prune_sync_logs/2" do
+  describe "prune_sync_logs/3" do
     setup do
       {:ok, user} =
         Accounts.create_user(%{
