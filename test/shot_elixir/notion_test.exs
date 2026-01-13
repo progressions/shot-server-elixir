@@ -5,7 +5,7 @@ defmodule ShotElixir.NotionTest do
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.{Accounts, Campaigns, Characters, Repo}
 
-  describe "prune_sync_logs/2" do
+  describe "prune_sync_logs_for_character/2" do
     setup do
       {:ok, user} =
         Accounts.create_user(%{
@@ -40,7 +40,8 @@ defmodule ShotElixir.NotionTest do
       # Create a log from 40 days ago
       {:ok, old_log} =
         Notion.create_sync_log(%{
-          character_id: character.id,
+          entity_type: "character",
+          entity_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -53,7 +54,8 @@ defmodule ShotElixir.NotionTest do
       # Create a log from 10 days ago (should not be deleted with default 30 days)
       {:ok, recent_log} =
         Notion.create_sync_log(%{
-          character_id: character.id,
+          entity_type: "character",
+          entity_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -64,7 +66,7 @@ defmodule ShotElixir.NotionTest do
       |> Repo.update!()
 
       # Prune logs older than 30 days
-      {:ok, count} = Notion.prune_sync_logs(character.id, days_old: 30)
+      {:ok, count} = Notion.prune_sync_logs_for_character(character.id, days_old: 30)
 
       assert count == 1
 
@@ -81,7 +83,8 @@ defmodule ShotElixir.NotionTest do
       # Create a log from 31 days ago
       {:ok, old_log} =
         Notion.create_sync_log(%{
-          character_id: character.id,
+          entity_type: "character",
+          entity_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -91,7 +94,7 @@ defmodule ShotElixir.NotionTest do
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -31, :day)})
       |> Repo.update!()
 
-      {:ok, count} = Notion.prune_sync_logs(character.id)
+      {:ok, count} = Notion.prune_sync_logs_for_character(character.id)
 
       assert count == 1
       assert Repo.get(NotionSyncLog, old_log.id) == nil
@@ -103,7 +106,8 @@ defmodule ShotElixir.NotionTest do
       # Create a log from 8 days ago
       {:ok, log} =
         Notion.create_sync_log(%{
-          character_id: character.id,
+          entity_type: "character",
+          entity_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -114,7 +118,7 @@ defmodule ShotElixir.NotionTest do
       |> Repo.update!()
 
       # Prune logs older than 7 days
-      {:ok, count} = Notion.prune_sync_logs(character.id, days_old: 7)
+      {:ok, count} = Notion.prune_sync_logs_for_character(character.id, days_old: 7)
 
       assert count == 1
       assert Repo.get(NotionSyncLog, log.id) == nil
@@ -139,7 +143,8 @@ defmodule ShotElixir.NotionTest do
       # Create old log for first character
       {:ok, log1} =
         Notion.create_sync_log(%{
-          character_id: character.id,
+          entity_type: "character",
+          entity_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -152,7 +157,8 @@ defmodule ShotElixir.NotionTest do
       # Create old log for second character
       {:ok, log2} =
         Notion.create_sync_log(%{
-          character_id: other_character.id,
+          entity_type: "character",
+          entity_id: other_character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -163,7 +169,7 @@ defmodule ShotElixir.NotionTest do
       |> Repo.update!()
 
       # Prune only first character's logs
-      {:ok, count} = Notion.prune_sync_logs(character.id, days_old: 30)
+      {:ok, count} = Notion.prune_sync_logs_for_character(character.id, days_old: 30)
 
       assert count == 1
 
@@ -175,7 +181,7 @@ defmodule ShotElixir.NotionTest do
     end
 
     test "returns 0 when no logs to prune", %{character: character} do
-      {:ok, count} = Notion.prune_sync_logs(character.id, days_old: 30)
+      {:ok, count} = Notion.prune_sync_logs_for_character(character.id, days_old: 30)
       assert count == 0
     end
 
@@ -183,13 +189,14 @@ defmodule ShotElixir.NotionTest do
       # Create a log from today
       {:ok, _log} =
         Notion.create_sync_log(%{
-          character_id: character.id,
+          entity_type: "character",
+          entity_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
         })
 
-      {:ok, count} = Notion.prune_sync_logs(character.id, days_old: 30)
+      {:ok, count} = Notion.prune_sync_logs_for_character(character.id, days_old: 30)
       assert count == 0
     end
   end

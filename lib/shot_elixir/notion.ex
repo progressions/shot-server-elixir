@@ -86,9 +86,7 @@ defmodule ShotElixir.Notion do
         {:campaign_broadcast, %{notion_sync_logs: "reload"}}
       )
     else
-      Logger.warning(
-        "Cannot broadcast sync log created: #{entity_type} #{entity_id} not found"
-      )
+      Logger.warning("Cannot broadcast sync log created: #{entity_type} #{entity_id} not found")
 
       :ok
     end

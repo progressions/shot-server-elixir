@@ -353,6 +353,7 @@ defmodule ShotElixir.Services.NotionService do
           page,
           "Unexpected response from Notion API"
         )
+
         {:error, :unexpected_notion_response}
     end
   rescue
@@ -367,6 +368,7 @@ defmodule ShotElixir.Services.NotionService do
         %{},
         "Exception: #{Exception.message(error)}"
       )
+
       {:error, :notion_request_failed}
   end
 
@@ -1864,6 +1866,7 @@ defmodule ShotElixir.Services.NotionService do
 
       %{"code" => error_code, "message" => message} ->
         Logger.error("Notion API error creating #{entity_type}: #{error_code} - #{message}")
+
         Notion.log_error(
           entity_type,
           entity.id,
@@ -1871,10 +1874,12 @@ defmodule ShotElixir.Services.NotionService do
           page,
           "Notion API error: #{error_code} - #{message}"
         )
+
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
         Logger.error("Unexpected response from Notion API when creating #{entity_type}")
+
         Notion.log_error(
           entity_type,
           entity.id,
@@ -1882,11 +1887,13 @@ defmodule ShotElixir.Services.NotionService do
           page,
           "Unexpected response from Notion API"
         )
+
         {:error, :unexpected_notion_response}
     end
   rescue
     error ->
       Logger.error("Failed to create Notion page for #{entity_type}: #{Exception.message(error)}")
+
       Notion.log_error(
         entity_type,
         entity.id,
@@ -1894,6 +1901,7 @@ defmodule ShotElixir.Services.NotionService do
         %{},
         "Exception: #{Exception.message(error)}"
       )
+
       {:error, :notion_request_failed}
   end
 
@@ -1912,6 +1920,7 @@ defmodule ShotElixir.Services.NotionService do
           handle_archived_entity(entity, opts, payload, response, message)
         else
           Logger.error("Notion API validation error on #{entity_type} update: #{message}")
+
           Notion.log_error(
             entity_type,
             entity.id,
@@ -1919,6 +1928,7 @@ defmodule ShotElixir.Services.NotionService do
             response,
             "Notion API error: validation_error - #{message}"
           )
+
           {:error, {:notion_api_error, "validation_error", message}}
         end
 
@@ -1927,6 +1937,7 @@ defmodule ShotElixir.Services.NotionService do
 
       %{"code" => error_code, "message" => message} ->
         Logger.error("Notion API error on #{entity_type} update: #{error_code}")
+
         Notion.log_error(
           entity_type,
           entity.id,
@@ -1934,6 +1945,7 @@ defmodule ShotElixir.Services.NotionService do
           response,
           "Notion API error: #{error_code} - #{message}"
         )
+
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
@@ -1943,6 +1955,7 @@ defmodule ShotElixir.Services.NotionService do
   rescue
     error ->
       Logger.error("Failed to update Notion page for #{entity_type}: #{Exception.message(error)}")
+
       Notion.log_error(
         entity_type,
         entity.id,
