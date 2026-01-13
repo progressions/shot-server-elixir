@@ -1,6 +1,7 @@
 defmodule ShotElixirWeb.Api.V2.SyncFromNotion do
   @moduledoc false
 
+  import Plug.Conn
   import Phoenix.Controller
   require Logger
 

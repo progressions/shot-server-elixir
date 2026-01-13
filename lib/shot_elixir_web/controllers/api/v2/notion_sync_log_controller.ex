@@ -9,6 +9,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Factions
+  alias ShotElixir.Junctures
   alias ShotElixir.Parties
   alias ShotElixir.Sites
   alias ShotElixir.Notion
@@ -122,6 +123,13 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
     case Factions.get_faction(faction_id) do
       nil -> {:error, :not_found}
       faction -> {:ok, "faction", faction}
+    end
+  end
+
+  defp fetch_entity(%{"juncture_id" => juncture_id}) do
+    case Junctures.get_juncture(juncture_id) do
+      nil -> {:error, :not_found}
+      juncture -> {:ok, "juncture", juncture}
     end
   end
 

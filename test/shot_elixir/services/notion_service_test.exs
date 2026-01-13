@@ -7,6 +7,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Accounts
   alias ShotElixir.Factions
+  alias ShotElixir.Junctures
   alias ShotElixir.Parties
   alias ShotElixir.Sites
   alias ShotElixir.Notion.NotionSyncLog
@@ -27,6 +28,24 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubError do
     def get_page(_page_id) do
       %{"code" => "object_not_found", "message" => "Page not found"}
+    end
+  end
+
+  defmodule NotionClientStubJunctureSuccess do
+    def character_notion_id, do: "c0a80123-4567-489a-bcde-1234567890ab"
+    def site_notion_id, do: "e5b1b80e-2a50-4a43-92b1-8d1f5f4dd721"
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Notion Name"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Notion Description"}]},
+          "At a Glance" => %{"checkbox" => true},
+          "People" => %{"relation" => [%{"id" => character_notion_id()}]},
+          "Locations" => %{"relation" => [%{"id" => site_notion_id()}]}
+        }
+      }
     end
   end
 
@@ -206,7 +225,14 @@ defmodule ShotElixir.Services.NotionServiceTest do
           notion_page_id: Ecto.UUID.generate()
         })
 
-      {:ok, site: site, party: party, faction: faction}
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Local Juncture",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok, site: site, party: party, faction: faction, juncture: juncture, campaign: campaign}
     end
 
     test "update_site_from_notion logs success and updates attributes", %{site: site} do
@@ -293,6 +319,59 @@ defmodule ShotElixir.Services.NotionServiceTest do
       [log] =
         NotionSyncLog
         |> Ecto.Query.where(entity_type: "faction", entity_id: ^faction.id)
+        |> Repo.all()
+
+      assert log.status == "error"
+      assert String.contains?(log.error_message, "Notion API error")
+    end
+
+    test "update_juncture_from_notion logs success and updates attributes", %{
+      juncture: juncture,
+      campaign: campaign
+    } do
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Notion Character",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubJunctureSuccess.character_notion_id()
+        })
+
+      {:ok, site} =
+        Sites.create_site(%{
+          name: "Notion Site",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubJunctureSuccess.site_notion_id()
+        })
+
+      {:ok, updated_juncture} =
+        NotionService.update_juncture_from_notion(juncture, client: NotionClientStubJunctureSuccess)
+
+      assert updated_juncture.name == "Notion Name"
+      assert updated_juncture.description == "Notion Description"
+      assert updated_juncture.at_a_glance == true
+
+      updated_character = Repo.get(Character, character.id)
+      assert updated_character.juncture_id == juncture.id
+
+      updated_site = Sites.get_site(site.id)
+      assert updated_site.juncture_id == juncture.id
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "juncture", entity_id: ^juncture.id)
+        |> Repo.all()
+
+      assert log.status == "success"
+      assert log.payload["page_id"] == juncture.notion_page_id
+    end
+
+    test "update_juncture_from_notion logs errors from Notion API", %{juncture: juncture} do
+      assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
+               NotionService.update_juncture_from_notion(juncture, client: NotionClientStubError)
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "juncture", entity_id: ^juncture.id)
         |> Repo.all()
 
       assert log.status == "error"

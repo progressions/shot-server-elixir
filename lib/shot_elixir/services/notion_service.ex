@@ -1,7 +1,7 @@
 defmodule ShotElixir.Services.NotionService do
   @moduledoc """
   Business logic layer for Notion API integration.
-  Handles synchronization of characters, sites, parties, and factions with Notion databases.
+  Handles synchronization of characters, sites, parties, factions, and junctures with Notion databases.
   """
 
   require Logger
@@ -11,6 +11,7 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Characters.Character
   alias ShotElixir.Factions
   alias ShotElixir.Factions.Faction
+  alias ShotElixir.Junctures
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Notion
   alias ShotElixir.Parties
@@ -47,6 +48,12 @@ defmodule ShotElixir.Services.NotionService do
   defp sites_database_id do
     Application.get_env(:shot_elixir, :notion)[:sites_database_id] ||
       "8ac4e657c540499c977f79b0643b7070"
+  end
+
+  # Junctures database
+  defp junctures_database_id do
+    Application.get_env(:shot_elixir, :notion)[:junctures_database_id] ||
+      "4228eb7fefef470bb9f19a7f5d73c0fc"
   end
 
   @doc """
@@ -817,6 +824,19 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
+  Search for junctures in the Notion Junctures database.
+
+  ## Parameters
+    * `name` - The name to search for (partial match)
+
+  ## Returns
+    * List of matching juncture pages with id, title, and url
+  """
+  def find_junctures_in_notion(name \\ "") do
+    find_pages_in_database(junctures_database_id(), name)
+  end
+
+  @doc """
   Find faction in Notion by name.
 
   ## Parameters
@@ -1214,6 +1234,106 @@ defmodule ShotElixir.Services.NotionService do
       description: get_rich_text_content(props, "Description")
     }
     |> maybe_put_at_a_glance(get_checkbox_content(props, "At a Glance"))
+  end
+
+  defp juncture_as_notion(%Juncture{} = juncture) do
+    properties = Juncture.as_notion(juncture)
+
+    location_ids =
+      from(s in Site,
+        where: s.juncture_id == ^juncture.id and not is_nil(s.notion_page_id),
+        select: s.notion_page_id
+      )
+      |> Repo.all()
+
+    people_ids =
+      from(c in Character,
+        where: c.juncture_id == ^juncture.id and not is_nil(c.notion_page_id),
+        select: c.notion_page_id
+      )
+      |> Repo.all()
+
+    properties
+    |> Map.put("Locations", %{
+      "relation" => Enum.map(location_ids, &%{"id" => &1})
+    })
+    |> Map.put("People", %{
+      "relation" => Enum.map(people_ids, &%{"id" => &1})
+    })
+  end
+
+  defp character_ids_from_notion(page, campaign_id) do
+    relation =
+      ["People", "Characters", "Natives"]
+      |> Enum.find_value(fn key ->
+        case get_in(page, ["properties", key, "relation"]) do
+          relations when is_list(relations) -> relations
+          _ -> nil
+        end
+      end)
+
+    case relation do
+      nil ->
+        :skip
+
+      relations ->
+        page_ids =
+          relations
+          |> Enum.map(& &1["id"])
+          |> Enum.filter(&is_binary/1)
+
+        character_ids =
+          case page_ids do
+            [] ->
+              []
+
+            _ ->
+              from(c in Character,
+                where: c.notion_page_id in ^page_ids and c.campaign_id == ^campaign_id,
+                select: c.id
+              )
+              |> Repo.all()
+          end
+
+        {:ok, character_ids}
+    end
+  end
+
+  defp site_ids_from_notion(page, campaign_id) do
+    relation =
+      ["Locations", "Sites"]
+      |> Enum.find_value(fn key ->
+        case get_in(page, ["properties", key, "relation"]) do
+          relations when is_list(relations) -> relations
+          _ -> nil
+        end
+      end)
+
+    case relation do
+      nil ->
+        :skip
+
+      relations ->
+        page_ids =
+          relations
+          |> Enum.map(& &1["id"])
+          |> Enum.filter(&is_binary/1)
+
+        site_ids =
+          case page_ids do
+            [] ->
+              []
+
+            _ ->
+              from(s in Site,
+                where: s.notion_page_id in ^page_ids and s.campaign_id == ^campaign_id,
+                select: s.id
+              )
+              |> Repo.all()
+          end
+
+        {:ok, site_ids}
+    end
   end
 
   defp get_entity_name(props) do
@@ -1697,7 +1817,7 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # =============================================================================
-  # Site, Party, Faction Sync Functions
+  # Site, Party, Faction, Juncture Sync Functions
   # =============================================================================
   # These use generic helpers to reduce code duplication
 
@@ -1737,6 +1857,19 @@ defmodule ShotElixir.Services.NotionService do
       database_id: factions_database_id(),
       update_fn: &Factions.update_faction/2,
       as_notion_fn: &Faction.as_notion/1
+    })
+  end
+
+  @doc """
+  Sync a juncture to Notion. Creates a new page if no notion_page_id exists,
+  otherwise updates the existing page.
+  """
+  def sync_juncture(%Juncture{} = juncture) do
+    sync_entity(juncture, %{
+      entity_type: "juncture",
+      database_id: junctures_database_id(),
+      update_fn: &Junctures.update_juncture/2,
+      as_notion_fn: &juncture_as_notion/1
     })
   end
 
@@ -1793,7 +1926,13 @@ defmodule ShotElixir.Services.NotionService do
   rescue
     error ->
       Logger.error("Failed to update site from Notion: #{Exception.message(error)}")
-      log_sync_error("site", site.id, payload, %{}, "Exception: #{Exception.message(error)}")
+      log_sync_error(
+        "site",
+        site.id,
+        %{"page_id" => site.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
       {:error, error}
   end
 
@@ -1850,7 +1989,13 @@ defmodule ShotElixir.Services.NotionService do
   rescue
     error ->
       Logger.error("Failed to update party from Notion: #{Exception.message(error)}")
-      log_sync_error("party", party.id, payload, %{}, "Exception: #{Exception.message(error)}")
+      log_sync_error(
+        "party",
+        party.id,
+        %{"page_id" => party.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
       {:error, error}
   end
 
@@ -1911,7 +2056,7 @@ defmodule ShotElixir.Services.NotionService do
       log_sync_error(
         "faction",
         faction.id,
-        payload,
+        %{"page_id" => faction.notion_page_id},
         %{},
         "Exception: #{Exception.message(error)}"
       )
@@ -1919,11 +2064,86 @@ defmodule ShotElixir.Services.NotionService do
       {:error, error}
   end
 
+  @doc """
+  Sync a juncture FROM Notion, overwriting local data with the Notion page data.
+  """
+  def update_juncture_from_notion(juncture, opts \\ [])
+
+  def update_juncture_from_notion(%Juncture{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
+
+  def update_juncture_from_notion(%Juncture{} = juncture, opts) do
+    payload = %{"page_id" => juncture.notion_page_id}
+    client = notion_client(opts)
+
+    case client.get_page(juncture.notion_page_id) do
+      nil ->
+        Logger.error("Failed to fetch Notion page: #{juncture.notion_page_id}")
+        log_sync_error("juncture", juncture.id, payload, %{}, "Notion page not found")
+        {:error, :notion_page_not_found}
+
+      %{"code" => error_code, "message" => message} = response ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+
+        log_sync_error(
+          "juncture",
+          juncture.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
+        {:error, {:notion_api_error, error_code, message}}
+
+      page when is_map(page) ->
+        attributes = entity_attributes_from_notion(page)
+
+        attributes =
+          case character_ids_from_notion(page, juncture.campaign_id) do
+            {:ok, character_ids} -> Map.put(attributes, :character_ids, character_ids)
+            :skip -> attributes
+          end
+
+        attributes =
+          case site_ids_from_notion(page, juncture.campaign_id) do
+            {:ok, site_ids} -> Map.put(attributes, :site_ids, site_ids)
+            :skip -> attributes
+          end
+
+        case Junctures.update_juncture(juncture, attributes) do
+          {:ok, updated_juncture} = result ->
+            Notion.log_success("juncture", updated_juncture.id, payload, page)
+            result
+
+          {:error, changeset} = error ->
+            log_sync_error(
+              "juncture",
+              juncture.id,
+              payload,
+              page,
+              "Failed to update juncture from Notion: #{inspect(changeset)}"
+            )
+
+            error
+        end
+    end
+  rescue
+    error ->
+      Logger.error("Failed to update juncture from Notion: #{Exception.message(error)}")
+      log_sync_error(
+        "juncture",
+        juncture.id,
+        %{"page_id" => juncture.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
+      {:error, error}
+  end
+
   # =============================================================================
   # Generic Entity Sync Helpers
   # =============================================================================
 
-  # Generic sync function for any entity type (site, party, faction)
+  # Generic sync function for any entity type (site, party, faction, juncture)
   defp sync_entity(entity, %{entity_type: entity_type} = opts) do
     result =
       if entity.notion_page_id do
