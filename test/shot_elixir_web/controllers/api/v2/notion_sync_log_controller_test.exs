@@ -12,6 +12,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
     Repo,
     Sites
   }
+
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.Guardian
 

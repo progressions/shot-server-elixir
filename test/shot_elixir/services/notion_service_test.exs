@@ -344,7 +344,9 @@ defmodule ShotElixir.Services.NotionServiceTest do
         })
 
       {:ok, updated_juncture} =
-        NotionService.update_juncture_from_notion(juncture, client: NotionClientStubJunctureSuccess)
+        NotionService.update_juncture_from_notion(juncture,
+          client: NotionClientStubJunctureSuccess
+        )
 
       assert updated_juncture.name == "Notion Name"
       assert updated_juncture.description == "Notion Description"

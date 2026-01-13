@@ -1937,6 +1937,7 @@ defmodule ShotElixir.Services.NotionService do
   rescue
     error ->
       Logger.error("Failed to update site from Notion: #{Exception.message(error)}")
+
       log_sync_error(
         "site",
         site.id,
@@ -1944,6 +1945,7 @@ defmodule ShotElixir.Services.NotionService do
         %{},
         "Exception: #{Exception.message(error)}"
       )
+
       {:error, error}
   end
 
@@ -2000,6 +2002,7 @@ defmodule ShotElixir.Services.NotionService do
   rescue
     error ->
       Logger.error("Failed to update party from Notion: #{Exception.message(error)}")
+
       log_sync_error(
         "party",
         party.id,
@@ -2007,6 +2010,7 @@ defmodule ShotElixir.Services.NotionService do
         %{},
         "Exception: #{Exception.message(error)}"
       )
+
       {:error, error}
   end
 
@@ -2080,7 +2084,8 @@ defmodule ShotElixir.Services.NotionService do
   """
   def update_juncture_from_notion(juncture, opts \\ [])
 
-  def update_juncture_from_notion(%Juncture{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
+  def update_juncture_from_notion(%Juncture{notion_page_id: nil}, _opts),
+    do: {:error, :no_page_id}
 
   def update_juncture_from_notion(%Juncture{} = juncture, opts) do
     payload = %{"page_id" => juncture.notion_page_id}
@@ -2140,6 +2145,7 @@ defmodule ShotElixir.Services.NotionService do
   rescue
     error ->
       Logger.error("Failed to update juncture from Notion: #{Exception.message(error)}")
+
       log_sync_error(
         "juncture",
         juncture.id,
@@ -2147,6 +2153,7 @@ defmodule ShotElixir.Services.NotionService do
         %{},
         "Exception: #{Exception.message(error)}"
       )
+
       {:error, error}
   end
 
