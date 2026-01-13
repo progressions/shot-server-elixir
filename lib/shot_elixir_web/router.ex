@@ -229,6 +229,9 @@ defmodule ShotElixirWeb.Router do
       delete "/attune/:character_id", SiteController, :unattune
       delete "/image", SiteController, :remove_image
       post "/sync", SiteController, :sync
+
+      resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
+      delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
     end
 
     # Parties with membership
@@ -242,6 +245,9 @@ defmodule ShotElixirWeb.Router do
       delete "/image", PartyController, :remove_image
       post "/sync", PartyController, :sync
 
+      resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
+      delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
+
       # Party composition / slot management
       post "/apply_template", PartyController, :apply_template
       post "/slots", PartyController, :add_slot
@@ -254,6 +260,9 @@ defmodule ShotElixirWeb.Router do
       post "/duplicate", FactionController, :duplicate
       delete "/image", FactionController, :remove_image
       post "/sync", FactionController, :sync
+
+      resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
+      delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
     end
 
     resources "/invitations", InvitationController, except: [:show] do
