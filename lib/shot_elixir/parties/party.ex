@@ -52,6 +52,7 @@ defmodule ShotElixir.Parties.Party do
 
   @doc """
   Convert party to Notion page properties format.
+  Requires [:memberships, :character] to be preloaded for the "Characters" relation to be populated.
   """
   def as_notion(%__MODULE__{} = party) do
     base = %{

@@ -52,6 +52,7 @@ defmodule ShotElixir.Sites.Site do
 
   @doc """
   Convert site to Notion page properties format.
+  Requires [:attunements, :character] to be preloaded for the "Characters" relation to be populated.
   """
   def as_notion(%__MODULE__{} = site) do
     base = %{

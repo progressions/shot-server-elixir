@@ -1659,6 +1659,9 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_site(%Site{} = site) do
+    # Ensure associations are loaded for as_notion
+    site = Repo.preload(site, [:faction, :juncture, attunements: :character])
+
     sync_entity(site, %{
       entity_type: "site",
       database_id: sites_database_id(),
@@ -1672,6 +1675,9 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_party(%Party{} = party) do
+    # Ensure associations are loaded for as_notion
+    party = Repo.preload(party, [:faction, :juncture, memberships: :character])
+
     sync_entity(party, %{
       entity_type: "party",
       database_id: parties_database_id(),
@@ -1685,6 +1691,9 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_faction(%Faction{} = faction) do
+    # Ensure associations are loaded for as_notion
+    faction = Repo.preload(faction, [:characters])
+
     sync_entity(faction, %{
       entity_type: "faction",
       database_id: factions_database_id(),
@@ -1791,7 +1800,28 @@ defmodule ShotElixir.Services.NotionService do
       _ ->
         # Add image if not present in Notion
         page = NotionClient.get_page(entity.notion_page_id)
-        image = find_image_block(page)
+
+        image =
+          case page do
+            %{"code" => error_code, "message" => message} ->
+              Logger.error(
+                "Notion API error retrieving page #{entity.notion_page_id} " <>
+                  "for #{entity_type} update: #{error_code} - #{message}"
+              )
+
+              nil
+
+            nil ->
+              Logger.error(
+                "Notion API returned nil page for #{entity.notion_page_id} " <>
+                  "on #{entity_type} update"
+              )
+
+              nil
+
+            _ ->
+              find_image_block(page)
+          end
 
         unless image do
           add_image_to_notion(entity)
