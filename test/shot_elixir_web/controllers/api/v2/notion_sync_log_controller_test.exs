@@ -219,12 +219,28 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
       |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -40, :day)})
       |> Repo.update!()
 
+      # Create a recent log (10 days ago)
+      {:ok, recent_log} =
+        Notion.create_sync_log(%{
+          entity_type: "character",
+          entity_id: character.id,
+          character_id: character.id,
+          status: "success",
+          payload: %{},
+          response: %{}
+        })
+
+      recent_log
+      |> Ecto.Changeset.change(%{created_at: DateTime.add(now, -10, :day)})
+      |> Repo.update!()
+
       conn = authenticate(conn, gm)
       conn = delete(conn, ~p"/api/v2/characters/#{character.id}/notion_sync_logs/prune")
       response = json_response(conn, 200)
 
       assert response["pruned_count"] == 1
       assert Repo.get(NotionSyncLog, old_log.id) == nil
+      assert Repo.get(NotionSyncLog, recent_log.id) != nil
     end
 
     test "prunes old sync logs for site", %{
@@ -412,6 +428,21 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
       non_existent_id = Ecto.UUID.generate()
       conn = delete(conn, ~p"/api/v2/characters/#{non_existent_id}/notion_sync_logs/prune")
       assert json_response(conn, 404)
+    end
+
+    test "admin can prune any character's logs", %{conn: conn, character: character} do
+      {:ok, admin} =
+        Accounts.create_user(%{
+          email: "admin@example.com",
+          password: "password123",
+          first_name: "Admin",
+          last_name: "User",
+          admin: true
+        })
+
+      conn = authenticate(conn, admin)
+      conn = delete(conn, ~p"/api/v2/characters/#{character.id}/notion_sync_logs/prune")
+      assert json_response(conn, 200)
     end
   end
 
