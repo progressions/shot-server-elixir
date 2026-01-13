@@ -59,6 +59,9 @@ config :shot_elixir, :imagekit,
   url_endpoint: "https://ik.imagekit.io/nvqgwnjgv",
   environment: config_env()
 
+# Remote image download allowlist (SSRF protection)
+config :shot_elixir, :image_download, allowed_hosts: [~r/\.imagekit\.io$/]
+
 # Arc configuration for file uploads
 config :arc,
   storage: Arc.Storage.Local
