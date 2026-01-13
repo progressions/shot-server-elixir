@@ -1,7 +1,7 @@
 defmodule ShotElixir.Factions.Faction do
   use Ecto.Schema
   import Ecto.Changeset
-  use Arc.Ecto.Schema
+  use Waffle.Ecto.Schema
 
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Characters.Character

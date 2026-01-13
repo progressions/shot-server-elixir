@@ -7,7 +7,7 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
 
   defmacro __using__(_opts) do
     quote do
-      use Arc.Ecto.Schema
+      use Waffle.Ecto.Schema
       import ShotElixir.Models.Concerns.WithImagekit
       import Ecto.Schema
 
@@ -108,7 +108,7 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
 
       defp get_upload_metadata(%Plug.Upload{path: path, filename: filename}) do
         # This would be populated by the ImageUploader after successful upload
-        # For now, return nil as metadata is handled internally by Arc
+        # For now, return nil as metadata is handled internally by Waffle
         nil
       end
 
@@ -117,7 +117,7 @@ defmodule ShotElixir.Models.Concerns.WithImagekit do
         {:ok, record}
       end
 
-      # Override Arc's default delete behavior
+      # Override Waffle's default delete behavior
       def delete_image(%__MODULE__{} = record) do
         # Image deletion handled by Rails app
         {:ok, record}

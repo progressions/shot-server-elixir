@@ -1,7 +1,7 @@
 defmodule ShotElixir.Characters.Character do
   use Ecto.Schema
   import Ecto.Changeset
-  use Arc.Ecto.Schema
+  use Waffle.Ecto.Schema
   alias ShotElixir.ImagePositions.ImagePosition
 
   @primary_key {:id, :binary_id, autogenerate: true}
