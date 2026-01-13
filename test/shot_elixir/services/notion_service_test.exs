@@ -6,6 +6,29 @@ defmodule ShotElixir.Services.NotionServiceTest do
   alias ShotElixir.Characters.Character
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Accounts
+  alias ShotElixir.Factions
+  alias ShotElixir.Parties
+  alias ShotElixir.Sites
+  alias ShotElixir.Notion.NotionSyncLog
+
+  defmodule NotionClientStubSuccess do
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Notion Name"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Notion Description"}]},
+          "At a Glance" => %{"checkbox" => true}
+        }
+      }
+    end
+  end
+
+  defmodule NotionClientStubError do
+    def get_page(_page_id) do
+      %{"code" => "object_not_found", "message" => "Page not found"}
+    end
+  end
 
   describe "handle_archived_page/4" do
     setup do
@@ -140,6 +163,140 @@ defmodule ShotElixir.Services.NotionServiceTest do
         })
 
       assert {:error, :no_page_id} = NotionService.update_notion_from_character(character)
+    end
+  end
+
+  describe "update entity from notion logging" do
+    setup do
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "gm-entity-notion@example.com",
+          password: "password123",
+          first_name: "Game",
+          last_name: "Master",
+          gamemaster: true
+        })
+
+      {:ok, campaign} =
+        %Campaign{}
+        |> Campaign.changeset(%{
+          name: "Notion Entity Campaign",
+          user_id: user.id
+        })
+        |> Repo.insert()
+
+      {:ok, site} =
+        Sites.create_site(%{
+          name: "Local Site",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Local Party",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Local Faction",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok, site: site, party: party, faction: faction}
+    end
+
+    test "update_site_from_notion logs success and updates attributes", %{site: site} do
+      {:ok, updated_site} =
+        NotionService.update_site_from_notion(site, client: NotionClientStubSuccess)
+
+      assert updated_site.name == "Notion Name"
+      assert updated_site.description == "Notion Description"
+      assert updated_site.at_a_glance == true
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "site", entity_id: ^site.id)
+        |> Repo.all()
+
+      assert log.status == "success"
+      assert log.payload["page_id"] == site.notion_page_id
+    end
+
+    test "update_site_from_notion logs errors from Notion API", %{site: site} do
+      assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
+               NotionService.update_site_from_notion(site, client: NotionClientStubError)
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "site", entity_id: ^site.id)
+        |> Repo.all()
+
+      assert log.status == "error"
+      assert String.contains?(log.error_message, "Notion API error")
+    end
+
+    test "update_party_from_notion logs success and updates attributes", %{party: party} do
+      {:ok, updated_party} =
+        NotionService.update_party_from_notion(party, client: NotionClientStubSuccess)
+
+      assert updated_party.name == "Notion Name"
+      assert updated_party.description == "Notion Description"
+      assert updated_party.at_a_glance == true
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "party", entity_id: ^party.id)
+        |> Repo.all()
+
+      assert log.status == "success"
+      assert log.payload["page_id"] == party.notion_page_id
+    end
+
+    test "update_party_from_notion logs errors from Notion API", %{party: party} do
+      assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
+               NotionService.update_party_from_notion(party, client: NotionClientStubError)
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "party", entity_id: ^party.id)
+        |> Repo.all()
+
+      assert log.status == "error"
+      assert String.contains?(log.error_message, "Notion API error")
+    end
+
+    test "update_faction_from_notion logs success and updates attributes", %{faction: faction} do
+      {:ok, updated_faction} =
+        NotionService.update_faction_from_notion(faction, client: NotionClientStubSuccess)
+
+      assert updated_faction.name == "Notion Name"
+      assert updated_faction.description == "Notion Description"
+      assert updated_faction.at_a_glance == true
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "faction", entity_id: ^faction.id)
+        |> Repo.all()
+
+      assert log.status == "success"
+      assert log.payload["page_id"] == faction.notion_page_id
+    end
+
+    test "update_faction_from_notion logs errors from Notion API", %{faction: faction} do
+      assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
+               NotionService.update_faction_from_notion(faction, client: NotionClientStubError)
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "faction", entity_id: ^faction.id)
+        |> Repo.all()
+
+      assert log.status == "error"
+      assert String.contains?(log.error_message, "Notion API error")
     end
   end
 

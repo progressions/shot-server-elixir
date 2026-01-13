@@ -1199,6 +1199,12 @@ defmodule ShotElixir.Services.NotionService do
     |> Enum.join("")
   end
 
+  defp notion_client(opts), do: Keyword.get(opts, :client, NotionClient)
+
+  defp log_sync_error(entity_type, entity_id, payload, response, message) do
+    Notion.log_error(entity_type, entity_id, payload, response, message)
+  end
+
   defp entity_attributes_from_notion(page) do
     props = page["properties"] || %{}
 
@@ -1737,75 +1743,179 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Sync a site FROM Notion, overwriting local data with the Notion page data.
   """
-  def update_site_from_notion(%Site{notion_page_id: nil}), do: {:error, :no_page_id}
+  def update_site_from_notion(site, opts \\ [])
 
-  def update_site_from_notion(%Site{} = site) do
-    case NotionClient.get_page(site.notion_page_id) do
+  def update_site_from_notion(%Site{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
+
+  def update_site_from_notion(%Site{} = site, opts) do
+    payload = %{"page_id" => site.notion_page_id}
+    client = notion_client(opts)
+
+    case client.get_page(site.notion_page_id) do
       nil ->
         Logger.error("Failed to fetch Notion page: #{site.notion_page_id}")
+        log_sync_error("site", site.id, payload, %{}, "Notion page not found")
         {:error, :notion_page_not_found}
 
-      %{"code" => error_code, "message" => message} ->
+      %{"code" => error_code, "message" => message} = response ->
         Logger.error("Notion API error: #{error_code} - #{message}")
+
+        log_sync_error(
+          "site",
+          site.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
         attributes = entity_attributes_from_notion(page)
-        Sites.update_site(site, attributes)
+
+        case Sites.update_site(site, attributes) do
+          {:ok, updated_site} = result ->
+            Notion.log_success("site", updated_site.id, payload, page)
+            result
+
+          {:error, changeset} = error ->
+            log_sync_error(
+              "site",
+              site.id,
+              payload,
+              page,
+              "Failed to update site from Notion: #{inspect(changeset)}"
+            )
+
+            error
+        end
     end
   rescue
     error ->
       Logger.error("Failed to update site from Notion: #{Exception.message(error)}")
+      log_sync_error("site", site.id, payload, %{}, "Exception: #{Exception.message(error)}")
       {:error, error}
   end
 
   @doc """
   Sync a party FROM Notion, overwriting local data with the Notion page data.
   """
-  def update_party_from_notion(%Party{notion_page_id: nil}), do: {:error, :no_page_id}
+  def update_party_from_notion(party, opts \\ [])
 
-  def update_party_from_notion(%Party{} = party) do
-    case NotionClient.get_page(party.notion_page_id) do
+  def update_party_from_notion(%Party{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
+
+  def update_party_from_notion(%Party{} = party, opts) do
+    payload = %{"page_id" => party.notion_page_id}
+    client = notion_client(opts)
+
+    case client.get_page(party.notion_page_id) do
       nil ->
         Logger.error("Failed to fetch Notion page: #{party.notion_page_id}")
+        log_sync_error("party", party.id, payload, %{}, "Notion page not found")
         {:error, :notion_page_not_found}
 
-      %{"code" => error_code, "message" => message} ->
+      %{"code" => error_code, "message" => message} = response ->
         Logger.error("Notion API error: #{error_code} - #{message}")
+
+        log_sync_error(
+          "party",
+          party.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
         attributes = entity_attributes_from_notion(page)
-        Parties.update_party(party, attributes)
+
+        case Parties.update_party(party, attributes) do
+          {:ok, updated_party} = result ->
+            Notion.log_success("party", updated_party.id, payload, page)
+            result
+
+          {:error, changeset} = error ->
+            log_sync_error(
+              "party",
+              party.id,
+              payload,
+              page,
+              "Failed to update party from Notion: #{inspect(changeset)}"
+            )
+
+            error
+        end
     end
   rescue
     error ->
       Logger.error("Failed to update party from Notion: #{Exception.message(error)}")
+      log_sync_error("party", party.id, payload, %{}, "Exception: #{Exception.message(error)}")
       {:error, error}
   end
 
   @doc """
   Sync a faction FROM Notion, overwriting local data with the Notion page data.
   """
-  def update_faction_from_notion(%Faction{notion_page_id: nil}), do: {:error, :no_page_id}
+  def update_faction_from_notion(faction, opts \\ [])
 
-  def update_faction_from_notion(%Faction{} = faction) do
-    case NotionClient.get_page(faction.notion_page_id) do
+  def update_faction_from_notion(%Faction{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
+
+  def update_faction_from_notion(%Faction{} = faction, opts) do
+    payload = %{"page_id" => faction.notion_page_id}
+    client = notion_client(opts)
+
+    case client.get_page(faction.notion_page_id) do
       nil ->
         Logger.error("Failed to fetch Notion page: #{faction.notion_page_id}")
+        log_sync_error("faction", faction.id, payload, %{}, "Notion page not found")
         {:error, :notion_page_not_found}
 
-      %{"code" => error_code, "message" => message} ->
+      %{"code" => error_code, "message" => message} = response ->
         Logger.error("Notion API error: #{error_code} - #{message}")
+
+        log_sync_error(
+          "faction",
+          faction.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
         attributes = entity_attributes_from_notion(page)
-        Factions.update_faction(faction, attributes)
+
+        case Factions.update_faction(faction, attributes) do
+          {:ok, updated_faction} = result ->
+            Notion.log_success("faction", updated_faction.id, payload, page)
+            result
+
+          {:error, changeset} = error ->
+            log_sync_error(
+              "faction",
+              faction.id,
+              payload,
+              page,
+              "Failed to update faction from Notion: #{inspect(changeset)}"
+            )
+
+            error
+        end
     end
   rescue
     error ->
       Logger.error("Failed to update faction from Notion: #{Exception.message(error)}")
+
+      log_sync_error(
+        "faction",
+        faction.id,
+        payload,
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
+
       {:error, error}
   end
 
