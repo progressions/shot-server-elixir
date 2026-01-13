@@ -23,6 +23,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
       name: juncture.name,
       description: juncture.description,
       active: juncture.active,
+      at_a_glance: juncture.at_a_glance,
       faction_id: juncture.faction_id,
       campaign_id: juncture.campaign_id,
       character_ids: get_character_ids(juncture),

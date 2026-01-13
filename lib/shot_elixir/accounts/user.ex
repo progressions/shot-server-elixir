@@ -17,6 +17,7 @@ defmodule ShotElixir.Accounts.User do
     field :last_name, :string
     field :name, :string
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
     field :admin, :boolean, default: false
     field :gamemaster, :boolean, default: false
     field :jti, :string
@@ -58,6 +59,7 @@ defmodule ShotElixir.Accounts.User do
       :password,
       :first_name,
       :last_name,
+      :at_a_glance,
       :admin,
       :gamemaster,
       :current_campaign_id,
@@ -88,7 +90,15 @@ defmodule ShotElixir.Accounts.User do
 
   def update_changeset(user, attrs) do
     user
-    |> cast(attrs, [:email, :first_name, :last_name, :admin, :gamemaster, :current_campaign_id])
+    |> cast(attrs, [
+      :email,
+      :first_name,
+      :last_name,
+      :at_a_glance,
+      :admin,
+      :gamemaster,
+      :current_campaign_id
+    ])
     |> validate_required([:email, :first_name, :last_name])
     |> validate_format(:email, ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/)
     |> validate_length(:first_name, min: 2)

@@ -54,6 +54,7 @@ defmodule ShotElixir.Characters do
 
     # Apply visibility filtering
     query = apply_visibility_filter(query, params)
+    query = apply_at_a_glance_filter(query, params)
 
     # Apply single id filter if present
     query =
@@ -307,6 +308,23 @@ defmodule ShotElixir.Characters do
         # Default to showing only active characters
         from c in query, where: c.active == true
     end
+  end
+
+  defp apply_at_a_glance_filter(query, params) do
+    case at_a_glance_param(params) do
+      "true" ->
+        from c in query, where: c.at_a_glance == true
+
+      true ->
+        from c in query, where: c.at_a_glance == true
+
+      _ ->
+        query
+    end
+  end
+
+  defp at_a_glance_param(params) do
+    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   # If ids param not present at all, don't filter

@@ -32,6 +32,7 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       name: party.name,
       description: party.description,
       active: party.active,
+      at_a_glance: party.at_a_glance,
       faction_id: party.faction_id,
       campaign_id: party.campaign_id,
       juncture_id: party.juncture_id,

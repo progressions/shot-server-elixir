@@ -68,6 +68,7 @@ defmodule ShotElixir.Weapons do
     |> filter_by_ids(filters["ids"], Map.has_key?(filters, "ids"))
     |> filter_by_category(filters["category"])
     |> filter_by_juncture(filters["juncture"])
+    |> filter_by_at_a_glance(filters)
   end
 
   # If ids param not present at all, don't filter
@@ -92,6 +93,19 @@ defmodule ShotElixir.Weapons do
 
   defp filter_by_juncture(query, juncture) do
     from w in query, where: w.juncture == ^juncture
+  end
+
+  defp filter_by_at_a_glance(query, filters) do
+    case Map.get(filters, "at_a_glance") || Map.get(filters, "at_a_glace") do
+      "true" ->
+        from w in query, where: w.at_a_glance == true
+
+      true ->
+        from w in query, where: w.at_a_glance == true
+
+      _ ->
+        query
+    end
   end
 
   def get_weapon!(id) do

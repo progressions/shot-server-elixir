@@ -24,6 +24,7 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       name: site.name,
       description: site.description,
       active: site.active,
+      at_a_glance: site.at_a_glance,
       faction_id: site.faction_id,
       campaign_id: site.campaign_id,
       juncture_id: site.juncture_id,

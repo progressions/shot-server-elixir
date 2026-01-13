@@ -12,6 +12,7 @@ defmodule ShotElixir.Campaigns.Campaign do
     field :name, :string
     field :description, :string
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
     field :is_master_template, :boolean, default: false
     field :seeded_at, :naive_datetime
 
@@ -66,6 +67,7 @@ defmodule ShotElixir.Campaigns.Campaign do
       :name,
       :description,
       :active,
+      :at_a_glance,
       :is_master_template,
       :user_id,
       :seeding_status,

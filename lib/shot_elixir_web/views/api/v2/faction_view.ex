@@ -23,6 +23,7 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       name: faction.name,
       description: faction.description,
       active: faction.active,
+      at_a_glance: faction.at_a_glance,
       campaign_id: faction.campaign_id,
       created_at: faction.created_at,
       updated_at: faction.updated_at,

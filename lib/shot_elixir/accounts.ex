@@ -72,6 +72,7 @@ defmodule ShotElixir.Accounts do
 
     # Visibility filtering
     query = apply_visibility_filter(query, params)
+    query = apply_at_a_glance_filter(query, params)
 
     # Character filtering
     query =
@@ -145,6 +146,7 @@ defmodule ShotElixir.Accounts do
       end
 
     count_query = apply_visibility_filter(count_query, params)
+    count_query = apply_at_a_glance_filter(count_query, params)
 
     count_query =
       if params["character_id"] && params["character_id"] != "" do
@@ -213,6 +215,23 @@ defmodule ShotElixir.Accounts do
         # Default to visible (active) only
         from u in query, where: u.active == true
     end
+  end
+
+  defp apply_at_a_glance_filter(query, params) do
+    case at_a_glance_param(params) do
+      "true" ->
+        from u in query, where: u.at_a_glance == true
+
+      true ->
+        from u in query, where: u.at_a_glance == true
+
+      _ ->
+        query
+    end
+  end
+
+  defp at_a_glance_param(params) do
+    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   defp parse_ids(ids_param) when is_binary(ids_param) do

@@ -75,6 +75,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       action_values: character.action_values,
       created_at: character.created_at,
       active: character.active,
+      at_a_glance: character.at_a_glance,
       extending: character.extending,
       color: character.color,
       entity_class: "Character",
@@ -95,6 +96,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       id: character.id,
       name: character.name,
       active: character.active,
+      at_a_glance: character.at_a_glance,
       extending: character.extending,
       created_at: character.created_at,
       updated_at: character.updated_at,
@@ -217,6 +219,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       admin: user.admin,
       entity_class: "User",
       active: user.active,
+      at_a_glance: user.at_a_glance,
       created_at: user.created_at,
       updated_at: user.updated_at
     }
@@ -240,6 +243,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       description: faction.description,
       image_url: get_image_url(faction),
       active: faction.active,
+      at_a_glance: faction.at_a_glance,
       created_at: faction.created_at,
       updated_at: faction.updated_at,
       entity_class: "Faction"

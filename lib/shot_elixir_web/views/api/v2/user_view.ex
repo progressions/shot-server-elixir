@@ -52,6 +52,7 @@ defmodule ShotElixirWeb.Api.V2.UserView do
       discord_id: user.discord_id,
       entity_class: "User",
       active: user.active,
+      at_a_glance: user.at_a_glance,
       created_at: user.created_at,
       updated_at: user.updated_at
     }

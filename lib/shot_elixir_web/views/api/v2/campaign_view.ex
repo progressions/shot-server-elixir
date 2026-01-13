@@ -98,6 +98,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       image_url: get_image_url(campaign),
       entity_class: "Campaign",
       active: campaign.active,
+      at_a_glance: campaign.at_a_glance,
       image_positions: render_image_positions_if_loaded(campaign),
       # Seeding status fields
       seeding_status: campaign.seeding_status,

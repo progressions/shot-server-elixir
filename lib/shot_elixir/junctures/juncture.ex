@@ -10,6 +10,7 @@ defmodule ShotElixir.Junctures.Juncture do
     field :name, :string
     field :description, :string
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
     field :notion_page_id, :binary_id
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
@@ -27,7 +28,15 @@ defmodule ShotElixir.Junctures.Juncture do
 
   def changeset(juncture, attrs) do
     juncture
-    |> cast(attrs, [:name, :description, :active, :notion_page_id, :campaign_id, :faction_id])
+    |> cast(attrs, [
+      :name,
+      :description,
+      :active,
+      :at_a_glance,
+      :notion_page_id,
+      :campaign_id,
+      :faction_id
+    ])
     |> validate_required([:name])
     |> validate_length(:name, min: 1, max: 255)
   end

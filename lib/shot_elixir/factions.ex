@@ -84,6 +84,7 @@ defmodule ShotElixir.Factions do
 
     # Visibility filtering
     query = apply_visibility_filter(query, params)
+    query = apply_at_a_glance_filter(query, params)
 
     # Character filtering (factions containing specific characters)
     query =
@@ -149,6 +150,7 @@ defmodule ShotElixir.Factions do
       end
 
     count_query = apply_visibility_filter(count_query, params)
+    count_query = apply_at_a_glance_filter(count_query, params)
 
     count_query =
       if params["character_id"] && params["character_id"] != "" do
@@ -246,6 +248,23 @@ defmodule ShotElixir.Factions do
         # Default to visible (active) only
         from f in query, where: f.active == true
     end
+  end
+
+  defp apply_at_a_glance_filter(query, params) do
+    case at_a_glance_param(params) do
+      "true" ->
+        from f in query, where: f.at_a_glance == true
+
+      true ->
+        from f in query, where: f.at_a_glance == true
+
+      _ ->
+        query
+    end
+  end
+
+  defp at_a_glance_param(params) do
+    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   defp apply_sorting(query, params) do

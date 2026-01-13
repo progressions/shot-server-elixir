@@ -60,6 +60,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
       juncture_id: vehicle.juncture_id,
       action_values: vehicle.action_values,
       active: vehicle.active,
+      at_a_glance: vehicle.at_a_glance,
       created_at: vehicle.created_at,
       updated_at: vehicle.updated_at,
       entity_class: "Vehicle"

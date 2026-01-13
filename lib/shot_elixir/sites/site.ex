@@ -12,6 +12,7 @@ defmodule ShotElixir.Sites.Site do
     field :name, :string
     field :description, :string
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
     field :image_url, :string, virtual: true
     field :notion_page_id, :string
     field :last_synced_to_notion_at, :utc_datetime
@@ -34,6 +35,7 @@ defmodule ShotElixir.Sites.Site do
       :name,
       :description,
       :active,
+      :at_a_glance,
       :campaign_id,
       :faction_id,
       :juncture_id,
