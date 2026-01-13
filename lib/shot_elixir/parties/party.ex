@@ -56,7 +56,8 @@ defmodule ShotElixir.Parties.Party do
   def as_notion(%__MODULE__{} = party) do
     %{
       "Name" => %{"title" => [%{"text" => %{"content" => party.name || ""}}]},
-      "Description" => %{"rich_text" => [%{"text" => %{"content" => party.description || ""}}]}
+      "Description" => %{"rich_text" => [%{"text" => %{"content" => party.description || ""}}]},
+      "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
   end
 end

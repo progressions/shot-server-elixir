@@ -111,6 +111,7 @@ defmodule ShotElixir.Services.NotionService do
         raw_notion_action_values = get_raw_action_values_from_notion(page)
         notion_description = get_description(page)
         notion_name = get_notion_name(page)
+        notion_at_a_glance = get_in(page, ["properties", "At a Glance", "checkbox"])
 
         # Perform smart merge for action_values
         merged_action_values =
@@ -133,12 +134,14 @@ defmodule ShotElixir.Services.NotionService do
             else: character.name
 
         # Update Chi War record with merged values
-        update_attrs = %{
-          notion_page_id: notion_page_id,
-          name: merged_name,
-          action_values: merged_action_values,
-          description: merged_description
-        }
+        update_attrs =
+          %{
+            notion_page_id: notion_page_id,
+            name: merged_name,
+            action_values: merged_action_values,
+            description: merged_description
+          }
+          |> Character.maybe_put_at_a_glance(notion_at_a_glance)
 
         case Characters.update_character(character, update_attrs) do
           {:ok, updated_character} ->

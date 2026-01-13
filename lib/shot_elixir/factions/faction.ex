@@ -60,7 +60,8 @@ defmodule ShotElixir.Factions.Faction do
   def as_notion(%__MODULE__{} = faction) do
     %{
       "Name" => %{"rich_text" => [%{"text" => %{"content" => faction.name || ""}}]},
-      "Description" => %{"rich_text" => [%{"text" => %{"content" => faction.description || ""}}]}
+      "Description" => %{"rich_text" => [%{"text" => %{"content" => faction.description || ""}}]},
+      "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
   end
 
