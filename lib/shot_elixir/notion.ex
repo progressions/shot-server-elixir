@@ -8,18 +8,23 @@ defmodule ShotElixir.Notion do
   alias ShotElixir.Repo
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.Characters
+  alias ShotElixir.Factions
+  alias ShotElixir.Parties
+  alias ShotElixir.Sites
 
   @doc """
   Creates a sync log entry.
 
   ## Parameters
-    - attrs: Map with :character_id, :status, :payload, :response, :error_message
+    - attrs: Map with :entity_type, :entity_id, :status, :payload, :response, :error_message
 
   ## Returns
     - {:ok, log} on success
     - {:error, changeset} on failure
   """
   def create_sync_log(attrs) do
+    attrs = maybe_set_character_id(attrs)
+
     result =
       %NotionSyncLog{}
       |> NotionSyncLog.changeset(attrs)
@@ -28,7 +33,7 @@ defmodule ShotElixir.Notion do
     # Broadcast reload signal after successful log creation
     case result do
       {:ok, log} ->
-        broadcast_sync_log_created(log.character_id)
+        broadcast_sync_log_created(log.entity_type, log.entity_id)
         {:ok, log}
 
       error ->
@@ -36,29 +41,66 @@ defmodule ShotElixir.Notion do
     end
   end
 
-  # Broadcasts a reload signal for notion_sync_logs to the character's campaign channel
-  defp broadcast_sync_log_created(character_id) do
-    case Characters.get_character(character_id) do
-      nil ->
-        Logger.warning("Cannot broadcast sync log created: character #{character_id} not found")
+  defp maybe_set_character_id(%{entity_type: "character", entity_id: entity_id} = attrs) do
+    Map.put_new(attrs, :character_id, entity_id)
+  end
 
-        :ok
+  defp maybe_set_character_id(attrs), do: attrs
 
-      character ->
-        Phoenix.PubSub.broadcast(
-          ShotElixir.PubSub,
-          "campaign:#{character.campaign_id}",
-          {:campaign_broadcast, %{notion_sync_logs: "reload"}}
-        )
+  # Broadcasts a reload signal for notion_sync_logs to the entity's campaign channel
+  defp broadcast_sync_log_created(entity_type, entity_id) do
+    campaign_id =
+      case entity_type do
+        "character" ->
+          case Characters.get_character(entity_id) do
+            nil -> nil
+            character -> character.campaign_id
+          end
+
+        "site" ->
+          case Sites.get_site(entity_id) do
+            nil -> nil
+            site -> site.campaign_id
+          end
+
+        "party" ->
+          case Parties.get_party(entity_id) do
+            nil -> nil
+            party -> party.campaign_id
+          end
+
+        "faction" ->
+          case Factions.get_faction(entity_id) do
+            nil -> nil
+            faction -> faction.campaign_id
+          end
+
+        _ ->
+          nil
+      end
+
+    if campaign_id do
+      Phoenix.PubSub.broadcast(
+        ShotElixir.PubSub,
+        "campaign:#{campaign_id}",
+        {:campaign_broadcast, %{notion_sync_logs: "reload"}}
+      )
+    else
+      Logger.warning(
+        "Cannot broadcast sync log created: #{entity_type} #{entity_id} not found"
+      )
+
+      :ok
     end
   end
 
   @doc """
   Logs a successful sync operation.
   """
-  def log_success(character_id, payload, response) do
+  def log_success(entity_type, entity_id, payload, response) do
     create_sync_log(%{
-      character_id: character_id,
+      entity_type: entity_type,
+      entity_id: entity_id,
       status: "success",
       payload: payload,
       response: response
@@ -68,9 +110,10 @@ defmodule ShotElixir.Notion do
   @doc """
   Logs a failed sync operation.
   """
-  def log_error(character_id, payload, response, error_message) do
+  def log_error(entity_type, entity_id, payload, response, error_message) do
     create_sync_log(%{
-      character_id: character_id,
+      entity_type: entity_type,
+      entity_id: entity_id,
       status: "error",
       payload: payload,
       response: response,
@@ -79,23 +122,24 @@ defmodule ShotElixir.Notion do
   end
 
   @doc """
-  Lists sync logs for a character with pagination.
+  Lists sync logs for an entity with pagination.
 
   ## Parameters
-    - character_id: The character's UUID
+    - entity_type: The entity type ("character", "site", "party", "faction")
+    - entity_id: The entity's UUID
     - params: Map with optional "page" and "per_page" keys
 
   ## Returns
     - Map with :logs, :meta keys
   """
-  def list_sync_logs_for_character(character_id, params \\ %{}) do
+  def list_sync_logs(entity_type, entity_id, params \\ %{}) do
     per_page = get_pagination_param(params, "per_page", 10)
     page = get_pagination_param(params, "page", 1)
     offset = (page - 1) * per_page
 
     base_query =
       NotionSyncLog
-      |> where([l], l.character_id == ^character_id)
+      |> where([l], l.entity_type == ^entity_type and l.entity_id == ^entity_id)
 
     total_count = Repo.aggregate(base_query, :count, :id)
 
@@ -117,6 +161,10 @@ defmodule ShotElixir.Notion do
     }
   end
 
+  def list_sync_logs_for_character(character_id, params \\ %{}) do
+    list_sync_logs("character", character_id, params)
+  end
+
   @doc """
   Gets a single sync log by ID.
   """
@@ -125,35 +173,44 @@ defmodule ShotElixir.Notion do
   end
 
   @doc """
-  Gets a sync log by ID, scoped to a character.
+  Gets a sync log by ID, scoped to an entity.
   """
-  def get_sync_log_for_character(character_id, log_id) do
+  def get_sync_log_for_entity(entity_type, entity_id, log_id) do
     NotionSyncLog
-    |> where([l], l.id == ^log_id and l.character_id == ^character_id)
+    |> where([l], l.id == ^log_id and l.entity_type == ^entity_type and l.entity_id == ^entity_id)
     |> Repo.one()
   end
 
+  def get_sync_log_for_character(character_id, log_id) do
+    get_sync_log_for_entity("character", character_id, log_id)
+  end
+
   @doc """
-  Prunes (deletes) old sync logs for a character.
+  Prunes (deletes) old sync logs for an entity.
 
   ## Parameters
-    - character_id: The character's UUID
+    - entity_type: The entity type ("character", "site", "party", "faction")
+    - entity_id: The entity's UUID
     - opts: Keyword list with optional :days_old (default 30)
 
   ## Returns
     - {:ok, count} with the number of deleted logs
   """
-  def prune_sync_logs(character_id, opts \\ []) do
+  def prune_sync_logs(entity_type, entity_id, opts \\ []) do
     days_old = Keyword.get(opts, :days_old, 30)
     cutoff_date = DateTime.utc_now() |> DateTime.add(-days_old, :day)
 
     {count, _} =
       NotionSyncLog
-      |> where([l], l.character_id == ^character_id)
+      |> where([l], l.entity_type == ^entity_type and l.entity_id == ^entity_id)
       |> where([l], l.created_at < ^cutoff_date)
       |> Repo.delete_all()
 
     {:ok, count}
+  end
+
+  def prune_sync_logs_for_character(character_id, opts \\ []) do
+    prune_sync_logs("character", character_id, opts)
   end
 
   # Private helper for pagination params

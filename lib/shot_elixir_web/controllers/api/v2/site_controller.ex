@@ -558,6 +558,62 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
     end
   end
 
+  # POST /api/v2/sites/:site_id/sync_from_notion
+  def sync_from_notion(conn, %{"site_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Sites.get_site(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Site not found"})
+
+      site ->
+        case Campaigns.get_campaign(site.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Site not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              with :ok <- require_notion_page_linked(site),
+                   {:ok, updated_site} <- NotionService.update_site_from_notion(site) do
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                |> render("show.json", site: updated_site)
+              else
+                {:error, :no_notion_page} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Site has no Notion page linked"})
+
+                {:error, {:notion_api_error, _code, message}} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync from Notion: #{message}"})
+
+                {:error, reason} ->
+                  Logger.error("Failed to sync site from Notion: #{inspect(reason)}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync from Notion"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync sites"})
+            end
+        end
+    end
+  end
+
+  defp require_notion_page_linked(%Sites.Site{notion_page_id: nil}),
+    do: {:error, :no_notion_page}
+
+  defp require_notion_page_linked(%Sites.Site{}), do: :ok
+
   defp ensure_campaign(user) do
     if user.current_campaign_id do
       {:ok, user.current_campaign_id}

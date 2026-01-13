@@ -475,6 +475,62 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
     end
   end
 
+  # POST /api/v2/factions/:faction_id/sync_from_notion
+  def sync_from_notion(conn, %{"faction_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Factions.get_faction(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Faction not found"})
+
+      faction ->
+        case Campaigns.get_campaign(faction.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Faction not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              with :ok <- require_notion_page_linked(faction),
+                   {:ok, updated_faction} <- NotionService.update_faction_from_notion(faction) do
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                |> render("show.json", faction: updated_faction)
+              else
+                {:error, :no_notion_page} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Faction has no Notion page linked"})
+
+                {:error, {:notion_api_error, _code, message}} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync from Notion: #{message}"})
+
+                {:error, reason} ->
+                  Logger.error("Failed to sync faction from Notion: #{inspect(reason)}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync from Notion"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync factions"})
+            end
+        end
+    end
+  end
+
+  defp require_notion_page_linked(%Factions.Faction{notion_page_id: nil}),
+    do: {:error, :no_notion_page}
+
+  defp require_notion_page_linked(%Factions.Faction{}), do: :ok
+
   # Private helper functions
   defp ensure_campaign(nil), do: {:error, :unauthorized}
   defp ensure_campaign(%{current_campaign_id: nil}), do: {:error, :no_campaign}

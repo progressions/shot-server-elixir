@@ -198,7 +198,7 @@ defmodule ShotElixir.Services.NotionService do
             add_image(page, updated_character)
 
             # Log successful merge
-            Notion.log_success(updated_character.id, %{action: "merge"}, page)
+            Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
 
             {:ok, updated_character}
 
@@ -312,7 +312,7 @@ defmodule ShotElixir.Services.NotionService do
         Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
         # Log successful sync
-        Notion.log_success(character.id, payload, page)
+        Notion.log_success("character", character.id, payload, page)
 
         # Update character with notion_page_id
         case Characters.update_character(character, %{notion_page_id: page_id}) do
@@ -334,6 +334,7 @@ defmodule ShotElixir.Services.NotionService do
         Logger.error("Notion API error: #{error_code}")
         # Log error sync
         Notion.log_error(
+          "character",
           character.id,
           payload,
           page,
@@ -345,7 +346,13 @@ defmodule ShotElixir.Services.NotionService do
       _ ->
         Logger.error("Unexpected response from Notion API")
         # Log error sync
-        Notion.log_error(character.id, payload, page, "Unexpected response from Notion API")
+        Notion.log_error(
+          "character",
+          character.id,
+          payload,
+          page,
+          "Unexpected response from Notion API"
+        )
         {:error, :unexpected_notion_response}
     end
   rescue
@@ -353,7 +360,13 @@ defmodule ShotElixir.Services.NotionService do
       # Avoid logging potentially sensitive HTTP request metadata
       Logger.error("Failed to create Notion page: #{Exception.message(error)}")
       # Log error sync (with nil payload since we may not have gotten there)
-      Notion.log_error(character.id, %{}, %{}, "Exception: #{Exception.message(error)}")
+      Notion.log_error(
+        "character",
+        character.id,
+        %{},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
       {:error, :notion_request_failed}
   end
 
@@ -394,6 +407,7 @@ defmodule ShotElixir.Services.NotionService do
           Logger.error("Notion API validation error on update: #{message}")
 
           Notion.log_error(
+            "character",
             character.id,
             payload,
             response,
@@ -411,6 +425,7 @@ defmodule ShotElixir.Services.NotionService do
         Logger.error("Notion API error on update: #{error_code}")
 
         Notion.log_error(
+          "character",
           character.id,
           payload,
           response,
@@ -429,7 +444,7 @@ defmodule ShotElixir.Services.NotionService do
         end
 
         # Log successful sync
-        Notion.log_success(character.id, payload, response || page)
+        Notion.log_success("character", character.id, payload, response || page)
 
         {:ok, page}
     end
@@ -438,6 +453,7 @@ defmodule ShotElixir.Services.NotionService do
       Logger.error("Failed to update Notion page: #{Exception.message(error)}")
       # Log error sync
       Notion.log_error(
+        "character",
         character.id,
         %{"page_id" => character.notion_page_id},
         %{},
@@ -649,6 +665,7 @@ defmodule ShotElixir.Services.NotionService do
 
     # Log the unlink event (as a special "unlinked" status or error with context)
     Notion.log_error(
+      "character",
       character.id,
       payload,
       response,
@@ -1180,6 +1197,49 @@ defmodule ShotElixir.Services.NotionService do
     |> Enum.join("")
   end
 
+  defp entity_attributes_from_notion(page) do
+    props = page["properties"] || %{}
+
+    %{
+      notion_page_id: page["id"],
+      name: get_entity_name(props),
+      description: get_rich_text_content(props, "Description")
+    }
+    |> maybe_put_at_a_glance(get_checkbox_content(props, "At a Glance"))
+  end
+
+  defp get_entity_name(props) do
+    title = get_title_content(props, "Name")
+
+    if title != "" do
+      title
+    else
+      get_rich_text_content(props, "Name")
+    end
+  end
+
+  defp get_title_content(props, key) do
+    props
+    |> Map.get(key, %{})
+    |> Map.get("title", [])
+    |> Enum.map(& &1["plain_text"])
+    |> Enum.join("")
+  end
+
+  defp get_checkbox_content(props, key) do
+    props
+    |> Map.get(key, %{})
+    |> Map.get("checkbox")
+  end
+
+  defp maybe_put_at_a_glance(attrs, at_a_glance) do
+    if is_boolean(at_a_glance) do
+      Map.put(attrs, :at_a_glance, at_a_glance)
+    else
+      attrs
+    end
+  end
+
   # =============================================================================
   # Session Notes Functions
   # =============================================================================
@@ -1672,6 +1732,81 @@ defmodule ShotElixir.Services.NotionService do
     })
   end
 
+  @doc """
+  Sync a site FROM Notion, overwriting local data with the Notion page data.
+  """
+  def update_site_from_notion(%Site{notion_page_id: nil}), do: {:error, :no_page_id}
+
+  def update_site_from_notion(%Site{} = site) do
+    case NotionClient.get_page(site.notion_page_id) do
+      nil ->
+        Logger.error("Failed to fetch Notion page: #{site.notion_page_id}")
+        {:error, :notion_page_not_found}
+
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      page when is_map(page) ->
+        attributes = entity_attributes_from_notion(page)
+        Sites.update_site(site, attributes)
+    end
+  rescue
+    error ->
+      Logger.error("Failed to update site from Notion: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  @doc """
+  Sync a party FROM Notion, overwriting local data with the Notion page data.
+  """
+  def update_party_from_notion(%Party{notion_page_id: nil}), do: {:error, :no_page_id}
+
+  def update_party_from_notion(%Party{} = party) do
+    case NotionClient.get_page(party.notion_page_id) do
+      nil ->
+        Logger.error("Failed to fetch Notion page: #{party.notion_page_id}")
+        {:error, :notion_page_not_found}
+
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      page when is_map(page) ->
+        attributes = entity_attributes_from_notion(page)
+        Parties.update_party(party, attributes)
+    end
+  rescue
+    error ->
+      Logger.error("Failed to update party from Notion: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  @doc """
+  Sync a faction FROM Notion, overwriting local data with the Notion page data.
+  """
+  def update_faction_from_notion(%Faction{notion_page_id: nil}), do: {:error, :no_page_id}
+
+  def update_faction_from_notion(%Faction{} = faction) do
+    case NotionClient.get_page(faction.notion_page_id) do
+      nil ->
+        Logger.error("Failed to fetch Notion page: #{faction.notion_page_id}")
+        {:error, :notion_page_not_found}
+
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+        {:error, {:notion_api_error, error_code, message}}
+
+      page when is_map(page) ->
+        attributes = entity_attributes_from_notion(page)
+        Factions.update_faction(faction, attributes)
+    end
+  rescue
+    error ->
+      Logger.error("Failed to update faction from Notion: #{Exception.message(error)}")
+      {:error, error}
+  end
+
   # =============================================================================
   # Generic Entity Sync Helpers
   # =============================================================================
@@ -1715,6 +1850,8 @@ defmodule ShotElixir.Services.NotionService do
 
     case page do
       %{"id" => page_id} when is_binary(page_id) ->
+        Notion.log_success(entity_type, entity.id, payload, page)
+
         case opts.update_fn.(entity, %{notion_page_id: page_id}) do
           {:ok, updated_entity} ->
             Logger.info("Created Notion page for #{entity_type} #{updated_entity.id}: #{page_id}")
@@ -1727,15 +1864,36 @@ defmodule ShotElixir.Services.NotionService do
 
       %{"code" => error_code, "message" => message} ->
         Logger.error("Notion API error creating #{entity_type}: #{error_code} - #{message}")
+        Notion.log_error(
+          entity_type,
+          entity.id,
+          payload,
+          page,
+          "Notion API error: #{error_code} - #{message}"
+        )
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
         Logger.error("Unexpected response from Notion API when creating #{entity_type}")
+        Notion.log_error(
+          entity_type,
+          entity.id,
+          payload,
+          page,
+          "Unexpected response from Notion API"
+        )
         {:error, :unexpected_notion_response}
     end
   rescue
     error ->
       Logger.error("Failed to create Notion page for #{entity_type}: #{Exception.message(error)}")
+      Notion.log_error(
+        entity_type,
+        entity.id,
+        %{},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
       {:error, :notion_request_failed}
   end
 
@@ -1744,42 +1902,73 @@ defmodule ShotElixir.Services.NotionService do
 
   defp update_notion_page(entity, %{entity_type: entity_type} = opts) do
     properties = opts.as_notion_fn.(entity)
+    payload = %{"page_id" => entity.notion_page_id, "properties" => properties}
     response = NotionClient.update_page(entity.notion_page_id, properties)
 
     case response do
       %{"code" => "validation_error", "message" => message}
       when is_binary(message) ->
         if String.contains?(String.downcase(message), "archived") do
-          handle_archived_entity(entity, opts)
+          handle_archived_entity(entity, opts, payload, response, message)
         else
           Logger.error("Notion API validation error on #{entity_type} update: #{message}")
+          Notion.log_error(
+            entity_type,
+            entity.id,
+            payload,
+            response,
+            "Notion API error: validation_error - #{message}"
+          )
           {:error, {:notion_api_error, "validation_error", message}}
         end
 
       %{"code" => "object_not_found", "message" => _message} ->
-        handle_archived_entity(entity, opts)
+        handle_archived_entity(entity, opts, payload, response, "object_not_found")
 
       %{"code" => error_code, "message" => message} ->
         Logger.error("Notion API error on #{entity_type} update: #{error_code}")
+        Notion.log_error(
+          entity_type,
+          entity.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
+        Notion.log_success(entity_type, entity.id, payload, response)
         {:ok, response}
     end
   rescue
     error ->
       Logger.error("Failed to update Notion page for #{entity_type}: #{Exception.message(error)}")
+      Notion.log_error(
+        entity_type,
+        entity.id,
+        %{"page_id" => entity.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
 
       {:error, error}
   end
 
   # Generic handler for archived/deleted Notion pages
-  defp handle_archived_entity(entity, opts) do
+  defp handle_archived_entity(entity, opts, payload, response, message) do
     entity_type = opts.entity_type
 
     Logger.warning(
       "Notion page #{entity.notion_page_id} for #{entity_type} #{entity.id} " <>
         "has been archived/deleted. Unlinking from #{entity_type}."
+    )
+
+    Notion.log_error(
+      entity_type,
+      entity.id,
+      payload,
+      response,
+      "Notion page archived/deleted - unlinking from #{entity_type}: #{message}"
     )
 
     case opts.update_fn.(entity, %{notion_page_id: nil}) do

@@ -870,6 +870,62 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
     end
   end
 
+  # POST /api/v2/parties/:party_id/sync_from_notion
+  def sync_from_notion(conn, %{"party_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Parties.get_party(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Party not found"})
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Party not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              with :ok <- require_notion_page_linked(party),
+                   {:ok, updated_party} <- NotionService.update_party_from_notion(party) do
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("show.json", party: updated_party)
+              else
+                {:error, :no_notion_page} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Party has no Notion page linked"})
+
+                {:error, {:notion_api_error, _code, message}} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync from Notion: #{message}"})
+
+                {:error, reason} ->
+                  Logger.error("Failed to sync party from Notion: #{inspect(reason)}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync from Notion"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync parties"})
+            end
+        end
+    end
+  end
+
+  defp require_notion_page_linked(%Parties.Party{notion_page_id: nil}),
+    do: {:error, :no_notion_page}
+
+  defp require_notion_page_linked(%Parties.Party{}), do: :ok
+
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do
     campaign.user_id == user.id || user.admin ||
