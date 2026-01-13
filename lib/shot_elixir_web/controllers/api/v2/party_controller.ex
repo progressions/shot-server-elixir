@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.SyncFromNotion
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -888,35 +889,15 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
             |> json(%{error: "Party not found"})
 
           campaign ->
-            if authorize_campaign_modification(campaign, current_user) do
-              with :ok <- require_notion_page_linked(party),
-                   {:ok, updated_party} <- NotionService.update_party_from_notion(party) do
-                conn
-                |> put_view(ShotElixirWeb.Api.V2.PartyView)
-                |> render("show.json", party: updated_party)
-              else
-                {:error, :no_notion_page} ->
-                  conn
-                  |> put_status(:unprocessable_entity)
-                  |> json(%{error: "Party has no Notion page linked"})
-
-                {:error, {:notion_api_error, _code, message}} ->
-                  conn
-                  |> put_status(:unprocessable_entity)
-                  |> json(%{error: "Failed to sync from Notion: #{message}"})
-
-                {:error, reason} ->
-                  Logger.error("Failed to sync party from Notion: #{inspect(reason)}")
-
-                  conn
-                  |> put_status(:unprocessable_entity)
-                  |> json(%{error: "Failed to sync from Notion"})
-              end
-            else
-              conn
-              |> put_status(:forbidden)
-              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync parties"})
-            end
+            SyncFromNotion.sync(conn, current_user, party, campaign,
+              assign_key: :party,
+              authorize: &authorize_campaign_modification/2,
+              forbidden_error: "Only campaign owners, admins, or gamemasters can sync parties",
+              no_page_error: "Party has no Notion page linked",
+              require_page: &require_notion_page_linked/1,
+              update: &NotionService.update_party_from_notion/1,
+              view: ShotElixirWeb.Api.V2.PartyView
+            )
         end
     end
   end
