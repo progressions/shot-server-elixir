@@ -58,11 +58,27 @@ defmodule ShotElixir.Factions.Faction do
   Note: Factions in Notion use rich_text for Name, not title.
   """
   def as_notion(%__MODULE__{} = faction) do
-    %{
+    base = %{
       "Name" => %{"rich_text" => [%{"text" => %{"content" => faction.name || ""}}]},
       "Description" => %{"rich_text" => [%{"text" => %{"content" => faction.description || ""}}]},
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
+
+    if Ecto.assoc_loaded?(faction.characters) do
+      character_ids =
+        faction.characters
+        |> Enum.map(& &1.notion_page_id)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(fn id -> %{"id" => id} end)
+
+      if Enum.any?(character_ids) do
+        Map.put(base, "Characters", %{"relation" => character_ids})
+      else
+        base
+      end
+    else
+      base
+    end
   end
 
   @doc """

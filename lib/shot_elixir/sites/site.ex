@@ -54,11 +54,31 @@ defmodule ShotElixir.Sites.Site do
   Convert site to Notion page properties format.
   """
   def as_notion(%__MODULE__{} = site) do
-    %{
+    base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => site.name || ""}}]},
       "Description" => %{"rich_text" => [%{"text" => %{"content" => site.description || ""}}]},
       "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
+
+    if Ecto.assoc_loaded?(site.attunements) do
+      character_ids =
+        site.attunements
+        |> Enum.map(fn a ->
+          if Ecto.assoc_loaded?(a.character), do: a.character, else: nil
+        end)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(& &1.notion_page_id)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(fn id -> %{"id" => id} end)
+
+      if Enum.any?(character_ids) do
+        Map.put(base, "Characters", %{"relation" => character_ids})
+      else
+        base
+      end
+    else
+      base
+    end
   end
 
   @doc """
