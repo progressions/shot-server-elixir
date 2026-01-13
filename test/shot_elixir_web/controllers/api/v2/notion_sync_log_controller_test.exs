@@ -93,6 +93,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
         Notion.create_sync_log(%{
           entity_type: "character",
           entity_id: character.id,
+          character_id: character.id,
           status: "success",
           payload: %{test: "data"},
           response: %{notion_id: "123"}
@@ -207,6 +208,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
         Notion.create_sync_log(%{
           entity_type: "character",
           entity_id: character.id,
+          character_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -221,6 +223,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
         Notion.create_sync_log(%{
           entity_type: "character",
           entity_id: character.id,
+          character_id: character.id,
           status: "success",
           payload: %{},
           response: %{}
@@ -352,6 +355,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
         Notion.create_sync_log(%{
           entity_type: "character",
           entity_id: character.id,
+          character_id: character.id,
           status: "success",
           payload: %{},
           response: %{}

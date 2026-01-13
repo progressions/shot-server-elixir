@@ -52,12 +52,33 @@ defmodule ShotElixir.Parties.Party do
 
   @doc """
   Convert party to Notion page properties format.
+  Requires [:memberships, :character] to be preloaded for the "Characters" relation to be populated.
   """
   def as_notion(%__MODULE__{} = party) do
-    %{
+    base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => party.name || ""}}]},
       "Description" => %{"rich_text" => [%{"text" => %{"content" => party.description || ""}}]},
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
+
+    if Ecto.assoc_loaded?(party.memberships) do
+      character_ids =
+        party.memberships
+        |> Enum.map(fn m ->
+          if Ecto.assoc_loaded?(m.character), do: m.character, else: nil
+        end)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(& &1.notion_page_id)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(fn id -> %{"id" => id} end)
+
+      if Enum.any?(character_ids) do
+        Map.put(base, "Characters", %{"relation" => character_ids})
+      else
+        base
+      end
+    else
+      base
+    end
   end
 end
