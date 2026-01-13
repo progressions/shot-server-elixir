@@ -17,6 +17,14 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
 
   action_fallback ShotElixirWeb.FallbackController
 
+  @entity_fetchers %{
+    "character_id" => {"character", Characters, :get_character},
+    "site_id" => {"site", Sites, :get_site},
+    "party_id" => {"party", Parties, :get_party},
+    "faction_id" => {"faction", Factions, :get_faction},
+    "juncture_id" => {"juncture", Junctures, :get_juncture}
+  }
+
   @doc """
   GET /api/v2/:entity/:id/notion_sync_logs
 
@@ -98,40 +106,21 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
     end
   end
 
-  defp fetch_entity(%{"character_id" => character_id}) do
-    case Characters.get_character(character_id) do
-      nil -> {:error, :not_found}
-      character -> {:ok, "character", character}
+  defp fetch_entity(params) do
+    # Find the first parameter that matches our known entity IDs
+    key = Enum.find(Map.keys(@entity_fetchers), &Map.has_key?(params, &1))
+
+    case Map.get(@entity_fetchers, key) do
+      {type, mod, fun} ->
+        id = Map.get(params, key)
+
+        case apply(mod, fun, [id]) do
+          nil -> {:error, :not_found}
+          entity -> {:ok, type, entity}
+        end
+
+      nil ->
+        {:error, :not_found}
     end
   end
-
-  defp fetch_entity(%{"site_id" => site_id}) do
-    case Sites.get_site(site_id) do
-      nil -> {:error, :not_found}
-      site -> {:ok, "site", site}
-    end
-  end
-
-  defp fetch_entity(%{"party_id" => party_id}) do
-    case Parties.get_party(party_id) do
-      nil -> {:error, :not_found}
-      party -> {:ok, "party", party}
-    end
-  end
-
-  defp fetch_entity(%{"faction_id" => faction_id}) do
-    case Factions.get_faction(faction_id) do
-      nil -> {:error, :not_found}
-      faction -> {:ok, "faction", faction}
-    end
-  end
-
-  defp fetch_entity(%{"juncture_id" => juncture_id}) do
-    case Junctures.get_juncture(juncture_id) do
-      nil -> {:error, :not_found}
-      juncture -> {:ok, "juncture", juncture}
-    end
-  end
-
-  defp fetch_entity(_params), do: {:error, :not_found}
 end
