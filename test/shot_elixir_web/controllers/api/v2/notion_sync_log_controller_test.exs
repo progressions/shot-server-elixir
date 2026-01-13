@@ -53,6 +53,8 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
     test "lists sync logs for a character", %{conn: conn, gamemaster: gm, character: character} do
       {:ok, _log} =
         Notion.create_sync_log(%{
+          entity_type: "character",
+          entity_id: character.id,
           character_id: character.id,
           status: "success",
           payload: %{test: "data"},
@@ -94,6 +96,8 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
       # Create an old log (40 days ago)
       {:ok, old_log} =
         Notion.create_sync_log(%{
+          entity_type: "character",
+          entity_id: character.id,
           character_id: character.id,
           status: "success",
           payload: %{},
@@ -107,6 +111,8 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
       # Create a recent log (10 days ago)
       {:ok, recent_log} =
         Notion.create_sync_log(%{
+          entity_type: "character",
+          entity_id: character.id,
           character_id: character.id,
           status: "success",
           payload: %{},
@@ -141,6 +147,8 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogControllerTest do
       # Create a log from 8 days ago
       {:ok, log} =
         Notion.create_sync_log(%{
+          entity_type: "character",
+          entity_id: character.id,
           character_id: character.id,
           status: "success",
           payload: %{},

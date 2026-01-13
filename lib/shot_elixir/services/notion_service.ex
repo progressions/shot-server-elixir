@@ -198,7 +198,7 @@ defmodule ShotElixir.Services.NotionService do
             add_image(page, updated_character)
 
             # Log successful merge
-            Notion.log_success(updated_character.id, %{action: "merge"}, page)
+            Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
 
             {:ok, updated_character}
 
@@ -312,7 +312,7 @@ defmodule ShotElixir.Services.NotionService do
         Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
         # Log successful sync
-        Notion.log_success(character.id, payload, page)
+        Notion.log_success("character", character.id, payload, page)
 
         # Update character with notion_page_id
         case Characters.update_character(character, %{notion_page_id: page_id}) do
@@ -334,6 +334,7 @@ defmodule ShotElixir.Services.NotionService do
         Logger.error("Notion API error: #{error_code}")
         # Log error sync
         Notion.log_error(
+          "character",
           character.id,
           payload,
           page,
@@ -345,7 +346,14 @@ defmodule ShotElixir.Services.NotionService do
       _ ->
         Logger.error("Unexpected response from Notion API")
         # Log error sync
-        Notion.log_error(character.id, payload, page, "Unexpected response from Notion API")
+        Notion.log_error(
+          "character",
+          character.id,
+          payload,
+          page,
+          "Unexpected response from Notion API"
+        )
+
         {:error, :unexpected_notion_response}
     end
   rescue
@@ -353,7 +361,14 @@ defmodule ShotElixir.Services.NotionService do
       # Avoid logging potentially sensitive HTTP request metadata
       Logger.error("Failed to create Notion page: #{Exception.message(error)}")
       # Log error sync (with nil payload since we may not have gotten there)
-      Notion.log_error(character.id, %{}, %{}, "Exception: #{Exception.message(error)}")
+      Notion.log_error(
+        "character",
+        character.id,
+        %{},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
+
       {:error, :notion_request_failed}
   end
 
@@ -394,6 +409,7 @@ defmodule ShotElixir.Services.NotionService do
           Logger.error("Notion API validation error on update: #{message}")
 
           Notion.log_error(
+            "character",
             character.id,
             payload,
             response,
@@ -411,6 +427,7 @@ defmodule ShotElixir.Services.NotionService do
         Logger.error("Notion API error on update: #{error_code}")
 
         Notion.log_error(
+          "character",
           character.id,
           payload,
           response,
@@ -429,7 +446,7 @@ defmodule ShotElixir.Services.NotionService do
         end
 
         # Log successful sync
-        Notion.log_success(character.id, payload, response || page)
+        Notion.log_success("character", character.id, payload, response || page)
 
         {:ok, page}
     end
@@ -438,6 +455,7 @@ defmodule ShotElixir.Services.NotionService do
       Logger.error("Failed to update Notion page: #{Exception.message(error)}")
       # Log error sync
       Notion.log_error(
+        "character",
         character.id,
         %{"page_id" => character.notion_page_id},
         %{},
@@ -649,6 +667,7 @@ defmodule ShotElixir.Services.NotionService do
 
     # Log the unlink event (as a special "unlinked" status or error with context)
     Notion.log_error(
+      "character",
       character.id,
       payload,
       response,
@@ -839,21 +858,23 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
-  Add image to Notion page from character.
+  Add image to Notion page from entity.
   """
-  def add_image_to_notion(%Character{image_url: nil}), do: nil
+  def add_image_to_notion(%{image_url: nil}), do: nil
+  def add_image_to_notion(%{image_url: ""}), do: nil
+  def add_image_to_notion(%{notion_page_id: nil}), do: nil
 
-  def add_image_to_notion(%Character{} = character) do
+  def add_image_to_notion(%{image_url: url, notion_page_id: page_id}) do
     child = %{
       "object" => "block",
       "type" => "image",
       "image" => %{
         "type" => "external",
-        "external" => %{"url" => character.image_url}
+        "external" => %{"url" => url}
       }
     }
 
-    NotionClient.append_block_children(character.notion_page_id, [child])
+    NotionClient.append_block_children(page_id, [child])
   rescue
     error ->
       Logger.warning("Failed to add image to Notion: #{Exception.message(error)}")
@@ -1638,6 +1659,9 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_site(%Site{} = site) do
+    # Ensure associations are loaded for as_notion
+    site = Repo.preload(site, [:faction, :juncture, attunements: :character])
+
     sync_entity(site, %{
       entity_type: "site",
       database_id: sites_database_id(),
@@ -1651,6 +1675,9 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_party(%Party{} = party) do
+    # Ensure associations are loaded for as_notion
+    party = Repo.preload(party, [:faction, :juncture, memberships: :character])
+
     sync_entity(party, %{
       entity_type: "party",
       database_id: parties_database_id(),
@@ -1664,6 +1691,9 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_faction(%Faction{} = faction) do
+    # Ensure associations are loaded for as_notion
+    faction = Repo.preload(faction, [:characters])
+
     sync_entity(faction, %{
       entity_type: "faction",
       database_id: factions_database_id(),
@@ -1718,6 +1748,10 @@ defmodule ShotElixir.Services.NotionService do
         case opts.update_fn.(entity, %{notion_page_id: page_id}) do
           {:ok, updated_entity} ->
             Logger.info("Created Notion page for #{entity_type} #{updated_entity.id}: #{page_id}")
+
+            # Add image if present
+            add_image_to_notion(updated_entity)
+
             {:ok, page}
 
           {:error, changeset} ->
@@ -1764,6 +1798,35 @@ defmodule ShotElixir.Services.NotionService do
         {:error, {:notion_api_error, error_code, message}}
 
       _ ->
+        # Add image if not present in Notion
+        page = NotionClient.get_page(entity.notion_page_id)
+
+        image =
+          case page do
+            %{"code" => error_code, "message" => message} ->
+              Logger.error(
+                "Notion API error retrieving page #{entity.notion_page_id} " <>
+                  "for #{entity_type} update: #{error_code} - #{message}"
+              )
+
+              nil
+
+            nil ->
+              Logger.error(
+                "Notion API returned nil page for #{entity.notion_page_id} " <>
+                  "on #{entity_type} update"
+              )
+
+              nil
+
+            _ ->
+              find_image_block(page)
+          end
+
+        unless image do
+          add_image_to_notion(entity)
+        end
+
         {:ok, response}
     end
   rescue
