@@ -50,7 +50,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
     with %{} = character <- Characters.get_character(character_id),
          :ok <- authorize_admin_access(character, current_user) do
       days_old = parse_days_old(params["days_old"])
-      {:ok, count} = Notion.prune_sync_logs(character_id, days_old: days_old)
+      {:ok, count} = Notion.prune_sync_logs("character", character_id, days_old: days_old)
 
       conn
       |> put_view(ShotElixirWeb.Api.V2.NotionSyncLogView)
