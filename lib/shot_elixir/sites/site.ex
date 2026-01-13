@@ -56,7 +56,8 @@ defmodule ShotElixir.Sites.Site do
   def as_notion(%__MODULE__{} = site) do
     %{
       "Name" => %{"title" => [%{"text" => %{"content" => site.name || ""}}]},
-      "Description" => %{"rich_text" => [%{"text" => %{"content" => site.description || ""}}]}
+      "Description" => %{"rich_text" => [%{"text" => %{"content" => site.description || ""}}]},
+      "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
   end
 

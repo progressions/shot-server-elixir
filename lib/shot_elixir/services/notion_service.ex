@@ -111,6 +111,7 @@ defmodule ShotElixir.Services.NotionService do
         raw_notion_action_values = get_raw_action_values_from_notion(page)
         notion_description = get_description(page)
         notion_name = get_notion_name(page)
+        notion_at_a_glance = get_in(page, ["properties", "At a Glance", "checkbox"])
 
         # Perform smart merge for action_values
         merged_action_values =
@@ -139,6 +140,13 @@ defmodule ShotElixir.Services.NotionService do
           action_values: merged_action_values,
           description: merged_description
         }
+
+        update_attrs =
+          if is_boolean(notion_at_a_glance) do
+            Map.put(update_attrs, :at_a_glance, notion_at_a_glance)
+          else
+            update_attrs
+          end
 
         case Characters.update_character(character, update_attrs) do
           {:ok, updated_character} ->

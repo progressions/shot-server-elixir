@@ -213,6 +213,7 @@ defmodule ShotElixir.Characters.Character do
       "Scroungetech" => %{"number" => to_number(av["Scroungetech"])},
       "Creature" => %{"number" => to_number(av["Creature"])},
       "Inactive" => %{"checkbox" => !character.active},
+      "At a Glance" => %{"checkbox" => !!character.at_a_glance},
       "Tags" => %{"multi_select" => tags_for_notion(character)}
     }
 
@@ -315,6 +316,7 @@ defmodule ShotElixir.Characters.Character do
   """
   def attributes_from_notion(character, page) do
     props = page["properties"]
+    at_a_glance = get_checkbox(props, "At a Glance")
 
     av =
       %{
@@ -356,12 +358,18 @@ defmodule ShotElixir.Characters.Character do
       |> Enum.reject(fn {_k, v} -> is_nil(v) || v == "" end)
       |> Map.new()
 
-    %{
+    attrs = %{
       notion_page_id: page["id"],
       name: get_title(props, "Name"),
       action_values: Map.merge(character.action_values || @default_action_values, av),
       description: Map.merge(character.description || %{}, description)
     }
+
+    if is_boolean(at_a_glance) do
+      Map.put(attrs, :at_a_glance, at_a_glance)
+    else
+      attrs
+    end
   end
 
   defp av_or_new(_character, _key, nil), do: nil
@@ -401,6 +409,12 @@ defmodule ShotElixir.Characters.Character do
     props
     |> Map.get(key, %{})
     |> Map.get("number")
+  end
+
+  defp get_checkbox(props, key) do
+    props
+    |> Map.get(key, %{})
+    |> Map.get("checkbox")
   end
 
   defp get_rich_text(props, key) do
