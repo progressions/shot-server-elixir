@@ -122,6 +122,7 @@ defmodule ShotElixir.Campaigns do
 
     # Apply visibility filtering (default to active only)
     query = apply_visibility_filter(query, params)
+    query = apply_at_a_glance_filter(query, params)
 
     # Apply sorting
     query = apply_sorting(query, params)
@@ -178,6 +179,7 @@ defmodule ShotElixir.Campaigns do
       end
 
     count_query = apply_visibility_filter(count_query, params)
+    count_query = apply_at_a_glance_filter(count_query, params)
     total_count = Repo.aggregate(count_query, :count, :id)
 
     # Apply pagination
@@ -216,6 +218,23 @@ defmodule ShotElixir.Campaigns do
         # Default to visible (active) only
         from c in query, where: c.active == true
     end
+  end
+
+  defp apply_at_a_glance_filter(query, params) do
+    case at_a_glance_param(params) do
+      "true" ->
+        from c in query, where: c.at_a_glance == true
+
+      true ->
+        from c in query, where: c.at_a_glance == true
+
+      _ ->
+        query
+    end
+  end
+
+  defp at_a_glance_param(params) do
+    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   defp parse_ids(ids_param) when is_binary(ids_param) do

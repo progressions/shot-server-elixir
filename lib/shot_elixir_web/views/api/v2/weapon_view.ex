@@ -38,6 +38,7 @@ defmodule ShotElixirWeb.Api.V2.WeaponView do
       kachunk: weapon.kachunk,
       image_url: get_image_url(weapon),
       active: weapon.active,
+      at_a_glance: weapon.at_a_glance,
       campaign_id: weapon.campaign_id,
       entity_class: "Weapon",
       created_at: weapon.created_at,

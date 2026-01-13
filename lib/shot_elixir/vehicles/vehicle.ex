@@ -14,6 +14,7 @@ defmodule ShotElixir.Vehicles.Vehicle do
     field :color, :string
     field :impairments, :integer, default: 0
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
     field :image_url, :string, virtual: true
     field :task, :boolean, default: false
     field :notion_page_id, :binary_id
@@ -41,6 +42,7 @@ defmodule ShotElixir.Vehicles.Vehicle do
       :color,
       :impairments,
       :active,
+      :at_a_glance,
       :task,
       :notion_page_id,
       :last_synced_to_notion_at,

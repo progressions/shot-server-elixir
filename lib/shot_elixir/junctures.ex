@@ -74,6 +74,7 @@ defmodule ShotElixir.Junctures do
 
     # Visibility filtering
     query = apply_visibility_filter(query, params)
+    query = apply_at_a_glance_filter(query, params)
 
     # Character filtering (junctures containing specific characters)
     query =
@@ -133,6 +134,7 @@ defmodule ShotElixir.Junctures do
       end
 
     count_query = apply_visibility_filter(count_query, params)
+    count_query = apply_at_a_glance_filter(count_query, params)
 
     count_query =
       if params["character_id"] && params["character_id"] != "" do
@@ -239,6 +241,23 @@ defmodule ShotElixir.Junctures do
         # Default to visible (active) only
         from j in query, where: j.active == true
     end
+  end
+
+  defp apply_at_a_glance_filter(query, params) do
+    case at_a_glance_param(params) do
+      "true" ->
+        from j in query, where: j.at_a_glance == true
+
+      true ->
+        from j in query, where: j.at_a_glance == true
+
+      _ ->
+        query
+    end
+  end
+
+  defp at_a_glance_param(params) do
+    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   defp apply_sorting(query, params) do

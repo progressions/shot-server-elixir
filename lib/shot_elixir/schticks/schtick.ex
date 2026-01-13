@@ -15,6 +15,7 @@ defmodule ShotElixir.Schticks.Schtick do
     field :bonus, :boolean, default: false
     field :archetypes, {:array, :string}
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :prerequisite, __MODULE__
@@ -36,6 +37,7 @@ defmodule ShotElixir.Schticks.Schtick do
       :bonus,
       :archetypes,
       :active,
+      :at_a_glance,
       :campaign_id,
       :prerequisite_id
     ])

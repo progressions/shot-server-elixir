@@ -58,6 +58,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
       path: schtick.path,
       prerequisite_id: schtick.prerequisite_id,
       active: schtick.active,
+      at_a_glance: schtick.at_a_glance,
       created_at: schtick.created_at,
       updated_at: schtick.updated_at,
       entity_class: "Schtick"

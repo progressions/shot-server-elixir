@@ -90,6 +90,7 @@ defmodule ShotElixir.Parties do
 
     # Visibility filtering
     query = apply_visibility_filter(query, params)
+    query = apply_at_a_glance_filter(query, params)
 
     # Character filtering (parties with memberships to specific character)
     query =
@@ -166,6 +167,7 @@ defmodule ShotElixir.Parties do
       end
 
     count_query = apply_visibility_filter(count_query, params)
+    count_query = apply_at_a_glance_filter(count_query, params)
 
     count_query =
       if params["character_id"] do
@@ -273,6 +275,23 @@ defmodule ShotElixir.Parties do
         # Default to visible (active) only
         from p in query, where: p.active == true
     end
+  end
+
+  defp apply_at_a_glance_filter(query, params) do
+    case at_a_glance_param(params) do
+      "true" ->
+        from p in query, where: p.at_a_glance == true
+
+      true ->
+        from p in query, where: p.at_a_glance == true
+
+      _ ->
+        query
+    end
+  end
+
+  defp at_a_glance_param(params) do
+    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   defp apply_sorting(query, params) do

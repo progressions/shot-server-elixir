@@ -51,6 +51,8 @@ defmodule ShotElixir.Vehicles do
         from v in query, where: v.active == true
       end
 
+    query = apply_at_a_glance_filter(query, params)
+
     # Apply basic filters
     query =
       if params["id"] do
@@ -162,6 +164,8 @@ defmodule ShotElixir.Vehicles do
       else
         from v in count_query, where: v.active == true
       end
+
+    count_query = apply_at_a_glance_filter(count_query, params)
 
     count_query =
       if params["id"] do
@@ -401,6 +405,23 @@ defmodule ShotElixir.Vehicles do
       _ ->
         order_by(query, [v], desc: v.created_at, asc: v.id)
     end
+  end
+
+  defp apply_at_a_glance_filter(query, params) do
+    case at_a_glance_param(params) do
+      "true" ->
+        from v in query, where: v.at_a_glance == true
+
+      true ->
+        from v in query, where: v.at_a_glance == true
+
+      _ ->
+        query
+    end
+  end
+
+  defp at_a_glance_param(params) do
+    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   def get_vehicle!(id) do

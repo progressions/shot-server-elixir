@@ -17,6 +17,7 @@ defmodule ShotElixir.Weapons.Weapon do
     field :kachunk, :boolean, default: false
     field :image_url, :string, virtual: true
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
 
@@ -36,6 +37,7 @@ defmodule ShotElixir.Weapons.Weapon do
       :category,
       :kachunk,
       :active,
+      :at_a_glance,
       :campaign_id
     ])
     |> validate_required([:name, :damage, :campaign_id])

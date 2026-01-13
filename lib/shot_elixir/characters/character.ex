@@ -53,6 +53,7 @@ defmodule ShotElixir.Characters.Character do
   schema "characters" do
     field :name, :string
     field :active, :boolean, default: true
+    field :at_a_glance, :boolean, default: false
     field :defense, :integer
     field :impairments, :integer, default: 0
     field :color, :string
@@ -104,6 +105,7 @@ defmodule ShotElixir.Characters.Character do
     |> cast(attrs, [
       :name,
       :active,
+      :at_a_glance,
       :defense,
       :impairments,
       :color,
@@ -173,7 +175,9 @@ defmodule ShotElixir.Characters.Character do
 
   defp ensure_default_action_values(changeset) do
     action_values = get_field(changeset, :action_values) || %{}
-    merged_values = Map.merge(@default_action_values, action_values)
+    # Filter out nil values so they don't overwrite defaults
+    non_nil_values = action_values |> Enum.reject(fn {_k, v} -> is_nil(v) end) |> Map.new()
+    merged_values = Map.merge(@default_action_values, non_nil_values)
     put_change(changeset, :action_values, merged_values)
   end
 
