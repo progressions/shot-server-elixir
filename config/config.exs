@@ -121,6 +121,7 @@ config :nostrum,
 config :shot_elixir, :notion,
   database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
   factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
+  junctures_database_id: "4228eb7fefef470bb9f19a7f5d73c0fc",
   # Periodic sync configuration (sync characters FROM Notion)
   # Schedule is controlled by Oban cron in the plugins config above
   periodic_sync_enabled: true

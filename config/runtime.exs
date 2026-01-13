@@ -37,6 +37,8 @@ if notion_token = System.get_env("NOTION_TOKEN") do
     parties_database_id: "2e5e0b55d4178083bd93e8a60280209b",
     # Sites/Locations database
     sites_database_id: "8ac4e657c540499c977f79b0643b7070",
+    # Junctures database
+    junctures_database_id: "4228eb7fefef470bb9f19a7f5d73c0fc",
     periodic_sync_enabled: true,
     token: notion_token
 end

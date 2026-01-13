@@ -1,9 +1,13 @@
 defmodule ShotElixirWeb.Api.V2.JunctureController do
   use ShotElixirWeb, :controller
 
+  require Logger
+
   alias ShotElixir.Junctures
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.SyncFromNotion
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -355,6 +359,97 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
         end
     end
   end
+
+  # POST /api/v2/junctures/:juncture_id/sync
+  def sync(conn, %{"juncture_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Junctures.get_juncture(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Juncture not found"})
+
+      juncture ->
+        case Campaigns.get_campaign(juncture.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Juncture not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case NotionService.sync_juncture(juncture) do
+                {:ok, :unlinked} ->
+                  updated_juncture = Junctures.get_juncture(id)
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.JunctureView)
+                  |> render("show.json", juncture: updated_juncture)
+
+                {:ok, updated_juncture} ->
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.JunctureView)
+                  |> render("show.json", juncture: updated_juncture)
+
+                {:error, {:notion_api_error, code, message}} ->
+                  Logger.error("Notion API error syncing juncture: #{code} - #{message}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion: #{message}"})
+
+                {:error, reason} ->
+                  Logger.error("Failed to sync juncture to Notion: #{inspect(reason)}")
+
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync to Notion"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only campaign owners, admins, or gamemasters can sync junctures"})
+            end
+        end
+    end
+  end
+
+  # POST /api/v2/junctures/:juncture_id/sync_from_notion
+  def sync_from_notion(conn, %{"juncture_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Junctures.get_juncture(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Juncture not found"})
+
+      juncture ->
+        case Campaigns.get_campaign(juncture.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Juncture not found"})
+
+          campaign ->
+            SyncFromNotion.sync(conn, current_user, juncture, campaign,
+              assign_key: :juncture,
+              authorize: &authorize_campaign_modification/2,
+              forbidden_error: "Only campaign owners, admins, or gamemasters can sync junctures",
+              no_page_error: "Juncture has no Notion page linked",
+              require_page: &require_notion_page_linked/1,
+              update: &NotionService.update_juncture_from_notion/1,
+              view: ShotElixirWeb.Api.V2.JunctureView
+            )
+        end
+    end
+  end
+
+  defp require_notion_page_linked(%Junctures.Juncture{notion_page_id: nil}),
+    do: {:error, :no_notion_page}
+
+  defp require_notion_page_linked(%Junctures.Juncture{}), do: :ok
 
   # Private helper functions
   defp authorize_campaign_access(campaign, user) do

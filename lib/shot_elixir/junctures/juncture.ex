@@ -40,4 +40,15 @@ defmodule ShotElixir.Junctures.Juncture do
     |> validate_required([:name])
     |> validate_length(:name, min: 1, max: 255)
   end
+
+  @doc """
+  Convert juncture to Notion page properties format.
+  """
+  def as_notion(%__MODULE__{} = juncture) do
+    %{
+      "Name" => %{"title" => [%{"text" => %{"content" => juncture.name || ""}}]},
+      "Description" => %{"rich_text" => [%{"text" => %{"content" => juncture.description || ""}}]},
+      "At a Glance" => %{"checkbox" => !!juncture.at_a_glance}
+    }
+  end
 end

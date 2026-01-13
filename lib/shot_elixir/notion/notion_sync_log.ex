@@ -2,7 +2,7 @@ defmodule ShotElixir.Notion.NotionSyncLog do
   use Ecto.Schema
   import Ecto.Changeset
 
-  @entity_types ~w(character site party faction)
+  @entity_types ~w(character site party faction juncture)
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id

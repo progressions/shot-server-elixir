@@ -194,6 +194,67 @@ defmodule ShotElixirWeb.Api.V2.JunctureControllerTest do
     end
   end
 
+  describe "sync_from_notion" do
+    test "returns 422 when juncture has no notion_page_id", %{
+      conn: conn,
+      campaign: campaign
+    } do
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "No Notion Juncture",
+          campaign_id: campaign.id
+        })
+
+      conn = post(conn, ~p"/api/v2/junctures/#{juncture.id}/sync_from_notion")
+      assert json_response(conn, 422)["error"] == "Juncture has no Notion page linked"
+    end
+
+    test "returns 403 for unauthorized player", %{conn: conn, campaign: campaign} do
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Restricted Juncture",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok, player} =
+        Accounts.create_user(%{
+          email: "player-juncture-sync@example.com",
+          password: "password123",
+          first_name: "Player",
+          last_name: "User"
+        })
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> post(~p"/api/v2/junctures/#{juncture.id}/sync_from_notion")
+
+      assert json_response(conn, 403)["error"] ==
+               "Only campaign owners, admins, or gamemasters can sync junctures"
+    end
+
+    test "returns 404 for invalid juncture id", %{conn: conn} do
+      conn = post(conn, ~p"/api/v2/junctures/#{Ecto.UUID.generate()}/sync_from_notion")
+      assert json_response(conn, 404)["error"] == "Juncture not found"
+    end
+
+    test "gamemaster can access sync_from_notion endpoint", %{
+      conn: conn,
+      campaign: campaign
+    } do
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Notion Juncture",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      conn = post(conn, ~p"/api/v2/junctures/#{juncture.id}/sync_from_notion")
+      assert conn.status in [200, 422]
+    end
+  end
+
   describe "delete" do
     setup %{campaign: campaign} do
       {:ok, juncture} =

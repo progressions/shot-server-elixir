@@ -252,6 +252,61 @@ defmodule ShotElixirWeb.Api.V2.SiteControllerTest do
     end
   end
 
+  describe "sync_from_notion" do
+    test "returns 422 when site has no notion_page_id", %{conn: conn, campaign: campaign} do
+      {:ok, site} =
+        Sites.create_site(%{
+          name: "No Notion Site",
+          campaign_id: campaign.id
+        })
+
+      conn = post(conn, ~p"/api/v2/sites/#{site.id}/sync_from_notion")
+      assert json_response(conn, 422)["error"] == "Site has no Notion page linked"
+    end
+
+    test "returns 403 for unauthorized player", %{conn: conn, campaign: campaign} do
+      {:ok, site} =
+        Sites.create_site(%{
+          name: "Restricted Site",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok, player} =
+        Accounts.create_user(%{
+          email: "player-site-sync@example.com",
+          password: "password123",
+          first_name: "Player",
+          last_name: "User"
+        })
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> post(~p"/api/v2/sites/#{site.id}/sync_from_notion")
+
+      assert json_response(conn, 403)["error"] ==
+               "Only campaign owners, admins, or gamemasters can sync sites"
+    end
+
+    test "returns 404 for invalid site id", %{conn: conn} do
+      conn = post(conn, ~p"/api/v2/sites/#{Ecto.UUID.generate()}/sync_from_notion")
+      assert json_response(conn, 404)["error"] == "Site not found"
+    end
+
+    test "gamemaster can access sync_from_notion endpoint", %{conn: conn, campaign: campaign} do
+      {:ok, site} =
+        Sites.create_site(%{
+          name: "Notion Site",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      conn = post(conn, ~p"/api/v2/sites/#{site.id}/sync_from_notion")
+      assert conn.status in [200, 422]
+    end
+  end
+
   describe "attune" do
     setup %{campaign: campaign} do
       {:ok, site} =
