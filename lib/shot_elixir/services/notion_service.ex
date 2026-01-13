@@ -134,19 +134,14 @@ defmodule ShotElixir.Services.NotionService do
             else: character.name
 
         # Update Chi War record with merged values
-        update_attrs = %{
-          notion_page_id: notion_page_id,
-          name: merged_name,
-          action_values: merged_action_values,
-          description: merged_description
-        }
-
         update_attrs =
-          if is_boolean(notion_at_a_glance) do
-            Map.put(update_attrs, :at_a_glance, notion_at_a_glance)
-          else
-            update_attrs
-          end
+          %{
+            notion_page_id: notion_page_id,
+            name: merged_name,
+            action_values: merged_action_values,
+            description: merged_description
+          }
+          |> Character.maybe_put_at_a_glance(notion_at_a_glance)
 
         case Characters.update_character(character, update_attrs) do
           {:ok, updated_character} ->
