@@ -96,7 +96,7 @@ defmodule ShotElixir.Weapons do
   end
 
   defp filter_by_at_a_glance(query, filters) do
-    case Map.get(filters, "at_a_glance") || Map.get(filters, "at_a_glace") do
+    case Map.get(filters, "at_a_glance") do
       "true" ->
         from w in query, where: w.at_a_glance == true
 

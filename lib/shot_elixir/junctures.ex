@@ -257,7 +257,7 @@ defmodule ShotElixir.Junctures do
   end
 
   defp at_a_glance_param(params) do
-    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
+    Map.get(params, "at_a_glance")
   end
 
   defp apply_sorting(query, params) do

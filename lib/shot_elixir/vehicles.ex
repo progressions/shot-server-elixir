@@ -421,7 +421,7 @@ defmodule ShotElixir.Vehicles do
   end
 
   defp at_a_glance_param(params) do
-    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
+    Map.get(params, "at_a_glance")
   end
 
   def get_vehicle!(id) do
