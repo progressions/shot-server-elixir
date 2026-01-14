@@ -240,7 +240,13 @@ CREATE TABLE public.campaigns (
     name character varying,
     active boolean DEFAULT true NOT NULL,
     is_master_template boolean DEFAULT false NOT NULL,
-    seeded_at timestamp(6) without time zone
+    seeded_at timestamp(6) without time zone,
+    notion_database_ids jsonb DEFAULT '{}'::jsonb,
+    notion_access_token character varying,
+    notion_bot_id character varying,
+    notion_workspace_name character varying,
+    notion_workspace_icon character varying,
+    notion_owner jsonb
 );
 
 
