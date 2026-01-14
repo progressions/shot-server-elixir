@@ -324,7 +324,7 @@ defmodule ShotElixir.Characters do
   end
 
   defp at_a_glance_param(params) do
-    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
+    Map.get(params, "at_a_glance")
   end
 
   # If ids param not present at all, don't filter

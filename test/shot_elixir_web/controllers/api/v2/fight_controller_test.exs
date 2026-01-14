@@ -281,6 +281,17 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = post(conn, ~p"/api/v2/fights", fight: @create_attrs)
       assert json_response(conn, 401)
     end
+
+    test "creates fight with at_a_glance set to true", %{conn: conn, gamemaster: gm} do
+      fight_attrs = Map.put(@create_attrs, :at_a_glance, true)
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights", fight: fight_attrs)
+      response = json_response(conn, 201)
+
+      assert response["name"] == @create_attrs.name
+      assert response["at_a_glance"] == true
+    end
   end
 
   describe "update" do
@@ -344,6 +355,14 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       response = json_response(conn, 200)
 
       assert response["active"] == false
+    end
+
+    test "updates at_a_glance status", %{conn: conn, gamemaster: gm, fight: fight} do
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: %{at_a_glance: true})
+      response = json_response(conn, 200)
+
+      assert response["at_a_glance"] == true
     end
 
     test "renders errors when data is invalid", %{conn: conn, gamemaster: gm, fight: fight} do
@@ -966,6 +985,30 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert 2 in response["seasons"]
       assert 3 in response["seasons"]
     end
+
+    test "filters by at_a_glance", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, glance_fight} =
+        Fights.create_fight(%{
+          name: "Glance Fight",
+          campaign_id: campaign.id,
+          at_a_glance: true
+        })
+
+      {:ok, _other_fight} =
+        Fights.create_fight(%{
+          name: "Other Fight",
+          campaign_id: campaign.id,
+          at_a_glance: false
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{at_a_glance: "true"})
+      response = json_response(conn, 200)
+
+      assert length(response["fights"]) == 1
+      assert List.first(response["fights"])["id"] == glance_fight.id
+      assert List.first(response["fights"])["at_a_glance"] == true
+    end
   end
 
   describe "sorting" do
@@ -1040,6 +1083,21 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
 
       sessions = Enum.map(response["fights"], & &1["session"])
       assert sessions == Enum.sort(sessions, :desc)
+    end
+
+    test "sorts by at_a_glance", %{conn: conn, gamemaster: gm, campaign: campaign} do
+      {:ok, _} =
+        Fights.create_fight(%{name: "No Glance", campaign_id: campaign.id, at_a_glance: false})
+
+      {:ok, _} =
+        Fights.create_fight(%{name: "Glance", campaign_id: campaign.id, at_a_glance: true})
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/fights", %{sort: "at_a_glance", order: "DESC"})
+      response = json_response(conn, 200)
+
+      glance_values = Enum.map(response["fights"], & &1["at_a_glance"])
+      assert List.first(glance_values) == true
     end
   end
 
