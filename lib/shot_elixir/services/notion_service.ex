@@ -22,6 +22,8 @@ defmodule ShotElixir.Services.NotionService do
 
   import Ecto.Query
 
+  @data_source_cache_table :notion_data_source_cache
+
   # =============================================================================
   # Database ID Helpers
   # =============================================================================
@@ -54,6 +56,107 @@ defmodule ShotElixir.Services.NotionService do
   defp junctures_database_id do
     Application.get_env(:shot_elixir, :notion)[:junctures_database_id] ||
       "4228eb7fefef470bb9f19a7f5d73c0fc"
+  end
+
+  @doc false
+  def init_data_source_cache do
+    _ = data_source_cache_table()
+    :ok
+  end
+
+  defp data_source_cache_table do
+    case :ets.whereis(@data_source_cache_table) do
+      :undefined ->
+        try do
+          :ets.new(@data_source_cache_table, [
+            :named_table,
+            :public,
+            :set,
+            read_concurrency: true
+          ])
+        rescue
+          ArgumentError -> @data_source_cache_table
+        end
+
+      _ ->
+        @data_source_cache_table
+    end
+  end
+
+  defp cached_data_source_id(database_id) do
+    table = data_source_cache_table()
+
+    case :ets.lookup(table, database_id) do
+      [{^database_id, data_source_id}] -> {:ok, data_source_id}
+      _ -> :miss
+    end
+  end
+
+  defp cache_data_source_id(database_id, data_source_id) do
+    table = data_source_cache_table()
+    :ets.insert(table, {database_id, data_source_id})
+    :ok
+  end
+
+  defp extract_data_source_id(data_sources) do
+    # Notion returns a list of data source objects; tests may pass raw IDs.
+    Enum.find_value(data_sources, fn
+      %{"id" => id} when is_binary(id) -> id
+      id when is_binary(id) -> id
+      _ -> nil
+    end)
+  end
+
+  defp data_source_id_for(database_id, opts \\ []) do
+    case cached_data_source_id(database_id) do
+      {:ok, data_source_id} ->
+        {:ok, data_source_id}
+
+      :miss ->
+        client = notion_client(opts)
+
+        case client.get_database(database_id) do
+          # 2025-09-03 returns data_sources as a list of objects.
+          %{"data_sources" => data_sources} when is_list(data_sources) ->
+            case extract_data_source_id(data_sources) do
+              nil ->
+                {:error, :notion_data_source_missing}
+
+              data_source_id ->
+                cache_data_source_id(database_id, data_source_id)
+                {:ok, data_source_id}
+            end
+
+          # Older responses may include a single data_source_id or data_source object.
+          %{"data_source_id" => data_source_id} when is_binary(data_source_id) ->
+            cache_data_source_id(database_id, data_source_id)
+            {:ok, data_source_id}
+
+          %{"data_source" => %{"id" => data_source_id}} when is_binary(data_source_id) ->
+            cache_data_source_id(database_id, data_source_id)
+            {:ok, data_source_id}
+
+          %{"code" => error_code, "message" => message} ->
+            Logger.error(
+              "Notion get_database error for database_id=#{database_id}: " <>
+                "#{error_code} - #{message}"
+            )
+
+            {:error, {:notion_api_error, error_code, message}}
+
+          nil ->
+            Logger.error("Notion get_database returned nil for database_id=#{database_id}")
+            {:error, :notion_database_not_found}
+
+          response ->
+            Logger.error(
+              "Unexpected response from Notion get_database for database_id=#{database_id}: " <>
+                "#{inspect(response)}"
+            )
+
+            {:error, {:unexpected_notion_response, response}}
+        end
+    end
   end
 
   @doc """
@@ -301,67 +404,83 @@ defmodule ShotElixir.Services.NotionService do
         properties
       end
 
-    Logger.debug("Creating Notion page with database_id: #{database_id()}")
+    case data_source_id_for(database_id()) do
+      {:ok, data_source_id} ->
+        Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
 
-    # Capture payload for logging
-    payload = %{
-      "parent" => %{"database_id" => database_id()},
-      "properties" => properties
-    }
+        # Capture payload for logging
+        payload = %{
+          "parent" => %{"data_source_id" => data_source_id},
+          "properties" => properties
+        }
 
-    page = NotionClient.create_page(payload)
+        page = NotionClient.create_page(payload)
 
-    Logger.debug("Notion API response received")
+        Logger.debug("Notion API response received")
 
-    # Check if Notion returned an error response
-    case page do
-      %{"id" => page_id} when is_binary(page_id) ->
-        Logger.debug("Extracted page ID: #{inspect(page_id)}")
+        # Check if Notion returned an error response
+        case page do
+          %{"id" => page_id} when is_binary(page_id) ->
+            Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
-        # Log successful sync
-        Notion.log_success("character", character.id, payload, page)
+            # Log successful sync
+            Notion.log_success("character", character.id, payload, page)
 
-        # Update character with notion_page_id
-        case Characters.update_character(character, %{notion_page_id: page_id}) do
-          {:ok, updated_character} ->
-            Logger.debug(
-              "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
+            # Update character with notion_page_id
+            case Characters.update_character(character, %{notion_page_id: page_id}) do
+              {:ok, updated_character} ->
+                Logger.debug(
+                  "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
+                )
+
+                # Add image if present
+                add_image_to_notion(updated_character)
+                {:ok, page}
+
+              {:error, changeset} ->
+                Logger.error("Failed to update character with notion_page_id")
+                {:error, changeset}
+            end
+
+          %{"code" => error_code, "message" => message} ->
+            Logger.error("Notion API error: #{error_code}")
+            # Log error sync
+            Notion.log_error(
+              "character",
+              character.id,
+              payload,
+              page,
+              "Notion API error: #{error_code} - #{message}"
             )
 
-            # Add image if present
-            add_image_to_notion(updated_character)
-            {:ok, page}
+            {:error, {:notion_api_error, error_code, message}}
 
-          {:error, changeset} ->
-            Logger.error("Failed to update character with notion_page_id")
-            {:error, changeset}
+          _ ->
+            Logger.error("Unexpected response from Notion API")
+            # Log error sync
+            Notion.log_error(
+              "character",
+              character.id,
+              payload,
+              page,
+              "Unexpected response from Notion API"
+            )
+
+            {:error, :unexpected_notion_response}
         end
 
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error: #{error_code}")
-        # Log error sync
+      {:error, reason} ->
+        Logger.error("Failed to resolve Notion data source for characters: #{inspect(reason)}")
+
         Notion.log_error(
           "character",
           character.id,
-          payload,
-          page,
-          "Notion API error: #{error_code} - #{message}"
+          %{},
+          %{},
+          "Notion data source lookup failed: #{inspect(reason)}"
         )
 
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        Logger.error("Unexpected response from Notion API")
-        # Log error sync
-        Notion.log_error(
-          "character",
-          character.id,
-          payload,
-          page,
-          "Unexpected response from Notion API"
-        )
-
-        {:error, :unexpected_notion_response}
+        {:error, reason}
     end
   rescue
     error ->
@@ -745,7 +864,7 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching Notion pages with id, title, and url
   """
-  def find_pages_in_database(database_id, name) do
+  def find_pages_in_database(database_id, name, opts \\ []) do
     filter =
       if name == "" do
         %{}
@@ -758,24 +877,35 @@ defmodule ShotElixir.Services.NotionService do
         }
       end
 
-    response = NotionClient.database_query(database_id, filter)
+    case data_source_id_for(database_id, opts) do
+      {:ok, data_source_id} ->
+        client = notion_client(opts)
+        response = client.data_source_query(data_source_id, filter)
 
-    case response do
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion database query error: #{error_code} - #{message}")
-        []
+        case response do
+          %{"code" => error_code, "message" => message} ->
+            Logger.error("Notion database query error: #{error_code} - #{message}")
+            []
 
-      %{"results" => pages} when is_list(pages) ->
-        Enum.map(pages, fn page ->
-          %{
-            "id" => page["id"],
-            "title" => extract_page_title(page),
-            "url" => page["url"]
-          }
-        end)
+          %{"results" => pages} when is_list(pages) ->
+            Enum.map(pages, fn page ->
+              %{
+                "id" => page["id"],
+                "title" => extract_page_title(page),
+                "url" => page["url"]
+              }
+            end)
 
-      _ ->
-        Logger.warning("Unexpected response from Notion database query: #{inspect(response)}")
+          _ ->
+            Logger.warning("Unexpected response from Notion database query: #{inspect(response)}")
+            []
+        end
+
+      {:error, reason} ->
+        Logger.error(
+          "Failed to resolve Notion data source for database #{database_id}: #{inspect(reason)}"
+        )
+
         []
     end
   rescue
@@ -845,7 +975,7 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching faction pages (empty list if not found)
   """
-  def find_faction_by_name(name) do
+  def find_faction_by_name(name, opts \\ []) do
     filter = %{
       "and" => [
         %{
@@ -855,8 +985,17 @@ defmodule ShotElixir.Services.NotionService do
       ]
     }
 
-    response = NotionClient.database_query(factions_database_id(), %{"filter" => filter})
-    response["results"]
+    case data_source_id_for(factions_database_id(), opts) do
+      {:ok, data_source_id} ->
+        client = notion_client(opts)
+        response = client.data_source_query(data_source_id, %{"filter" => filter})
+        response["results"]
+
+      {:error, reason} ->
+        Logger.error("Failed to resolve Notion data source for factions: #{inspect(reason)}")
+
+        []
+    end
   end
 
   @doc """
@@ -2191,56 +2330,76 @@ defmodule ShotElixir.Services.NotionService do
   defp create_notion_page(entity, %{entity_type: entity_type} = opts) do
     properties = opts.as_notion_fn.(entity)
 
-    payload = %{
-      "parent" => %{"database_id" => opts.database_id},
-      "properties" => properties
-    }
+    case data_source_id_for(opts.database_id) do
+      {:ok, data_source_id} ->
+        payload = %{
+          "parent" => %{"data_source_id" => data_source_id},
+          "properties" => properties
+        }
 
-    page = NotionClient.create_page(payload)
+        page = NotionClient.create_page(payload)
 
-    case page do
-      %{"id" => page_id} when is_binary(page_id) ->
-        Notion.log_success(entity_type, entity.id, payload, page)
+        case page do
+          %{"id" => page_id} when is_binary(page_id) ->
+            Notion.log_success(entity_type, entity.id, payload, page)
 
-        case opts.update_fn.(entity, %{notion_page_id: page_id}) do
-          {:ok, updated_entity} ->
-            Logger.info("Created Notion page for #{entity_type} #{updated_entity.id}: #{page_id}")
+            case opts.update_fn.(entity, %{notion_page_id: page_id}) do
+              {:ok, updated_entity} ->
+                Logger.info(
+                  "Created Notion page for #{entity_type} #{updated_entity.id}: #{page_id}"
+                )
 
-            # Add image if present
-            add_image_to_notion(updated_entity)
+                # Add image if present
+                add_image_to_notion(updated_entity)
 
-            {:ok, page}
+                {:ok, page}
 
-          {:error, changeset} ->
-            Logger.error("Failed to update #{entity_type} with notion_page_id")
-            {:error, changeset}
+              {:error, changeset} ->
+                Logger.error("Failed to update #{entity_type} with notion_page_id")
+                {:error, changeset}
+            end
+
+          %{"code" => error_code, "message" => message} ->
+            Logger.error("Notion API error creating #{entity_type}: #{error_code} - #{message}")
+
+            Notion.log_error(
+              entity_type,
+              entity.id,
+              payload,
+              page,
+              "Notion API error: #{error_code} - #{message}"
+            )
+
+            {:error, {:notion_api_error, error_code, message}}
+
+          _ ->
+            Logger.error("Unexpected response from Notion API when creating #{entity_type}")
+
+            Notion.log_error(
+              entity_type,
+              entity.id,
+              payload,
+              page,
+              "Unexpected response from Notion API"
+            )
+
+            {:error, :unexpected_notion_response}
         end
 
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error creating #{entity_type}: #{error_code} - #{message}")
+      {:error, reason} ->
+        Logger.error(
+          "Failed to resolve Notion data source for #{entity_type}: #{inspect(reason)}"
+        )
 
         Notion.log_error(
           entity_type,
           entity.id,
-          payload,
-          page,
-          "Notion API error: #{error_code} - #{message}"
+          %{},
+          %{},
+          "Notion data source lookup failed: #{inspect(reason)}"
         )
 
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        Logger.error("Unexpected response from Notion API when creating #{entity_type}")
-
-        Notion.log_error(
-          entity_type,
-          entity.id,
-          payload,
-          page,
-          "Unexpected response from Notion API"
-        )
-
-        {:error, :unexpected_notion_response}
+        {:error, reason}
     end
   rescue
     error ->
