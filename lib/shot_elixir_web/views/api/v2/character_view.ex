@@ -72,6 +72,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       image_url: get_image_url(character),
       user_id: character.user_id,
       faction_id: character.faction_id,
+      juncture_id: character.juncture_id,
       action_values: character.action_values,
       created_at: character.created_at,
       active: character.active,
@@ -85,7 +86,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       equipped_weapon_id: character.equipped_weapon_id,
       skills: character.skills,
       user: render_user_if_loaded(character),
-      faction: render_faction_if_loaded(character),
+      faction: render_faction_lite_if_loaded(character),
+      juncture: render_juncture_lite_if_loaded(character),
       image_positions: render_image_positions_if_loaded(character)
     }
   end
@@ -158,14 +160,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     end
   end
 
-  defp render_faction_if_loaded(character) do
-    case Map.get(character, :faction) do
-      %Ecto.Association.NotLoaded{} -> nil
-      nil -> nil
-      faction -> render_faction_full(faction)
-    end
-  end
-
   defp render_faction_lite_if_loaded(character) do
     case Map.get(character, :faction) do
       %Ecto.Association.NotLoaded{} -> nil
@@ -232,21 +226,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       name: "#{user.first_name} #{user.last_name}",
       email: user.email,
       entity_class: "User"
-    }
-  end
-
-  # Rails FactionSerializer format
-  defp render_faction_full(faction) do
-    %{
-      id: faction.id,
-      name: faction.name,
-      description: faction.description,
-      image_url: get_image_url(faction),
-      active: faction.active,
-      at_a_glance: faction.at_a_glance,
-      created_at: faction.created_at,
-      updated_at: faction.updated_at,
-      entity_class: "Faction"
     }
   end
 
