@@ -281,6 +281,17 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       conn = post(conn, ~p"/api/v2/fights", fight: @create_attrs)
       assert json_response(conn, 401)
     end
+
+    test "creates fight with at_a_glance set to true", %{conn: conn, gamemaster: gm} do
+      fight_attrs = Map.put(@create_attrs, :at_a_glance, true)
+
+      conn = authenticate(conn, gm)
+      conn = post(conn, ~p"/api/v2/fights", fight: fight_attrs)
+      response = json_response(conn, 201)
+
+      assert response["name"] == @create_attrs.name
+      assert response["at_a_glance"] == true
+    end
   end
 
   describe "update" do
@@ -344,6 +355,14 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       response = json_response(conn, 200)
 
       assert response["active"] == false
+    end
+
+    test "updates at_a_glance status", %{conn: conn, gamemaster: gm, fight: fight} do
+      conn = authenticate(conn, gm)
+      conn = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: %{at_a_glance: true})
+      response = json_response(conn, 200)
+
+      assert response["at_a_glance"] == true
     end
 
     test "renders errors when data is invalid", %{conn: conn, gamemaster: gm, fight: fight} do
