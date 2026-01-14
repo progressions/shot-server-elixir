@@ -3151,4 +3151,5 @@ INSERT INTO public."ecto_migrations" (version) VALUES (20260111152425);
 INSERT INTO public."ecto_migrations" (version) VALUES (20260113000000);
 INSERT INTO public."ecto_migrations" (version) VALUES (20260113120000);
 INSERT INTO public."ecto_migrations" (version) VALUES (20260113143744);
+INSERT INTO public."ecto_migrations" (version) VALUES (20260114000000);
 INSERT INTO public."ecto_migrations" (version) VALUES (20260114013100);
