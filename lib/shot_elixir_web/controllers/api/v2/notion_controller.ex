@@ -43,6 +43,9 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
                   title: extract_database_title(db)
                 }
               end)
+              |> Enum.reject(fn db ->
+                is_nil(db.title) || db.title == "Untitled"
+              end)
 
             json(conn, databases)
 
