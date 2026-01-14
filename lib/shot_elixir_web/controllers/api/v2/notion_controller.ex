@@ -29,9 +29,10 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
       # Use Notion search API to find all databases the user has access to
       # Wrapped in try-rescue since NotionClient.search uses Req.post! which can raise
       try do
+        # Notion API 2025-09-03 uses "data_source" filter for databases
         case NotionClient.search("", %{
                token: token,
-               filter: %{value: "database", property: "object"}
+               filter: %{value: "data_source", property: "object"}
              }) do
           %{"results" => results} ->
             databases =
