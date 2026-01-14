@@ -68,7 +68,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     %{
       id: character.id,
       name: character.name,
-      task: get_in(character.action_values, ["Task"]),
+      task: character.task,
       image_url: get_image_url(character),
       user_id: character.user_id,
       faction_id: character.faction_id,
@@ -109,7 +109,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       skills: character.skills,
       category: get_in(character.action_values, ["Type"]),
       image_url: get_image_url(character),
-      task: get_in(character.action_values, ["Task"]),
+      task: character.task,
       notion_page_id: character.notion_page_id,
       wealth: character.wealth,
       juncture_id: character.juncture_id,

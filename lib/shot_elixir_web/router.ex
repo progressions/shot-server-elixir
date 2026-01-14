@@ -27,6 +27,12 @@ defmodule ShotElixirWeb.Router do
     plug Guardian.Plug.EnsureAuthenticated
   end
 
+  # OAuth flow pipeline - supports token in query params for browser redirects
+  pipeline :oauth_authenticated do
+    plug ShotElixirWeb.AuthPipeline
+    plug ShotElixirWeb.Plugs.VerifyTokenParam
+  end
+
   # Health check endpoint
   scope "/", ShotElixirWeb do
     pipe_through :api
@@ -39,6 +45,14 @@ defmodule ShotElixirWeb.Router do
 
     get "/google", GoogleOAuthController, :authorize
     get "/google/callback", GoogleOAuthController, :callback
+  end
+
+  # Notion OAuth endpoints (uses oauth_authenticated - supports token in query params)
+  scope "/auth", ShotElixirWeb do
+    pipe_through [:api, :oauth_authenticated]
+
+    get "/notion/authorize", NotionOAuthController, :authorize
+    get "/notion/callback", NotionOAuthController, :callback
   end
 
   # Authentication endpoints (Devise compatible)

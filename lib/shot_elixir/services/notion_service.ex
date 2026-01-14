@@ -25,6 +25,19 @@ defmodule ShotElixir.Services.NotionService do
   @data_source_cache_table :notion_data_source_cache
 
   # =============================================================================
+  # OAuth Token Support
+  # =============================================================================
+
+  @doc """
+  Get Notion API token for a campaign.
+  Currently uses environment variable, but prepared for campaign-specific OAuth tokens.
+  """
+  def get_token(_campaign_id) do
+    # TODO: Implement per-campaign token retrieval from campaigns.notion_access_token
+    System.get_env("NOTION_TOKEN") || Application.get_env(:shot_elixir, :notion)[:token]
+  end
+
+  # =============================================================================
   # Database ID Helpers
   # =============================================================================
 

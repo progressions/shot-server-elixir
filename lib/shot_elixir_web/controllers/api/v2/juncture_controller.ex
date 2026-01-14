@@ -439,7 +439,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
               forbidden_error: "Only campaign owners, admins, or gamemasters can sync junctures",
               no_page_error: "Juncture has no Notion page linked",
               require_page: &require_notion_page_linked/1,
-              update: &NotionService.update_juncture_from_notion/1,
+              update: &NotionService.update_juncture_from_notion/2,
               view: ShotElixirWeb.Api.V2.JunctureView
             )
         end
