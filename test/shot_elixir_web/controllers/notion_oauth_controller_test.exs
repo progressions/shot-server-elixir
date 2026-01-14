@@ -44,7 +44,7 @@ defmodule ShotElixirWeb.NotionOAuthControllerTest do
 
     test "returns 401 when not authenticated", %{conn: conn, campaign: campaign} do
       conn = get(conn, ~p"/auth/notion/authorize?#{[campaign_id: campaign.id]}")
-      assert json_response(conn, 401)["error"] == "Not authenticated"
+      assert json_response(conn, 401)["error"] == "Authentication required"
     end
   end
 
