@@ -58,6 +58,12 @@ defmodule ShotElixir.Services.NotionService do
       "4228eb7fefef470bb9f19a7f5d73c0fc"
   end
 
+  # Get Notion token for a campaign
+  # TODO: Implement per-campaign token retrieval from ShotElixir.NotionOAuth
+  def get_token(_campaign_id) do
+    System.get_env("NOTION_TOKEN") || Application.get_env(:shot_elixir, :notion)[:token]
+  end
+
   @doc false
   def init_data_source_cache do
     _ = data_source_cache_table()
