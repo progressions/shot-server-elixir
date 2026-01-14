@@ -10,7 +10,6 @@ defmodule ShotElixir.Application do
     # Initialize ETS tables for rate limiting
     ShotElixir.Invitations.init_rate_limiting()
     ShotElixir.RateLimiter.init()
-    ShotElixir.Services.NotionService.init_data_source_cache()
 
     children =
       [

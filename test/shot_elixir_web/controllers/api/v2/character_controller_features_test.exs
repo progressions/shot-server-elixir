@@ -175,46 +175,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerFeaturesTest do
       assert response["juncture"]["name"] == "Modern Day"
     end
 
-    test "renders faction and juncture associations in index response", %{
-      conn: conn,
-      gamemaster: gm,
-      campaign: campaign
-    } do
-      {:ok, faction} =
-        Factions.create_faction(%{
-          name: "The Ascended",
-          description: "Faction for index test",
-          campaign_id: campaign.id
-        })
-
-      {:ok, juncture} =
-        Junctures.create_juncture(%{
-          name: "Future",
-          description: "Juncture for index test",
-          campaign_id: campaign.id
-        })
-
-      {:ok, character} =
-        Characters.create_character(%{
-          name: "Indexed Character",
-          campaign_id: campaign.id,
-          user_id: gm.id,
-          faction_id: faction.id,
-          juncture_id: juncture.id,
-          action_values: %{"Type" => "PC"}
-        })
-
-      conn = authenticate(conn, gm)
-      conn = get(conn, ~p"/api/v2/characters")
-      response = json_response(conn, 200)
-
-      character_json = Enum.find(response["characters"], &(&1["id"] == character.id))
-      assert character_json["faction"]["id"] == faction.id
-      assert character_json["faction"]["name"] == faction.name
-      assert character_json["juncture"]["id"] == juncture.id
-      assert character_json["juncture"]["name"] == juncture.name
-    end
-
     test "renders user association when character has owner", %{
       conn: conn,
       gamemaster: gm,

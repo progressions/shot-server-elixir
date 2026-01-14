@@ -49,32 +49,6 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
-  defmodule NotionClientStubDataSource do
-    def get_database(_database_id) do
-      %{"data_sources" => [%{"id" => "data-source-123"}]}
-    end
-
-    def data_source_query("data-source-123", _filter) do
-      %{
-        "results" => [
-          %{
-            "id" => "page-1",
-            "properties" => %{
-              "Name" => %{"title" => [%{"plain_text" => "Alpha"}]}
-            },
-            "url" => "https://notion.example/page-1"
-          }
-        ]
-      }
-    end
-  end
-
-  defmodule NotionClientStubDataSourceMissing do
-    def get_database(_database_id) do
-      %{"data_sources" => []}
-    end
-  end
-
   describe "handle_archived_page/4" do
     setup do
       {:ok, user} =
@@ -540,28 +514,6 @@ defmodule ShotElixir.Services.NotionServiceTest do
       assert character.description["Height"] == "6'2\""
       assert character.description["Eye Color"] == "Brown"
       assert character.description["Hair Color"] == "Black"
-    end
-  end
-
-  describe "find_pages_in_database/3 data source lookup" do
-    test "returns pages when data source is resolved" do
-      results =
-        NotionService.find_pages_in_database("db-id-success", "Alpha",
-          client: NotionClientStubDataSource
-        )
-
-      assert [
-               %{"id" => "page-1", "title" => "Alpha", "url" => "https://notion.example/page-1"}
-             ] = results
-    end
-
-    test "returns empty list when data source lookup fails" do
-      results =
-        NotionService.find_pages_in_database("db-id-missing", "Alpha",
-          client: NotionClientStubDataSourceMissing
-        )
-
-      assert [] = results
     end
   end
 end

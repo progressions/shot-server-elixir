@@ -209,7 +209,7 @@ defmodule ShotElixir.Characters do
       query
       |> limit(^per_page)
       |> offset(^offset)
-      |> preload([:image_positions, :faction, :juncture])
+      |> preload([:image_positions])
       |> Repo.all()
 
     Logger.debug("Characters returned after pagination: #{length(characters)}")
