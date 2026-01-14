@@ -268,7 +268,15 @@ CREATE TABLE public.campaigns (
     notion_bot_id character varying,
     notion_workspace_name character varying,
     notion_workspace_icon character varying,
-    notion_owner jsonb
+    notion_owner jsonb,
+    seeding_status character varying,
+    seeding_images_total integer DEFAULT 0,
+    seeding_images_completed integer DEFAULT 0,
+    batch_image_status character varying,
+    batch_images_total integer DEFAULT 0,
+    batch_images_completed integer DEFAULT 0,
+    ai_generation_enabled boolean DEFAULT true NOT NULL,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -372,7 +380,8 @@ CREATE TABLE public.characters (
     juncture_id uuid,
     wealth character varying,
     is_template boolean,
-    status jsonb DEFAULT '[]'::jsonb
+    status jsonb DEFAULT '[]'::jsonb,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -431,7 +440,8 @@ CREATE TABLE public.factions (
     created_at timestamp(6) without time zone NOT NULL,
     updated_at timestamp(6) without time zone NOT NULL,
     campaign_id uuid NOT NULL,
-    active boolean DEFAULT true NOT NULL
+    active boolean DEFAULT true NOT NULL,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -532,7 +542,8 @@ CREATE TABLE public.junctures (
     updated_at timestamp(6) without time zone NOT NULL,
     notion_page_id uuid,
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    campaign_id uuid
+    campaign_id uuid,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -589,7 +600,8 @@ CREATE TABLE public.parties (
     updated_at timestamp(6) without time zone NOT NULL,
     faction_id uuid,
     juncture_id uuid,
-    active boolean DEFAULT true NOT NULL
+    active boolean DEFAULT true NOT NULL,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -633,7 +645,8 @@ CREATE TABLE public.schticks (
     bonus boolean,
     archetypes jsonb,
     name character varying,
-    active boolean DEFAULT true NOT NULL
+    active boolean DEFAULT true NOT NULL,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -677,7 +690,8 @@ CREATE TABLE public.sites (
     name character varying,
     faction_id uuid,
     juncture_id uuid,
-    active boolean DEFAULT true NOT NULL
+    active boolean DEFAULT true NOT NULL,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -740,7 +754,8 @@ CREATE TABLE public.vehicles (
     last_synced_to_notion_at timestamp(6) without time zone,
     summary character varying,
     juncture_id uuid,
-    description jsonb
+    description jsonb,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
@@ -764,7 +779,8 @@ CREATE TABLE public.weapons (
     mook_bonus integer DEFAULT 0 NOT NULL,
     category character varying,
     kachunk boolean,
-    active boolean DEFAULT true NOT NULL
+    active boolean DEFAULT true NOT NULL,
+    at_a_glance boolean DEFAULT false NOT NULL
 );
 
 
