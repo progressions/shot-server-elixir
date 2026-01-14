@@ -41,6 +41,14 @@ defmodule ShotElixirWeb.Router do
     get "/google/callback", GoogleOAuthController, :callback
   end
 
+  # Notion OAuth endpoints (authenticated - linking existing campaign)
+  scope "/auth", ShotElixirWeb do
+    pipe_through [:api, :authenticated]
+
+    get "/notion/authorize", NotionOAuthController, :authorize
+    get "/notion/callback", NotionOAuthController, :callback
+  end
+
   # Authentication endpoints (Devise compatible)
   scope "/users", ShotElixirWeb.Users do
     pipe_through :api

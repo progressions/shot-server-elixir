@@ -500,7 +500,7 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
               forbidden_error: "Only campaign owners, admins, or gamemasters can sync factions",
               no_page_error: "Faction has no Notion page linked",
               require_page: &require_notion_page_linked/1,
-              update: &NotionService.update_faction_from_notion/1,
+              update: &NotionService.update_faction_from_notion/2,
               view: ShotElixirWeb.Api.V2.FactionView
             )
         end

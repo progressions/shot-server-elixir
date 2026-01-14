@@ -120,7 +120,12 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       ai_generation_enabled: campaign.ai_generation_enabled,
       # AI provider configuration
       ai_provider: campaign.ai_provider,
-      ai_provider_connected: has_ai_provider_credential?(campaign, credential_lookup)
+      ai_provider_connected: has_ai_provider_credential?(campaign, credential_lookup),
+      # Notion Integration
+      notion_connected: !!campaign.notion_access_token,
+      notion_workspace_name: campaign.notion_workspace_name,
+      notion_workspace_icon: campaign.notion_workspace_icon,
+      notion_database_ids: campaign.notion_database_ids || %{}
     }
   end
 

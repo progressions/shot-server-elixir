@@ -37,6 +37,14 @@ defmodule ShotElixir.Campaigns.Campaign do
     # AI provider selection (grok, openai, gemini, or nil)
     field :ai_provider, :string
 
+    # Notion Integration (OAuth)
+    field :notion_access_token, ShotElixir.Encrypted.Binary
+    field :notion_bot_id, :string
+    field :notion_workspace_name, :string
+    field :notion_workspace_icon, :string
+    field :notion_owner, :map
+    field :notion_database_ids, :map, default: %{}
+
     belongs_to :user, ShotElixir.Accounts.User
 
     has_many :campaign_memberships, ShotElixir.Campaigns.CampaignMembership
@@ -81,7 +89,13 @@ defmodule ShotElixir.Campaigns.Campaign do
       :ai_credits_exhausted_provider,
       :ai_credits_exhausted_notified_at,
       :ai_generation_enabled,
-      :ai_provider
+      :ai_provider,
+      :notion_access_token,
+      :notion_bot_id,
+      :notion_workspace_name,
+      :notion_workspace_icon,
+      :notion_owner,
+      :notion_database_ids
     ])
     |> validate_required([:name, :user_id])
     |> validate_inclusion(:ai_provider, @valid_ai_providers ++ [nil])
