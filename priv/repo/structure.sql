@@ -163,6 +163,28 @@ CREATE TABLE public.advancements (
 ALTER TABLE public.advancements OWNER TO isaacpriestley;
 
 --
+-- Name: ai_credentials; Type: TABLE; Schema: public; Owner: isaacpriestley
+--
+
+CREATE TABLE public.ai_credentials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    user_id uuid NOT NULL,
+    provider character varying NOT NULL,
+    api_key_encrypted bytea,
+    access_token_encrypted bytea,
+    refresh_token_encrypted bytea,
+    token_expires_at timestamp without time zone,
+    created_at timestamp without time zone NOT NULL,
+    updated_at timestamp without time zone NOT NULL,
+    status character varying DEFAULT 'active'::character varying NOT NULL,
+    status_message character varying,
+    status_updated_at timestamp without time zone
+);
+
+
+ALTER TABLE public.ai_credentials OWNER TO isaacpriestley;
+
+--
 -- Name: ar_internal_metadata; Type: TABLE; Schema: public; Owner: isaacpriestley
 --
 
@@ -816,6 +838,22 @@ ALTER TABLE ONLY public.advancements
 
 
 --
+-- Name: ai_credentials ai_credentials_pkey; Type: CONSTRAINT; Schema: public; Owner: isaacpriestley
+--
+
+ALTER TABLE ONLY public.ai_credentials
+    ADD CONSTRAINT ai_credentials_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: ai_credentials ai_credentials_user_id_provider_index; Type: CONSTRAINT; Schema: public; Owner: isaacpriestley
+--
+
+ALTER TABLE ONLY public.ai_credentials
+    ADD CONSTRAINT ai_credentials_user_id_provider_index UNIQUE (user_id, provider);
+
+
+--
 -- Name: ar_internal_metadata ar_internal_metadata_pkey; Type: CONSTRAINT; Schema: public; Owner: isaacpriestley
 --
 
@@ -1080,6 +1118,20 @@ CREATE UNIQUE INDEX index_active_storage_variant_records_uniqueness ON public.ac
 --
 
 CREATE INDEX index_advancements_on_character_id ON public.advancements USING btree (character_id);
+
+
+--
+-- Name: ai_credentials_status_index; Type: INDEX; Schema: public; Owner: isaacpriestley
+--
+
+CREATE INDEX ai_credentials_status_index ON public.ai_credentials USING btree (status);
+
+
+--
+-- Name: ai_credentials_user_id_index; Type: INDEX; Schema: public; Owner: isaacpriestley
+--
+
+CREATE INDEX ai_credentials_user_id_index ON public.ai_credentials USING btree (user_id);
 
 
 --
@@ -1815,6 +1867,14 @@ CREATE INDEX index_weapons_on_lower_name ON public.weapons USING btree (lower((n
 --
 
 CREATE UNIQUE INDEX unique_active_relationship ON public.chase_relationships USING btree (pursuer_id, evader_id, fight_id) WHERE (active = true);
+
+
+--
+-- Name: ai_credentials ai_credentials_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: isaacpriestley
+--
+
+ALTER TABLE ONLY public.ai_credentials
+    ADD CONSTRAINT ai_credentials_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
