@@ -6,7 +6,6 @@ defmodule ShotElixirWeb.Plugs.VerifyTokenParam do
   Usage in router:
       plug ShotElixirWeb.Plugs.VerifyTokenParam
   """
-  import Plug.Conn
   alias ShotElixir.Guardian
 
   def init(opts), do: opts
