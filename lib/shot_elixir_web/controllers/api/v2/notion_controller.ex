@@ -1,9 +1,89 @@
 defmodule ShotElixirWeb.Api.V2.NotionController do
   use ShotElixirWeb, :controller
 
+  alias ShotElixir.Campaigns
   alias ShotElixir.Services.NotionService
+  alias ShotElixir.Services.NotionClient
 
   action_fallback ShotElixirWeb.FallbackController
+
+  @doc """
+  List databases available in the campaign's connected Notion workspace.
+  Uses the campaign's OAuth access token to search for databases.
+
+  ## Parameters
+    * `campaign_id` - The campaign ID (required)
+
+  ## Response
+    * 200 - List of databases with id and title
+    * 400 - Missing campaign_id parameter
+    * 404 - Campaign not found or Notion not connected
+    * 500 - Internal server error if Notion API fails
+  """
+  def databases(conn, %{"campaign_id" => campaign_id}) do
+    user = Guardian.Plug.current_resource(conn)
+
+    with %Campaigns.Campaign{} = campaign <- Campaigns.get_campaign(campaign_id),
+         true <- campaign.user_id == user.id || Campaigns.is_member?(campaign.id, user.id),
+         token when not is_nil(token) <- campaign.notion_access_token do
+      # Use Notion search API to find all databases the user has access to
+      case NotionClient.search("", %{
+             token: token,
+             filter: %{value: "database", property: "object"}
+           }) do
+        %{"results" => results} ->
+          databases =
+            results
+            |> Enum.map(fn db ->
+              %{
+                id: db["id"],
+                title: extract_database_title(db)
+              }
+            end)
+
+          json(conn, databases)
+
+        {:error, reason} ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "Failed to fetch databases", details: inspect(reason)})
+
+        other ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "Unexpected response from Notion", details: inspect(other)})
+      end
+    else
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Campaign not found or Notion not connected"})
+
+      false ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "You do not have access to this campaign"})
+    end
+  end
+
+  def databases(conn, _params) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing required parameter: campaign_id"})
+  end
+
+  # Extract database title from Notion database object
+  defp extract_database_title(%{"title" => title}) when is_list(title) do
+    title
+    |> Enum.map(fn t -> t["plain_text"] end)
+    |> Enum.join("")
+    |> case do
+      "" -> nil
+      title -> title
+    end
+  end
+
+  defp extract_database_title(_), do: nil
 
   @doc """
   Search for Notion pages by name.

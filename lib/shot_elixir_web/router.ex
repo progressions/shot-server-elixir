@@ -139,6 +139,7 @@ defmodule ShotElixirWeb.Router do
     post "/campaigns/current", CampaignController, :set_current
 
     # Notion integration
+    get "/notion/databases", NotionController, :databases
     get "/notion/search", NotionController, :search
     get "/notion/characters", NotionController, :search
     get "/notion/sites", NotionController, :search_sites
