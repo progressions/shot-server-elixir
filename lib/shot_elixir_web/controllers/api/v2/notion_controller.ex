@@ -27,31 +27,39 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
          true <- campaign.user_id == user.id || Campaigns.is_member?(campaign.id, user.id),
          token when not is_nil(token) <- campaign.notion_access_token do
       # Use Notion search API to find all databases the user has access to
-      case NotionClient.search("", %{
-             token: token,
-             filter: %{value: "database", property: "object"}
-           }) do
-        %{"results" => results} ->
-          databases =
-            results
-            |> Enum.map(fn db ->
-              %{
-                id: db["id"],
-                title: extract_database_title(db)
-              }
-            end)
+      # Wrapped in try-rescue since NotionClient.search uses Req.post! which can raise
+      try do
+        case NotionClient.search("", %{
+               token: token,
+               filter: %{value: "database", property: "object"}
+             }) do
+          %{"results" => results} ->
+            databases =
+              results
+              |> Enum.map(fn db ->
+                %{
+                  id: db["id"],
+                  title: extract_database_title(db)
+                }
+              end)
 
-          json(conn, databases)
+            json(conn, databases)
 
-        {:error, reason} ->
+          {:error, reason} ->
+            conn
+            |> put_status(:internal_server_error)
+            |> json(%{error: "Failed to fetch databases", details: inspect(reason)})
+
+          other ->
+            conn
+            |> put_status(:internal_server_error)
+            |> json(%{error: "Unexpected response from Notion", details: inspect(other)})
+        end
+      rescue
+        error ->
           conn
           |> put_status(:internal_server_error)
-          |> json(%{error: "Failed to fetch databases", details: inspect(reason)})
-
-        other ->
-          conn
-          |> put_status(:internal_server_error)
-          |> json(%{error: "Unexpected response from Notion", details: inspect(other)})
+          |> json(%{error: "Failed to connect to Notion", details: inspect(error)})
       end
     else
       nil ->
@@ -73,9 +81,10 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   end
 
   # Extract database title from Notion database object
+  # Uses Map.get/3 for nil safety in case of malformed Notion API responses
   defp extract_database_title(%{"title" => title}) when is_list(title) do
     title
-    |> Enum.map(fn t -> t["plain_text"] end)
+    |> Enum.map(fn t -> Map.get(t || %{}, "plain_text", "") end)
     |> Enum.join("")
     |> case do
       "" -> nil
