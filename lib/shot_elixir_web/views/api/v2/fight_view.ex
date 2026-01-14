@@ -75,7 +75,6 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       ended_at: fight.ended_at,
       season: fight.season,
       session: fight.session,
-      at_a_glance: fight.at_a_glance,
       campaign_id: fight.campaign_id,
       user_id: fight.user_id,
       solo_mode: fight.solo_mode,

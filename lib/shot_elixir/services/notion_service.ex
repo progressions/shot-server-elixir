@@ -7,7 +7,6 @@ defmodule ShotElixir.Services.NotionService do
   require Logger
 
   alias ShotElixir.Services.NotionClient
-  alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Characters.Character
   alias ShotElixir.Factions
@@ -26,65 +25,51 @@ defmodule ShotElixir.Services.NotionService do
   @data_source_cache_table :notion_data_source_cache
 
   # =============================================================================
-  # Configuration Helpers
+  # OAuth Token Support
   # =============================================================================
 
-  defp get_notion_config(campaign_id, key) do
-    campaign = if campaign_id, do: Campaigns.get_campaign(campaign_id), else: nil
-
-    value =
-      if campaign do
-        case key do
-          :token ->
-            case campaign.notion_access_token do
-              nil ->
-                nil
-
-              encrypted ->
-                case ShotElixir.Encrypted.Binary.load(encrypted) do
-                  {:ok, token} -> token
-                  _ -> nil
-                end
-            end
-
-          _ ->
-            db_key =
-              case key do
-                :database_id -> "characters"
-                :factions_database_id -> "factions"
-                :parties_database_id -> "parties"
-                :sites_database_id -> "sites"
-                :junctures_database_id -> "junctures"
-                _ -> to_string(key)
-              end
-
-            get_in(campaign.notion_database_ids || %{}, [db_key])
-        end
-      end
-
-    value || Application.get_env(:shot_elixir, :notion)[key]
+  @doc """
+  Get Notion API token for a campaign.
+  Currently uses environment variable, but prepared for campaign-specific OAuth tokens.
+  """
+  def get_token(_campaign_id) do
+    # TODO: Implement per-campaign token retrieval from campaigns.notion_access_token
+    System.get_env("NOTION_TOKEN") || Application.get_env(:shot_elixir, :notion)[:token]
   end
 
-  def get_token(campaign_id) do
-    get_notion_config(campaign_id, :token)
+  # =============================================================================
+  # Database ID Helpers
+  # =============================================================================
+
+  # Characters database (main database)
+  defp database_id do
+    Application.get_env(:shot_elixir, :notion)[:database_id] ||
+      "f6fa27ac-19cd-4b17-b218-55acc6d077be"
   end
 
-  defp database_id(campaign_id),
-    do: get_notion_config(campaign_id, :database_id) || "f6fa27ac-19cd-4b17-b218-55acc6d077be"
+  # Factions database
+  defp factions_database_id do
+    Application.get_env(:shot_elixir, :notion)[:factions_database_id] ||
+      "0ae94bfa1a754c8fbda28ea50afa5fd5"
+  end
 
-  defp factions_database_id(campaign_id),
-    do:
-      get_notion_config(campaign_id, :factions_database_id) || "0ae94bfa1a754c8fbda28ea50afa5fd5"
+  # Parties database
+  defp parties_database_id do
+    Application.get_env(:shot_elixir, :notion)[:parties_database_id] ||
+      "2e5e0b55d4178083bd93e8a60280209b"
+  end
 
-  defp parties_database_id(campaign_id),
-    do: get_notion_config(campaign_id, :parties_database_id) || "2e5e0b55d4178083bd93e8a60280209b"
+  # Sites/Locations database
+  defp sites_database_id do
+    Application.get_env(:shot_elixir, :notion)[:sites_database_id] ||
+      "8ac4e657c540499c977f79b0643b7070"
+  end
 
-  defp sites_database_id(campaign_id),
-    do: get_notion_config(campaign_id, :sites_database_id) || "8ac4e657c540499c977f79b0643b7070"
-
-  defp junctures_database_id(campaign_id),
-    do:
-      get_notion_config(campaign_id, :junctures_database_id) || "4228eb7fefef470bb9f19a7f5d73c0fc"
+  # Junctures database
+  defp junctures_database_id do
+    Application.get_env(:shot_elixir, :notion)[:junctures_database_id] ||
+      "4228eb7fefef470bb9f19a7f5d73c0fc"
+  end
 
   @doc false
   def init_data_source_cache do
@@ -135,9 +120,7 @@ defmodule ShotElixir.Services.NotionService do
     end)
   end
 
-  defp data_source_id_for(database_id, opts_or_token \\ []) do
-    opts = normalize_notion_opts(opts_or_token)
-
+  defp data_source_id_for(database_id, opts \\ []) do
     case cached_data_source_id(database_id) do
       {:ok, data_source_id} ->
         {:ok, data_source_id}
@@ -145,7 +128,7 @@ defmodule ShotElixir.Services.NotionService do
       :miss ->
         client = notion_client(opts)
 
-        case notion_request(client, :get_database, [database_id], opts) do
+        case client.get_database(database_id) do
           # 2025-09-03 returns data_sources as a list of objects.
           %{"data_sources" => data_sources} when is_list(data_sources) ->
             case extract_data_source_id(data_sources) do
@@ -189,52 +172,18 @@ defmodule ShotElixir.Services.NotionService do
     end
   end
 
-  defp normalize_notion_opts(opts_or_token, campaign_id \\ nil) do
-    opts =
-      cond do
-        is_list(opts_or_token) -> opts_or_token
-        is_map(opts_or_token) -> Map.to_list(opts_or_token)
-        is_binary(opts_or_token) -> [token: opts_or_token]
-        is_nil(opts_or_token) -> []
-        true -> []
-      end
-
-    token = Keyword.get(opts, :token) || (campaign_id && get_token(campaign_id))
-
-    if token do
-      Keyword.put(opts, :token, token)
-    else
-      opts
-    end
-  end
-
-  defp notion_request(client, func, args, opts) do
-    token = Keyword.get(opts, :token)
-
-    if token && function_exported?(client, func, length(args) + 1) do
-      apply(client, func, args ++ [token: token])
-    else
-      apply(client, func, args)
-    end
-  end
-
-  defp maybe_put_token(payload, token) do
-    if token, do: Map.put(payload, :token, token), else: payload
-  end
-
   @doc """
   Main sync function - creates or updates character in Notion.
   Environment check performed at worker level.
   """
   def sync_character(%Character{} = character) do
     character = Repo.preload(character, :faction)
-    token = get_token(character.campaign_id)
 
     result =
       if character.notion_page_id do
-        update_notion_from_character(character, token)
+        update_notion_from_character(character)
       else
-        create_notion_from_character(character, token)
+        create_notion_from_character(character)
       end
 
     case result do
@@ -269,10 +218,9 @@ defmodule ShotElixir.Services.NotionService do
   """
   def merge_with_notion(%Character{} = character, notion_page_id) do
     character = Repo.preload(character, :faction)
-    token = get_token(character.campaign_id)
 
     # Fetch the Notion page
-    case NotionClient.get_page(notion_page_id, token: token) do
+    case NotionClient.get_page(notion_page_id) do
       %{"code" => error_code, "message" => message} ->
         Logger.error("Notion API error: #{error_code} - #{message}")
         {:error, {:notion_api_error, error_code, message}}
@@ -324,7 +272,7 @@ defmodule ShotElixir.Services.NotionService do
             updated_character = Repo.preload(updated_character, :faction)
 
             # Log warning if Notion update fails (but don't fail the merge)
-            case update_notion_from_character(updated_character, token) do
+            case update_notion_from_character(updated_character) do
               {:ok, _} ->
                 :ok
 
@@ -345,8 +293,7 @@ defmodule ShotElixir.Services.NotionService do
                 case set_faction_from_notion(
                        updated_character,
                        page,
-                       updated_character.campaign_id,
-                       token
+                       updated_character.campaign_id
                      ) do
                   {:ok, char} -> char
                   {:error, _} -> updated_character
@@ -361,8 +308,7 @@ defmodule ShotElixir.Services.NotionService do
                 case set_juncture_from_notion(
                        updated_character,
                        page,
-                       updated_character.campaign_id,
-                       token
+                       updated_character.campaign_id
                      ) do
                   {:ok, char} -> char
                   {:error, _} -> updated_character
@@ -372,7 +318,7 @@ defmodule ShotElixir.Services.NotionService do
               end
 
             # Add image from Notion if character doesn't have one
-            add_image(page, updated_character, token)
+            add_image(page, updated_character)
 
             # Log successful merge
             Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
@@ -457,24 +403,21 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Create a new Notion page from character data.
   """
-  def create_notion_from_character(%Character{} = character, token \\ nil) do
+  def create_notion_from_character(%Character{} = character) do
     # Ensure faction is loaded for Notion properties
     character = Repo.preload(character, :faction)
-    token = token || get_token(character.campaign_id)
     properties = Character.as_notion(character)
 
     properties =
       if character.faction do
-        faction_props =
-          notion_faction_properties(character.faction.name, character.campaign_id, token)
-
+        faction_props = notion_faction_properties(character.faction.name)
         # Only add Faction if we found a matching faction in Notion
         if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
         properties
       end
 
-    case data_source_id_for(database_id(character.campaign_id), token: token) do
+    case data_source_id_for(database_id()) do
       {:ok, data_source_id} ->
         Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
 
@@ -484,7 +427,7 @@ defmodule ShotElixir.Services.NotionService do
           "properties" => properties
         }
 
-        page = NotionClient.create_page(maybe_put_token(payload, token))
+        page = NotionClient.create_page(payload)
 
         Logger.debug("Notion API response received")
 
@@ -504,7 +447,7 @@ defmodule ShotElixir.Services.NotionService do
                 )
 
                 # Add image if present
-                add_image_to_notion(updated_character, token)
+                add_image_to_notion(updated_character)
                 {:ok, page}
 
               {:error, changeset} ->
@@ -571,20 +514,14 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Update existing Notion page with character data.
   """
-  def update_notion_from_character(character, token \\ nil)
+  def update_notion_from_character(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
 
-  def update_notion_from_character(%Character{notion_page_id: nil}, _token),
-    do: {:error, :no_page_id}
-
-  def update_notion_from_character(%Character{} = character, token) do
-    token = token || get_token(character.campaign_id)
+  def update_notion_from_character(%Character{} = character) do
     properties = Character.as_notion(character)
 
     properties =
       if character.faction do
-        faction_props =
-          notion_faction_properties(character.faction.name, character.campaign_id, token)
-
+        faction_props = notion_faction_properties(character.faction.name)
         # Only add Faction if we found a matching faction in Notion
         if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
@@ -597,7 +534,7 @@ defmodule ShotElixir.Services.NotionService do
       "properties" => properties
     }
 
-    response = NotionClient.update_page(character.notion_page_id, properties, token: token)
+    response = NotionClient.update_page(character.notion_page_id, properties)
 
     # Check if Notion returned an error response
     case response do
@@ -640,11 +577,11 @@ defmodule ShotElixir.Services.NotionService do
 
       _ ->
         # Add image if not present in Notion
-        page = NotionClient.get_page(character.notion_page_id, token: token)
-        image = find_image_block(page, token)
+        page = NotionClient.get_page(character.notion_page_id)
+        image = find_image_block(page)
 
         unless image do
-          add_image_to_notion(character, token)
+          add_image_to_notion(character)
         end
 
         # Log successful sync
@@ -677,8 +614,7 @@ defmodule ShotElixir.Services.NotionService do
   - Juncture (from Notion multi_select, matched by name to local juncture)
   - Fortune and other action values
   """
-  def create_character_from_notion(page, campaign_id, token \\ nil) do
-    token = token || get_token(campaign_id)
+  def create_character_from_notion(page, campaign_id) do
     name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
 
     # Generate unique name to avoid overwriting existing characters
@@ -706,13 +642,13 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, character} = Characters.update_character(character, %{description: merged_description})
 
     # Look up and set faction from Notion relation
-    {:ok, character} = set_faction_from_notion(character, page, campaign_id, token)
+    {:ok, character} = set_faction_from_notion(character, page, campaign_id)
 
     # Look up and set juncture from Notion multi_select
-    {:ok, character} = set_juncture_from_notion(character, page, campaign_id, token)
+    {:ok, character} = set_juncture_from_notion(character, page, campaign_id)
 
     # Add image if not already present
-    add_image(page, character, token)
+    add_image(page, character)
 
     {:ok, character}
   rescue
@@ -722,8 +658,8 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Look up faction from Notion relation and set on character
-  defp set_faction_from_notion(character, page, campaign_id, token) do
-    case get_faction_name_from_notion(page, token) do
+  defp set_faction_from_notion(character, page, campaign_id) do
+    case get_faction_name_from_notion(page) do
       nil ->
         {:ok, character}
 
@@ -740,7 +676,7 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Look up juncture from Notion multi_select and set on character
-  defp set_juncture_from_notion(character, page, campaign_id, _token) do
+  defp set_juncture_from_notion(character, page, campaign_id) do
     case get_juncture_name_from_notion(page) do
       nil ->
         {:ok, character}
@@ -758,10 +694,10 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Get faction name from Notion relation by fetching the related page
-  defp get_faction_name_from_notion(page, token) do
+  defp get_faction_name_from_notion(page) do
     case get_in(page, ["properties", "Faction", "relation"]) do
       [%{"id" => faction_page_id} | _] ->
-        faction_page = NotionClient.get_page(faction_page_id, token: token)
+        faction_page = NotionClient.get_page(faction_page_id)
 
         # Faction pages use rich_text for Name, not title
         get_in(faction_page, ["properties", "Name", "rich_text", Access.at(0), "plain_text"]) ||
@@ -827,15 +763,10 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Update character from Notion page data.
   """
-  def update_character_from_notion(character, token \\ nil)
+  def update_character_from_notion(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
 
-  def update_character_from_notion(%Character{notion_page_id: nil}, _token),
-    do: {:error, :no_page_id}
-
-  def update_character_from_notion(%Character{} = character, token) do
-    token = token || get_token(character.campaign_id)
-
-    case NotionClient.get_page(character.notion_page_id, token: token) do
+  def update_character_from_notion(%Character{} = character) do
+    case NotionClient.get_page(character.notion_page_id) do
       # Defensive check: Req.get! typically raises on failure, but we handle
       # the unlikely case of a nil body for robustness
       nil ->
@@ -852,7 +783,7 @@ defmodule ShotElixir.Services.NotionService do
         attributes = Character.attributes_from_notion(character, page)
 
         # Add image if not already present
-        add_image(page, character, token)
+        add_image(page, character)
 
         Characters.update_character(character, attributes)
     end
@@ -903,15 +834,11 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching Notion pages with id, title/name, and url
   """
-  def find_page_by_name(name, opts_or_token \\ []) do
-    opts = normalize_notion_opts(opts_or_token)
-    token = Keyword.get(opts, :token)
-
+  def find_page_by_name(name) do
     results =
-      NotionClient.search(
-        name,
-        maybe_put_token(%{"filter" => %{"property" => "object", "value" => "page"}}, token)
-      )
+      NotionClient.search(name, %{
+        "filter" => %{"property" => "object", "value" => "page"}
+      })
 
     case results do
       # Handle Notion API error responses
@@ -950,9 +877,7 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching Notion pages with id, title, and url
   """
-  def find_pages_in_database(database_id, name, opts_or_token \\ []) do
-    opts = normalize_notion_opts(opts_or_token)
-
+  def find_pages_in_database(database_id, name, opts \\ []) do
     filter =
       if name == "" do
         %{}
@@ -968,7 +893,7 @@ defmodule ShotElixir.Services.NotionService do
     case data_source_id_for(database_id, opts) do
       {:ok, data_source_id} ->
         client = notion_client(opts)
-        response = notion_request(client, :data_source_query, [data_source_id, filter], opts)
+        response = client.data_source_query(data_source_id, filter)
 
         case response do
           %{"code" => error_code, "message" => message} ->
@@ -1011,14 +936,8 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching site pages with id, title, and url
   """
-  def find_sites_in_notion(name \\ "")
-
-  def find_sites_in_notion(name) when is_binary(name) do
-    find_pages_in_database(sites_database_id(nil), name)
-  end
-
-  def find_sites_in_notion(campaign_id, name) do
-    find_pages_in_database(sites_database_id(campaign_id), name, token: get_token(campaign_id))
+  def find_sites_in_notion(name \\ "") do
+    find_pages_in_database(sites_database_id(), name)
   end
 
   @doc """
@@ -1030,14 +949,8 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching party pages with id, title, and url
   """
-  def find_parties_in_notion(name \\ "")
-
-  def find_parties_in_notion(name) when is_binary(name) do
-    find_pages_in_database(parties_database_id(nil), name)
-  end
-
-  def find_parties_in_notion(campaign_id, name) do
-    find_pages_in_database(parties_database_id(campaign_id), name, token: get_token(campaign_id))
+  def find_parties_in_notion(name \\ "") do
+    find_pages_in_database(parties_database_id(), name)
   end
 
   @doc """
@@ -1049,14 +962,8 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching faction pages with id, title, and url
   """
-  def find_factions_in_notion(name \\ "")
-
-  def find_factions_in_notion(name) when is_binary(name) do
-    find_pages_in_database(factions_database_id(nil), name)
-  end
-
-  def find_factions_in_notion(campaign_id, name) do
-    find_pages_in_database(factions_database_id(campaign_id), name, token: get_token(campaign_id))
+  def find_factions_in_notion(name \\ "") do
+    find_pages_in_database(factions_database_id(), name)
   end
 
   @doc """
@@ -1068,16 +975,8 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching juncture pages with id, title, and url
   """
-  def find_junctures_in_notion(name \\ "")
-
-  def find_junctures_in_notion(name) when is_binary(name) do
-    find_pages_in_database(junctures_database_id(nil), name)
-  end
-
-  def find_junctures_in_notion(campaign_id, name) do
-    find_pages_in_database(junctures_database_id(campaign_id), name,
-      token: get_token(campaign_id)
-    )
+  def find_junctures_in_notion(name \\ "") do
+    find_pages_in_database(junctures_database_id(), name)
   end
 
   @doc """
@@ -1089,10 +988,7 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * List of matching faction pages (empty list if not found)
   """
-  def find_faction_by_name(name, opts_or_token \\ []) do
-    opts = normalize_notion_opts(opts_or_token)
-    campaign_id = Keyword.get(opts, :campaign_id)
-
+  def find_faction_by_name(name, opts \\ []) do
     filter = %{
       "and" => [
         %{
@@ -1102,18 +998,10 @@ defmodule ShotElixir.Services.NotionService do
       ]
     }
 
-    case data_source_id_for(factions_database_id(campaign_id), opts) do
+    case data_source_id_for(factions_database_id(), opts) do
       {:ok, data_source_id} ->
         client = notion_client(opts)
-
-        response =
-          notion_request(
-            client,
-            :data_source_query,
-            [data_source_id, %{"filter" => filter}],
-            opts
-          )
-
+        response = client.data_source_query(data_source_id, %{"filter" => filter})
         response["results"]
 
       {:error, reason} ->
@@ -1132,8 +1020,8 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * Image block if found, nil otherwise
   """
-  def find_image_block(page, token \\ nil) do
-    response = NotionClient.get_block_children(page["id"], token: token)
+  def find_image_block(page) do
+    response = NotionClient.get_block_children(page["id"])
     results = response["results"]
 
     if results do
@@ -1144,11 +1032,11 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Add image to Notion page from entity.
   """
-  def add_image_to_notion(%{image_url: nil}, _token), do: nil
-  def add_image_to_notion(%{image_url: ""}, _token), do: nil
-  def add_image_to_notion(%{notion_page_id: nil}, _token), do: nil
+  def add_image_to_notion(%{image_url: nil}), do: nil
+  def add_image_to_notion(%{image_url: ""}), do: nil
+  def add_image_to_notion(%{notion_page_id: nil}), do: nil
 
-  def add_image_to_notion(%{image_url: url, notion_page_id: page_id}, token) do
+  def add_image_to_notion(%{image_url: url, notion_page_id: page_id}) do
     child = %{
       "object" => "block",
       "type" => "image",
@@ -1158,7 +1046,7 @@ defmodule ShotElixir.Services.NotionService do
       }
     }
 
-    NotionClient.append_block_children(page_id, [child], token: token)
+    NotionClient.append_block_children(page_id, [child])
   rescue
     error ->
       Logger.warning("Failed to add image to Notion: #{Exception.message(error)}")
@@ -1175,14 +1063,14 @@ defmodule ShotElixir.Services.NotionService do
   This function should be called immediately after extracting the URL from Notion,
   not in a delayed or asynchronous context.
   """
-  def add_image(page, %Character{} = character, token \\ nil) do
+  def add_image(page, %Character{} = character) do
     # Check if character already has an image via ActiveStorage
     existing_image_url = ShotElixir.ActiveStorage.get_image_url("Character", character.id)
 
     if existing_image_url do
       {:ok, :skipped_existing_image}
     else
-      case find_image_block(page, token) do
+      case find_image_block(page) do
         nil ->
           {:ok, :no_image_block}
 
@@ -1467,8 +1355,8 @@ defmodule ShotElixir.Services.NotionService do
 
   # Private helper functions
 
-  defp notion_faction_properties(name, campaign_id, token) do
-    case find_faction_by_name(name, campaign_id: campaign_id, token: token) do
+  defp notion_faction_properties(name) do
+    case find_faction_by_name(name) do
       [faction | _] ->
         %{"relation" => [%{"id" => faction["id"]}]}
 
@@ -2097,10 +1985,9 @@ defmodule ShotElixir.Services.NotionService do
 
     sync_entity(site, %{
       entity_type: "site",
-      database_id: sites_database_id(site.campaign_id),
+      database_id: sites_database_id(),
       update_fn: &Sites.update_site/2,
-      as_notion_fn: &Site.as_notion/1,
-      token: get_token(site.campaign_id)
+      as_notion_fn: &Site.as_notion/1
     })
   end
 
@@ -2114,10 +2001,9 @@ defmodule ShotElixir.Services.NotionService do
 
     sync_entity(party, %{
       entity_type: "party",
-      database_id: parties_database_id(party.campaign_id),
+      database_id: parties_database_id(),
       update_fn: &Parties.update_party/2,
-      as_notion_fn: &Party.as_notion/1,
-      token: get_token(party.campaign_id)
+      as_notion_fn: &Party.as_notion/1
     })
   end
 
@@ -2131,10 +2017,9 @@ defmodule ShotElixir.Services.NotionService do
 
     sync_entity(faction, %{
       entity_type: "faction",
-      database_id: factions_database_id(faction.campaign_id),
+      database_id: factions_database_id(),
       update_fn: &Factions.update_faction/2,
-      as_notion_fn: &Faction.as_notion/1,
-      token: get_token(faction.campaign_id)
+      as_notion_fn: &Faction.as_notion/1
     })
   end
 
@@ -2145,10 +2030,9 @@ defmodule ShotElixir.Services.NotionService do
   def sync_juncture(%Juncture{} = juncture) do
     sync_entity(juncture, %{
       entity_type: "juncture",
-      database_id: junctures_database_id(juncture.campaign_id),
+      database_id: junctures_database_id(),
       update_fn: &Junctures.update_juncture/2,
-      as_notion_fn: &juncture_as_notion/1,
-      token: get_token(juncture.campaign_id)
+      as_notion_fn: &juncture_as_notion/1
     })
   end
 
@@ -2479,7 +2363,7 @@ defmodule ShotElixir.Services.NotionService do
                 )
 
                 # Add image if present
-                add_image_to_notion(updated_entity, get_token(updated_entity.campaign_id))
+                add_image_to_notion(updated_entity)
 
                 {:ok, page}
 
@@ -2615,7 +2499,7 @@ defmodule ShotElixir.Services.NotionService do
           end
 
         unless image do
-          add_image_to_notion(entity, get_token(entity.campaign_id))
+          add_image_to_notion(entity)
         end
 
         Notion.log_success(entity_type, entity.id, payload, response)

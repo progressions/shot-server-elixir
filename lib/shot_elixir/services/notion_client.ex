@@ -4,7 +4,7 @@ defmodule ShotElixir.Services.NotionClient do
   Uses Req library for HTTP requests.
   """
 
-  @notion_version "2022-06-28"
+  @notion_version "2025-09-03"
   @base_url "https://api.notion.com/v1"
 
   def client(token \\ nil) do
@@ -34,6 +34,14 @@ defmodule ShotElixir.Services.NotionClient do
 
     client(token)
     |> Req.post!(url: "/search", json: body)
+    |> Map.get(:body)
+  end
+
+  def data_source_query(data_source_id, opts \\ %{}) do
+    {token, opts} = Map.pop(opts, :token)
+
+    client(token)
+    |> Req.post!(url: "/data_sources/#{data_source_id}/query", json: opts)
     |> Map.get(:body)
   end
 

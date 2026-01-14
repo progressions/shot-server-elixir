@@ -25,7 +25,6 @@ defmodule ShotElixir.Fights.Fight do
     field :solo_mode, :boolean, default: false
     field :solo_player_character_ids, {:array, :binary_id}, default: []
     field :solo_behavior_type, :string, default: "simple"
-    field :at_a_glance, :boolean, default: false
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :user, ShotElixir.Accounts.User
@@ -65,8 +64,7 @@ defmodule ShotElixir.Fights.Fight do
       :user_id,
       :solo_mode,
       :solo_player_character_ids,
-      :solo_behavior_type,
-      :at_a_glance
+      :solo_behavior_type
     ])
     |> validate_required([:name, :campaign_id])
     |> validate_number(:sequence, greater_than_or_equal_to: 0)

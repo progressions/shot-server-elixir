@@ -53,9 +53,6 @@ defmodule ShotElixir.Fights do
     # Apply visibility filtering (default to active only)
     query = apply_visibility_filter(query, params)
 
-    # Apply at_a_glance filter
-    query = apply_at_a_glance_filter(query, params)
-
     # Apply basic filters
     query =
       if params["id"] do
@@ -291,32 +288,9 @@ defmodule ShotElixir.Fights do
           {:asc, fragment("LOWER(?)", f.name)}
         ])
 
-      "at_a_glance" ->
-        order_by(query, [f], [
-          {^order, f.at_a_glance},
-          {:asc, fragment("LOWER(?)", f.name)}
-        ])
-
       _ ->
         order_by(query, [f], desc: f.created_at, asc: f.id)
     end
-  end
-
-  defp apply_at_a_glance_filter(query, params) do
-    case at_a_glance_param(params) do
-      "true" ->
-        from f in query, where: f.at_a_glance == true
-
-      true ->
-        from f in query, where: f.at_a_glance == true
-
-      _ ->
-        query
-    end
-  end
-
-  defp at_a_glance_param(params) do
-    Map.get(params, "at_a_glance") || Map.get(params, "at_a_glace")
   end
 
   defp apply_visibility_filter(query, params) do
