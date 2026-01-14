@@ -117,11 +117,11 @@ defmodule ShotElixirWeb.NotionOAuthController do
             "NotionOAuth: Successfully linked campaign #{campaign_id} to Notion workspace #{token_data["workspace_name"]}"
           )
 
-          # Redirect to the frontend campaign settings page
+          # Redirect to the frontend campaign page
           frontend_url = Application.get_env(:shot_elixir, :frontend_url, "http://localhost:3001")
 
           redirect(conn,
-            external: "#{frontend_url}/campaigns/#{campaign_id}/settings?notion_connected=true"
+            external: "#{frontend_url}/campaigns/#{campaign_id}?notion_connected=true"
           )
 
         {:error, changeset} ->
