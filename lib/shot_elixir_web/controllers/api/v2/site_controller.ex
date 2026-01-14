@@ -578,11 +578,13 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
           campaign ->
             SyncFromNotion.sync(conn, current_user, site, campaign,
+              assign_key: :site,
+              authorize: &authorize_campaign_modification/2,
+              forbidden_error: "Only campaign owners, admins, or gamemasters can sync sites",
               no_page_error: "Site has no Notion page linked",
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_site_from_notion/2,
-              view: ShotElixirWeb.Api.V2.SiteView,
-              assign_key: :site
+              view: ShotElixirWeb.Api.V2.SiteView
             )
         end
     end
