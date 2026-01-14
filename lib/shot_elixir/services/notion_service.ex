@@ -450,9 +450,7 @@ defmodule ShotElixir.Services.NotionService do
         end
 
       {:error, reason} ->
-        Logger.error(
-          "Failed to resolve Notion data source for characters: #{inspect(reason)}"
-        )
+        Logger.error("Failed to resolve Notion data source for characters: #{inspect(reason)}")
 
         Notion.log_error(
           "character",
@@ -974,9 +972,7 @@ defmodule ShotElixir.Services.NotionService do
         response["results"]
 
       {:error, reason} ->
-        Logger.error(
-          "Failed to resolve Notion data source for factions: #{inspect(reason)}"
-        )
+        Logger.error("Failed to resolve Notion data source for factions: #{inspect(reason)}")
 
         []
     end

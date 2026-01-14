@@ -7,7 +7,11 @@ defmodule ShotElixir.Workers.SyncFactionToNotionWorker do
   use Oban.Worker,
     queue: :notion,
     max_attempts: 3,
-    unique: [period: 60, fields: [:args], states: [:available, :scheduled, :executing, :retryable]]
+    unique: [
+      period: 60,
+      fields: [:args],
+      states: [:available, :scheduled, :executing, :retryable]
+    ]
 
   alias ShotElixir.Factions
   alias ShotElixir.Services.NotionService
