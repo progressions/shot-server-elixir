@@ -58,6 +58,12 @@ defmodule ShotElixir.Services.NotionService do
       "4228eb7fefef470bb9f19a7f5d73c0fc"
   end
 
+  @doc false
+  def init_data_source_cache do
+    _ = data_source_cache_table()
+    :ok
+  end
+
   defp data_source_cache_table do
     case :ets.whereis(@data_source_cache_table) do
       :undefined ->
@@ -93,6 +99,7 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   defp extract_data_source_id(data_sources) do
+    # Notion returns a list of data source objects; tests may pass raw IDs.
     Enum.find_value(data_sources, fn
       %{"id" => id} when is_binary(id) -> id
       id when is_binary(id) -> id
@@ -109,6 +116,7 @@ defmodule ShotElixir.Services.NotionService do
         client = notion_client(opts)
 
         case client.get_database(database_id) do
+          # 2025-09-03 returns data_sources as a list of objects.
           %{"data_sources" => data_sources} when is_list(data_sources) ->
             case extract_data_source_id(data_sources) do
               nil ->
@@ -119,6 +127,7 @@ defmodule ShotElixir.Services.NotionService do
                 {:ok, data_source_id}
             end
 
+          # Older responses may include a single data_source_id or data_source object.
           %{"data_source_id" => data_source_id} when is_binary(data_source_id) ->
             cache_data_source_id(database_id, data_source_id)
             {:ok, data_source_id}
@@ -128,12 +137,23 @@ defmodule ShotElixir.Services.NotionService do
             {:ok, data_source_id}
 
           %{"code" => error_code, "message" => message} ->
+            Logger.error(
+              "Notion get_database error for database_id=#{database_id}: " <>
+                "#{error_code} - #{message}"
+            )
+
             {:error, {:notion_api_error, error_code, message}}
 
           nil ->
+            Logger.error("Notion get_database returned nil for database_id=#{database_id}")
             {:error, :notion_database_not_found}
 
           response ->
+            Logger.error(
+              "Unexpected response from Notion get_database for database_id=#{database_id}: " <>
+                "#{inspect(response)}"
+            )
+
             {:error, {:unexpected_notion_response, response}}
         end
     end

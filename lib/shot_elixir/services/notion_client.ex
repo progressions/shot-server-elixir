@@ -42,10 +42,6 @@ defmodule ShotElixir.Services.NotionClient do
     |> Map.get(:body)
   end
 
-  def database_query(database_id, opts \\ %{}) do
-    data_source_query(database_id, opts)
-  end
-
   def create_page(params) do
     client()
     |> Req.post!(url: "/pages", json: params)
