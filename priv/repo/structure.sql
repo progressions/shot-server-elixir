@@ -690,7 +690,8 @@ CREATE TABLE public.users (
     current_campaign_id uuid,
     name character varying,
     active boolean DEFAULT true NOT NULL,
-    pending_invitation_id uuid
+    pending_invitation_id uuid,
+    at_a_glance boolean DEFAULT false
 );
 
 
