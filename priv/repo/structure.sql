@@ -381,6 +381,7 @@ CREATE TABLE public.characters (
     wealth character varying,
     is_template boolean,
     status jsonb DEFAULT '[]'::jsonb,
+    extending boolean DEFAULT false NOT NULL,
     at_a_glance boolean DEFAULT false NOT NULL
 );
 
@@ -727,7 +728,9 @@ CREATE TABLE public.users (
     name character varying,
     active boolean DEFAULT true NOT NULL,
     pending_invitation_id uuid,
-    at_a_glance boolean DEFAULT false
+    at_a_glance boolean DEFAULT false,
+    discord_id bigint,
+    current_character_id uuid
 );
 
 
@@ -1785,6 +1788,13 @@ CREATE UNIQUE INDEX index_users_on_reset_password_token ON public.users USING bt
 --
 
 CREATE UNIQUE INDEX index_users_on_unlock_token ON public.users USING btree (unlock_token);
+
+
+--
+-- Name: users_discord_id_index; Type: INDEX; Schema: public; Owner: isaacpriestley
+--
+
+CREATE UNIQUE INDEX users_discord_id_index ON public.users USING btree (discord_id);
 
 
 --
