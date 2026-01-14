@@ -125,8 +125,16 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       notion_connected: !!campaign.notion_access_token,
       notion_workspace_name: campaign.notion_workspace_name,
       notion_workspace_icon: campaign.notion_workspace_icon,
-      notion_database_ids: campaign.notion_database_ids || %{}
+      notion_database_ids: campaign.notion_database_ids || %{},
+      notion_oauth_available: notion_oauth_configured?()
     }
+  end
+
+  # Check if Notion OAuth credentials are configured in the environment
+  defp notion_oauth_configured? do
+    client_id = System.get_env("NOTION_CLIENT_ID")
+    client_secret = System.get_env("NOTION_CLIENT_SECRET")
+    !!(client_id && client_id != "" && client_secret && client_secret != "")
   end
 
   # Check if the campaign owner has a credential for the selected AI provider
