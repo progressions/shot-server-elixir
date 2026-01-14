@@ -4,7 +4,10 @@ defmodule ShotElixir.Workers.SyncPartyToNotionWorker do
   Only runs in production environment.
   """
 
-  use Oban.Worker, queue: :notion, max_attempts: 3, unique: [period: 60, fields: [:args]]
+  use Oban.Worker,
+    queue: :notion,
+    max_attempts: 3,
+    unique: [period: 60, fields: [:args], states: [:available, :scheduled, :executing, :retryable]]
 
   alias ShotElixir.Parties
   alias ShotElixir.Services.NotionService
