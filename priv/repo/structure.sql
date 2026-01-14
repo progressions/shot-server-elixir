@@ -382,7 +382,8 @@ CREATE TABLE public.characters (
     is_template boolean,
     status jsonb DEFAULT '[]'::jsonb,
     extending boolean DEFAULT false NOT NULL,
-    at_a_glance boolean DEFAULT false NOT NULL
+    at_a_glance boolean DEFAULT false NOT NULL,
+    equipped_weapon_id uuid
 );
 
 
@@ -1357,6 +1358,13 @@ CREATE INDEX index_characters_on_user_id ON public.characters USING btree (user_
 
 
 --
+-- Name: characters_equipped_weapon_id_index; Type: INDEX; Schema: public; Owner: isaacpriestley
+--
+
+CREATE INDEX characters_equipped_weapon_id_index ON public.characters USING btree (equipped_weapon_id);
+
+
+--
 -- Name: index_chase_relationships_on_evader_id; Type: INDEX; Schema: public; Owner: isaacpriestley
 --
 
@@ -2005,6 +2013,14 @@ ALTER TABLE ONLY public.users
 
 ALTER TABLE ONLY public.characters
     ADD CONSTRAINT fk_rails_4a6a8aaa2d FOREIGN KEY (campaign_id) REFERENCES public.campaigns(id);
+
+
+--
+-- Name: characters characters_equipped_weapon_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: isaacpriestley
+--
+
+ALTER TABLE ONLY public.characters
+    ADD CONSTRAINT characters_equipped_weapon_id_fkey FOREIGN KEY (equipped_weapon_id) REFERENCES public.weapons(id) ON DELETE SET NULL;
 
 
 --
