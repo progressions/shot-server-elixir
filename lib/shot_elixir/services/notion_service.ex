@@ -1977,7 +1977,8 @@ defmodule ShotElixir.Services.NotionService do
           entity_type: "site",
           database_id: database_id,
           update_fn: &Sites.update_site/2,
-          as_notion_fn: &Site.as_notion/1
+          as_notion_fn: &Site.as_notion/1,
+          token: get_token(site.campaign)
         })
     end
   end
@@ -1999,7 +2000,8 @@ defmodule ShotElixir.Services.NotionService do
           entity_type: "party",
           database_id: database_id,
           update_fn: &Parties.update_party/2,
-          as_notion_fn: &Party.as_notion/1
+          as_notion_fn: &Party.as_notion/1,
+          token: get_token(party.campaign)
         })
     end
   end
@@ -2021,7 +2023,8 @@ defmodule ShotElixir.Services.NotionService do
           entity_type: "faction",
           database_id: database_id,
           update_fn: &Factions.update_faction/2,
-          as_notion_fn: &Faction.as_notion/1
+          as_notion_fn: &Faction.as_notion/1,
+          token: get_token(faction.campaign)
         })
     end
   end
@@ -2043,7 +2046,8 @@ defmodule ShotElixir.Services.NotionService do
           entity_type: "juncture",
           database_id: database_id,
           update_fn: &Junctures.update_juncture/2,
-          as_notion_fn: &juncture_as_notion/1
+          as_notion_fn: &juncture_as_notion/1,
+          token: get_token(juncture.campaign)
         })
     end
   end
@@ -2072,7 +2076,8 @@ defmodule ShotElixir.Services.NotionService do
           entity_type: "adventure",
           database_id: database_id,
           update_fn: &Adventures.update_adventure/2,
-          as_notion_fn: &Adventure.as_notion/1
+          as_notion_fn: &Adventure.as_notion/1,
+          token: get_token(adventure.campaign)
         })
     end
   end
@@ -2449,12 +2454,14 @@ defmodule ShotElixir.Services.NotionService do
   # Generic create function for any entity type
   defp create_notion_page(entity, %{entity_type: entity_type} = opts) do
     properties = opts.as_notion_fn.(entity)
+    token = Map.get(opts, :token)
 
-    case data_source_id_for(opts.database_id) do
+    case data_source_id_for(opts.database_id, token: token) do
       {:ok, data_source_id} ->
         payload = %{
           "parent" => %{"data_source_id" => data_source_id},
-          "properties" => properties
+          "properties" => properties,
+          :token => token
         }
 
         page = NotionClient.create_page(payload)
@@ -2541,8 +2548,9 @@ defmodule ShotElixir.Services.NotionService do
 
   defp update_notion_page(entity, %{entity_type: entity_type} = opts) do
     properties = opts.as_notion_fn.(entity)
+    token = Map.get(opts, :token)
     payload = %{"page_id" => entity.notion_page_id, "properties" => properties}
-    response = NotionClient.update_page(entity.notion_page_id, properties)
+    response = NotionClient.update_page(entity.notion_page_id, properties, %{token: token})
 
     case response do
       %{"code" => "validation_error", "message" => message}
@@ -2581,7 +2589,7 @@ defmodule ShotElixir.Services.NotionService do
 
       _ ->
         # Add image if not present in Notion
-        page = NotionClient.get_page(entity.notion_page_id)
+        page = NotionClient.get_page(entity.notion_page_id, %{token: token})
 
         image =
           case page do

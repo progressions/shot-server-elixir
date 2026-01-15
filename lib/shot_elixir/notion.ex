@@ -7,6 +7,7 @@ defmodule ShotElixir.Notion do
   require Logger
   alias ShotElixir.Repo
   alias ShotElixir.Notion.NotionSyncLog
+  alias ShotElixir.Adventures
   alias ShotElixir.Characters
   alias ShotElixir.Factions
   alias ShotElixir.Junctures
@@ -80,6 +81,12 @@ defmodule ShotElixir.Notion do
           case Junctures.get_juncture(entity_id) do
             nil -> nil
             juncture -> juncture.campaign_id
+          end
+
+        "adventure" ->
+          case Adventures.get_adventure(entity_id) do
+            nil -> nil
+            adventure -> adventure.campaign_id
           end
 
         _ ->
