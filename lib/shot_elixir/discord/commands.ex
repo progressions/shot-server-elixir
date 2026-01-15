@@ -65,6 +65,9 @@ defmodule ShotElixir.Discord.Commands do
     server_id = interaction.guild_id
     fight_name = get_option(interaction, "name")
 
+    Logger.info("DISCORD /start: fight_name=#{inspect(fight_name)}")
+    Logger.info("DISCORD /start: interaction.data=#{inspect(interaction.data)}")
+
     cond do
       is_nil(channel_id) ->
         respond(interaction, "Error: Discord channel ID is missing.", ephemeral: true)
@@ -315,6 +318,12 @@ defmodule ShotElixir.Discord.Commands do
   def handle_campaign(interaction) do
     server_id = interaction.guild_id
     campaign_name = get_option(interaction, "name")
+
+    Logger.info(
+      "DISCORD /campaign: server_id=#{inspect(server_id)}, campaign_name=#{inspect(campaign_name)}"
+    )
+
+    Logger.info("DISCORD /campaign: interaction.data=#{inspect(interaction.data)}")
 
     cond do
       is_nil(server_id) ->
