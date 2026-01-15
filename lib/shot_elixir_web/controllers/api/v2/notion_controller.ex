@@ -242,20 +242,6 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     search_notion_entities(conn, params, &NotionService.find_junctures_in_notion/1)
   end
 
-  @doc """
-  Search for adventures in the Notion Adventures database.
-
-  ## Parameters
-    * `name` - The name to search for (query parameter, optional)
-
-  ## Response
-    * 200 - List of matching adventure pages (JSON array)
-    * 500 - Internal server error if Notion API fails
-  """
-  def search_adventures(conn, params) do
-    search_notion_entities(conn, params, &NotionService.find_adventures_in_notion/1)
-  end
-
   # Private helper to reduce duplication across Notion search endpoints.
   # Takes a service function and handles the common response patterns.
   defp search_notion_entities(conn, params, service_fn) do
