@@ -95,12 +95,16 @@ defmodule ShotElixir.Repo.Migrations.CreateBaselineSchema do
       timestamps(inserted_at: :created_at, type: :naive_datetime_usec)
     end
 
-    create unique_index(:users, [:email])
-    create unique_index(:users, [:jti])
-    create unique_index(:users, [:confirmation_token])
-    create unique_index(:users, [:reset_password_token])
-    create unique_index(:users, [:unlock_token])
-    create index(:users, [:pending_invitation_id])
+    create unique_index(:users, [:email], name: :index_users_on_email)
+    create unique_index(:users, [:jti], name: :index_users_on_jti)
+    create unique_index(:users, [:confirmation_token], name: :index_users_on_confirmation_token)
+
+    create unique_index(:users, [:reset_password_token],
+             name: :index_users_on_reset_password_token
+           )
+
+    create unique_index(:users, [:unlock_token], name: :index_users_on_unlock_token)
+    create index(:users, [:pending_invitation_id], name: :index_users_on_pending_invitation_id)
     execute "CREATE INDEX index_users_on_lower_name ON users (lower(name))"
 
     # Campaigns table
