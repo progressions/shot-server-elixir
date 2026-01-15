@@ -25,20 +25,13 @@ end
 
 # Notion API configuration - token loaded from environment variables
 # Must be set AFTER dotenvy loads .env above
-# Note: database_id, factions_database_id, and periodic_sync_enabled are defined in config.exs
-# No longer using compile_env, so runtime config can differ
+#
+# NOTE: Notion database IDs are NO LONGER configured here.
+# Database IDs are stored dynamically per-campaign in campaign.notion_database_ids
+# This is set up via the Notion OAuth flow when a user connects their Notion workspace.
+# See NotionService.get_database_id_for_entity/2 for the dynamic lookup.
 if notion_token = System.get_env("NOTION_TOKEN") do
   config :shot_elixir, :notion,
-    # Characters database (main database)
-    database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
-    # Factions database
-    factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
-    # Parties database
-    parties_database_id: "2e5e0b55d4178083bd93e8a60280209b",
-    # Sites/Locations database
-    sites_database_id: "8ac4e657c540499c977f79b0643b7070",
-    # Junctures database
-    junctures_database_id: "4228eb7fefef470bb9f19a7f5d73c0fc",
     periodic_sync_enabled: true,
     token: notion_token
 end

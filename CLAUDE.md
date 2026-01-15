@@ -351,6 +351,87 @@ Emails are automatically sent when:
 - 📝 **User registers** → Confirmation email (needs token implementation)
 - 📝 **Password reset requested** → Reset email (needs reset flow)
 
+## Notion Integration
+
+Shot Elixir integrates with Notion for syncing game content (characters, sites, parties, factions, junctures, adventures).
+
+### Dynamic Notion Configuration (IMPORTANT)
+
+**Notion integration uses OAuth and campaign-specific settings stored in the database, NOT hardcoded config.**
+
+Each campaign stores its own Notion settings:
+- `campaign.notion_access_token` - OAuth token from Notion OAuth flow
+- `campaign.notion_database_ids` - Map of entity types to Notion database IDs
+
+```elixir
+# Example campaign.notion_database_ids structure
+%{
+  "characters" => "abc123-notion-db-id",
+  "sites" => "def456-notion-db-id",
+  "parties" => "ghi789-notion-db-id",
+  "factions" => "jkl012-notion-db-id",
+  "junctures" => "mno345-notion-db-id",
+  "adventures" => "pqr678-notion-db-id"
+}
+```
+
+### Key Patterns
+
+**Getting database IDs:**
+```elixir
+# CORRECT - use dynamic lookup from campaign
+{:ok, database_id} <- NotionService.get_database_id_for_entity(campaign, "characters")
+
+# WRONG - do NOT use hardcoded config (legacy, removed)
+# database_id = Application.get_env(:shot_elixir, :notion)[:database_id]
+```
+
+**Getting OAuth tokens:**
+```elixir
+# CORRECT - use campaign's OAuth token
+token = NotionService.get_token(campaign)
+
+# WRONG - do NOT rely solely on environment variables
+# token = System.get_env("NOTION_TOKEN")
+```
+
+### NotionService Functions
+
+**Sync Functions** - All accept entities with campaign preloaded:
+- `sync_character/1` - Sync character to Notion
+- `sync_site/1` - Sync site to Notion
+- `sync_party/1` - Sync party to Notion
+- `sync_faction/1` - Sync faction to Notion
+- `sync_juncture/1` - Sync juncture to Notion
+- `sync_adventure/1` - Sync adventure to Notion
+
+**Update from Notion Functions:**
+- `update_site_from_notion/2` - Pull site data from Notion
+- `update_party_from_notion/2` - Pull party data from Notion
+- `update_faction_from_notion/2` - Pull faction data from Notion
+- `update_juncture_from_notion/2` - Pull juncture data from Notion
+- `update_adventure_from_notion/2` - Pull adventure data from Notion
+
+### Error Handling
+
+When no Notion database is configured for an entity type:
+```elixir
+{:error, :no_database_configured}
+```
+
+This error is returned when:
+- Campaign has no `notion_database_ids` set
+- Campaign's `notion_database_ids` doesn't include the requested entity type
+
+### Adding Notion Support for New Entity Types
+
+1. Ensure entity has `campaign_id` field and `belongs_to :campaign` association
+2. Add the entity type to `campaign.notion_database_ids` via Notion OAuth setup flow
+3. Create sync function in NotionService that:
+   - Preloads campaign: `entity = Repo.preload(entity, :campaign)`
+   - Gets database ID: `get_database_id_for_entity(entity.campaign, "entity_type")`
+   - Calls `sync_entity/2` with the database ID
+
 ## Migration Path
 
 1. Phoenix API runs alongside Rails API

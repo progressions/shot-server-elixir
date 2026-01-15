@@ -27,55 +27,69 @@ defmodule ShotElixir.Services.NotionService do
   @data_source_cache_table :notion_data_source_cache
 
   # =============================================================================
-  # OAuth Token Support
+  # Dynamic Notion Integration (OAuth + Campaign-specific Database IDs)
   # =============================================================================
+  #
+  # Notion integration uses OAuth and campaign-specific settings stored in the database:
+  # - campaign.notion_access_token - OAuth token for the campaign's Notion workspace
+  # - campaign.notion_database_ids - Map of entity types to Notion database IDs
+  #   Example: %{"characters" => "abc123", "sites" => "def456", "adventures" => "ghi789"}
+  #
+  # This replaces the legacy hardcoded database IDs that were in runtime.exs config.
+  # =============================================================================
+
+  alias ShotElixir.Campaigns.Campaign
 
   @doc """
   Get Notion API token for a campaign.
-  Currently uses environment variable, but prepared for campaign-specific OAuth tokens.
+
+  Uses the campaign's OAuth token (notion_access_token) if available,
+  otherwise falls back to the environment variable for backwards compatibility.
   """
+  def get_token(campaign) when is_struct(campaign, Campaign) do
+    campaign.notion_access_token ||
+      System.get_env("NOTION_TOKEN") ||
+      Application.get_env(:shot_elixir, :notion)[:token]
+  end
+
   def get_token(_campaign_id) do
-    # TODO: Implement per-campaign token retrieval from campaigns.notion_access_token
+    # Legacy fallback for non-campaign calls
     System.get_env("NOTION_TOKEN") || Application.get_env(:shot_elixir, :notion)[:token]
   end
 
-  # =============================================================================
-  # Database ID Helpers
-  # =============================================================================
+  @doc """
+  Get Notion database ID for an entity type from campaign settings.
 
-  # Characters database (main database)
-  defp database_id do
-    Application.get_env(:shot_elixir, :notion)[:database_id] ||
-      "f6fa27ac-19cd-4b17-b218-55acc6d077be"
+  Returns {:ok, database_id} or {:error, :no_database_configured}.
+
+  ## Entity Types
+  - "characters" - Character database
+  - "sites" - Sites/Locations database
+  - "parties" - Parties database
+  - "factions" - Factions database
+  - "junctures" - Junctures/Time periods database
+  - "adventures" - Adventures database
+  """
+  def get_database_id_for_entity(%Campaign{notion_database_ids: nil}, entity_type) do
+    Logger.warning("Campaign has no notion_database_ids configured for #{entity_type}")
+    {:error, :no_database_configured}
   end
 
-  # Factions database
-  defp factions_database_id do
-    Application.get_env(:shot_elixir, :notion)[:factions_database_id] ||
-      "0ae94bfa1a754c8fbda28ea50afa5fd5"
+  def get_database_id_for_entity(%Campaign{notion_database_ids: db_ids}, entity_type)
+      when is_map(db_ids) do
+    case Map.get(db_ids, entity_type) do
+      nil ->
+        Logger.warning("No Notion database ID configured for #{entity_type}")
+        {:error, :no_database_configured}
+
+      database_id when is_binary(database_id) ->
+        {:ok, database_id}
+    end
   end
 
-  # Parties database
-  defp parties_database_id do
-    Application.get_env(:shot_elixir, :notion)[:parties_database_id] ||
-      "2e5e0b55d4178083bd93e8a60280209b"
-  end
-
-  # Sites/Locations database
-  defp sites_database_id do
-    Application.get_env(:shot_elixir, :notion)[:sites_database_id] ||
-      "8ac4e657c540499c977f79b0643b7070"
-  end
-
-  # Junctures database
-  defp junctures_database_id do
-    Application.get_env(:shot_elixir, :notion)[:junctures_database_id] ||
-      "4228eb7fefef470bb9f19a7f5d73c0fc"
-  end
-
-  # Adventures database
-  defp adventures_database_id do
-    Application.get_env(:shot_elixir, :notion)[:adventures_database_id]
+  def get_database_id_for_entity(_campaign, entity_type) do
+    Logger.warning("Invalid campaign or notion_database_ids for #{entity_type}")
+    {:error, :no_database_configured}
   end
 
   @doc false
@@ -412,84 +426,84 @@ defmodule ShotElixir.Services.NotionService do
   Create a new Notion page from character data.
   """
   def create_notion_from_character(%Character{} = character) do
-    # Ensure faction is loaded for Notion properties
-    character = Repo.preload(character, :faction)
+    # Ensure faction and campaign are loaded for Notion properties and database ID
+    character = Repo.preload(character, [:faction, :campaign])
     properties = Character.as_notion(character)
 
     properties =
       if character.faction do
-        faction_props = notion_faction_properties(character.faction.name)
+        faction_props = notion_faction_properties(character.campaign, character.faction.name)
         # Only add Faction if we found a matching faction in Notion
         if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
         properties
       end
 
-    case data_source_id_for(database_id()) do
-      {:ok, data_source_id} ->
-        Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
+    with {:ok, database_id} <- get_database_id_for_entity(character.campaign, "characters"),
+         {:ok, data_source_id} <- data_source_id_for(database_id) do
+      Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
 
-        # Capture payload for logging
-        payload = %{
-          "parent" => %{"data_source_id" => data_source_id},
-          "properties" => properties
-        }
+      # Capture payload for logging
+      payload = %{
+        "parent" => %{"data_source_id" => data_source_id},
+        "properties" => properties
+      }
 
-        page = NotionClient.create_page(payload)
+      page = NotionClient.create_page(payload)
 
-        Logger.debug("Notion API response received")
+      Logger.debug("Notion API response received")
 
-        # Check if Notion returned an error response
-        case page do
-          %{"id" => page_id} when is_binary(page_id) ->
-            Logger.debug("Extracted page ID: #{inspect(page_id)}")
+      # Check if Notion returned an error response
+      case page do
+        %{"id" => page_id} when is_binary(page_id) ->
+          Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
-            # Log successful sync
-            Notion.log_success("character", character.id, payload, page)
+          # Log successful sync
+          Notion.log_success("character", character.id, payload, page)
 
-            # Update character with notion_page_id
-            case Characters.update_character(character, %{notion_page_id: page_id}) do
-              {:ok, updated_character} ->
-                Logger.debug(
-                  "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
-                )
+          # Update character with notion_page_id
+          case Characters.update_character(character, %{notion_page_id: page_id}) do
+            {:ok, updated_character} ->
+              Logger.debug(
+                "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
+              )
 
-                # Add image if present
-                add_image_to_notion(updated_character)
-                {:ok, page}
+              # Add image if present
+              add_image_to_notion(updated_character)
+              {:ok, page}
 
-              {:error, changeset} ->
-                Logger.error("Failed to update character with notion_page_id")
-                {:error, changeset}
-            end
+            {:error, changeset} ->
+              Logger.error("Failed to update character with notion_page_id")
+              {:error, changeset}
+          end
 
-          %{"code" => error_code, "message" => message} ->
-            Logger.error("Notion API error: #{error_code}")
-            # Log error sync
-            Notion.log_error(
-              "character",
-              character.id,
-              payload,
-              page,
-              "Notion API error: #{error_code} - #{message}"
-            )
+        %{"code" => error_code, "message" => message} ->
+          Logger.error("Notion API error: #{error_code}")
+          # Log error sync
+          Notion.log_error(
+            "character",
+            character.id,
+            payload,
+            page,
+            "Notion API error: #{error_code} - #{message}"
+          )
 
-            {:error, {:notion_api_error, error_code, message}}
+          {:error, {:notion_api_error, error_code, message}}
 
-          _ ->
-            Logger.error("Unexpected response from Notion API")
-            # Log error sync
-            Notion.log_error(
-              "character",
-              character.id,
-              payload,
-              page,
-              "Unexpected response from Notion API"
-            )
+        _ ->
+          Logger.error("Unexpected response from Notion API")
+          # Log error sync
+          Notion.log_error(
+            "character",
+            character.id,
+            payload,
+            page,
+            "Unexpected response from Notion API"
+          )
 
-            {:error, :unexpected_notion_response}
-        end
-
+          {:error, :unexpected_notion_response}
+      end
+    else
       {:error, reason} ->
         Logger.error("Failed to resolve Notion data source for characters: #{inspect(reason)}")
 
@@ -525,11 +539,13 @@ defmodule ShotElixir.Services.NotionService do
   def update_notion_from_character(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
 
   def update_notion_from_character(%Character{} = character) do
+    # Ensure campaign is loaded for faction properties lookup
+    character = Repo.preload(character, :campaign)
     properties = Character.as_notion(character)
 
     properties =
       if character.faction do
-        faction_props = notion_faction_properties(character.faction.name)
+        faction_props = notion_faction_properties(character.campaign, character.faction.name)
         # Only add Faction if we found a matching faction in Notion
         if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
@@ -935,81 +951,27 @@ defmodule ShotElixir.Services.NotionService do
       []
   end
 
-  @doc """
-  Search for sites in the Notion Sites database.
-
-  ## Parameters
-    * `name` - The name to search for (partial match)
-
-  ## Returns
-    * List of matching site pages with id, title, and url
-  """
-  def find_sites_in_notion(name \\ "") do
-    find_pages_in_database(sites_database_id(), name)
-  end
-
-  @doc """
-  Search for parties in the Notion Parties database.
-
-  ## Parameters
-    * `name` - The name to search for (partial match)
-
-  ## Returns
-    * List of matching party pages with id, title, and url
-  """
-  def find_parties_in_notion(name \\ "") do
-    find_pages_in_database(parties_database_id(), name)
-  end
-
-  @doc """
-  Search for factions in the Notion Factions database.
-
-  ## Parameters
-    * `name` - The name to search for (partial match)
-
-  ## Returns
-    * List of matching faction pages with id, title, and url
-  """
-  def find_factions_in_notion(name \\ "") do
-    find_pages_in_database(factions_database_id(), name)
-  end
-
-  @doc """
-  Search for junctures in the Notion Junctures database.
-
-  ## Parameters
-    * `name` - The name to search for (partial match)
-
-  ## Returns
-    * List of matching juncture pages with id, title, and url
-  """
-  def find_junctures_in_notion(name \\ "") do
-    find_pages_in_database(junctures_database_id(), name)
-  end
-
-  @doc """
-  Search for adventures in the Notion Adventures database.
-
-  ## Parameters
-    * `name` - The name to search for (partial match)
-
-  ## Returns
-    * List of matching adventure pages with id, title, and url
-  """
-  def find_adventures_in_notion(name \\ "") do
-    find_pages_in_database(adventures_database_id(), name)
-  end
+  # NOTE: Legacy search functions (find_sites_in_notion, find_parties_in_notion, etc.)
+  # have been removed. They were unused and relied on legacy hardcoded database IDs.
+  # If needed in the future, they should be reimplemented to accept a campaign parameter
+  # and use get_database_id_for_entity/2 for dynamic database ID lookup.
 
   @doc """
   Find faction in Notion by name.
 
   ## Parameters
+    * `campaign` - The campaign struct with notion_database_ids
     * `name` - The faction name to search for
+    * `opts` - Additional options (e.g., :token)
 
   ## Returns
-    * List of matching faction pages (empty list if not found)
+    * List of matching faction pages (empty list if not found or no database configured)
   """
-  def find_faction_by_name(name, opts \\ []) do
+  def find_faction_by_name(campaign, name, opts \\ [])
+
+  def find_faction_by_name(nil, _name, _opts), do: []
+
+  def find_faction_by_name(%Campaign{} = campaign, name, opts) do
     filter = %{
       "and" => [
         %{
@@ -1019,18 +981,17 @@ defmodule ShotElixir.Services.NotionService do
       ]
     }
 
-    case data_source_id_for(factions_database_id(), opts) do
-      {:ok, data_source_id} ->
-        client = notion_client(opts)
-        # Extract token from opts and pass to data_source_query
-        token = Keyword.get(opts, :token)
-        query_opts = Map.put(%{"filter" => filter}, :token, token)
-        response = client.data_source_query(data_source_id, query_opts)
-        response["results"]
-
+    with {:ok, database_id} <- get_database_id_for_entity(campaign, "factions"),
+         {:ok, data_source_id} <- data_source_id_for(database_id, opts) do
+      client = notion_client(opts)
+      # Extract token from opts and pass to data_source_query
+      token = Keyword.get(opts, :token)
+      query_opts = Map.put(%{"filter" => filter}, :token, token)
+      response = client.data_source_query(data_source_id, query_opts)
+      response["results"] || []
+    else
       {:error, reason} ->
         Logger.error("Failed to resolve Notion data source for factions: #{inspect(reason)}")
-
         []
     end
   end
@@ -1379,8 +1340,8 @@ defmodule ShotElixir.Services.NotionService do
 
   # Private helper functions
 
-  defp notion_faction_properties(name) do
-    case find_faction_by_name(name) do
+  defp notion_faction_properties(campaign, name) do
+    case find_faction_by_name(campaign, name) do
       [faction | _] ->
         %{"relation" => [%{"id" => faction["id"]}]}
 
@@ -2004,15 +1965,21 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_site(%Site{} = site) do
-    # Ensure associations are loaded for as_notion
-    site = Repo.preload(site, [:faction, :juncture, attunements: :character])
+    # Ensure associations are loaded for as_notion, including campaign for database IDs
+    site = Repo.preload(site, [:faction, :juncture, :campaign, attunements: :character])
 
-    sync_entity(site, %{
-      entity_type: "site",
-      database_id: sites_database_id(),
-      update_fn: &Sites.update_site/2,
-      as_notion_fn: &Site.as_notion/1
-    })
+    case get_database_id_for_entity(site.campaign, "sites") do
+      {:error, :no_database_configured} ->
+        {:error, :no_database_configured}
+
+      {:ok, database_id} ->
+        sync_entity(site, %{
+          entity_type: "site",
+          database_id: database_id,
+          update_fn: &Sites.update_site/2,
+          as_notion_fn: &Site.as_notion/1
+        })
+    end
   end
 
   @doc """
@@ -2020,15 +1987,21 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_party(%Party{} = party) do
-    # Ensure associations are loaded for as_notion
-    party = Repo.preload(party, [:faction, :juncture, memberships: :character])
+    # Ensure associations are loaded for as_notion, including campaign for database IDs
+    party = Repo.preload(party, [:faction, :juncture, :campaign, memberships: :character])
 
-    sync_entity(party, %{
-      entity_type: "party",
-      database_id: parties_database_id(),
-      update_fn: &Parties.update_party/2,
-      as_notion_fn: &Party.as_notion/1
-    })
+    case get_database_id_for_entity(party.campaign, "parties") do
+      {:error, :no_database_configured} ->
+        {:error, :no_database_configured}
+
+      {:ok, database_id} ->
+        sync_entity(party, %{
+          entity_type: "party",
+          database_id: database_id,
+          update_fn: &Parties.update_party/2,
+          as_notion_fn: &Party.as_notion/1
+        })
+    end
   end
 
   @doc """
@@ -2036,15 +2009,21 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_faction(%Faction{} = faction) do
-    # Ensure associations are loaded for as_notion
-    faction = Repo.preload(faction, [:characters])
+    # Ensure associations are loaded for as_notion, including campaign for database IDs
+    faction = Repo.preload(faction, [:characters, :campaign])
 
-    sync_entity(faction, %{
-      entity_type: "faction",
-      database_id: factions_database_id(),
-      update_fn: &Factions.update_faction/2,
-      as_notion_fn: &Faction.as_notion/1
-    })
+    case get_database_id_for_entity(faction.campaign, "factions") do
+      {:error, :no_database_configured} ->
+        {:error, :no_database_configured}
+
+      {:ok, database_id} ->
+        sync_entity(faction, %{
+          entity_type: "faction",
+          database_id: database_id,
+          update_fn: &Factions.update_faction/2,
+          as_notion_fn: &Faction.as_notion/1
+        })
+    end
   end
 
   @doc """
@@ -2052,12 +2031,21 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_juncture(%Juncture{} = juncture) do
-    sync_entity(juncture, %{
-      entity_type: "juncture",
-      database_id: junctures_database_id(),
-      update_fn: &Junctures.update_juncture/2,
-      as_notion_fn: &juncture_as_notion/1
-    })
+    # Preload campaign for database IDs
+    juncture = Repo.preload(juncture, :campaign)
+
+    case get_database_id_for_entity(juncture.campaign, "junctures") do
+      {:error, :no_database_configured} ->
+        {:error, :no_database_configured}
+
+      {:ok, database_id} ->
+        sync_entity(juncture, %{
+          entity_type: "juncture",
+          database_id: database_id,
+          update_fn: &Junctures.update_juncture/2,
+          as_notion_fn: &juncture_as_notion/1
+        })
+    end
   end
 
   @doc """
@@ -2065,20 +2053,21 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_adventure(%Adventure{} = adventure) do
-    # Ensure associations are loaded for as_notion
+    # Ensure associations are loaded for as_notion, including campaign for database IDs
     adventure =
       Repo.preload(adventure, [
         :user,
+        :campaign,
         adventure_characters: :character,
         adventure_villains: :character,
         adventure_fights: :fight
       ])
 
-    case adventures_database_id() do
-      nil ->
+    case get_database_id_for_entity(adventure.campaign, "adventures") do
+      {:error, :no_database_configured} ->
         {:error, :no_database_configured}
 
-      database_id ->
+      {:ok, database_id} ->
         sync_entity(adventure, %{
           entity_type: "adventure",
           database_id: database_id,
