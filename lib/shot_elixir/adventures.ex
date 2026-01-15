@@ -116,7 +116,10 @@ defmodule ShotElixir.Adventures do
 
   defp apply_ids_filter(query, ids, true) when is_binary(ids) do
     parsed = parse_ids(ids)
-    if parsed == [], do: from(a in query, where: false), else: from(a in query, where: a.id in ^parsed)
+
+    if parsed == [],
+      do: from(a in query, where: false),
+      else: from(a in query, where: a.id in ^parsed)
   end
 
   defp parse_ids(ids_param) when is_binary(ids_param) do

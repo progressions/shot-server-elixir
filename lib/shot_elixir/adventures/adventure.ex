@@ -68,7 +68,9 @@ defmodule ShotElixir.Adventures.Adventure do
   def as_notion(%__MODULE__{} = adventure) do
     base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => adventure.name || ""}}]},
-      "Description" => %{"rich_text" => [%{"text" => %{"content" => adventure.description || ""}}]},
+      "Description" => %{
+        "rich_text" => [%{"text" => %{"content" => adventure.description || ""}}]
+      },
       "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
     }
 
@@ -81,7 +83,9 @@ defmodule ShotElixir.Adventures.Adventure do
 
     base =
       if adventure.started_at do
-        Map.put(base, "Started", %{"date" => %{"start" => DateTime.to_iso8601(adventure.started_at)}})
+        Map.put(base, "Started", %{
+          "date" => %{"start" => DateTime.to_iso8601(adventure.started_at)}
+        })
       else
         base
       end

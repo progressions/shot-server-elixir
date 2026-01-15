@@ -14,7 +14,9 @@ defmodule ShotElixir.Repo.Migrations.CreateAdventures do
       add :notion_page_id, :string
       add :last_synced_to_notion_at, :utc_datetime
       add :user_id, references(:users, type: :binary_id), null: false
-      add :campaign_id, references(:campaigns, type: :binary_id, on_delete: :delete_all), null: false
+
+      add :campaign_id, references(:campaigns, type: :binary_id, on_delete: :delete_all),
+        null: false
 
       timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
     end

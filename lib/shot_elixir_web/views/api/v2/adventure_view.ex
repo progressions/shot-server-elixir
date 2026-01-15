@@ -62,8 +62,12 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
 
   defp get_character_ids(adventure) do
     case Map.get(adventure, :adventure_characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       adventure_characters ->
         adventure_characters
         |> Enum.map(fn ac -> ac.character_id end)
@@ -73,8 +77,12 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
 
   defp get_villain_ids(adventure) do
     case Map.get(adventure, :adventure_villains) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       adventure_villains ->
         adventure_villains
         |> Enum.map(fn av -> av.character_id end)
@@ -84,8 +92,12 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
 
   defp get_fight_ids(adventure) do
     case Map.get(adventure, :adventure_fights) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       adventure_fights ->
         adventure_fights
         |> Enum.map(fn af -> af.fight_id end)
@@ -95,8 +107,12 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
 
   defp render_characters_if_loaded(adventure) do
     case Map.get(adventure, :adventure_characters) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       adventure_characters ->
         characters =
           adventure_characters
@@ -110,8 +126,12 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
 
   defp render_villains_if_loaded(adventure) do
     case Map.get(adventure, :adventure_villains) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       adventure_villains ->
         villains =
           adventure_villains
@@ -125,8 +145,12 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
 
   defp render_fights_if_loaded(adventure) do
     case Map.get(adventure, :adventure_fights) do
-      %Ecto.Association.NotLoaded{} -> []
-      nil -> []
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
       adventure_fights ->
         adventure_fights
         |> Enum.map(fn af -> af.fight end)

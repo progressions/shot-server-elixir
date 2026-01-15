@@ -87,7 +87,9 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
       case params do
         %{"adventure" => adventure_data} when is_binary(adventure_data) ->
           case Jason.decode(adventure_data) do
-            {:ok, decoded} -> decoded
+            {:ok, decoded} ->
+              decoded
+
             {:error, _} ->
               conn
               |> put_status(:bad_request)
@@ -168,7 +170,9 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
                 case params do
                   %{"adventure" => adventure_data} when is_binary(adventure_data) ->
                     case Jason.decode(adventure_data) do
-                      {:ok, decoded} -> decoded
+                      {:ok, decoded} ->
+                        decoded
+
                       {:error, _} ->
                         conn
                         |> put_status(:bad_request)
