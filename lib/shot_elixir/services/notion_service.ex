@@ -987,6 +987,19 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
+  Search for adventures in the Notion Adventures database.
+
+  ## Parameters
+    * `name` - The name to search for (partial match)
+
+  ## Returns
+    * List of matching adventure pages with id, title, and url
+  """
+  def find_adventures_in_notion(name \\ "") do
+    find_pages_in_database(adventures_database_id(), name)
+  end
+
+  @doc """
   Find faction in Notion by name.
 
   ## Parameters

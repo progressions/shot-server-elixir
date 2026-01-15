@@ -147,7 +147,7 @@ defmodule ShotElixirWeb.Router do
     get "/notion/factions", NotionController, :search_factions
     get "/notion/junctures", NotionController, :search_junctures
     get "/notion/sessions", NotionController, :sessions
-    get "/notion/adventures", NotionController, :adventures
+    get "/notion/adventures", NotionController, :search_adventures
 
     # Suggestions for @ mentions in rich text editors
     get "/suggestions", SuggestionsController, :index
