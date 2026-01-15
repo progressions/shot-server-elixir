@@ -539,8 +539,8 @@ defmodule ShotElixir.Services.NotionService do
   def update_notion_from_character(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
 
   def update_notion_from_character(%Character{} = character) do
-    # Ensure campaign is loaded for faction properties lookup
-    character = Repo.preload(character, :campaign)
+    # Ensure campaign and faction are loaded for faction properties lookup
+    character = Repo.preload(character, [:campaign, :faction])
     properties = Character.as_notion(character)
 
     properties =
