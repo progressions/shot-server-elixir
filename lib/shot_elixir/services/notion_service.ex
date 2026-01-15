@@ -19,6 +19,8 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Repo
   alias ShotElixir.Sites
   alias ShotElixir.Sites.Site
+  alias ShotElixir.Adventures
+  alias ShotElixir.Adventures.Adventure
 
   import Ecto.Query
 
@@ -69,6 +71,11 @@ defmodule ShotElixir.Services.NotionService do
   defp junctures_database_id do
     Application.get_env(:shot_elixir, :notion)[:junctures_database_id] ||
       "4228eb7fefef470bb9f19a7f5d73c0fc"
+  end
+
+  # Adventures database
+  defp adventures_database_id do
+    Application.get_env(:shot_elixir, :notion)[:adventures_database_id]
   end
 
   @doc false
@@ -2037,6 +2044,25 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
+  Sync an adventure to Notion. Creates a new page if no notion_page_id exists,
+  otherwise updates the existing page.
+  """
+  def sync_adventure(%Adventure{} = adventure) do
+    case adventures_database_id() do
+      nil ->
+        {:error, :no_database_configured}
+
+      database_id ->
+        sync_entity(adventure, %{
+          entity_type: "adventure",
+          database_id: database_id,
+          update_fn: &Adventures.update_adventure/2,
+          as_notion_fn: &Adventure.as_notion/1
+        })
+    end
+  end
+
+  @doc """
   Sync a site FROM Notion, overwriting local data with the Notion page data.
   """
   def update_site_from_notion(site, opts \\ [])
@@ -2302,6 +2328,72 @@ defmodule ShotElixir.Services.NotionService do
         "juncture",
         juncture.id,
         %{"page_id" => juncture.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
+
+      {:error, error}
+  end
+
+  @doc """
+  Sync an adventure FROM Notion, overwriting local data with the Notion page data.
+  """
+  def update_adventure_from_notion(adventure, opts \\ [])
+
+  def update_adventure_from_notion(%Adventure{notion_page_id: nil}, _opts),
+    do: {:error, :no_page_id}
+
+  def update_adventure_from_notion(%Adventure{} = adventure, opts) do
+    payload = %{"page_id" => adventure.notion_page_id}
+    client = notion_client(opts)
+
+    case client.get_page(adventure.notion_page_id) do
+      nil ->
+        Logger.error("Failed to fetch Notion page: #{adventure.notion_page_id}")
+        log_sync_error("adventure", adventure.id, payload, %{}, "Notion page not found")
+        {:error, :notion_page_not_found}
+
+      %{"code" => error_code, "message" => message} = response ->
+        Logger.error("Notion API error: #{error_code} - #{message}")
+
+        log_sync_error(
+          "adventure",
+          adventure.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
+        {:error, {:notion_api_error, error_code, message}}
+
+      page when is_map(page) ->
+        attributes = entity_attributes_from_notion(page)
+
+        case Adventures.update_adventure(adventure, attributes) do
+          {:ok, updated_adventure} = result ->
+            Notion.log_success("adventure", updated_adventure.id, payload, page)
+            result
+
+          {:error, changeset} = error ->
+            log_sync_error(
+              "adventure",
+              adventure.id,
+              payload,
+              page,
+              "Failed to update adventure from Notion: #{inspect(changeset)}"
+            )
+
+            error
+        end
+    end
+  rescue
+    error ->
+      Logger.error("Failed to update adventure from Notion: #{Exception.message(error)}")
+
+      log_sync_error(
+        "adventure",
+        adventure.id,
+        %{"page_id" => adventure.notion_page_id},
         %{},
         "Exception: #{Exception.message(error)}"
       )

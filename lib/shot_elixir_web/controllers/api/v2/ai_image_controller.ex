@@ -430,6 +430,19 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
     end
   end
 
+  defp get_entity("Adventure", entity_id, campaign_id) do
+    import Ecto.Query
+
+    query =
+      from a in ShotElixir.Adventures.Adventure,
+        where: a.id == ^entity_id and a.campaign_id == ^campaign_id
+
+    case ShotElixir.Repo.one(query) do
+      nil -> {:error, :not_found}
+      adventure -> {:ok, adventure}
+    end
+  end
+
   defp get_entity(_, _, _), do: {:error, :not_found}
 
   # Pluralize entity class names for Rails-compatible broadcast keys

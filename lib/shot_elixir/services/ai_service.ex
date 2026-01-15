@@ -27,6 +27,7 @@ defmodule ShotElixir.Services.AiService do
   alias ShotElixir.Schticks
   alias ShotElixir.Fights
   alias ShotElixir.Campaigns
+  alias ShotElixir.Adventures
 
   @doc """
   Generates a new character using AI based on a description.
@@ -362,6 +363,13 @@ defmodule ShotElixir.Services.AiService do
     case Campaigns.get_campaign(entity_id) do
       nil -> {:error, "Campaign not found"}
       campaign -> {:ok, campaign}
+    end
+  end
+
+  defp get_entity("Adventure", entity_id) do
+    case Adventures.get_adventure(entity_id) do
+      nil -> {:error, "Adventure not found"}
+      adventure -> {:ok, adventure}
     end
   end
 

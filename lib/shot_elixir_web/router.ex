@@ -276,6 +276,22 @@ defmodule ShotElixirWeb.Router do
       post "/reorder_slots", PartyController, :reorder_slots
     end
 
+    # Adventures
+    resources "/adventures", AdventureController do
+      post "/duplicate", AdventureController, :duplicate
+      delete "/image", AdventureController, :remove_image
+      post "/characters", AdventureController, :add_character
+      delete "/characters/:character_id", AdventureController, :remove_character
+      post "/villains", AdventureController, :add_villain
+      delete "/villains/:character_id", AdventureController, :remove_villain
+      post "/fights", AdventureController, :add_fight
+      delete "/fights/:fight_id", AdventureController, :remove_fight
+      post "/sync", AdventureController, :sync
+      post "/sync_from_notion", AdventureController, :sync_from_notion
+      resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
+      delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
+    end
+
     resources "/factions", FactionController do
       post "/duplicate", FactionController, :duplicate
       delete "/image", FactionController, :remove_image

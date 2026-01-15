@@ -335,13 +335,13 @@ defmodule ShotElixir.Fights do
 
   def get_fight!(id) do
     Repo.get!(Fight, id)
-    |> Repo.preload([:image_positions])
+    |> Repo.preload([:image_positions, adventure_fights: [:adventure]])
     |> ImageLoader.load_image_url("Fight")
   end
 
   def get_fight(id) do
     Repo.get(Fight, id)
-    |> Repo.preload([:image_positions])
+    |> Repo.preload([:image_positions, adventure_fights: [:adventure]])
     |> ImageLoader.load_image_url("Fight")
   end
 
