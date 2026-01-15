@@ -2367,7 +2367,7 @@ defmodule ShotElixir.Services.NotionService do
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
-        attributes = entity_attributes_from_notion(page)
+        attributes = Adventure.attributes_from_notion(page, adventure)
 
         case Adventures.update_adventure(adventure, attributes) do
           {:ok, updated_adventure} = result ->

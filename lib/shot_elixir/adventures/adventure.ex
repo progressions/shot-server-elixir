@@ -55,7 +55,7 @@ defmodule ShotElixir.Adventures.Adventure do
       :notion_page_id,
       :last_synced_to_notion_at
     ])
-    |> validate_required([:name, :campaign_id, :user_id])
+    |> validate_required([:name, :campaign_id])
     |> validate_length(:name, min: 1, max: 255)
     |> foreign_key_constraint(:campaign_id)
     |> foreign_key_constraint(:user_id)

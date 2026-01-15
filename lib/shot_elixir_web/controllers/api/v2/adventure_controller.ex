@@ -6,6 +6,8 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
   alias ShotElixir.Adventures
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.SyncFromNotion
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -110,39 +112,45 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
     if conn.halted do
       conn
     else
-      adventure_params =
-        parsed_params
-        |> Map.put("campaign_id", current_user.current_campaign_id)
-        |> Map.put("user_id", current_user.id)
+      if is_nil(current_user.current_campaign_id) do
+        conn
+        |> put_status(:unprocessable_entity)
+        |> json(%{error: "No active campaign selected"})
+      else
+        adventure_params =
+          parsed_params
+          |> Map.put("campaign_id", current_user.current_campaign_id)
+          |> Map.put("user_id", current_user.id)
 
-      case Campaigns.get_campaign(current_user.current_campaign_id) do
-        nil ->
-          conn
-          |> put_status(:unprocessable_entity)
-          |> json(%{error: "No active campaign selected"})
-
-        campaign ->
-          if authorize_campaign_modification(campaign, current_user) do
-            case Adventures.create_adventure(adventure_params) do
-              {:ok, adventure} ->
-                adventure = maybe_handle_image_upload(conn, adventure)
-
-                conn
-                |> put_status(:created)
-                |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                |> render("show.json", adventure: adventure)
-
-              {:error, changeset} ->
-                conn
-                |> put_status(:unprocessable_entity)
-                |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                |> render("error.json", changeset: changeset)
-            end
-          else
+        case Campaigns.get_campaign(current_user.current_campaign_id) do
+          nil ->
             conn
-            |> put_status(:forbidden)
-            |> json(%{error: "Only gamemaster can create adventures"})
-          end
+            |> put_status(:not_found)
+            |> json(%{error: "Campaign not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case Adventures.create_adventure(adventure_params) do
+                {:ok, adventure} ->
+                  adventure = maybe_handle_image_upload(conn, adventure)
+
+                  conn
+                  |> put_status(:created)
+                  |> put_view(ShotElixirWeb.Api.V2.AdventureView)
+                  |> render("show.json", adventure: adventure)
+
+                {:error, changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.AdventureView)
+                  |> render("error.json", changeset: changeset)
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can create adventures"})
+            end
+        end
       end
     end
   end
@@ -598,6 +606,91 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
     end
   end
 
+  # POST /api/v2/adventures/:id/sync
+  def sync(conn, %{"adventure_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Adventures.get_adventure(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Adventure not found"})
+
+      adventure ->
+        case Campaigns.get_campaign(adventure.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Adventure not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              case NotionService.sync_adventure(adventure) do
+                {:ok, :unlinked} ->
+                  # Page was deleted in Notion, reload adventure to get cleared notion_page_id
+                  updated_adventure = Adventures.get_adventure(id)
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.AdventureView)
+                  |> render("show.json", adventure: updated_adventure)
+
+                {:ok, updated_adventure} ->
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.AdventureView)
+                  |> render("show.json", adventure: updated_adventure)
+
+                {:error, :no_database_configured} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "No Notion database configured for adventures"})
+
+                {:error, reason} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> json(%{error: "Failed to sync adventure to Notion: #{inspect(reason)}"})
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{
+                error: "Only campaign owners, admins, or gamemasters can sync adventures"
+              })
+            end
+        end
+    end
+  end
+
+  # POST /api/v2/adventures/:id/sync_from_notion
+  def sync_from_notion(conn, %{"adventure_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Adventures.get_adventure(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Adventure not found"})
+
+      adventure ->
+        case Campaigns.get_campaign(adventure.campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Adventure not found"})
+
+          campaign ->
+            SyncFromNotion.sync(conn, current_user, adventure, campaign,
+              assign_key: :adventure,
+              authorize: &authorize_campaign_modification/2,
+              forbidden_error: "Only campaign owners, admins, or gamemasters can sync adventures",
+              no_page_error: "Adventure has no Notion page linked",
+              require_page: &require_notion_page_linked/1,
+              update: &NotionService.update_adventure_from_notion/2,
+              view: ShotElixirWeb.Api.V2.AdventureView
+            )
+        end
+    end
+  end
+
   # Helper functions
 
   defp ensure_campaign(user) do
@@ -642,4 +735,9 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
       user.admin ||
       (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
+
+  defp require_notion_page_linked(%Adventures.Adventure{notion_page_id: nil}),
+    do: {:error, :no_page}
+
+  defp require_notion_page_linked(%Adventures.Adventure{}), do: :ok
 end

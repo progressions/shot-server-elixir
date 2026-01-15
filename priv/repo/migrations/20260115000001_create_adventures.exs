@@ -13,7 +13,7 @@ defmodule ShotElixir.Repo.Migrations.CreateAdventures do
       add :at_a_glance, :boolean, default: false, null: false
       add :notion_page_id, :string
       add :last_synced_to_notion_at, :utc_datetime
-      add :user_id, references(:users, type: :binary_id), null: false
+      add :user_id, references(:users, type: :binary_id, on_delete: :nilify_all)
 
       add :campaign_id, references(:campaigns, type: :binary_id, on_delete: :delete_all),
         null: false
