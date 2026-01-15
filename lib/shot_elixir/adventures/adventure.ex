@@ -118,11 +118,19 @@ defmodule ShotElixir.Adventures.Adventure do
           if existing_adventure, do: attrs, else: Map.put(attrs, :name, "Untitled Adventure")
       end
 
-    # Description from rich_text
+    # Description from rich_text (using plain_text to handle all rich_text types)
     attrs =
       case get_in(props, ["Description", "rich_text"]) do
-        [%{"text" => %{"content" => desc}} | _] -> Map.put(attrs, :description, desc)
-        _ -> attrs
+        rich_text when is_list(rich_text) and length(rich_text) > 0 ->
+          description =
+            rich_text
+            |> Enum.map(& &1["plain_text"])
+            |> Enum.join("")
+
+          Map.put(attrs, :description, description)
+
+        _ ->
+          attrs
       end
 
     # Season from number
