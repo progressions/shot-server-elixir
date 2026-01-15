@@ -362,12 +362,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.add_character(adventure_id, character_id) do
-                {:ok, _} ->
-                  adventure = Adventures.get_adventure!(adventure_id)
-
+                {:ok, updated_adventure} ->
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                  |> render("show.json", adventure: adventure)
+                  |> render("show.json", adventure: updated_adventure)
 
                 {:error, changeset} ->
                   conn
@@ -404,12 +402,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.remove_character(adventure_id, character_id) do
-                {:ok, _} ->
-                  adventure = Adventures.get_adventure!(adventure_id)
-
+                {:ok, updated_adventure} ->
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                  |> render("show.json", adventure: adventure)
+                  |> render("show.json", adventure: updated_adventure)
 
                 {:error, :not_found} ->
                   conn
@@ -450,12 +446,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.add_villain(adventure_id, character_id) do
-                {:ok, _} ->
-                  adventure = Adventures.get_adventure!(adventure_id)
-
+                {:ok, updated_adventure} ->
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                  |> render("show.json", adventure: adventure)
+                  |> render("show.json", adventure: updated_adventure)
 
                 {:error, changeset} ->
                   conn
@@ -492,12 +486,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.remove_villain(adventure_id, character_id) do
-                {:ok, _} ->
-                  adventure = Adventures.get_adventure!(adventure_id)
-
+                {:ok, updated_adventure} ->
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                  |> render("show.json", adventure: adventure)
+                  |> render("show.json", adventure: updated_adventure)
 
                 {:error, :not_found} ->
                   conn
@@ -538,12 +530,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.add_fight(adventure_id, fight_id) do
-                {:ok, _} ->
-                  adventure = Adventures.get_adventure!(adventure_id)
-
+                {:ok, updated_adventure} ->
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                  |> render("show.json", adventure: adventure)
+                  |> render("show.json", adventure: updated_adventure)
 
                 {:error, changeset} ->
                   conn
@@ -580,12 +570,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.remove_fight(adventure_id, fight_id) do
-                {:ok, _} ->
-                  adventure = Adventures.get_adventure!(adventure_id)
-
+                {:ok, updated_adventure} ->
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                  |> render("show.json", adventure: adventure)
+                  |> render("show.json", adventure: updated_adventure)
 
                 {:error, :not_found} ->
                   conn

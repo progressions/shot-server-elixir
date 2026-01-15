@@ -497,10 +497,6 @@ defmodule ShotElixir.Adventures do
 
   def add_character(%Adventure{} = adventure, character_id) do
     add_character(adventure.id, character_id)
-    |> case do
-      {:ok, _} -> {:ok, get_adventure_with_ids!(adventure.id)}
-      error -> error
-    end
   end
 
   def add_character(adventure_id, character_id) when is_binary(adventure_id) do
@@ -510,9 +506,9 @@ defmodule ShotElixir.Adventures do
     |> AdventureCharacter.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, ac} ->
+      {:ok, _ac} ->
         broadcast_adventure_update(adventure_id)
-        {:ok, ac}
+        {:ok, get_adventure_with_ids!(adventure_id)}
 
       error ->
         error
@@ -521,11 +517,6 @@ defmodule ShotElixir.Adventures do
 
   def remove_character(%Adventure{} = adventure, character_id) do
     remove_character(adventure.id, character_id)
-    |> case do
-      {:ok, _} -> {:ok, get_adventure_with_ids!(adventure.id)}
-      {:error, :not_found} -> {:error, :not_found}
-      error -> error
-    end
   end
 
   def remove_character(adventure_id, character_id) when is_binary(adventure_id) do
@@ -537,7 +528,7 @@ defmodule ShotElixir.Adventures do
         case Repo.delete(ac) do
           {:ok, _} ->
             broadcast_adventure_update(adventure_id)
-            {:ok, ac}
+            {:ok, get_adventure_with_ids!(adventure_id)}
 
           error ->
             error
@@ -577,10 +568,6 @@ defmodule ShotElixir.Adventures do
 
   def add_villain(%Adventure{} = adventure, character_id) do
     add_villain(adventure.id, character_id)
-    |> case do
-      {:ok, _} -> {:ok, get_adventure_with_ids!(adventure.id)}
-      error -> error
-    end
   end
 
   def add_villain(adventure_id, character_id) when is_binary(adventure_id) do
@@ -590,9 +577,9 @@ defmodule ShotElixir.Adventures do
     |> AdventureVillain.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, av} ->
+      {:ok, _av} ->
         broadcast_adventure_update(adventure_id)
-        {:ok, av}
+        {:ok, get_adventure_with_ids!(adventure_id)}
 
       error ->
         error
@@ -601,11 +588,6 @@ defmodule ShotElixir.Adventures do
 
   def remove_villain(%Adventure{} = adventure, character_id) do
     remove_villain(adventure.id, character_id)
-    |> case do
-      {:ok, _} -> {:ok, get_adventure_with_ids!(adventure.id)}
-      {:error, :not_found} -> {:error, :not_found}
-      error -> error
-    end
   end
 
   def remove_villain(adventure_id, character_id) when is_binary(adventure_id) do
@@ -617,7 +599,7 @@ defmodule ShotElixir.Adventures do
         case Repo.delete(av) do
           {:ok, _} ->
             broadcast_adventure_update(adventure_id)
-            {:ok, av}
+            {:ok, get_adventure_with_ids!(adventure_id)}
 
           error ->
             error
@@ -655,10 +637,6 @@ defmodule ShotElixir.Adventures do
 
   def add_fight(%Adventure{} = adventure, fight_id) do
     add_fight(adventure.id, fight_id)
-    |> case do
-      {:ok, _} -> {:ok, get_adventure_with_ids!(adventure.id)}
-      error -> error
-    end
   end
 
   def add_fight(adventure_id, fight_id) when is_binary(adventure_id) do
@@ -668,9 +646,9 @@ defmodule ShotElixir.Adventures do
     |> AdventureFight.changeset(attrs)
     |> Repo.insert()
     |> case do
-      {:ok, af} ->
+      {:ok, _af} ->
         broadcast_adventure_update(adventure_id)
-        {:ok, af}
+        {:ok, get_adventure_with_ids!(adventure_id)}
 
       error ->
         error
@@ -679,11 +657,6 @@ defmodule ShotElixir.Adventures do
 
   def remove_fight(%Adventure{} = adventure, fight_id) do
     remove_fight(adventure.id, fight_id)
-    |> case do
-      {:ok, _} -> {:ok, get_adventure_with_ids!(adventure.id)}
-      {:error, :not_found} -> {:error, :not_found}
-      error -> error
-    end
   end
 
   def remove_fight(adventure_id, fight_id) when is_binary(adventure_id) do
@@ -695,7 +668,7 @@ defmodule ShotElixir.Adventures do
         case Repo.delete(af) do
           {:ok, _} ->
             broadcast_adventure_update(adventure_id)
-            {:ok, af}
+            {:ok, get_adventure_with_ids!(adventure_id)}
 
           error ->
             error
