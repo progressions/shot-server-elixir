@@ -5,14 +5,10 @@ defmodule ShotElixirWeb.Api.V2.SyncFromNotion do
   import Phoenix.Controller
   require Logger
 
-  alias ShotElixir.Services.NotionService
-
   def sync(conn, current_user, entity, campaign, opts) do
     if opts[:authorize].(campaign, current_user) do
-      token = NotionService.get_token(campaign.id)
-
       with :ok <- opts[:require_page].(entity),
-           {:ok, updated_entity} <- opts[:update].(entity, token) do
+           {:ok, updated_entity} <- opts[:update].(entity, []) do
         conn
         |> put_view(opts[:view])
         |> render("show.json", %{opts[:assign_key] => updated_entity})
