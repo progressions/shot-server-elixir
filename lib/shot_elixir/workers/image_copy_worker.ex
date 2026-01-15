@@ -312,6 +312,7 @@ defmodule ShotElixir.Workers.ImageCopyWorker do
     end
   end
 
+  defp get_module("Adventure"), do: ShotElixir.Adventures.Adventure
   defp get_module("Campaign"), do: ShotElixir.Campaigns.Campaign
   defp get_module("Character"), do: ShotElixir.Characters.Character
   defp get_module("Schtick"), do: ShotElixir.Schticks.Schtick

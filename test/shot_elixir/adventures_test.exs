@@ -275,6 +275,103 @@ defmodule ShotElixir.AdventuresTest do
     end
   end
 
+  describe "duplicate_adventure/1" do
+    test "duplicates adventure with new unique name", %{campaign: campaign, user: user} do
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Original Adventure",
+          description: "The original description",
+          season: 1,
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      assert {:ok, duplicated} = Adventures.duplicate_adventure(adventure)
+      assert duplicated.id != adventure.id
+      assert duplicated.name == "Original Adventure (1)"
+      assert duplicated.description == adventure.description
+      assert duplicated.season == adventure.season
+      assert duplicated.campaign_id == adventure.campaign_id
+    end
+
+    test "copies character associations", %{campaign: campaign, user: user} do
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Adventure with Characters",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Hero",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _} = Adventures.add_character(adventure, character.id)
+
+      assert {:ok, duplicated} = Adventures.duplicate_adventure(adventure)
+      assert character.id in duplicated.character_ids
+    end
+
+    test "copies villain associations", %{campaign: campaign, user: user} do
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Adventure with Villains",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Villain",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _} = Adventures.add_villain(adventure, character.id)
+
+      assert {:ok, duplicated} = Adventures.duplicate_adventure(adventure)
+      assert character.id in duplicated.villain_ids
+    end
+
+    test "copies fight associations", %{campaign: campaign, user: user} do
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Adventure with Fights",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Epic Battle",
+          campaign_id: campaign.id
+        })
+
+      {:ok, _} = Adventures.add_fight(adventure, fight.id)
+
+      assert {:ok, duplicated} = Adventures.duplicate_adventure(adventure)
+      assert fight.id in duplicated.fight_ids
+    end
+
+    test "generates unique name when copy already exists", %{campaign: campaign, user: user} do
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Test Adventure",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      # Create first copy
+      {:ok, copy1} = Adventures.duplicate_adventure(adventure)
+      assert copy1.name == "Test Adventure (1)"
+
+      # Create second copy - should get a different name
+      {:ok, copy2} = Adventures.duplicate_adventure(adventure)
+      assert copy2.name == "Test Adventure (2)"
+    end
+  end
+
   describe "list_campaign_adventures/3" do
     test "returns paginated adventures for campaign", %{campaign: campaign, user: user} do
       for i <- 1..5 do

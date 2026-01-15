@@ -422,25 +422,31 @@ defmodule ShotElixir.Adventures do
         {:ok, new_adventure} ->
           queue_image_copy(adventure, new_adventure)
 
-          # Copy character associations
-          list_adventure_characters(adventure.id)
-          |> Enum.each(fn ac ->
-            add_character(new_adventure.id, ac.character_id)
+          # Copy character associations with error handling
+          Enum.each(list_adventure_characters(adventure.id), fn ac ->
+            case add_character(new_adventure.id, ac.character_id) do
+              {:ok, _} -> :ok
+              {:error, changeset} -> Repo.rollback({:character_copy_failed, changeset})
+            end
           end)
 
-          # Copy villain associations
-          list_adventure_villains(adventure.id)
-          |> Enum.each(fn av ->
-            add_villain(new_adventure.id, av.character_id)
+          # Copy villain associations with error handling
+          Enum.each(list_adventure_villains(adventure.id), fn av ->
+            case add_villain(new_adventure.id, av.character_id) do
+              {:ok, _} -> :ok
+              {:error, changeset} -> Repo.rollback({:villain_copy_failed, changeset})
+            end
           end)
 
-          # Copy fight associations
-          list_adventure_fights(adventure.id)
-          |> Enum.each(fn af ->
-            add_fight(new_adventure.id, af.fight_id)
+          # Copy fight associations with error handling
+          Enum.each(list_adventure_fights(adventure.id), fn af ->
+            case add_fight(new_adventure.id, af.fight_id) do
+              {:ok, _} -> :ok
+              {:error, changeset} -> Repo.rollback({:fight_copy_failed, changeset})
+            end
           end)
 
-          get_adventure!(new_adventure.id)
+          get_adventure_with_ids!(new_adventure.id)
 
         {:error, changeset} ->
           Repo.rollback(changeset)

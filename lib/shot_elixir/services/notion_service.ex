@@ -2048,6 +2048,15 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_adventure(%Adventure{} = adventure) do
+    # Ensure associations are loaded for as_notion
+    adventure =
+      Repo.preload(adventure, [
+        :user,
+        adventure_characters: :character,
+        adventure_villains: :character,
+        adventure_fights: :fight
+      ])
+
     case adventures_database_id() do
       nil ->
         {:error, :no_database_configured}

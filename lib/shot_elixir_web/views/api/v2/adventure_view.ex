@@ -71,7 +71,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
       adventure_characters ->
         adventure_characters
         |> Enum.map(fn ac -> ac.character_id end)
-        |> Enum.filter(&(&1 != nil))
+        |> Enum.reject(&is_nil/1)
     end
   end
 
@@ -86,7 +86,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
       adventure_villains ->
         adventure_villains
         |> Enum.map(fn av -> av.character_id end)
-        |> Enum.filter(&(&1 != nil))
+        |> Enum.reject(&is_nil/1)
     end
   end
 
@@ -101,7 +101,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
       adventure_fights ->
         adventure_fights
         |> Enum.map(fn af -> af.fight_id end)
-        |> Enum.filter(&(&1 != nil))
+        |> Enum.reject(&is_nil/1)
     end
   end
 
@@ -117,7 +117,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
         characters =
           adventure_characters
           |> Enum.map(fn ac -> ac.character end)
-          |> Enum.filter(&(&1 != nil))
+          |> Enum.reject(&is_nil/1)
 
         characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
         Enum.map(characters_with_images, &render_character_lite/1)
@@ -136,7 +136,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
         villains =
           adventure_villains
           |> Enum.map(fn av -> av.character end)
-          |> Enum.filter(&(&1 != nil))
+          |> Enum.reject(&is_nil/1)
 
         villains_with_images = ShotElixir.ImageLoader.load_image_urls(villains, "Character")
         Enum.map(villains_with_images, &render_character_lite/1)
@@ -154,7 +154,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
       adventure_fights ->
         adventure_fights
         |> Enum.map(fn af -> af.fight end)
-        |> Enum.filter(&(&1 != nil))
+        |> Enum.reject(&is_nil/1)
         |> Enum.map(&render_fight_lite/1)
     end
   end

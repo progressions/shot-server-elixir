@@ -277,6 +277,48 @@ defmodule ShotElixirWeb.Api.V2.AdventureControllerTest do
     end
   end
 
+  describe "remove_villain" do
+    setup %{campaign: campaign, user: user} do
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Test Adventure",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Test Villain",
+          campaign_id: campaign.id
+        })
+
+      {:ok, adventure} = Adventures.add_villain(adventure, character.id)
+
+      %{adventure: adventure, character: character}
+    end
+
+    test "removes villain from adventure", %{
+      conn: conn,
+      adventure: adventure,
+      character: character
+    } do
+      conn =
+        delete(conn, ~p"/api/v2/adventures/#{adventure.id}/villains/#{character.id}")
+
+      assert updated = json_response(conn, 200)
+      refute character.id in updated["villain_ids"]
+    end
+
+    test "returns 404 when villain not in adventure", %{conn: conn, adventure: adventure} do
+      non_existent_id = Ecto.UUID.generate()
+
+      conn =
+        delete(conn, ~p"/api/v2/adventures/#{adventure.id}/villains/#{non_existent_id}")
+
+      assert %{"error" => "Villain not in adventure"} = json_response(conn, 404)
+    end
+  end
+
   describe "add_fight" do
     setup %{campaign: campaign, user: user} do
       {:ok, adventure} =
@@ -307,6 +349,48 @@ defmodule ShotElixirWeb.Api.V2.AdventureControllerTest do
 
       assert updated = json_response(conn, 200)
       assert fight.id in updated["fight_ids"]
+    end
+  end
+
+  describe "remove_fight" do
+    setup %{campaign: campaign, user: user} do
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Test Adventure",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Test Fight",
+          campaign_id: campaign.id
+        })
+
+      {:ok, adventure} = Adventures.add_fight(adventure, fight.id)
+
+      %{adventure: adventure, fight: fight}
+    end
+
+    test "removes fight from adventure", %{
+      conn: conn,
+      adventure: adventure,
+      fight: fight
+    } do
+      conn =
+        delete(conn, ~p"/api/v2/adventures/#{adventure.id}/fights/#{fight.id}")
+
+      assert updated = json_response(conn, 200)
+      refute fight.id in updated["fight_ids"]
+    end
+
+    test "returns 404 when fight not in adventure", %{conn: conn, adventure: adventure} do
+      non_existent_id = Ecto.UUID.generate()
+
+      conn =
+        delete(conn, ~p"/api/v2/adventures/#{adventure.id}/fights/#{non_existent_id}")
+
+      assert %{"error" => "Fight not in adventure"} = json_response(conn, 404)
     end
   end
 end
