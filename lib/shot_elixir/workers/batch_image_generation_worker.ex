@@ -25,6 +25,7 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
   alias ShotElixir.Factions
   alias ShotElixir.Parties
   alias ShotElixir.Vehicles
+  alias ShotElixir.Adventures
   require Logger
 
   @impl Oban.Worker
@@ -229,6 +230,13 @@ defmodule ShotElixir.Workers.BatchImageGenerationWorker do
 
   defp get_entity("Vehicle", id) do
     case Vehicles.get_vehicle(id) do
+      nil -> {:error, :not_found}
+      entity -> {:ok, entity}
+    end
+  end
+
+  defp get_entity("Adventure", id) do
+    case Adventures.get_adventure(id) do
       nil -> {:error, :not_found}
       entity -> {:ok, entity}
     end

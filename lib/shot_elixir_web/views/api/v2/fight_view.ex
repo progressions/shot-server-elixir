@@ -70,6 +70,8 @@ defmodule ShotElixirWeb.Api.V2.FightView do
       character_ids: get_character_ids(fight),
       vehicles: render_vehicles_if_loaded(fight),
       vehicle_ids: get_vehicle_ids(fight),
+      adventures: render_adventures_if_loaded(fight),
+      adventure_ids: get_adventure_ids(fight),
       entity_class: "Fight",
       started_at: fight.started_at,
       ended_at: fight.ended_at,
@@ -179,6 +181,45 @@ defmodule ShotElixirWeb.Api.V2.FightView do
         |> Enum.map(& &1.vehicle_id)
         |> Enum.reject(&is_nil/1)
     end
+  end
+
+  defp render_adventures_if_loaded(fight) do
+    case Map.get(fight, :adventure_fights) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      adventure_fights ->
+        adventure_fights
+        |> Enum.map(& &1.adventure)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(&render_adventure_lite/1)
+    end
+  end
+
+  defp get_adventure_ids(fight) do
+    case Map.get(fight, :adventure_fights) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      adventure_fights ->
+        adventure_fights
+        |> Enum.map(& &1.adventure_id)
+        |> Enum.reject(&is_nil/1)
+    end
+  end
+
+  defp render_adventure_lite(adventure) do
+    %{
+      id: adventure.id,
+      name: adventure.name,
+      entity_class: "Adventure"
+    }
   end
 
   defp render_character_autocomplete(character) do

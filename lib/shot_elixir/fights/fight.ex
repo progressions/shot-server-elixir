@@ -42,6 +42,9 @@ defmodule ShotElixir.Fights.Fight do
       foreign_key: :positionable_id,
       where: [positionable_type: "Fight"]
 
+    has_many :adventure_fights, ShotElixir.Adventures.AdventureFight
+    has_many :adventures, through: [:adventure_fights, :adventure]
+
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
   end
 
