@@ -118,10 +118,12 @@ config :nostrum,
 # Notion API configuration
 # Note: token is loaded at runtime from .env via runtime.exs
 # to ensure Dotenvy has loaded the .env file first
+#
+# NOTE: Notion database IDs are NO LONGER hardcoded here.
+# Database IDs are stored dynamically per-campaign in campaign.notion_database_ids
+# This is set up via the Notion OAuth flow when a user connects their Notion workspace.
+# See NotionService.get_database_id_for_entity/2 for the dynamic lookup.
 config :shot_elixir, :notion,
-  database_id: "f6fa27ac-19cd-4b17-b218-55acc6d077be",
-  factions_database_id: "0ae94bfa1a754c8fbda28ea50afa5fd5",
-  junctures_database_id: "4228eb7fefef470bb9f19a7f5d73c0fc",
   # Periodic sync configuration (sync characters FROM Notion)
   # Schedule is controlled by Oban cron in the plugins config above
   periodic_sync_enabled: true
