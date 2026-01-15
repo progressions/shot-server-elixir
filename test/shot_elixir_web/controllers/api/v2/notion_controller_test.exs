@@ -92,7 +92,7 @@ defmodule ShotElixirWeb.Api.V2.NotionControllerTest do
     # - Response is a list of databases with id and title
   end
 
-  describe "search_adventures" do
+  describe "adventures" do
     test "returns 401 when not authenticated", %{conn: conn} do
       conn = get(conn, ~p"/api/v2/notion/adventures?name=test")
 

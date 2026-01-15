@@ -173,57 +173,17 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   end
 
   @doc """
-  Search for adventure pages in Notion or fetch a specific page by ID.
+  Search for adventures in the Notion Adventures database.
 
   ## Parameters
-    * `q` - Search query (optional)
-    * `id` - Notion page ID to fetch directly (optional)
-
-  One of `q` or `id` must be provided.
+    * `name` - The name to search for (query parameter, optional)
 
   ## Response
-    * 200 - Adventure data with title, page_id, content, and pages list
-    * 400 - Bad request if neither q nor id provided
-    * 404 - Not found if no matching pages
+    * 200 - List of matching adventure pages (JSON array)
+    * 500 - Internal server error if Notion API fails
   """
-  def adventures(conn, %{"id" => page_id}) when is_binary(page_id) and page_id != "" do
-    case NotionService.fetch_adventure_by_id(page_id) do
-      {:ok, adventure} ->
-        json(conn, adventure)
-
-      {:error, {:notion_api_error, "object_not_found", _message}} ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Adventure not found"})
-
-      {:error, reason} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to fetch adventure", details: inspect(reason)})
-    end
-  end
-
-  def adventures(conn, %{"q" => query}) when is_binary(query) and query != "" do
-    case NotionService.fetch_adventure(query) do
-      {:ok, %{pages: [], title: nil}} ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "No adventure found matching '#{query}'"})
-
-      {:ok, adventure} ->
-        json(conn, adventure)
-
-      {:error, reason} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to search adventures", details: inspect(reason)})
-    end
-  end
-
-  def adventures(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Must provide either 'q' (search query) or 'id' (page ID) parameter"})
+  def adventures(conn, params) do
+    search_notion_entities(conn, params, &NotionService.find_adventures_in_notion/1)
   end
 
   @doc """
