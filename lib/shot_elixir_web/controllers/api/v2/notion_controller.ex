@@ -99,18 +99,19 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   defp extract_database_title(_), do: nil
 
   @doc """
-  Search for Notion pages by name.
-  Returns a list of matching Notion pages.
+  Search for characters in the campaign's Notion Characters database.
 
   ## Parameters
-    * `name` - The name to search for (query parameter)
+    * `campaign_id` - The campaign ID (required)
+    * `name` - The name to search for (query parameter, optional)
 
   ## Response
-    * 200 - List of matching pages (JSON array)
-    * 500 - Internal server error if Notion API fails
+    * 200 - List of matching character pages (JSON array)
+    * 400 - Missing campaign_id
+    * 404 - Campaign not found or Notion not connected
   """
   def search(conn, params) do
-    search_notion_entities(conn, params, &NotionService.find_page_by_name/1)
+    search_campaign_notion_entities(conn, params, "characters")
   end
 
   @doc """
@@ -173,92 +174,144 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   end
 
   @doc """
-  Search for adventures in the Notion Adventures database.
+  Search for adventures in the campaign's Notion Adventures database.
 
   ## Parameters
+    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching adventure pages (JSON array)
-    * 500 - Internal server error if Notion API fails
+    * 400 - Missing campaign_id
+    * 404 - Campaign not found or Notion not connected
   """
   def adventures(conn, params) do
-    search_notion_entities(conn, params, &NotionService.find_adventures_in_notion/1)
+    search_campaign_notion_entities(conn, params, "adventures")
   end
 
   @doc """
-  Search for sites in the Notion Sites database.
+  Search for sites in the campaign's Notion Sites database.
 
   ## Parameters
+    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching site pages (JSON array)
-    * 500 - Internal server error if Notion API fails
+    * 400 - Missing campaign_id
+    * 404 - Campaign not found or Notion not connected
   """
   def search_sites(conn, params) do
-    search_notion_entities(conn, params, &NotionService.find_sites_in_notion/1)
+    search_campaign_notion_entities(conn, params, "sites")
   end
 
   @doc """
-  Search for parties in the Notion Parties database.
+  Search for parties in the campaign's Notion Parties database.
 
   ## Parameters
+    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching party pages (JSON array)
-    * 500 - Internal server error if Notion API fails
+    * 400 - Missing campaign_id
+    * 404 - Campaign not found or Notion not connected
   """
   def search_parties(conn, params) do
-    search_notion_entities(conn, params, &NotionService.find_parties_in_notion/1)
+    search_campaign_notion_entities(conn, params, "parties")
   end
 
   @doc """
-  Search for factions in the Notion Factions database.
+  Search for factions in the campaign's Notion Factions database.
 
   ## Parameters
+    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching faction pages (JSON array)
-    * 500 - Internal server error if Notion API fails
+    * 400 - Missing campaign_id
+    * 404 - Campaign not found or Notion not connected
   """
   def search_factions(conn, params) do
-    search_notion_entities(conn, params, &NotionService.find_factions_in_notion/1)
+    search_campaign_notion_entities(conn, params, "factions")
   end
 
   @doc """
-  Search for junctures in the Notion Junctures database.
+  Search for junctures in the campaign's Notion Junctures database.
 
   ## Parameters
+    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching juncture pages (JSON array)
-    * 500 - Internal server error if Notion API fails
+    * 400 - Missing campaign_id
+    * 404 - Campaign not found or Notion not connected
   """
   def search_junctures(conn, params) do
-    search_notion_entities(conn, params, &NotionService.find_junctures_in_notion/1)
+    search_campaign_notion_entities(conn, params, "junctures")
   end
 
-  # Private helper to reduce duplication across Notion search endpoints.
-  # Takes a service function and handles the common response patterns.
-  defp search_notion_entities(conn, params, service_fn) do
+  # Private helper to search Notion entities using campaign's OAuth token and database mapping.
+  defp search_campaign_notion_entities(
+         conn,
+         %{"campaign_id" => campaign_id} = params,
+         entity_type
+       ) do
+    user = Guardian.Plug.current_resource(conn)
     name = params["name"] || ""
 
-    case service_fn.(name) do
-      pages when is_list(pages) ->
-        json(conn, pages)
+    with {:campaign, %Campaigns.Campaign{} = campaign} <-
+           {:campaign, Campaigns.get_campaign(campaign_id)},
+         {:access, true} <-
+           {:access, campaign.user_id == user.id || Campaigns.is_member?(campaign.id, user.id)},
+         {:token, token} when not is_nil(token) <-
+           {:token, campaign.notion_access_token},
+         {:database, database_id} when not is_nil(database_id) and database_id != "" <-
+           {:database, get_in(campaign.notion_database_ids || %{}, [entity_type])} do
+      # Search using campaign's OAuth token and mapped database ID
+      case NotionService.find_pages_in_database(database_id, name, token: token) do
+        pages when is_list(pages) ->
+          json(conn, pages)
 
-      nil ->
-        json(conn, [])
+        {:error, reason} ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "Failed to search #{entity_type}", details: inspect(reason)})
+      end
+    else
+      {:campaign, nil} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Campaign not found or Notion not connected"})
 
-      {:error, reason} ->
-        {:error, reason}
+      {:access, false} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "You do not have access to this campaign"})
+
+      {:token, nil} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Campaign not found or Notion not connected"})
+
+      {:database, _} ->
+        # No database mapped for this entity type
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "No #{entity_type} database configured for this campaign"})
     end
   rescue
     error ->
-      {:error, error}
+      conn
+      |> put_status(:internal_server_error)
+      |> json(%{error: "Failed to search Notion", details: inspect(error)})
+  end
+
+  defp search_campaign_notion_entities(conn, _params, _entity_type) do
+    conn
+    |> put_status(:bad_request)
+    |> json(%{error: "Missing required parameter: campaign_id"})
   end
 end
