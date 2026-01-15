@@ -299,7 +299,7 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
       {:campaign, nil} ->
         conn
         |> put_status(:not_found)
-        |> json(%{error: "Campaign not found or Notion not connected"})
+        |> json(%{error: "Campaign not found"})
 
       {:token, nil} ->
         conn

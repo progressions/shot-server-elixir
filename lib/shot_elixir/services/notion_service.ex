@@ -1024,7 +1024,8 @@ defmodule ShotElixir.Services.NotionService do
         client = notion_client(opts)
         # Extract token from opts and pass to data_source_query
         token = Keyword.get(opts, :token)
-        response = client.data_source_query(data_source_id, %{"filter" => filter, token: token})
+        query_opts = Map.put(%{"filter" => filter}, :token, token)
+        response = client.data_source_query(data_source_id, query_opts)
         response["results"]
 
       {:error, reason} ->
