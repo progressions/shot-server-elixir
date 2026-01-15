@@ -134,8 +134,9 @@ defmodule ShotElixir.Services.NotionService do
 
       :miss ->
         client = notion_client(opts)
+        token = Keyword.get(opts, :token)
 
-        case client.get_database(database_id) do
+        case client.get_database(database_id, %{token: token}) do
           # 2025-09-03 returns data_sources as a list of objects.
           %{"data_sources" => data_sources} when is_list(data_sources) ->
             case extract_data_source_id(data_sources) do
@@ -875,16 +876,24 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
-  Search for pages in a specific Notion database by name.
+  Search for pages in a Notion data source by name.
+
+  In Notion API 2025-09-03, the search API with filter "data_source" returns
+  data_source IDs (not database IDs). This function expects a data_source_id
+  and queries it directly.
 
   ## Parameters
-    * `database_id` - The Notion database ID to search in
+    * `data_source_id` - The Notion data source ID (from search API with "data_source" filter)
     * `name` - The name to search for (partial match, case-insensitive)
+    * `opts` - Options including `:token` for OAuth authentication
 
   ## Returns
     * List of matching Notion pages with id, title, and url
   """
-  def find_pages_in_database(database_id, name, opts \\ []) do
+  def find_pages_in_database(data_source_id, name, opts \\ []) do
+    # In Notion API 2025-09-03, IDs from search with filter "data_source" are already
+    # data_source IDs. Use them directly with data_source_query instead of calling
+    # get_database (which expects a database ID, not a data_source ID).
     filter =
       if name == "" do
         %{}
@@ -897,35 +906,27 @@ defmodule ShotElixir.Services.NotionService do
         }
       end
 
-    case data_source_id_for(database_id, opts) do
-      {:ok, data_source_id} ->
-        client = notion_client(opts)
-        response = client.data_source_query(data_source_id, filter)
+    client = notion_client(opts)
+    token = Keyword.get(opts, :token)
+    query_opts = Map.put(filter, :token, token)
+    response = client.data_source_query(data_source_id, query_opts)
 
-        case response do
-          %{"code" => error_code, "message" => message} ->
-            Logger.error("Notion database query error: #{error_code} - #{message}")
-            []
+    case response do
+      %{"code" => error_code, "message" => message} ->
+        Logger.error("Notion data_source_query error: #{error_code} - #{message}")
+        []
 
-          %{"results" => pages} when is_list(pages) ->
-            Enum.map(pages, fn page ->
-              %{
-                "id" => page["id"],
-                "title" => extract_page_title(page),
-                "url" => page["url"]
-              }
-            end)
+      %{"results" => pages} when is_list(pages) ->
+        Enum.map(pages, fn page ->
+          %{
+            "id" => page["id"],
+            "title" => extract_page_title(page),
+            "url" => page["url"]
+          }
+        end)
 
-          _ ->
-            Logger.warning("Unexpected response from Notion database query: #{inspect(response)}")
-            []
-        end
-
-      {:error, reason} ->
-        Logger.error(
-          "Failed to resolve Notion data source for database #{database_id}: #{inspect(reason)}"
-        )
-
+      _ ->
+        Logger.warning("Unexpected response from Notion data_source_query: #{inspect(response)}")
         []
     end
   rescue
@@ -1021,7 +1022,10 @@ defmodule ShotElixir.Services.NotionService do
     case data_source_id_for(factions_database_id(), opts) do
       {:ok, data_source_id} ->
         client = notion_client(opts)
-        response = client.data_source_query(data_source_id, %{"filter" => filter})
+        # Extract token from opts and pass to data_source_query
+        token = Keyword.get(opts, :token)
+        query_opts = Map.put(%{"filter" => filter}, :token, token)
+        response = client.data_source_query(data_source_id, query_opts)
         response["results"]
 
       {:error, reason} ->

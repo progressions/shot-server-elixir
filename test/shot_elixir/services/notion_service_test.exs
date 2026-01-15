@@ -50,11 +50,9 @@ defmodule ShotElixir.Services.NotionServiceTest do
   end
 
   defmodule NotionClientStubDataSource do
-    def get_database(_database_id) do
-      %{"data_sources" => [%{"id" => "data-source-123"}]}
-    end
-
-    def data_source_query("data-source-123", _filter) do
+    # Now find_pages_in_database uses the ID directly as a data_source_id,
+    # so we just need to stub data_source_query
+    def data_source_query("ds-id-success", _filter) do
       %{
         "results" => [
           %{
@@ -70,8 +68,9 @@ defmodule ShotElixir.Services.NotionServiceTest do
   end
 
   defmodule NotionClientStubDataSourceMissing do
-    def get_database(_database_id) do
-      %{"data_sources" => []}
+    # Stub that returns an error from data_source_query
+    def data_source_query("ds-id-missing", _filter) do
+      %{"code" => "object_not_found", "message" => "Data source not found"}
     end
   end
 
@@ -543,10 +542,10 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
-  describe "find_pages_in_database/3 data source lookup" do
-    test "returns pages when data source is resolved" do
+  describe "find_pages_in_database/3" do
+    test "returns pages when data_source_query succeeds" do
       results =
-        NotionService.find_pages_in_database("db-id-success", "Alpha",
+        NotionService.find_pages_in_database("ds-id-success", "Alpha",
           client: NotionClientStubDataSource
         )
 
@@ -555,9 +554,9 @@ defmodule ShotElixir.Services.NotionServiceTest do
              ] = results
     end
 
-    test "returns empty list when data source lookup fails" do
+    test "returns empty list when data_source_query fails" do
       results =
-        NotionService.find_pages_in_database("db-id-missing", "Alpha",
+        NotionService.find_pages_in_database("ds-id-missing", "Alpha",
           client: NotionClientStubDataSourceMissing
         )
 

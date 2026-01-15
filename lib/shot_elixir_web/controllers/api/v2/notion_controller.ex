@@ -9,23 +9,26 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
 
   @doc """
   List databases available in the campaign's connected Notion workspace.
-  Uses the campaign's OAuth access token to search for databases.
+  Uses the authenticated user's current_campaign_id and the campaign's OAuth access token.
 
-  ## Parameters
-    * `campaign_id` - The campaign ID (required)
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
 
   ## Response
     * 200 - List of databases with id and title
-    * 400 - Missing campaign_id parameter
+    * 400 - No current campaign set for the authenticated user
     * 404 - Campaign not found or Notion not connected
     * 500 - Internal server error if Notion API fails
   """
-  def databases(conn, %{"campaign_id" => campaign_id}) do
+  def databases(conn, _params) do
     user = Guardian.Plug.current_resource(conn)
 
-    with %Campaigns.Campaign{} = campaign <- Campaigns.get_campaign(campaign_id),
-         true <- campaign.user_id == user.id || Campaigns.is_member?(campaign.id, user.id),
-         token when not is_nil(token) <- campaign.notion_access_token do
+    with {:current_campaign, campaign_id} when not is_nil(campaign_id) <-
+           {:current_campaign, user.current_campaign_id},
+         {:campaign, %Campaigns.Campaign{} = campaign} <-
+           {:campaign, Campaigns.get_campaign(campaign_id)},
+         {:token, token} when not is_nil(token) <-
+           {:token, campaign.notion_access_token} do
       # Use Notion search API to find all databases the user has access to
       # Wrapped in try-rescue since NotionClient.search uses Req.post! which can raise
       try do
@@ -66,22 +69,21 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
           |> json(%{error: "Failed to connect to Notion", details: inspect(error)})
       end
     else
-      nil ->
+      {:current_campaign, nil} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "No current campaign set"})
+
+      {:campaign, nil} ->
         conn
         |> put_status(:not_found)
-        |> json(%{error: "Campaign not found or Notion not connected"})
+        |> json(%{error: "Campaign not found"})
 
-      false ->
+      {:token, nil} ->
         conn
-        |> put_status(:forbidden)
-        |> json(%{error: "You do not have access to this campaign"})
+        |> put_status(:not_found)
+        |> json(%{error: "Notion not connected for this campaign"})
     end
-  end
-
-  def databases(conn, _params) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Missing required parameter: campaign_id"})
   end
 
   # Extract database title from Notion database object
@@ -101,14 +103,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for characters in the campaign's Notion Characters database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching character pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or characters database not configured
   """
   def search(conn, params) do
     search_campaign_notion_entities(conn, params, "characters")
@@ -176,14 +180,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for adventures in the campaign's Notion Adventures database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching adventure pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or adventures database not configured
   """
   def adventures(conn, params) do
     search_campaign_notion_entities(conn, params, "adventures")
@@ -192,14 +198,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for sites in the campaign's Notion Sites database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching site pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or sites database not configured
   """
   def search_sites(conn, params) do
     search_campaign_notion_entities(conn, params, "sites")
@@ -208,14 +216,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for parties in the campaign's Notion Parties database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching party pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or parties database not configured
   """
   def search_parties(conn, params) do
     search_campaign_notion_entities(conn, params, "parties")
@@ -224,14 +234,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for factions in the campaign's Notion Factions database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching faction pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or factions database not configured
   """
   def search_factions(conn, params) do
     search_campaign_notion_entities(conn, params, "factions")
@@ -240,37 +252,35 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for junctures in the campaign's Notion Junctures database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching juncture pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or junctures database not configured
   """
   def search_junctures(conn, params) do
     search_campaign_notion_entities(conn, params, "junctures")
   end
 
   # Private helper to search Notion entities using campaign's OAuth token and database mapping.
-  defp search_campaign_notion_entities(
-         conn,
-         %{"campaign_id" => campaign_id} = params,
-         entity_type
-       ) do
+  # Uses the current user's current_campaign_id instead of requiring campaign_id parameter.
+  defp search_campaign_notion_entities(conn, params, entity_type) do
     user = Guardian.Plug.current_resource(conn)
     name = params["name"] || ""
 
-    with {:campaign, %Campaigns.Campaign{} = campaign} <-
+    with {:current_campaign, campaign_id} when not is_nil(campaign_id) <-
+           {:current_campaign, user.current_campaign_id},
+         {:campaign, %Campaigns.Campaign{} = campaign} <-
            {:campaign, Campaigns.get_campaign(campaign_id)},
-         {:access, true} <-
-           {:access, campaign.user_id == user.id || Campaigns.is_member?(campaign.id, user.id)},
          {:token, token} when not is_nil(token) <-
            {:token, campaign.notion_access_token},
          {:database, database_id} when not is_nil(database_id) and database_id != "" <-
            {:database, get_in(campaign.notion_database_ids || %{}, [entity_type])} do
-      # Search using campaign's OAuth token and mapped database ID
       case NotionService.find_pages_in_database(database_id, name, token: token) do
         pages when is_list(pages) ->
           json(conn, pages)
@@ -281,20 +291,20 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
           |> json(%{error: "Failed to search #{entity_type}", details: inspect(reason)})
       end
     else
+      {:current_campaign, nil} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "No current campaign set"})
+
       {:campaign, nil} ->
         conn
         |> put_status(:not_found)
-        |> json(%{error: "Campaign not found or Notion not connected"})
-
-      {:access, false} ->
-        conn
-        |> put_status(:forbidden)
-        |> json(%{error: "You do not have access to this campaign"})
+        |> json(%{error: "Campaign not found"})
 
       {:token, nil} ->
         conn
         |> put_status(:not_found)
-        |> json(%{error: "Campaign not found or Notion not connected"})
+        |> json(%{error: "Notion not connected for this campaign"})
 
       {:database, _} ->
         # No database mapped for this entity type
@@ -307,11 +317,5 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
       conn
       |> put_status(:internal_server_error)
       |> json(%{error: "Failed to search Notion", details: inspect(error)})
-  end
-
-  defp search_campaign_notion_entities(conn, _params, _entity_type) do
-    conn
-    |> put_status(:bad_request)
-    |> json(%{error: "Missing required parameter: campaign_id"})
   end
 end
