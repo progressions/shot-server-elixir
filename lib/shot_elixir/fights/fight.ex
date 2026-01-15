@@ -27,6 +27,11 @@ defmodule ShotElixir.Fights.Fight do
     field :solo_behavior_type, :string, default: "simple"
     field :at_a_glance, :boolean, default: false
 
+    # Virtual fields for relationship IDs
+    field :adventure_ids, {:array, :binary_id}, virtual: true, default: []
+    field :character_ids, {:array, :binary_id}, virtual: true, default: []
+    field :vehicle_ids, {:array, :binary_id}, virtual: true, default: []
+
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :user, ShotElixir.Accounts.User
 

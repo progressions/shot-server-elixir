@@ -193,7 +193,11 @@ defmodule ShotElixir.Fights do
       |> limit(^per_page)
       |> offset(^offset)
       |> Repo.all()
-      |> Repo.preload([:image_positions, shots: [:character, :vehicle]])
+      |> Repo.preload([
+        :image_positions,
+        [shots: [:character, :vehicle]],
+        [adventure_fights: :adventure]
+      ])
 
     # Get seasons - only from actual results to match Rails behavior
     # When filter returns no results, seasons should be empty
@@ -350,7 +354,7 @@ defmodule ShotElixir.Fights do
     Fight
     |> Repo.get(id)
     |> Repo.preload(shots: [:character, :vehicle, :character_effects])
-    |> Repo.preload([:characters, :vehicles, :image_positions, [adventure_fights: [:adventure]]])
+    |> Repo.preload([:characters, :vehicles, :image_positions, adventure_fights: [:adventure]])
     |> ImageLoader.load_image_url("Fight")
   end
 
