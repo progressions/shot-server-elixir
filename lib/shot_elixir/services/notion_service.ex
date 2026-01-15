@@ -876,11 +876,16 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
-  Search for pages in a specific Notion database by name.
+  Search for pages in a Notion data source by name.
+
+  In Notion API 2025-09-03, the search API with filter "data_source" returns
+  data_source IDs (not database IDs). This function expects a data_source_id
+  and queries it directly.
 
   ## Parameters
-    * `database_id` - The Notion database ID to search in
+    * `data_source_id` - The Notion data source ID (from search API with "data_source" filter)
     * `name` - The name to search for (partial match, case-insensitive)
+    * `opts` - Options including `:token` for OAuth authentication
 
   ## Returns
     * List of matching Notion pages with id, title, and url

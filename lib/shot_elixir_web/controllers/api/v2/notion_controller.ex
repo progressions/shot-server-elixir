@@ -9,14 +9,14 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
 
   @doc """
   List databases available in the campaign's connected Notion workspace.
-  Uses the campaign's OAuth access token to search for databases.
+  Uses the authenticated user's current_campaign_id and the campaign's OAuth access token.
 
-  ## Parameters
-    * `campaign_id` - The campaign ID (required)
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
 
   ## Response
     * 200 - List of databases with id and title
-    * 400 - Missing campaign_id parameter
+    * 400 - No current campaign set for the authenticated user
     * 404 - Campaign not found or Notion not connected
     * 500 - Internal server error if Notion API fails
   """
@@ -103,14 +103,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for characters in the campaign's Notion Characters database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching character pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or characters database not configured
   """
   def search(conn, params) do
     search_campaign_notion_entities(conn, params, "characters")
@@ -178,14 +180,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for adventures in the campaign's Notion Adventures database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching adventure pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or adventures database not configured
   """
   def adventures(conn, params) do
     search_campaign_notion_entities(conn, params, "adventures")
@@ -194,14 +198,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for sites in the campaign's Notion Sites database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching site pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or sites database not configured
   """
   def search_sites(conn, params) do
     search_campaign_notion_entities(conn, params, "sites")
@@ -210,14 +216,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for parties in the campaign's Notion Parties database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching party pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or parties database not configured
   """
   def search_parties(conn, params) do
     search_campaign_notion_entities(conn, params, "parties")
@@ -226,14 +234,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for factions in the campaign's Notion Factions database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching faction pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or factions database not configured
   """
   def search_factions(conn, params) do
     search_campaign_notion_entities(conn, params, "factions")
@@ -242,14 +252,16 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
   @doc """
   Search for junctures in the campaign's Notion Junctures database.
 
+  ## Authentication
+  Requires JWT authentication. Uses the authenticated user's `current_campaign_id`.
+
   ## Parameters
-    * `campaign_id` - The campaign ID (required)
     * `name` - The name to search for (query parameter, optional)
 
   ## Response
     * 200 - List of matching juncture pages (JSON array)
-    * 400 - Missing campaign_id
-    * 404 - Campaign not found or Notion not connected
+    * 400 - No current campaign set for the authenticated user
+    * 404 - Campaign not found, Notion not connected, or junctures database not configured
   """
   def search_junctures(conn, params) do
     search_campaign_notion_entities(conn, params, "junctures")
