@@ -6,6 +6,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
 
   use ShotElixirWeb, :controller
 
+  alias ShotElixir.Adventures
   alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Factions
@@ -18,6 +19,7 @@ defmodule ShotElixirWeb.Api.V2.NotionSyncLogController do
   action_fallback ShotElixirWeb.FallbackController
 
   @entity_fetchers %{
+    "adventure_id" => {"adventure", Adventures, :get_adventure},
     "character_id" => {"character", Characters, :get_character},
     "site_id" => {"site", Sites, :get_site},
     "party_id" => {"party", Parties, :get_party},
