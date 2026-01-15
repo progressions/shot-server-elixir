@@ -174,9 +174,7 @@ defmodule ShotElixir.Workers.NotionWebhookWorker do
       entity_class = entity_type_to_class(entity_type)
       CampaignChannel.broadcast_entity_reload(campaign_id, entity_class)
 
-      Logger.debug(
-        "Broadcast #{entity_class} reload to campaign #{campaign_id}"
-      )
+      Logger.debug("Broadcast #{entity_class} reload to campaign #{campaign_id}")
     end
   end
 

@@ -38,7 +38,8 @@ defmodule ShotElixirWeb.Api.V2.NotionWebhookController do
     conn
     |> put_status(:ok)
     |> json(%{
-      message: "Verification token received. Enter this token in Notion to verify the subscription.",
+      message:
+        "Verification token received. Enter this token in Notion to verify the subscription.",
       verification_token: token
     })
   end
