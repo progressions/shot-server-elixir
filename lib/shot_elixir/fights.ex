@@ -6,6 +6,7 @@ defmodule ShotElixir.Fights do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Fights.{Fight, Shot, FightEvent}
+  alias ShotElixir.Adventures.AdventureFight
   alias ShotElixir.ImageLoader
   use ShotElixir.Models.Broadcastable
 
@@ -349,7 +350,7 @@ defmodule ShotElixir.Fights do
     Fight
     |> Repo.get(id)
     |> Repo.preload(shots: [:character, :vehicle, :character_effects])
-    |> Repo.preload([:characters, :vehicles, :image_positions])
+    |> Repo.preload([:characters, :vehicles, :image_positions, [adventure_fights: [:adventure]]])
     |> ImageLoader.load_image_url("Fight")
   end
 
@@ -372,9 +373,10 @@ defmodule ShotElixir.Fights do
   end
 
   def update_fight(%Fight{} = fight, attrs) do
-    # Extract character_ids and vehicle_ids from attrs
+    # Extract character_ids, vehicle_ids, and adventure_ids from attrs
     character_ids = attrs["character_ids"] || attrs[:character_ids]
     vehicle_ids = attrs["vehicle_ids"] || attrs[:vehicle_ids]
+    adventure_ids = attrs["adventure_ids"] || attrs[:adventure_ids]
 
     # Remove them from attrs so they don't go through changeset
     attrs =
@@ -383,6 +385,8 @@ defmodule ShotElixir.Fights do
       |> Map.delete(:character_ids)
       |> Map.delete("vehicle_ids")
       |> Map.delete(:vehicle_ids)
+      |> Map.delete("adventure_ids")
+      |> Map.delete(:adventure_ids)
 
     # Start a transaction to update fight and manage shots
     Ecto.Multi.new()
@@ -401,6 +405,13 @@ defmodule ShotElixir.Fights do
         {:ok, []}
       end
     end)
+    |> Ecto.Multi.run(:adventure_fights, fn _repo, %{fight: updated_fight} ->
+      if adventure_ids do
+        sync_adventure_fights(updated_fight, adventure_ids)
+      else
+        {:ok, []}
+      end
+    end)
     |> Repo.transaction()
     |> case do
       {:ok, %{fight: updated_fight}} ->
@@ -411,6 +422,36 @@ defmodule ShotElixir.Fights do
       {:error, _step, changeset, _changes} ->
         {:error, changeset}
     end
+  end
+
+  defp sync_adventure_fights(fight, adventure_ids) do
+    # Get current adventure associations
+    existing_links =
+      Repo.all(from af in AdventureFight, where: af.fight_id == ^fight.id)
+
+    existing_ids = Enum.map(existing_links, & &1.adventure_id)
+    desired_ids = adventure_ids || []
+
+    # Determine additions and removals
+    to_add = desired_ids -- existing_ids
+    to_remove = existing_ids -- desired_ids
+
+    # Add new associations
+    Enum.each(to_add, fn adventure_id ->
+      %AdventureFight{}
+      |> AdventureFight.changeset(%{fight_id: fight.id, adventure_id: adventure_id})
+      |> Repo.insert!()
+    end)
+
+    # Remove old associations
+    if to_remove != [] do
+      from(af in AdventureFight,
+        where: af.fight_id == ^fight.id and af.adventure_id in ^to_remove
+      )
+      |> Repo.delete_all()
+    end
+
+    {:ok, []}
   end
 
   defp sync_character_shots(fight, character_ids) do
@@ -820,6 +861,7 @@ defmodule ShotElixir.Fights do
       :image_positions,
       :characters,
       :vehicles,
+      [adventure_fights: [:adventure]],
       shots: [
         :character,
         :vehicle,
