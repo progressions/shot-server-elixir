@@ -2204,4 +2204,75 @@ defmodule ShotElixirWeb.Api.V2.FightControllerTest do
       assert length(shots) == 1
     end
   end
+
+  describe "adventure associations" do
+    alias ShotElixir.Adventures
+    alias ShotElixir.Adventures.AdventureFight
+    import Ecto.Query
+
+    setup %{gamemaster: gm, campaign: campaign} do
+      {:ok, fight} =
+        Fights.create_fight(%{
+          name: "Adventure Sync Fight",
+          campaign_id: campaign.id
+        })
+
+      {:ok, adventure1} =
+        Adventures.create_adventure(%{
+          name: "Adventure One",
+          campaign_id: campaign.id,
+          user_id: gm.id
+        })
+
+      {:ok, adventure2} =
+        Adventures.create_adventure(%{
+          name: "Adventure Two",
+          campaign_id: campaign.id,
+          user_id: gm.id
+        })
+
+      %{fight: fight, adventure1: adventure1, adventure2: adventure2}
+    end
+
+    test "syncs adventure associations on update", %{
+      conn: conn,
+      gamemaster: gm,
+      fight: fight,
+      adventure1: adventure1,
+      adventure2: adventure2
+    } do
+      conn = authenticate(conn, gm)
+
+      # Add both adventures
+      update_attrs = %{
+        adventure_ids: [adventure1.id, adventure2.id]
+      }
+
+      conn1 = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: update_attrs)
+      response1 = json_response(conn1, 200)
+
+      assert length(response1["adventure_ids"]) == 2
+      assert adventure1.id in response1["adventure_ids"]
+      assert adventure2.id in response1["adventure_ids"]
+
+      # Verify in DB
+      links = ShotElixir.Repo.all(from af in AdventureFight, where: af.fight_id == ^fight.id)
+      assert length(links) == 2
+
+      # Remove one adventure
+      update_attrs2 = %{
+        adventure_ids: [adventure1.id]
+      }
+
+      conn2 = patch(conn, ~p"/api/v2/fights/#{fight.id}", fight: update_attrs2)
+      response2 = json_response(conn2, 200)
+
+      assert response2["adventure_ids"] == [adventure1.id]
+
+      # Verify in DB
+      links2 = ShotElixir.Repo.all(from af in AdventureFight, where: af.fight_id == ^fight.id)
+      assert length(links2) == 1
+      assert List.first(links2).adventure_id == adventure1.id
+    end
+  end
 end

@@ -70,7 +70,7 @@ defmodule ShotElixir.Accounts.User do
     |> validate_length(:first_name, min: 2)
     |> validate_length(:last_name, min: 2)
     |> validate_password_strength()
-    |> unique_constraint(:email, name: :index_users_on_email)
+    |> unique_constraint(:email, name: :users_email_index)
     |> set_name()
     |> hash_password()
   end
@@ -103,7 +103,7 @@ defmodule ShotElixir.Accounts.User do
     |> validate_format(:email, ~r/\A[^@\s]+@[^@.\s]+(?:\.[^@.\s]+)+\z/)
     |> validate_length(:first_name, min: 2)
     |> validate_length(:last_name, min: 2)
-    |> unique_constraint(:email, name: :index_users_on_email)
+    |> unique_constraint(:email, name: :users_email_index)
     |> set_name()
   end
 
