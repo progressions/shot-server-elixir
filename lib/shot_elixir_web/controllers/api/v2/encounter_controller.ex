@@ -492,8 +492,10 @@ defmodule ShotElixirWeb.Api.V2.EncounterController do
         false
 
       campaign ->
+        # Allow campaign owners, admins, and all campaign members
+        # This enables players using magic links to apply combat actions
         campaign.user_id == user.id || user.admin ||
-          (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+          Campaigns.is_member?(campaign.id, user.id)
     end
   end
 
