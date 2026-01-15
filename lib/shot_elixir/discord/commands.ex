@@ -319,7 +319,10 @@ defmodule ShotElixir.Discord.Commands do
     server_id = interaction.guild_id
     campaign_name = get_option(interaction, "name")
 
-    Logger.info("DISCORD /campaign: server_id=#{inspect(server_id)}, campaign_name=#{inspect(campaign_name)}")
+    Logger.info(
+      "DISCORD /campaign: server_id=#{inspect(server_id)}, campaign_name=#{inspect(campaign_name)}"
+    )
+
     Logger.info("DISCORD /campaign: interaction.data=#{inspect(interaction.data)}")
 
     cond do
