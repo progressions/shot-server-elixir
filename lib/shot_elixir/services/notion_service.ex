@@ -809,7 +809,8 @@ defmodule ShotElixir.Services.NotionService do
         # Add image if not already present
         add_image(page, character)
 
-        Characters.update_character(character, attributes)
+        # Skip Notion sync to prevent ping-pong loops when updating from webhook
+        Characters.update_character(character, attributes, skip_notion_sync: true)
     end
   rescue
     error ->
@@ -2115,7 +2116,8 @@ defmodule ShotElixir.Services.NotionService do
       page when is_map(page) ->
         attributes = entity_attributes_from_notion(page)
 
-        case Sites.update_site(site, attributes) do
+        # Skip Notion sync to prevent ping-pong loops when updating from webhook
+        case Sites.update_site(site, attributes, skip_notion_sync: true) do
           {:ok, updated_site} = result ->
             Notion.log_success("site", updated_site.id, payload, page)
             result
@@ -2180,7 +2182,8 @@ defmodule ShotElixir.Services.NotionService do
       page when is_map(page) ->
         attributes = entity_attributes_from_notion(page)
 
-        case Parties.update_party(party, attributes) do
+        # Skip Notion sync to prevent ping-pong loops when updating from webhook
+        case Parties.update_party(party, attributes, skip_notion_sync: true) do
           {:ok, updated_party} = result ->
             Notion.log_success("party", updated_party.id, payload, page)
             result
@@ -2245,7 +2248,8 @@ defmodule ShotElixir.Services.NotionService do
       page when is_map(page) ->
         attributes = entity_attributes_from_notion(page)
 
-        case Factions.update_faction(faction, attributes) do
+        # Skip Notion sync to prevent ping-pong loops when updating from webhook
+        case Factions.update_faction(faction, attributes, skip_notion_sync: true) do
           {:ok, updated_faction} = result ->
             Notion.log_success("faction", updated_faction.id, payload, page)
             result

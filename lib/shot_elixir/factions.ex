@@ -325,7 +325,11 @@ defmodule ShotElixir.Factions do
     end
   end
 
-  def update_faction(%Faction{} = faction, attrs) do
+  def update_faction(faction, attrs, opts \\ [])
+
+  def update_faction(%Faction{} = faction, attrs, opts) do
+    skip_notion_sync = Keyword.get(opts, :skip_notion_sync, false)
+
     result =
       faction
       |> Faction.changeset(attrs)
@@ -354,7 +358,10 @@ defmodule ShotElixir.Factions do
           sync_faction_junctures(updated_faction, attrs["juncture_ids"])
         end
 
-        maybe_enqueue_notion_sync(updated_faction)
+        # Skip Notion sync when updating from webhook to prevent ping-pong loops
+        unless skip_notion_sync do
+          maybe_enqueue_notion_sync(updated_faction)
+        end
 
         updated_faction =
           Repo.preload(

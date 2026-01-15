@@ -505,7 +505,9 @@ defmodule ShotElixir.Characters do
     end
   end
 
-  def update_character(%Character{} = character, attrs) do
+  def update_character(character, attrs, opts \\ [])
+
+  def update_character(%Character{} = character, attrs, opts) do
     # Extract association IDs from attrs (they're not part of the schema)
     {weapon_ids, attrs} =
       Map.pop(attrs, "weapon_ids", Map.pop(attrs, :weapon_ids, nil) |> elem(0))
@@ -515,6 +517,8 @@ defmodule ShotElixir.Characters do
 
     {party_ids, attrs} = Map.pop(attrs, "party_ids", Map.pop(attrs, :party_ids, nil) |> elem(0))
     {site_ids, attrs} = Map.pop(attrs, "site_ids", Map.pop(attrs, :site_ids, nil) |> elem(0))
+
+    skip_notion_sync = Keyword.get(opts, :skip_notion_sync, false)
 
     Multi.new()
     |> Multi.update(:character, Character.changeset(character, attrs))
@@ -541,7 +545,11 @@ defmodule ShotElixir.Characters do
       {:ok, character}
     end)
     |> Multi.run(:notion_sync, fn _repo, %{character: character} ->
-      maybe_enqueue_notion_sync(character)
+      # Skip Notion sync when updating from webhook to prevent ping-pong loops
+      unless skip_notion_sync do
+        maybe_enqueue_notion_sync(character)
+      end
+
       {:ok, character}
     end)
     |> Repo.transaction()

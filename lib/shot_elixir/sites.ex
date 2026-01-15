@@ -319,7 +319,11 @@ defmodule ShotElixir.Sites do
     end
   end
 
-  def update_site(%Site{} = site, attrs) do
+  def update_site(site, attrs, opts \\ [])
+
+  def update_site(%Site{} = site, attrs, opts) do
+    skip_notion_sync = Keyword.get(opts, :skip_notion_sync, false)
+
     site
     |> Site.changeset(attrs)
     |> Repo.update()
@@ -339,7 +343,12 @@ defmodule ShotElixir.Sites do
           )
 
         broadcast_change(site, :update)
-        maybe_enqueue_notion_sync(site)
+
+        # Skip Notion sync when updating from webhook to prevent ping-pong loops
+        unless skip_notion_sync do
+          maybe_enqueue_notion_sync(site)
+        end
+
         {:ok, site}
 
       error ->

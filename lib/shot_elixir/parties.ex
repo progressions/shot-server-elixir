@@ -354,7 +354,11 @@ defmodule ShotElixir.Parties do
     end
   end
 
-  def update_party(%Party{} = party, attrs) do
+  def update_party(party, attrs, opts \\ [])
+
+  def update_party(%Party{} = party, attrs, opts) do
+    skip_notion_sync = Keyword.get(opts, :skip_notion_sync, false)
+
     party
     |> Party.changeset(attrs)
     |> Repo.update()
@@ -384,7 +388,12 @@ defmodule ShotElixir.Parties do
           )
 
         broadcast_change(party, :update)
-        maybe_enqueue_notion_sync(party)
+
+        # Skip Notion sync when updating from webhook to prevent ping-pong loops
+        unless skip_notion_sync do
+          maybe_enqueue_notion_sync(party)
+        end
+
         {:ok, party}
 
       error ->
