@@ -72,11 +72,14 @@ defmodule ShotElixir.MixProject do
       {:phoenix_swoosh, "~> 1.2"},
       {:phoenix_view, "~> 2.0"},
       {:phoenix_live_view, "~> 1.0"},
+      {:phoenix_live_dashboard, "~> 0.8.3"},
       {:gen_smtp, "~> 1.2"},
       {:multipart, "~> 0.4"},
 
       # Background jobs for email delivery
       {:oban, "~> 2.17"},
+      {:oban_web, "~> 2.11"},
+      {:oban_met, "~> 1.0"},
 
       # Discord bot integration
       {:nostrum, "~> 0.10"},

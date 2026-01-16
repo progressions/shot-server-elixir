@@ -94,6 +94,7 @@ config :shot_elixir, Oban,
   ],
   plugins: [
     Oban.Plugins.Pruner,
+    Oban.Met,
     {Oban.Plugins.Cron,
      crontab: [
        # Clean up expired Discord link codes every 10 minutes
