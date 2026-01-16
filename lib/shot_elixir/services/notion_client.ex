@@ -21,7 +21,8 @@ defmodule ShotElixir.Services.NotionClient do
     Req.new(
       base_url: @base_url,
       receive_timeout: 15_000,
-      connect_timeout: 10_000,
+      pool_timeout: 10_000,
+      connect_options: [timeout: 10_000],
       headers: [
         {"Authorization", "Bearer #{token}"},
         {"Notion-Version", @notion_version},
