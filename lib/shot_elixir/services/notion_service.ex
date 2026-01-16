@@ -1338,6 +1338,20 @@ defmodule ShotElixir.Services.NotionService do
     get_in(props, [key, "number"])
   end
 
+  # Get date value from Notion properties (parses ISO8601 to DateTime)
+  defp get_date_content(props, key) do
+    case get_in(props, [key, "date", "start"]) do
+      date_str when is_binary(date_str) ->
+        case DateTime.from_iso8601(date_str) do
+          {:ok, dt, _} -> dt
+          _ -> nil
+        end
+
+      _ ->
+        nil
+    end
+  end
+
   @doc """
   Extract description fields from Notion page.
   """
@@ -1393,6 +1407,20 @@ defmodule ShotElixir.Services.NotionService do
     }
     |> maybe_put_at_a_glance(get_checkbox_content(props, "At a Glance"))
   end
+
+  # Adventure-specific version with additional fields (season, started_at, ended_at)
+  defp adventure_attributes_from_notion(page, campaign_id) do
+    props = page["properties"] || %{}
+
+    entity_attributes_from_notion(page, campaign_id)
+    |> Map.put(:last_synced_to_notion_at, DateTime.utc_now())
+    |> maybe_put_if_not_nil(:season, get_number_content(props, "Season"))
+    |> maybe_put_if_not_nil(:started_at, get_date_content(props, "Started"))
+    |> maybe_put_if_not_nil(:ended_at, get_date_content(props, "Ended"))
+  end
+
+  defp maybe_put_if_not_nil(map, _key, nil), do: map
+  defp maybe_put_if_not_nil(map, key, value), do: Map.put(map, key, value)
 
   # Convert Notion rich_text to Chi War HTML with mention support
   defp get_rich_text_as_html(props, key, campaign_id) do
@@ -2423,9 +2451,11 @@ defmodule ShotElixir.Services.NotionService do
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
-        attributes = Adventure.attributes_from_notion(page, adventure)
+        # Use centralized mention-aware conversion with campaign_id
+        attributes = adventure_attributes_from_notion(page, adventure.campaign_id)
 
-        case Adventures.update_adventure(adventure, attributes) do
+        # Skip Notion sync to prevent ping-pong loops when updating from webhook
+        case Adventures.update_adventure(adventure, attributes, skip_notion_sync: true) do
           {:ok, updated_adventure} = result ->
             Notion.log_success("adventure", updated_adventure.id, payload, page)
             result

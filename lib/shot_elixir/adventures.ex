@@ -296,7 +296,11 @@ defmodule ShotElixir.Adventures do
   @doc """
   Updates an adventure.
   """
-  def update_adventure(%Adventure{} = adventure, attrs) do
+  def update_adventure(adventure, attrs, opts \\ [])
+
+  def update_adventure(%Adventure{} = adventure, attrs, opts) do
+    skip_notion_sync = Keyword.get(opts, :skip_notion_sync, false)
+
     adventure
     |> Adventure.changeset(attrs)
     |> Repo.update()
@@ -340,7 +344,12 @@ defmodule ShotElixir.Adventures do
           )
 
         broadcast_change(adventure, :update)
-        maybe_enqueue_notion_sync(adventure)
+
+        # Skip Notion sync when updating from webhook to prevent ping-pong loops
+        unless skip_notion_sync do
+          maybe_enqueue_notion_sync(adventure)
+        end
+
         {:ok, adventure}
 
       error ->
