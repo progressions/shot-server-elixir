@@ -391,7 +391,7 @@ defmodule ShotElixirWeb.Router do
 
   defp admin_basic_auth(conn, _opts) do
     {username, password} =
-      if Mix.env() == :prod do
+      if Application.get_env(:shot_elixir, :environment) == :prod do
         {
           System.fetch_env!("DASHBOARD_USER"),
           System.fetch_env!("DASHBOARD_PASS")
