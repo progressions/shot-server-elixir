@@ -33,6 +33,9 @@ defmodule ShotElixir.Helpers.MentionConverter do
   # Alternative regex for spans where attributes may be in different order
   @mention_regex_alt ~r/<span[^>]*data-id="([^"]*)"[^>]*data-type="mention"[^>]*data-label="([^"]*)"[^>]*data-href="([^"]*)"[^>]*>@([^<]*)<\/span>/
 
+  # Regex for HTML br tags (used in multiple functions)
+  @br_tag_regex ~r/<br\s*\/?>/
+
   @type entity_type ::
           :character | :site | :party | :faction | :juncture | :adventure | :vehicle
 
@@ -78,7 +81,7 @@ defmodule ShotElixir.Helpers.MentionConverter do
       html
       |> String.replace(~r/<p>/, "")
       |> String.replace(~r/<\/p>/, "\n")
-      |> String.replace(~r/<br\s*\/?>/, "\n")
+      |> String.replace(@br_tag_regex, "\n")
 
     # Find all mentions and their positions
     mentions = extract_mentions(text_with_mentions, campaign)
@@ -452,7 +455,14 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp entity_type_from_href(_), do: nil
 
   # Find entity by type and ID
-  # Uses process-level caching to avoid N+1 queries when processing multiple mentions
+  # Uses process-level caching to avoid N+1 queries when processing multiple mentions.
+  #
+  # Cache behavior:
+  # - Cache is stored in the process dictionary and persists for the lifetime of the process
+  # - In Phoenix, this typically means the cache lasts for a single HTTP request
+  # - Cache is automatically cleared when the process terminates
+  # - This assumes entities don't change during a single request (safe assumption)
+  # - For long-running processes, consider implementing explicit cache invalidation
   defp find_entity_by_id(entity_type, id, campaign_id) do
     schema = entity_type_to_schema(entity_type)
 
@@ -519,20 +529,26 @@ defmodule ShotElixir.Helpers.MentionConverter do
   end
 
   # Normalize UUID format (handle with/without dashes)
+  # Returns normalized UUID with dashes, or original string if invalid
   defp normalize_uuid(uuid) when is_binary(uuid) do
-    uuid
-    |> String.downcase()
-    |> String.replace("-", "")
-    |> then(fn hex ->
-      if String.length(hex) == 32 do
-        <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
-          e::binary-size(12)>> = hex
+    hex =
+      uuid
+      |> String.downcase()
+      |> String.replace("-", "")
 
-        "#{a}-#{b}-#{c}-#{d}-#{e}"
-      else
-        uuid
+    if String.length(hex) == 32 do
+      case hex do
+        <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
+          e::binary-size(12)>> ->
+          "#{a}-#{b}-#{c}-#{d}-#{e}"
+
+        _ ->
+          # Fallback for malformed hex strings
+          uuid
       end
-    end)
+    else
+      uuid
+    end
   end
 
   defp normalize_uuid(_), do: nil
@@ -576,7 +592,7 @@ defmodule ShotElixir.Helpers.MentionConverter do
     text
     |> String.replace(~r/<p>/, "")
     |> String.replace(~r/<\/p>/, "\n")
-    |> String.replace(~r/<br\s*\/?>/, "\n")
+    |> String.replace(@br_tag_regex, "\n")
     |> String.replace(~r/<[^>]+>/, "")
     |> String.trim()
   end
@@ -588,7 +604,7 @@ defmodule ShotElixir.Helpers.MentionConverter do
     text
     |> String.replace(~r/<p>/, "")
     |> String.replace(~r/<\/p>/, "\n")
-    |> String.replace(~r/<br\s*\/?>/, "\n")
+    |> String.replace(@br_tag_regex, "\n")
     |> String.replace(~r/<[^>]+>/, "")
 
     # Don't trim - preserve whitespace at boundaries
