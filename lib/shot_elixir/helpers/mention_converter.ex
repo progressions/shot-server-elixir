@@ -285,13 +285,29 @@ defmodule ShotElixir.Helpers.MentionConverter do
   def notion_rich_text_to_html(_rich_text, _campaign_id), do: ""
 
   # Convert a single rich_text block to HTML
+  # Notion mention blocks have structure: %{"type" => "mention", "mention" => ..., "plain_text" => "Name"}
+  defp rich_text_block_to_html(
+         %{"type" => "mention", "mention" => mention_data, "plain_text" => plain_text},
+         campaign_id
+       ) do
+    case mention_data do
+      %{"type" => "page", "page" => %{"id" => notion_page_id}} ->
+        notion_page_mention_to_html(notion_page_id, plain_text, campaign_id)
+
+      _ ->
+        # Unknown mention type - preserve the plain text
+        "@#{escape_html(plain_text)}"
+    end
+  end
+
+  # Fallback for mention blocks without plain_text
   defp rich_text_block_to_html(%{"type" => "mention", "mention" => mention_data}, campaign_id) do
     case mention_data do
       %{"type" => "page", "page" => %{"id" => notion_page_id}} ->
-        notion_page_mention_to_html(notion_page_id, campaign_id)
+        notion_page_mention_to_html(notion_page_id, nil, campaign_id)
 
       _ ->
-        # Unknown mention type - extract plain text if available
+        # Unknown mention type with no plain_text - nothing to show
         ""
     end
   end
@@ -323,15 +339,22 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp rich_text_block_to_html(_block, _campaign_id), do: ""
 
   # Convert a Notion page mention to Chi War HTML
-  defp notion_page_mention_to_html(notion_page_id, _campaign_id) do
+  # If entity is found, creates a proper mention span
+  # If not found, falls back to "@Name" text (preserving the mention visually)
+  defp notion_page_mention_to_html(notion_page_id, plain_text, _campaign_id) do
     case find_entity_by_notion_page_id(notion_page_id) do
       {:ok, entity_type, entity} ->
         build_mention_span(entity, entity_type)
 
       {:error, :not_found} ->
-        # Entity not found - return empty or placeholder
+        # Entity not found - preserve the plain text as "@Name" so mention is visible
         Logger.warning("Could not find entity for Notion page ID: #{notion_page_id}")
-        ""
+
+        if plain_text && plain_text != "" do
+          "@#{escape_html(plain_text)}"
+        else
+          ""
+        end
     end
   end
 
@@ -398,13 +421,24 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp parse_chiwar_url(_), do: :error
 
   # Build a Chi War mention span HTML
+  # Matches the format produced by the TipTap editor's mention extension
   defp build_mention_span(entity, entity_type) do
     id = entity.id
     name = entity.name || "Unknown"
-    href = "/#{entity_type_to_path(entity_type)}/#{id}"
+    class_name = entity_type_to_class_name(entity_type)
 
-    ~s(<span data-type="mention" data-id="#{id}" data-label="#{escape_attr(name)}" data-href="#{href}">@#{escape_html(name)}</span>)
+    ~s(<span class="Editor-module-scss-module__mofiSq__mention" data-type="mention" data-id="#{id}" data-label="#{escape_attr(name)}" data-mention-class-name="#{class_name}" data-mention-suggestion-char="@">@#{escape_html(name)}</span>)
   end
+
+  # Convert entity type to class name for mention (PascalCase)
+  defp entity_type_to_class_name(:character), do: "Character"
+  defp entity_type_to_class_name(:site), do: "Site"
+  defp entity_type_to_class_name(:party), do: "Party"
+  defp entity_type_to_class_name(:faction), do: "Faction"
+  defp entity_type_to_class_name(:juncture), do: "Juncture"
+  defp entity_type_to_class_name(:adventure), do: "Adventure"
+  defp entity_type_to_class_name(:vehicle), do: "Vehicle"
+  defp entity_type_to_class_name(_), do: "Unknown"
 
   # =============================================================================
   # Entity Lookup Helpers
@@ -576,18 +610,6 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp entity_type_to_schema(:vehicle), do: Vehicle
   # Weapons and Schticks don't have notion_page_id, so no schema mapping
   defp entity_type_to_schema(_), do: nil
-
-  # Map entity type to URL path segment
-  defp entity_type_to_path(:character), do: "characters"
-  defp entity_type_to_path(:site), do: "sites"
-  defp entity_type_to_path(:party), do: "parties"
-  defp entity_type_to_path(:faction), do: "factions"
-  defp entity_type_to_path(:juncture), do: "junctures"
-  defp entity_type_to_path(:adventure), do: "adventures"
-  defp entity_type_to_path(:vehicle), do: "vehicles"
-  defp entity_type_to_path(:weapon), do: "weapons"
-  defp entity_type_to_path(:schtick), do: "schticks"
-  defp entity_type_to_path(_), do: "entities"
 
   # =============================================================================
   # HTML Helpers

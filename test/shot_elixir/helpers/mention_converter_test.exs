@@ -310,6 +310,31 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
       assert result =~ "&gt;"
       assert result =~ "&amp;"
     end
+
+    test "preserves plain_text when Notion page mention cannot be resolved", %{campaign: campaign} do
+      # Use a random notion_page_id that doesn't exist in Chi War
+      nonexistent_notion_id = "99999999-0000-0000-0000-000000000000"
+
+      rich_text = [
+        %{"type" => "text", "text" => %{"content" => "Hello "}},
+        %{
+          "type" => "mention",
+          "mention" => %{
+            "type" => "page",
+            "page" => %{"id" => nonexistent_notion_id}
+          },
+          "plain_text" => "Unknown Person"
+        },
+        %{"type" => "text", "text" => %{"content" => " is here"}}
+      ]
+
+      result = MentionConverter.notion_rich_text_to_html(rich_text, campaign.id)
+
+      # Should preserve the mention as "@Name" text, not strip it
+      assert result =~ "@Unknown Person"
+      assert result =~ "Hello"
+      assert result =~ "is here"
+    end
   end
 
   describe "extract_mentions/2" do
