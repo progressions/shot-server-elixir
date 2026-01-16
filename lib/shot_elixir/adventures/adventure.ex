@@ -2,6 +2,7 @@ defmodule ShotElixir.Adventures.Adventure do
   use Ecto.Schema
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
+  import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -172,16 +173,4 @@ defmodule ShotElixir.Adventures.Adventure do
         attrs
     end
   end
-
-  # Strip HTML tags from text, converting paragraph and line breaks to newlines
-  defp strip_html(text) when is_binary(text) do
-    text
-    |> String.replace(~r/<p>/, "")
-    |> String.replace(~r/<\/p>/, "\n")
-    |> String.replace(~r/<br\s*\/?>/, "\n")
-    |> String.replace(~r/<[^>]+>/, "")
-    |> String.trim()
-  end
-
-  defp strip_html(_), do: ""
 end
