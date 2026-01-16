@@ -1007,26 +1007,21 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * Image block if found, nil otherwise
   """
-  def find_image_block(page) do
-    find_image_block_paginated(page["id"], nil)
+  def find_image_block(page, opts \\ []) do
+    client = Keyword.get(opts, :client, NotionClient)
+    find_image_block_paginated(page["id"], nil, client)
   end
 
-  defp find_image_block_paginated(page_id, start_cursor) do
-    response =
-      if start_cursor do
-        NotionClient.get_block_children(page_id, %{start_cursor: start_cursor})
-      else
-        NotionClient.get_block_children(page_id)
-      end
-
+  defp find_image_block_paginated(page_id, start_cursor, client) do
+    response = client.get_block_children(page_id, %{start_cursor: start_cursor})
     results = response["results"] || []
 
     # Check if there's an image in this page of results
     case Enum.find(results, fn block -> block["type"] == "image" end) do
       nil ->
         # No image found in this page - check if there are more pages
-        if response["has_more"] && response["next_cursor"] do
-          find_image_block_paginated(page_id, response["next_cursor"])
+        if response["has_more"] do
+          find_image_block_paginated(page_id, response["next_cursor"], client)
         else
           nil
         end

@@ -95,7 +95,7 @@ defmodule ShotElixir.Services.NotionClient do
     query_params =
       opts
       |> Map.drop([:token])
-      |> Enum.filter(fn {_k, v} -> v != nil end)
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
       |> Map.new()
 
     client(token)

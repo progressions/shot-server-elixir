@@ -563,4 +563,124 @@ defmodule ShotElixir.Services.NotionServiceTest do
       assert [] = results
     end
   end
+
+  describe "find_image_block/1 pagination" do
+    defmodule NotionClientStubImageFirstPage do
+      @moduledoc "Stub that returns an image on the first page"
+      def get_block_children(_page_id, _opts \\ %{}) do
+        %{
+          "results" => [
+            %{"type" => "paragraph", "id" => "block-1"},
+            %{"type" => "image", "id" => "image-block-1"},
+            %{"type" => "paragraph", "id" => "block-2"}
+          ],
+          "has_more" => false,
+          "next_cursor" => nil
+        }
+      end
+    end
+
+    defmodule NotionClientStubImageSecondPage do
+      @moduledoc "Stub that returns an image on the second page (after pagination)"
+      def get_block_children(_page_id, opts \\ %{}) do
+        case Map.get(opts, :start_cursor) do
+          nil ->
+            # First page - no image
+            %{
+              "results" => [
+                %{"type" => "paragraph", "id" => "block-1"},
+                %{"type" => "heading_1", "id" => "block-2"},
+                %{"type" => "paragraph", "id" => "block-3"}
+              ],
+              "has_more" => true,
+              "next_cursor" => "cursor-page-2"
+            }
+
+          "cursor-page-2" ->
+            # Second page - has image
+            %{
+              "results" => [
+                %{"type" => "paragraph", "id" => "block-4"},
+                %{"type" => "image", "id" => "image-block-on-page-2"},
+                %{"type" => "paragraph", "id" => "block-5"}
+              ],
+              "has_more" => false,
+              "next_cursor" => nil
+            }
+        end
+      end
+    end
+
+    defmodule NotionClientStubNoImage do
+      @moduledoc "Stub that returns multiple pages with no image"
+      def get_block_children(_page_id, opts \\ %{}) do
+        case Map.get(opts, :start_cursor) do
+          nil ->
+            %{
+              "results" => [
+                %{"type" => "paragraph", "id" => "block-1"},
+                %{"type" => "heading_1", "id" => "block-2"}
+              ],
+              "has_more" => true,
+              "next_cursor" => "cursor-page-2"
+            }
+
+          "cursor-page-2" ->
+            %{
+              "results" => [
+                %{"type" => "paragraph", "id" => "block-3"},
+                %{"type" => "callout", "id" => "block-4"}
+              ],
+              "has_more" => false,
+              "next_cursor" => nil
+            }
+        end
+      end
+    end
+
+    defmodule NotionClientStubEmptyResults do
+      @moduledoc "Stub that returns empty results"
+      def get_block_children(_page_id, _opts \\ %{}) do
+        %{
+          "results" => [],
+          "has_more" => false,
+          "next_cursor" => nil
+        }
+      end
+    end
+
+    test "finds image on first page without pagination" do
+      page = %{"id" => "test-page-id"}
+
+      result =
+        NotionService.find_image_block(page, client: NotionClientStubImageFirstPage)
+
+      assert %{"type" => "image", "id" => "image-block-1"} = result
+    end
+
+    test "finds image on second page via pagination" do
+      page = %{"id" => "test-page-id"}
+
+      result =
+        NotionService.find_image_block(page, client: NotionClientStubImageSecondPage)
+
+      assert %{"type" => "image", "id" => "image-block-on-page-2"} = result
+    end
+
+    test "returns nil when no image found after checking all pages" do
+      page = %{"id" => "test-page-id"}
+
+      result = NotionService.find_image_block(page, client: NotionClientStubNoImage)
+
+      assert result == nil
+    end
+
+    test "returns nil for empty results" do
+      page = %{"id" => "test-page-id"}
+
+      result = NotionService.find_image_block(page, client: NotionClientStubEmptyResults)
+
+      assert result == nil
+    end
+  end
 end
