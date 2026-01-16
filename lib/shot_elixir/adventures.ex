@@ -8,6 +8,7 @@ defmodule ShotElixir.Adventures do
   alias ShotElixir.Adventures.{Adventure, AdventureCharacter, AdventureVillain, AdventureFight}
   alias ShotElixir.ImageLoader
   alias ShotElixir.Workers.ImageCopyWorker
+  alias ShotElixir.Workers.SyncAdventureToNotionWorker
   use ShotElixir.Models.Broadcastable
 
   @doc """
@@ -339,6 +340,7 @@ defmodule ShotElixir.Adventures do
           )
 
         broadcast_change(adventure, :update)
+        maybe_enqueue_notion_sync(adventure)
         {:ok, adventure}
 
       error ->
@@ -709,5 +711,13 @@ defmodule ShotElixir.Adventures do
       nil -> :ok
       adventure -> broadcast_change(adventure, :update)
     end
+  end
+
+  defp maybe_enqueue_notion_sync(%Adventure{notion_page_id: nil}), do: :ok
+
+  defp maybe_enqueue_notion_sync(%Adventure{id: id, notion_page_id: _page_id}) do
+    %{"adventure_id" => id}
+    |> SyncAdventureToNotionWorker.new()
+    |> Oban.insert()
   end
 end
