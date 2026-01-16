@@ -108,7 +108,9 @@ defmodule ShotElixirWeb.NotionOAuthController do
         notion_workspace_icon: token_data["workspace_icon"],
         notion_owner: token_data["owner"],
         # Don't overwrite database_ids if they exist, but initialize if nil
-        notion_database_ids: campaign.notion_database_ids || %{}
+        notion_database_ids: campaign.notion_database_ids || %{},
+        # Set status to working on successful connection
+        notion_status: "working"
       }
 
       case Campaigns.update_campaign(campaign, update_params) do

@@ -44,6 +44,7 @@ defmodule ShotElixir.Campaigns.Campaign do
     field :notion_workspace_icon, :string
     field :notion_owner, :map
     field :notion_database_ids, :map, default: %{}
+    field :notion_status, :string, default: "disconnected"
 
     belongs_to :user, ShotElixir.Accounts.User
 
@@ -68,6 +69,7 @@ defmodule ShotElixir.Campaigns.Campaign do
   end
 
   @valid_ai_providers ["grok", "openai", "gemini"]
+  @valid_notion_statuses ["working", "disconnected", "needs_attention"]
 
   def changeset(campaign, attrs) do
     campaign
@@ -95,10 +97,12 @@ defmodule ShotElixir.Campaigns.Campaign do
       :notion_workspace_name,
       :notion_workspace_icon,
       :notion_owner,
-      :notion_database_ids
+      :notion_database_ids,
+      :notion_status
     ])
     |> validate_required([:name, :user_id])
     |> validate_inclusion(:ai_provider, @valid_ai_providers ++ [nil])
+    |> validate_inclusion(:notion_status, @valid_notion_statuses)
     |> validate_unique_name_per_user()
     |> validate_only_one_master_template()
   end

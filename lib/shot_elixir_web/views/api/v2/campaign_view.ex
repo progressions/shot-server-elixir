@@ -123,6 +123,7 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
       ai_provider_connected: has_ai_provider_credential?(campaign, credential_lookup),
       # Notion Integration
       notion_connected: !!campaign.notion_access_token,
+      notion_status: campaign.notion_status || compute_notion_status(campaign),
       notion_workspace_name: campaign.notion_workspace_name,
       notion_workspace_icon: campaign.notion_workspace_icon,
       notion_database_ids: campaign.notion_database_ids || %{},
@@ -135,6 +136,16 @@ defmodule ShotElixirWeb.Api.V2.CampaignView do
     client_id = System.get_env("NOTION_CLIENT_ID")
     client_secret = System.get_env("NOTION_CLIENT_SECRET")
     !!(client_id && client_id != "" && client_secret && client_secret != "")
+  end
+
+  # Compute notion_status for backwards compatibility with campaigns
+  # that don't have the field set yet
+  defp compute_notion_status(campaign) do
+    if campaign.notion_access_token do
+      "working"
+    else
+      "disconnected"
+    end
   end
 
   # Check if the campaign owner has a credential for the selected AI provider
