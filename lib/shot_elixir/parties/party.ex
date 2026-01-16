@@ -2,6 +2,7 @@ defmodule ShotElixir.Parties.Party do
   use Ecto.Schema
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Helpers.MentionConverter
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -54,8 +55,45 @@ defmodule ShotElixir.Parties.Party do
   @doc """
   Convert party to Notion page properties format.
   Requires [:memberships, :character] to be preloaded for the "Characters" relation to be populated.
+
+  If campaign is preloaded, uses MentionConverter to convert @mentions to Notion page links.
+  Otherwise, falls back to simple HTML stripping.
   """
   def as_notion(%__MODULE__{} = party) do
+    # Check if campaign is preloaded - if so, use mention-aware conversion
+    if Ecto.assoc_loaded?(party.campaign) and party.campaign != nil do
+      as_notion(party, party.campaign)
+    else
+      as_notion_simple(party)
+    end
+  end
+
+  @doc """
+  Convert party to Notion page properties format with mention support.
+  Uses MentionConverter to convert @mentions to Notion page links.
+  """
+  def as_notion(%__MODULE__{} = party, %ShotElixir.Campaigns.Campaign{} = campaign) do
+    description_rich_text =
+      MentionConverter.html_to_notion_rich_text(party.description || "", campaign)
+
+    description_rich_text =
+      if Enum.empty?(description_rich_text) do
+        [%{"text" => %{"content" => ""}}]
+      else
+        description_rich_text
+      end
+
+    base = %{
+      "Name" => %{"title" => [%{"text" => %{"content" => party.name || ""}}]},
+      "Description" => %{"rich_text" => description_rich_text},
+      "At a Glance" => %{"checkbox" => !!party.at_a_glance}
+    }
+
+    maybe_add_character_relations(base, party)
+  end
+
+  # Simple version without mention conversion (fallback)
+  defp as_notion_simple(%__MODULE__{} = party) do
     base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => party.name || ""}}]},
       "Description" => %{
@@ -64,6 +102,11 @@ defmodule ShotElixir.Parties.Party do
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
+    maybe_add_character_relations(base, party)
+  end
+
+  # Helper to add character relations to base properties
+  defp maybe_add_character_relations(base, party) do
     if Ecto.assoc_loaded?(party.memberships) do
       character_ids =
         party.memberships

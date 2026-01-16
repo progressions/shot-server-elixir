@@ -4,6 +4,7 @@ defmodule ShotElixir.Sites.Site do
   use Waffle.Ecto.Schema
 
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Helpers.MentionConverter
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -54,8 +55,45 @@ defmodule ShotElixir.Sites.Site do
   @doc """
   Convert site to Notion page properties format.
   Requires [:attunements, :character] to be preloaded for the "Characters" relation to be populated.
+
+  If campaign is preloaded, uses MentionConverter to convert @mentions to Notion page links.
+  Otherwise, falls back to simple HTML stripping.
   """
   def as_notion(%__MODULE__{} = site) do
+    # Check if campaign is preloaded - if so, use mention-aware conversion
+    if Ecto.assoc_loaded?(site.campaign) and site.campaign != nil do
+      as_notion(site, site.campaign)
+    else
+      as_notion_simple(site)
+    end
+  end
+
+  @doc """
+  Convert site to Notion page properties format with mention support.
+  Uses MentionConverter to convert @mentions to Notion page links.
+  """
+  def as_notion(%__MODULE__{} = site, %ShotElixir.Campaigns.Campaign{} = campaign) do
+    description_rich_text =
+      MentionConverter.html_to_notion_rich_text(site.description || "", campaign)
+
+    description_rich_text =
+      if Enum.empty?(description_rich_text) do
+        [%{"text" => %{"content" => ""}}]
+      else
+        description_rich_text
+      end
+
+    base = %{
+      "Name" => %{"title" => [%{"text" => %{"content" => site.name || ""}}]},
+      "Description" => %{"rich_text" => description_rich_text},
+      "At a Glance" => %{"checkbox" => !!site.at_a_glance}
+    }
+
+    maybe_add_character_relations(base, site)
+  end
+
+  # Simple version without mention conversion (fallback)
+  defp as_notion_simple(%__MODULE__{} = site) do
     base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => site.name || ""}}]},
       "Description" => %{
@@ -64,6 +102,11 @@ defmodule ShotElixir.Sites.Site do
       "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
 
+    maybe_add_character_relations(base, site)
+  end
+
+  # Helper to add character relations to base properties
+  defp maybe_add_character_relations(base, site) do
     if Ecto.assoc_loaded?(site.attunements) do
       character_ids =
         site.attunements

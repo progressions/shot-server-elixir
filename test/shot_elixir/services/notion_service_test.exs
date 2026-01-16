@@ -265,7 +265,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
         NotionService.update_site_from_notion(site, client: NotionClientStubSuccess)
 
       assert updated_site.name == "Notion Name"
-      assert updated_site.description == "Notion Description"
+      assert updated_site.description == "<p>Notion Description</p>"
       assert updated_site.at_a_glance == true
 
       [log] =
@@ -295,7 +295,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
         NotionService.update_party_from_notion(party, client: NotionClientStubSuccess)
 
       assert updated_party.name == "Notion Name"
-      assert updated_party.description == "Notion Description"
+      assert updated_party.description == "<p>Notion Description</p>"
       assert updated_party.at_a_glance == true
 
       [log] =
@@ -325,7 +325,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
         NotionService.update_faction_from_notion(faction, client: NotionClientStubSuccess)
 
       assert updated_faction.name == "Notion Name"
-      assert updated_faction.description == "Notion Description"
+      assert updated_faction.description == "<p>Notion Description</p>"
       assert updated_faction.at_a_glance == true
 
       [log] =
@@ -374,7 +374,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
         )
 
       assert updated_juncture.name == "Notion Name"
-      assert updated_juncture.description == "Notion Description"
+      assert updated_juncture.description == "<p>Notion Description</p>"
       assert updated_juncture.at_a_glance == true
 
       updated_character = Repo.get(Character, character.id)

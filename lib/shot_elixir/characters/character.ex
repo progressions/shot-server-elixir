@@ -3,6 +3,7 @@ defmodule ShotElixir.Characters.Character do
   import Ecto.Changeset
   use Waffle.Ecto.Schema
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Helpers.MentionConverter
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -192,8 +193,73 @@ defmodule ShotElixir.Characters.Character do
 
   @doc """
   Convert character to Notion property format for creating/updating Notion pages.
+
+  If campaign is preloaded, uses MentionConverter to convert @mentions to Notion page links.
+  Otherwise, falls back to simple HTML stripping.
   """
   def as_notion(%__MODULE__{} = character) do
+    # Check if campaign is preloaded - if so, use mention-aware conversion
+    if Ecto.assoc_loaded?(character.campaign) and character.campaign != nil do
+      as_notion(character, character.campaign)
+    else
+      as_notion_simple(character)
+    end
+  end
+
+  @doc """
+  Convert character to Notion property format with mention support.
+  Uses MentionConverter to convert @mentions to Notion page links.
+  """
+  def as_notion(%__MODULE__{} = character, %ShotElixir.Campaigns.Campaign{} = campaign) do
+    av = character.action_values || @default_action_values
+    desc = character.description || %{}
+    # Ensure name is never nil for Notion API (titles cannot be nil)
+    name = character.name || "Unnamed Character"
+
+    base_properties = %{
+      "Name" => %{"title" => [%{"type" => "text", "text" => %{"content" => name}}]},
+      "Enemy Type" => %{"select" => %{"name" => av["Type"] || "PC"}},
+      "Wounds" => %{"number" => to_number(av["Wounds"])},
+      "Defense" => %{"number" => to_number(av["Defense"])},
+      "Toughness" => %{"number" => to_number(av["Toughness"])},
+      "Speed" => %{"number" => to_number(av["Speed"])},
+      "Fortune" => %{"number" => to_number(av["Max Fortune"])},
+      "Guns" => %{"number" => to_number(av["Guns"])},
+      "Martial Arts" => %{"number" => to_number(av["Martial Arts"])},
+      "Sorcery" => %{"number" => to_number(av["Sorcery"])},
+      "Mutant" => %{"number" => to_number(av["Mutant"])},
+      "Scroungetech" => %{"number" => to_number(av["Scroungetech"])},
+      "Creature" => %{"number" => to_number(av["Creature"])},
+      "Inactive" => %{"checkbox" => !character.active},
+      "At a Glance" => %{"checkbox" => !!character.at_a_glance},
+      "Tags" => %{"multi_select" => tags_for_notion(character)}
+    }
+
+    # Add rich_text fields - use MentionConverter for fields that may contain @mentions
+    base_properties
+    |> maybe_add_rich_text("Damage", to_string(av["Damage"] || ""))
+    |> maybe_add_rich_text("Age", to_string(desc["Age"] || ""))
+    |> maybe_add_rich_text("Nicknames", to_string(desc["Nicknames"] || ""))
+    |> maybe_add_rich_text("Height", to_string(desc["Height"] || ""))
+    |> maybe_add_rich_text("Weight", to_string(desc["Weight"] || ""))
+    |> maybe_add_rich_text("Hair Color", to_string(desc["Hair Color"] || ""))
+    |> maybe_add_rich_text("Eye Color", to_string(desc["Eye Color"] || ""))
+    |> maybe_add_rich_text("Style of Dress", to_string(desc["Style of Dress"] || ""))
+    |> maybe_add_rich_text_with_mentions(
+      "Melodramatic Hook",
+      desc["Melodramatic Hook"] || "",
+      campaign
+    )
+    |> maybe_add_rich_text_with_mentions("Description", desc["Appearance"] || "", campaign)
+    |> maybe_add_select("MainAttack", av["MainAttack"])
+    |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
+    |> maybe_add_select("FortuneType", av["FortuneType"])
+    |> maybe_add_archetype(av["Archetype"])
+    |> maybe_add_chi_war_link(character)
+  end
+
+  # Simple version without mention conversion (fallback)
+  defp as_notion_simple(%__MODULE__{} = character) do
     av = character.action_values || @default_action_values
     desc = character.description || %{}
     # Ensure name is never nil for Notion API (titles cannot be nil)
@@ -245,6 +311,23 @@ defmodule ShotElixir.Characters.Character do
     Map.put(properties, key, %{
       "rich_text" => [%{"type" => "text", "text" => %{"content" => value}}]
     })
+  end
+
+  # Add rich_text property with mention conversion support
+  defp maybe_add_rich_text_with_mentions(properties, _key, nil, _campaign), do: properties
+  defp maybe_add_rich_text_with_mentions(properties, _key, "", _campaign), do: properties
+
+  defp maybe_add_rich_text_with_mentions(properties, key, value, campaign) do
+    rich_text = MentionConverter.html_to_notion_rich_text(value, campaign)
+
+    rich_text =
+      if Enum.empty?(rich_text) do
+        [%{"type" => "text", "text" => %{"content" => ""}}]
+      else
+        rich_text
+      end
+
+    Map.put(properties, key, %{"rich_text" => rich_text})
   end
 
   # Convert string values to numbers for Notion API
