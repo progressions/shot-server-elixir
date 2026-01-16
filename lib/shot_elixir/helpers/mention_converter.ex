@@ -529,7 +529,13 @@ defmodule ShotElixir.Helpers.MentionConverter do
   end
 
   # Normalize UUID format (handle with/without dashes)
-  # Returns normalized UUID with dashes, or original string if invalid
+  #
+  # Returns normalized UUID with dashes, or original string if invalid.
+  # Invalid UUIDs are preserved (returned as-is) rather than returning nil/error
+  # because this function is used for Notion page ID lookup, where the UUID comes
+  # from Notion's API and may already be in various formats. Preserving the original
+  # allows the subsequent database lookup to fail gracefully with no match rather
+  # than failing early with a normalization error.
   defp normalize_uuid(uuid) when is_binary(uuid) do
     hex =
       uuid
