@@ -101,7 +101,8 @@ if config_env() == :prod do
     check_origin: [
       "https://chiwar.net",
       "https://shot-client-phoenix.fly.dev",
-      "https://shot-client-next.fly.dev"
+      "https://shot-client-next.fly.dev",
+      "https://shot-elixir.fly.dev"
     ]
 
   # ## SSL Support

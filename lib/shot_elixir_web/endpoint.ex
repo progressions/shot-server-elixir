@@ -47,12 +47,13 @@ defmodule ShotElixirWeb.Endpoint do
     plug Tidewave
   end
 
-  # CORS configuration
-  # Localhost origins only in development (includes worktree ports)
+  # CORS and WebSocket origin configuration
+  # Localhost origins only in development (includes worktree ports and API ports)
   @localhost_origins if(Mix.env() == :dev,
                        do: [
                          "http://localhost:3000",
                          "http://localhost:3001",
+                         "http://localhost:4002",
                          # Worktree ports (3011, 3021, 3031, etc.)
                          "http://localhost:3011",
                          "http://localhost:3021",
@@ -60,7 +61,14 @@ defmodule ShotElixirWeb.Endpoint do
                          "http://localhost:3041",
                          "http://localhost:3051",
                          "http://localhost:3061",
-                         "http://localhost:3071"
+                         "http://localhost:3071",
+                         # Worktree API ports (4012, 4022, 4032, etc.)
+                         "http://localhost:4012",
+                         "http://localhost:4022",
+                         "http://localhost:4032",
+                         "http://localhost:4042",
+                         "http://localhost:4052",
+                         "http://localhost:4062"
                        ],
                        else: []
                      )
