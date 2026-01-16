@@ -368,16 +368,31 @@ defmodule ShotElixirWeb.Router do
   end
 
   # Email preview in development
-  if Mix.env() in [:dev, :test] do
-    import Phoenix.LiveDashboard.Router
-    import Oban.Web.Router
-
+  if Mix.env() == :dev do
     scope "/dev" do
       pipe_through :browser
       forward "/mailbox", Plug.Swoosh.MailboxPreview
-      oban_dashboard("/oban")
-      live_dashboard "/dashboard", metrics: ShotElixirWeb.Telemetry
     end
+  end
+
+  import Phoenix.LiveDashboard.Router
+  import Oban.Web.Router
+
+  pipeline :admins_only do
+    plug :browser
+    plug :admin_basic_auth
+  end
+
+  scope "/admin" do
+    pipe_through :admins_only
+    oban_dashboard("/oban")
+    live_dashboard "/dashboard", metrics: ShotElixirWeb.Telemetry
+  end
+
+  defp admin_basic_auth(conn, _opts) do
+    username = System.get_env("DASHBOARD_USER") || "admin"
+    password = System.get_env("DASHBOARD_PASS") || "admin"
+    Plug.BasicAuth.basic_auth(conn, username: username, password: password)
   end
 
   # WebSocket support
