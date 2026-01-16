@@ -3,6 +3,7 @@ defmodule ShotElixir.Characters.Character do
   import Ecto.Changeset
   use Waffle.Ecto.Schema
   alias ShotElixir.ImagePositions.ImagePosition
+  import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
   @foreign_key_type :binary_id
@@ -297,17 +298,6 @@ defmodule ShotElixir.Characters.Character do
       properties
     end
   end
-
-  defp strip_html(text) when is_binary(text) do
-    text
-    |> String.replace(~r/<p>/, "")
-    |> String.replace(~r/<\/p>/, "\n")
-    |> String.replace(~r/<br\s*\/?>/, "\n")
-    |> String.replace(~r/<[^>]+>/, "")
-    |> String.trim()
-  end
-
-  defp strip_html(_), do: ""
 
   @doc """
   Extract character attributes from Notion page properties.
