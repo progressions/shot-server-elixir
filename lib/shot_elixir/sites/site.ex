@@ -57,7 +57,9 @@ defmodule ShotElixir.Sites.Site do
   def as_notion(%__MODULE__{} = site) do
     base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => site.name || ""}}]},
-      "Description" => %{"rich_text" => [%{"text" => %{"content" => site.description || ""}}]},
+      "Description" => %{
+        "rich_text" => [%{"text" => %{"content" => strip_html(site.description || "")}}]
+      },
       "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
 
@@ -88,4 +90,16 @@ defmodule ShotElixir.Sites.Site do
   def image_url(%__MODULE__{} = site) do
     site.image_url
   end
+
+  # Strip HTML tags from text, converting paragraph and line breaks to newlines
+  defp strip_html(text) when is_binary(text) do
+    text
+    |> String.replace(~r/<p>/, "")
+    |> String.replace(~r/<\/p>/, "\n")
+    |> String.replace(~r/<br\s*\/?>/, "\n")
+    |> String.replace(~r/<[^>]+>/, "")
+    |> String.trim()
+  end
+
+  defp strip_html(_), do: ""
 end

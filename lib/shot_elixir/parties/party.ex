@@ -57,7 +57,9 @@ defmodule ShotElixir.Parties.Party do
   def as_notion(%__MODULE__{} = party) do
     base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => party.name || ""}}]},
-      "Description" => %{"rich_text" => [%{"text" => %{"content" => party.description || ""}}]},
+      "Description" => %{
+        "rich_text" => [%{"text" => %{"content" => strip_html(party.description || "")}}]
+      },
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
@@ -81,4 +83,16 @@ defmodule ShotElixir.Parties.Party do
       base
     end
   end
+
+  # Strip HTML tags from text, converting paragraph and line breaks to newlines
+  defp strip_html(text) when is_binary(text) do
+    text
+    |> String.replace(~r/<p>/, "")
+    |> String.replace(~r/<\/p>/, "\n")
+    |> String.replace(~r/<br\s*\/?>/, "\n")
+    |> String.replace(~r/<[^>]+>/, "")
+    |> String.trim()
+  end
+
+  defp strip_html(_), do: ""
 end

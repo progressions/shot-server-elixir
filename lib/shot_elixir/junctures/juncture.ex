@@ -47,8 +47,22 @@ defmodule ShotElixir.Junctures.Juncture do
   def as_notion(%__MODULE__{} = juncture) do
     %{
       "Name" => %{"title" => [%{"text" => %{"content" => juncture.name || ""}}]},
-      "Description" => %{"rich_text" => [%{"text" => %{"content" => juncture.description || ""}}]},
+      "Description" => %{
+        "rich_text" => [%{"text" => %{"content" => strip_html(juncture.description || "")}}]
+      },
       "At a Glance" => %{"checkbox" => !!juncture.at_a_glance}
     }
   end
+
+  # Strip HTML tags from text, converting paragraph and line breaks to newlines
+  defp strip_html(text) when is_binary(text) do
+    text
+    |> String.replace(~r/<p>/, "")
+    |> String.replace(~r/<\/p>/, "\n")
+    |> String.replace(~r/<br\s*\/?>/, "\n")
+    |> String.replace(~r/<[^>]+>/, "")
+    |> String.trim()
+  end
+
+  defp strip_html(_), do: ""
 end
