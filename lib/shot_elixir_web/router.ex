@@ -368,10 +368,15 @@ defmodule ShotElixirWeb.Router do
   end
 
   # Email preview in development
-  if Mix.env() == :dev do
+  if Mix.env() in [:dev, :test] do
+    import Phoenix.LiveDashboard.Router
+    import Oban.Web.Router
+
     scope "/dev" do
       pipe_through :browser
       forward "/mailbox", Plug.Swoosh.MailboxPreview
+      oban_dashboard("/oban")
+      live_dashboard "/dashboard", metrics: ShotElixirWeb.Telemetry
     end
   end
 
