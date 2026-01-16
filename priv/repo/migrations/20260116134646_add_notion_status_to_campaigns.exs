@@ -3,12 +3,12 @@ defmodule ShotElixir.Repo.Migrations.AddNotionStatusToCampaigns do
 
   def change do
     alter table(:campaigns) do
-      add :notion_status, :string
+      add :notion_status, :string, null: false, default: "disconnected"
     end
 
     # Set initial status based on existing data:
     # - "working" if notion_access_token is present
-    # - "disconnected" if not
+    # - "disconnected" if not connected
     execute(
       """
       UPDATE campaigns
@@ -17,7 +17,7 @@ defmodule ShotElixir.Repo.Migrations.AddNotionStatusToCampaigns do
         ELSE 'disconnected'
       END
       """,
-      "UPDATE campaigns SET notion_status = NULL"
+      "SELECT 1"
     )
   end
 end

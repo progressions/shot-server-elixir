@@ -102,7 +102,7 @@ defmodule ShotElixir.Campaigns.Campaign do
     ])
     |> validate_required([:name, :user_id])
     |> validate_inclusion(:ai_provider, @valid_ai_providers ++ [nil])
-    |> validate_inclusion(:notion_status, @valid_notion_statuses)
+    |> validate_inclusion(:notion_status, @valid_notion_statuses ++ [nil])
     |> validate_unique_name_per_user()
     |> validate_only_one_master_template()
   end
