@@ -34,6 +34,11 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
     {:ok, user: user, campaign: campaign}
   end
 
+  # Helper to build TipTap mention span HTML (matches actual TipTap editor output)
+  defp tiptap_mention(id, label, class_name) do
+    ~s(<span class="Editor-module-scss-module__mofiSq__mention" data-type="mention" data-id="#{id}" data-label="#{label}" data-mention-class-name="#{class_name}" data-mention-suggestion-char="@">@#{label}</span>)
+  end
+
   describe "html_to_notion_rich_text/2" do
     test "returns empty list for nil input", %{campaign: campaign} do
       assert MentionConverter.html_to_notion_rich_text(nil, campaign) == []
@@ -71,8 +76,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         })
         |> Repo.insert()
 
-      html =
-        ~s(<p>Hello <span data-type="mention" data-id="#{character.id}" data-label="Bob the Fighter" data-href="/characters/#{character.id}">@Bob the Fighter</span>!</p>)
+      html = "<p>Hello #{tiptap_mention(character.id, "Bob the Fighter", "Character")}!</p>"
 
       result = MentionConverter.html_to_notion_rich_text(html, campaign)
 
@@ -97,8 +101,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         })
         |> Repo.insert()
 
-      html =
-        ~s(<p>Meet <span data-type="mention" data-id="#{character.id}" data-label="Jane the Rogue" data-href="/characters/#{character.id}">@Jane the Rogue</span></p>)
+      html = "<p>Meet #{tiptap_mention(character.id, "Jane the Rogue", "Character")}</p>"
 
       result = MentionConverter.html_to_notion_rich_text(html, campaign)
 
@@ -131,7 +134,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         |> Repo.insert()
 
       html =
-        ~s(<p><span data-type="mention" data-id="#{char1.id}" data-label="Alice" data-href="/characters/#{char1.id}">@Alice</span> and <span data-type="mention" data-id="#{char2.id}" data-label="Bob" data-href="/characters/#{char2.id}">@Bob</span></p>)
+        "<p>#{tiptap_mention(char1.id, "Alice", "Character")} and #{tiptap_mention(char2.id, "Bob", "Character")}</p>"
 
       result = MentionConverter.html_to_notion_rich_text(html, campaign)
 
@@ -150,8 +153,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         })
         |> Repo.insert()
 
-      html =
-        ~s(<p>Located at <span data-type="mention" data-id="#{site.id}" data-label="Dragon's Lair" data-href="/sites/#{site.id}">@Dragon's Lair</span></p>)
+      html = "<p>Located at #{tiptap_mention(site.id, "Dragon's Lair", "Site")}</p>"
 
       result = MentionConverter.html_to_notion_rich_text(html, campaign)
 
@@ -169,8 +171,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         })
         |> Repo.insert()
 
-      html =
-        ~s(<p>Join <span data-type="mention" data-id="#{party.id}" data-label="Dragon Hunters" data-href="/parties/#{party.id}">@Dragon Hunters</span></p>)
+      html = "<p>Join #{tiptap_mention(party.id, "Dragon Hunters", "Party")}</p>"
 
       result = MentionConverter.html_to_notion_rich_text(html, campaign)
 
@@ -188,8 +189,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         })
         |> Repo.insert()
 
-      html =
-        ~s(<p>Enemies of <span data-type="mention" data-id="#{faction.id}" data-label="The Ascended" data-href="/factions/#{faction.id}">@The Ascended</span></p>)
+      html = "<p>Enemies of #{tiptap_mention(faction.id, "The Ascended", "Faction")}</p>"
 
       result = MentionConverter.html_to_notion_rich_text(html, campaign)
 
@@ -355,8 +355,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         })
         |> Repo.insert()
 
-      html =
-        ~s(<span data-type="mention" data-id="#{character.id}" data-label="Extracted Hero" data-href="/characters/#{character.id}">@Extracted Hero</span>)
+      html = tiptap_mention(character.id, "Extracted Hero", "Character")
 
       result = MentionConverter.extract_mentions(html, campaign)
 
@@ -364,7 +363,6 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
       mention = hd(result)
       assert mention.id == character.id
       assert mention.label == "Extracted Hero"
-      assert mention.href == "/characters/#{character.id}"
       assert mention.entity_type == :character
       assert mention.notion_page_id == character.notion_page_id
     end
@@ -387,7 +385,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         |> Repo.insert()
 
       html =
-        ~s(<span data-type="mention" data-id="#{char1.id}" data-label="First" data-href="/characters/#{char1.id}">@First</span> and <span data-type="mention" data-id="#{char2.id}" data-label="Second" data-href="/characters/#{char2.id}">@Second</span>)
+        "#{tiptap_mention(char1.id, "First", "Character")} and #{tiptap_mention(char2.id, "Second", "Character")}"
 
       result = MentionConverter.extract_mentions(html, campaign)
 
@@ -410,7 +408,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
       result =
         MentionConverter.lookup_entity_for_mention(
           character.id,
-          "/characters/#{character.id}",
+          :character,
           campaign
         )
 
@@ -430,7 +428,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
       result =
         MentionConverter.lookup_entity_for_mention(
           character.id,
-          "/characters/#{character.id}",
+          :character,
           campaign
         )
 
@@ -442,14 +440,14 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
       fake_id = Ecto.UUID.generate()
 
       result =
-        MentionConverter.lookup_entity_for_mention(fake_id, "/characters/#{fake_id}", campaign)
+        MentionConverter.lookup_entity_for_mention(fake_id, :character, campaign)
 
       assert result.entity_type == :character
       assert result.notion_page_id == nil
     end
 
-    test "returns nil entity_type for unknown href", %{campaign: campaign} do
-      result = MentionConverter.lookup_entity_for_mention("some-id", "/unknown/some-id", campaign)
+    test "returns nil entity_type for nil type", %{campaign: campaign} do
+      result = MentionConverter.lookup_entity_for_mention("some-id", nil, campaign)
 
       assert result.entity_type == nil
       assert result.notion_page_id == nil
@@ -468,7 +466,7 @@ defmodule ShotElixir.Helpers.MentionConverterTest do
         |> Repo.insert()
 
       original_html =
-        ~s(<p>Hello <span data-type="mention" data-id="#{character.id}" data-label="Roundtrip Hero" data-href="/characters/#{character.id}">@Roundtrip Hero</span>!</p>)
+        "<p>Hello #{tiptap_mention(character.id, "Roundtrip Hero", "Character")}!</p>"
 
       # Convert to Notion
       notion_rich_text = MentionConverter.html_to_notion_rich_text(original_html, campaign)

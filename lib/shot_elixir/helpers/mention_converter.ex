@@ -26,12 +26,13 @@ defmodule ShotElixir.Helpers.MentionConverter do
 
   import Ecto.Query
 
-  # Regex to match Chi War mention spans
-  # Captures: id, label, href, display text
-  @mention_regex ~r/<span[^>]*data-type="mention"[^>]*data-id="([^"]*)"[^>]*data-label="([^"]*)"[^>]*data-href="([^"]*)"[^>]*>@([^<]*)<\/span>/
+  # Regex to match Chi War mention spans (TipTap format)
+  # TipTap produces: <span class="..." data-type="mention" data-id="uuid" data-label="Name" data-mention-class-name="Character" data-mention-suggestion-char="@">@Name</span>
+  # Captures: id, label, mention-class-name, display text
+  @mention_regex ~r/<span[^>]*data-type="mention"[^>]*data-id="([^"]*)"[^>]*data-label="([^"]*)"[^>]*data-mention-class-name="([^"]*)"[^>]*>@([^<]*)<\/span>/
 
   # Alternative regex for spans where attributes may be in different order
-  @mention_regex_alt ~r/<span[^>]*data-id="([^"]*)"[^>]*data-type="mention"[^>]*data-label="([^"]*)"[^>]*data-href="([^"]*)"[^>]*>@([^<]*)<\/span>/
+  @mention_regex_alt ~r/<span[^>]*data-id="([^"]*)"[^>]*data-type="mention"[^>]*data-label="([^"]*)"[^>]*data-mention-class-name="([^"]*)"[^>]*>@([^<]*)<\/span>/
 
   # Regex for HTML br tags (used in multiple functions)
   @br_tag_regex ~r/<br\s*\/?>/
@@ -122,15 +123,16 @@ defmodule ShotElixir.Helpers.MentionConverter do
 
     # Build mention info with positions
     Enum.zip(mentions, content_matches)
-    |> Enum.map(fn {[{start_pos, length} | _captures], [_full_match, id, label, href, _display]} ->
-      entity_info = lookup_entity_for_mention(id, href, campaign)
+    |> Enum.map(fn {[{start_pos, length} | _captures],
+                    [_full_match, id, label, class_name, _display]} ->
+      entity_type = class_name_to_entity_type(class_name)
+      entity_info = lookup_entity_for_mention(id, entity_type, campaign)
 
       %{
         start_pos: start_pos,
         length: length,
         id: id,
         label: label,
-        href: href,
         entity_type: entity_info[:entity_type],
         notion_page_id: entity_info[:notion_page_id]
       }
@@ -205,9 +207,10 @@ defmodule ShotElixir.Helpers.MentionConverter do
     }
   end
 
-  defp mention_to_notion_rich_text(%{href: href, label: label}) when is_binary(href) do
+  defp mention_to_notion_rich_text(%{entity_type: entity_type, id: id, label: label})
+       when not is_nil(entity_type) do
     # No Notion page - use chiwar.net URL link
-    url = build_chiwar_url(href)
+    url = build_chiwar_url_from_entity(entity_type, id)
 
     %{
       "type" => "text",
@@ -226,16 +229,21 @@ defmodule ShotElixir.Helpers.MentionConverter do
     }
   end
 
-  # Build chiwar.net URL from relative href
-  defp build_chiwar_url(href) when is_binary(href) do
-    if String.starts_with?(href, "http") do
-      href
-    else
-      "https://chiwar.net#{href}"
-    end
+  # Build chiwar.net URL from entity type and ID
+  defp build_chiwar_url_from_entity(entity_type, id) do
+    path_segment = entity_type_to_url_segment(entity_type)
+    "https://chiwar.net/#{path_segment}/#{id}"
   end
 
-  defp build_chiwar_url(_), do: "https://chiwar.net"
+  # Convert entity type to URL path segment
+  defp entity_type_to_url_segment(:character), do: "characters"
+  defp entity_type_to_url_segment(:site), do: "sites"
+  defp entity_type_to_url_segment(:party), do: "parties"
+  defp entity_type_to_url_segment(:faction), do: "factions"
+  defp entity_type_to_url_segment(:juncture), do: "junctures"
+  defp entity_type_to_url_segment(:adventure), do: "adventures"
+  defp entity_type_to_url_segment(:vehicle), do: "vehicles"
+  defp entity_type_to_url_segment(_), do: "unknown"
 
   # =============================================================================
   # Notion → Chi War
@@ -445,13 +453,11 @@ defmodule ShotElixir.Helpers.MentionConverter do
   # =============================================================================
 
   @doc """
-  Looks up entity information for a mention by ID and href.
+  Looks up entity information for a mention by ID and entity type.
   Returns map with :entity_type and :notion_page_id.
   """
-  @spec lookup_entity_for_mention(String.t(), String.t(), Campaign.t()) :: map()
-  def lookup_entity_for_mention(id, href, %Campaign{} = campaign) do
-    entity_type = entity_type_from_href(href)
-
+  @spec lookup_entity_for_mention(String.t(), entity_type() | nil, Campaign.t()) :: map()
+  def lookup_entity_for_mention(id, entity_type, %Campaign{} = campaign) do
     case entity_type do
       nil ->
         %{entity_type: nil, notion_page_id: nil}
@@ -470,23 +476,15 @@ defmodule ShotElixir.Helpers.MentionConverter do
     end
   end
 
-  # Extract entity type from href
-  defp entity_type_from_href(href) when is_binary(href) do
-    cond do
-      String.contains?(href, "/characters") -> :character
-      String.contains?(href, "/sites") -> :site
-      String.contains?(href, "/parties") -> :party
-      String.contains?(href, "/factions") -> :faction
-      String.contains?(href, "/junctures") -> :juncture
-      String.contains?(href, "/adventures") -> :adventure
-      String.contains?(href, "/vehicles") -> :vehicle
-      String.contains?(href, "/weapons") -> :weapon
-      String.contains?(href, "/schticks") -> :schtick
-      true -> nil
-    end
-  end
-
-  defp entity_type_from_href(_), do: nil
+  # Convert TipTap class name to entity type atom
+  defp class_name_to_entity_type("Character"), do: :character
+  defp class_name_to_entity_type("Site"), do: :site
+  defp class_name_to_entity_type("Party"), do: :party
+  defp class_name_to_entity_type("Faction"), do: :faction
+  defp class_name_to_entity_type("Juncture"), do: :juncture
+  defp class_name_to_entity_type("Adventure"), do: :adventure
+  defp class_name_to_entity_type("Vehicle"), do: :vehicle
+  defp class_name_to_entity_type(_), do: nil
 
   # Find entity by type and ID
   # Uses process-level caching to avoid N+1 queries when processing multiple mentions.
