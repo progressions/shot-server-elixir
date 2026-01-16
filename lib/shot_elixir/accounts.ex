@@ -707,9 +707,10 @@ defmodule ShotElixir.Accounts do
   Links a Discord account to a Chi War user.
   Returns {:ok, user} on success, {:error, changeset} on failure.
   """
-  def link_discord(%User{} = user, discord_id) when is_integer(discord_id) do
+  def link_discord(%User{} = user, discord_id, discord_username \\ nil)
+      when is_integer(discord_id) do
     user
-    |> User.discord_changeset(%{discord_id: discord_id})
+    |> User.discord_changeset(%{discord_id: discord_id, discord_username: discord_username})
     |> Repo.update()
   end
 
@@ -719,7 +720,7 @@ defmodule ShotElixir.Accounts do
   """
   def unlink_discord(%User{} = user) do
     user
-    |> User.discord_changeset(%{discord_id: nil})
+    |> User.discord_changeset(%{discord_id: nil, discord_username: nil})
     |> Repo.update()
   end
 

@@ -1,0 +1,27 @@
+<h2>Discord Account Unlinked</h2>
+
+<p>Hello <%= @user.first_name || @user.email %>,</p>
+
+<p>Your Discord account has been unlinked from your Chi War account.</p>
+
+<div class="callout callout-info">
+  <h4>Discord Account Removed</h4>
+  <p><strong>Discord Username:</strong> <%= @discord_username %></p>
+</div>
+
+<div class="callout callout-info">
+  <h4>What this means:</h4>
+  <ul>
+    <li><strong>Discord commands disabled</strong> - You can no longer use Discord bot commands</li>
+    <li><strong>Re-link anytime</strong> - You can link a Discord account again from your profile</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin: 32px 0;">
+  <%= render "_button.html", url: @profile_url, text: "View Profile Settings" %>
+</div>
+
+<div class="callout callout-warning">
+  <h4>Didn't do this?</h4>
+  <p>If you did not unlink this Discord account, your Chi War account may have been compromised. Please change your password immediately and review your account security.</p>
+</div>

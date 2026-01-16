@@ -1,8 +1,10 @@
 defmodule ShotElixirWeb.Api.V2.UserControllerTest do
   use ShotElixirWeb.ConnCase, async: false
+  use Oban.Testing, repo: ShotElixir.Repo
   alias ShotElixir.Accounts
   alias ShotElixir.Guardian
   alias ShotElixir.Discord.LinkCodes
+  alias ShotElixir.Workers.EmailWorker
 
   @create_attrs %{
     email: "new@example.com",
@@ -399,21 +401,34 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "successfully links Discord account with valid code", %{conn: conn, user: user} do
-      discord_id = 123_456_789_012_345_678
-      discord_username = "testuser"
-      code = LinkCodes.generate(discord_id, discord_username)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        discord_id = 123_456_789_012_345_678
+        discord_username = "testuser"
+        code = LinkCodes.generate(discord_id, discord_username)
 
-      conn = authenticate(conn, user)
-      conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
-      response = json_response(conn, 200)
+        conn = authenticate(conn, user)
+        conn = post(conn, ~p"/api/v2/users/link_discord", %{code: code})
+        response = json_response(conn, 200)
 
-      assert response["success"] == true
-      assert response["message"] == "Discord account linked successfully"
-      assert response["discord_username"] == discord_username
+        assert response["success"] == true
+        assert response["message"] == "Discord account linked successfully"
+        assert response["discord_username"] == discord_username
 
-      # Verify user was updated in database
-      updated_user = Accounts.get_user(user.id)
-      assert updated_user.discord_id == discord_id
+        # Verify user was updated in database
+        updated_user = Accounts.get_user(user.id)
+        assert updated_user.discord_id == discord_id
+        assert updated_user.discord_username == discord_username
+
+        # Verify email notification was queued
+        assert_enqueued(
+          worker: EmailWorker,
+          args: %{
+            "type" => "discord_linked",
+            "user_id" => user.id,
+            "discord_username" => discord_username
+          }
+        )
+      end)
     end
 
     test "returns error for invalid code", %{conn: conn, user: user} do
@@ -592,19 +607,33 @@ defmodule ShotElixirWeb.Api.V2.UserControllerTest do
     end
 
     test "successfully unlinks Discord account", %{conn: conn, user: user} do
-      discord_id = 123_456_789_012_345_684
-      {:ok, linked_user} = Accounts.link_discord(user, discord_id)
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        discord_id = 123_456_789_012_345_684
+        discord_username = "unlinkuser"
+        {:ok, linked_user} = Accounts.link_discord(user, discord_id, discord_username)
 
-      conn = authenticate(conn, linked_user)
-      conn = delete(conn, ~p"/api/v2/users/unlink_discord")
-      response = json_response(conn, 200)
+        conn = authenticate(conn, linked_user)
+        conn = delete(conn, ~p"/api/v2/users/unlink_discord")
+        response = json_response(conn, 200)
 
-      assert response["success"] == true
-      assert response["message"] == "Discord account unlinked successfully"
+        assert response["success"] == true
+        assert response["message"] == "Discord account unlinked successfully"
 
-      # Verify user was updated in database
-      updated_user = Accounts.get_user(user.id)
-      assert updated_user.discord_id == nil
+        # Verify user was updated in database
+        updated_user = Accounts.get_user(user.id)
+        assert updated_user.discord_id == nil
+        assert updated_user.discord_username == nil
+
+        # Verify email notification was queued with the original username
+        assert_enqueued(
+          worker: EmailWorker,
+          args: %{
+            "type" => "discord_unlinked",
+            "user_id" => user.id,
+            "discord_username" => discord_username
+          }
+        )
+      end)
     end
 
     test "returns error when no Discord account is linked", %{conn: conn, user: user} do

@@ -1,0 +1,22 @@
+DISCORD ACCOUNT UNLINKED
+========================
+
+Hello <%= @user.first_name || @user.email %>,
+
+Your Discord account has been unlinked from your Chi War account.
+
+DISCORD ACCOUNT REMOVED:
+Discord Username: <%= @discord_username %>
+
+WHAT THIS MEANS:
+- Discord commands disabled - You can no longer use Discord bot commands
+- Re-link anytime - You can link a Discord account again from your profile
+
+View your profile settings: <%= @profile_url %>
+
+DIDN'T DO THIS?
+If you did not unlink this Discord account, your Chi War account may have been compromised. Please change your password immediately and review your account security.
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>

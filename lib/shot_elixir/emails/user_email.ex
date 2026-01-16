@@ -246,6 +246,66 @@ defmodule ShotElixir.Emails.UserEmail do
   end
 
   @doc """
+  Notification email when user links their Discord account.
+
+  ## Parameters
+    - user: The user who linked their Discord account
+    - discord_username: The Discord username that was linked
+  """
+  def discord_linked(user, discord_username) do
+    profile_url = "#{build_root_url()}/profile"
+
+    new()
+    |> to({user.first_name || user.email, user.email})
+    |> from({@from_name, @from_email})
+    |> subject("Discord Account Linked - #{discord_username}")
+    |> html_body(
+      render_template("discord_linked.html", %{
+        user: user,
+        discord_username: discord_username,
+        profile_url: profile_url
+      })
+    )
+    |> text_body(
+      render_text_template("discord_linked.text", %{
+        user: user,
+        discord_username: discord_username,
+        profile_url: profile_url
+      })
+    )
+  end
+
+  @doc """
+  Notification email when user unlinks their Discord account.
+
+  ## Parameters
+    - user: The user who unlinked their Discord account
+    - discord_username: The Discord username that was unlinked
+  """
+  def discord_unlinked(user, discord_username) do
+    profile_url = "#{build_root_url()}/profile"
+
+    new()
+    |> to({user.first_name || user.email, user.email})
+    |> from({@from_name, @from_email})
+    |> subject("Discord Account Unlinked")
+    |> html_body(
+      render_template("discord_unlinked.html", %{
+        user: user,
+        discord_username: discord_username,
+        profile_url: profile_url
+      })
+    )
+    |> text_body(
+      render_text_template("discord_unlinked.text", %{
+        user: user,
+        discord_username: discord_username,
+        profile_url: profile_url
+      })
+    )
+  end
+
+  @doc """
   OTP login email with 6-digit code and magic link.
   Sent when user requests passwordless login.
   """

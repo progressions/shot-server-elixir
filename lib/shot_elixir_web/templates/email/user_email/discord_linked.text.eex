@@ -1,0 +1,23 @@
+DISCORD ACCOUNT LINKED
+======================
+
+Hello <%= @user.first_name || @user.email %>,
+
+Your Discord account has been successfully linked to your Chi War account.
+
+DISCORD ACCOUNT DETAILS:
+Discord Username: <%= @discord_username %>
+
+WHAT THIS MEANS:
+- Discord Bot Integration - You can now interact with your campaigns through Discord
+- Roll dice - Use Discord commands to roll dice during sessions
+- Character access - Quickly look up your characters from Discord
+
+View your profile settings: <%= @profile_url %>
+
+DIDN'T DO THIS?
+If you did not link this Discord account, please unlink it immediately from your profile settings and secure your account.
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>

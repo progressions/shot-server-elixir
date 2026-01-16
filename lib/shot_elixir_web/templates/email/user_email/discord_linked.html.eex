@@ -1,0 +1,28 @@
+<h2>Discord Account Linked</h2>
+
+<p>Hello <%= @user.first_name || @user.email %>,</p>
+
+<p>Your Discord account has been successfully linked to your Chi War account.</p>
+
+<div class="callout callout-success">
+  <h4>Discord Account Details</h4>
+  <p><strong>Discord Username:</strong> <%= @discord_username %></p>
+</div>
+
+<div class="callout callout-info">
+  <h4>What this means:</h4>
+  <ul>
+    <li><strong>Discord Bot Integration</strong> - You can now interact with your campaigns through Discord</li>
+    <li><strong>Roll dice</strong> - Use Discord commands to roll dice during sessions</li>
+    <li><strong>Character access</strong> - Quickly look up your characters from Discord</li>
+  </ul>
+</div>
+
+<div style="text-align: center; margin: 32px 0;">
+  <%= render "_button.html", url: @profile_url, text: "View Profile Settings" %>
+</div>
+
+<div class="callout callout-warning">
+  <h4>Didn't do this?</h4>
+  <p>If you did not link this Discord account, please unlink it immediately from your profile settings and secure your account.</p>
+</div>

@@ -574,9 +574,18 @@ defmodule ShotElixirWeb.Api.V2.UserController do
           # Check if Discord ID is already linked to another user
           case Accounts.get_user_by_discord_id(discord_id) do
             nil ->
-              # Link the Discord account
-              case Accounts.link_discord(current_user, discord_id) do
+              # Link the Discord account (store username for future email notifications)
+              case Accounts.link_discord(current_user, discord_id, discord_username) do
                 {:ok, _updated_user} ->
+                  # Queue discord_linked email
+                  %{
+                    "type" => "discord_linked",
+                    "user_id" => current_user.id,
+                    "discord_username" => discord_username
+                  }
+                  |> ShotElixir.Workers.EmailWorker.new()
+                  |> Oban.insert()
+
                   conn
                   |> json(%{
                     success: true,
@@ -620,8 +629,20 @@ defmodule ShotElixirWeb.Api.V2.UserController do
     current_user = Guardian.Plug.current_resource(conn)
 
     if current_user.discord_id do
+      # Capture discord info before unlinking for the email
+      discord_username = current_user.discord_username || "ID: #{current_user.discord_id}"
+
       case Accounts.unlink_discord(current_user) do
         {:ok, _updated_user} ->
+          # Queue discord_unlinked email
+          %{
+            "type" => "discord_unlinked",
+            "user_id" => current_user.id,
+            "discord_username" => discord_username
+          }
+          |> ShotElixir.Workers.EmailWorker.new()
+          |> Oban.insert()
+
           conn
           |> json(%{
             success: true,
