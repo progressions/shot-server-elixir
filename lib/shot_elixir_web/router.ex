@@ -375,23 +375,34 @@ defmodule ShotElixirWeb.Router do
     end
   end
 
-  import Phoenix.LiveDashboard.Router
-  import Oban.Web.Router
-
   pipeline :admins_only do
-    plug :browser
     plug :admin_basic_auth
   end
 
   scope "/admin" do
-    pipe_through :admins_only
+    pipe_through [:browser, :admins_only]
+
+    import Phoenix.LiveDashboard.Router
+    import Oban.Web.Router
+
     oban_dashboard("/oban")
     live_dashboard "/dashboard", metrics: ShotElixirWeb.Telemetry
   end
 
   defp admin_basic_auth(conn, _opts) do
-    username = System.get_env("DASHBOARD_USER") || "admin"
-    password = System.get_env("DASHBOARD_PASS") || "admin"
+    {username, password} =
+      if Mix.env() == :prod do
+        {
+          System.fetch_env!("DASHBOARD_USER"),
+          System.fetch_env!("DASHBOARD_PASS")
+        }
+      else
+        {
+          System.get_env("DASHBOARD_USER") || "admin",
+          System.get_env("DASHBOARD_PASS") || "admin"
+        }
+      end
+
     Plug.BasicAuth.basic_auth(conn, username: username, password: password)
   end
 

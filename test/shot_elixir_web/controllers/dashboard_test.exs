@@ -17,7 +17,7 @@ defmodule ShotElixirWeb.DashboardTest do
     assert html_response(conn, 200) =~ "Dashboard"
   end
 
-  test "GET /admin/dashboard without auth", %{conn: conn} do
+  test "GET /admin/dashboard without auth" do
     # Create a fresh conn without auth headers
     conn = build_conn()
     conn = get(conn, "/admin/dashboard")

@@ -79,6 +79,7 @@ defmodule ShotElixir.MixProject do
       # Background jobs for email delivery
       {:oban, "~> 2.17"},
       {:oban_web, "~> 2.11"},
+      {:oban_met, "~> 1.0"},
 
       # Discord bot integration
       {:nostrum, "~> 0.10"},
