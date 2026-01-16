@@ -125,6 +125,16 @@ defmodule ShotElixir.Workers.EmailWorker do
     UserEmail.ai_credits_exhausted(user, campaign, provider_name)
   end
 
+  # Build Notion status changed notification email
+  defp build_email(%{
+         "type" => "notion_status_changed",
+         "campaign_id" => campaign_id,
+         "new_status" => new_status
+       }) do
+    campaign = Repo.get!(ShotElixir.Campaigns.Campaign, campaign_id) |> Repo.preload(:user)
+    UserEmail.notion_status_changed(campaign.user, campaign, new_status)
+  end
+
   # Build admin error notification email
   defp build_email(%{
          "type" => "admin_error",

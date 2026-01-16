@@ -114,10 +114,13 @@ defmodule ShotElixirWeb.NotionOAuthController do
       }
 
       case Campaigns.update_campaign(campaign, update_params) do
-        {:ok, _updated_campaign} ->
+        {:ok, updated_campaign} ->
           Logger.info(
             "NotionOAuth: Successfully linked campaign #{campaign_id} to Notion workspace #{token_data["workspace_name"]}"
           )
+
+          # Queue email notification for successful connection
+          queue_status_change_email(updated_campaign.id, "working")
 
           # Redirect to the frontend campaign page
           frontend_url = Application.get_env(:shot_elixir, :frontend_url, "http://localhost:3001")
@@ -212,5 +215,12 @@ defmodule ShotElixirWeb.NotionOAuthController do
     end
 
     value
+  end
+
+  # Queues an email notification for Notion status change
+  defp queue_status_change_email(campaign_id, new_status) do
+    %{"type" => "notion_status_changed", "campaign_id" => campaign_id, "new_status" => new_status}
+    |> ShotElixir.Workers.EmailWorker.new()
+    |> Oban.insert()
   end
 end

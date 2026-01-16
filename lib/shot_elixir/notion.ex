@@ -240,8 +240,18 @@ defmodule ShotElixir.Notion do
       nil ->
         :ok
 
+      %{notion_status: "needs_attention"} ->
+        # Already needs_attention, don't send another email
+        :ok
+
       campaign ->
-        Campaigns.update_campaign(campaign, %{notion_status: "needs_attention"})
+        case Campaigns.update_campaign(campaign, %{notion_status: "needs_attention"}) do
+          {:ok, _updated} ->
+            queue_status_change_email(campaign.id, "needs_attention")
+
+          _ ->
+            :ok
+        end
     end
   end
 
@@ -252,11 +262,24 @@ defmodule ShotElixir.Notion do
         :ok
 
       %{notion_status: "needs_attention"} = campaign ->
-        Campaigns.update_campaign(campaign, %{notion_status: "working"})
+        case Campaigns.update_campaign(campaign, %{notion_status: "working"}) do
+          {:ok, _updated} ->
+            queue_status_change_email(campaign.id, "working")
+
+          _ ->
+            :ok
+        end
 
       _campaign ->
         :ok
     end
+  end
+
+  # Queues an email notification for Notion status change
+  defp queue_status_change_email(campaign_id, new_status) do
+    %{"type" => "notion_status_changed", "campaign_id" => campaign_id, "new_status" => new_status}
+    |> ShotElixir.Workers.EmailWorker.new()
+    |> Oban.insert()
   end
 
   # Gets the campaign for an entity

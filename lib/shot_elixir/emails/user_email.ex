@@ -209,6 +209,43 @@ defmodule ShotElixir.Emails.UserEmail do
   end
 
   @doc """
+  Notification email when Notion integration status changes.
+
+  ## Parameters
+    - user: The campaign owner to notify
+    - campaign: The campaign affected
+    - new_status: The new status ("working", "needs_attention", "disconnected")
+  """
+  def notion_status_changed(user, campaign, new_status) do
+    subject =
+      case new_status do
+        "working" -> "Notion Integration Connected - #{campaign.name}"
+        "needs_attention" -> "Notion Integration Needs Attention - #{campaign.name}"
+        "disconnected" -> "Notion Integration Disconnected - #{campaign.name}"
+        _ -> "Notion Integration Status Update - #{campaign.name}"
+      end
+
+    new()
+    |> to({user.first_name || user.email, user.email})
+    |> from({@from_name, @from_email})
+    |> subject(subject)
+    |> html_body(
+      render_template("notion_status_changed.html", %{
+        user: user,
+        campaign: campaign,
+        new_status: new_status
+      })
+    )
+    |> text_body(
+      render_text_template("notion_status_changed.text", %{
+        user: user,
+        campaign: campaign,
+        new_status: new_status
+      })
+    )
+  end
+
+  @doc """
   OTP login email with 6-digit code and magic link.
   Sent when user requests passwordless login.
   """
