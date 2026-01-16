@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.NotionOAuthController do
   require Logger
   alias ShotElixir.Campaigns
   alias ShotElixir.Accounts
+  alias ShotElixir.Notion
 
   @notion_auth_url "https://api.notion.com/v1/oauth/authorize"
   @notion_token_url "https://api.notion.com/v1/oauth/token"
@@ -108,14 +109,19 @@ defmodule ShotElixirWeb.NotionOAuthController do
         notion_workspace_icon: token_data["workspace_icon"],
         notion_owner: token_data["owner"],
         # Don't overwrite database_ids if they exist, but initialize if nil
-        notion_database_ids: campaign.notion_database_ids || %{}
+        notion_database_ids: campaign.notion_database_ids || %{},
+        # Set status to working on successful connection
+        notion_status: "working"
       }
 
       case Campaigns.update_campaign(campaign, update_params) do
-        {:ok, _updated_campaign} ->
+        {:ok, updated_campaign} ->
           Logger.info(
             "NotionOAuth: Successfully linked campaign #{campaign_id} to Notion workspace #{token_data["workspace_name"]}"
           )
+
+          # Queue email notification for successful connection
+          Notion.queue_status_change_email(updated_campaign.id, "working")
 
           # Redirect to the frontend campaign page
           frontend_url = Application.get_env(:shot_elixir, :frontend_url, "http://localhost:3001")

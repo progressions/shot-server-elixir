@@ -519,6 +519,115 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
     end
   end
 
+  describe "notion_status in API responses" do
+    test "returns notion_status as 'disconnected' by default for new campaigns", %{
+      conn: conn,
+      gamemaster: gm
+    } do
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign Without Notion",
+          description: "No Notion connected",
+          user_id: gm.id
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
+      response = json_response(conn, 200)
+
+      assert response["notion_status"] == "disconnected"
+      assert response["notion_connected"] == false
+    end
+
+    test "returns notion_status as 'working' when Notion is connected", %{
+      conn: conn,
+      gamemaster: gm
+    } do
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign With Notion",
+          description: "Notion connected",
+          user_id: gm.id,
+          notion_access_token: "test-token",
+          notion_status: "working"
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
+      response = json_response(conn, 200)
+
+      assert response["notion_status"] == "working"
+      assert response["notion_connected"] == true
+    end
+
+    test "returns notion_status as 'needs_attention' when sync has issues", %{
+      conn: conn,
+      gamemaster: gm
+    } do
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign With Notion Issues",
+          description: "Notion needs attention",
+          user_id: gm.id,
+          notion_access_token: "test-token",
+          notion_status: "needs_attention"
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
+      response = json_response(conn, 200)
+
+      assert response["notion_status"] == "needs_attention"
+      assert response["notion_connected"] == true
+    end
+
+    test "notion_status defaults to 'disconnected' for new campaigns with token", %{
+      conn: conn,
+      gamemaster: gm
+    } do
+      # Create campaign with token but no explicit status
+      # The database default is "disconnected", but the view will compute "working"
+      # based on having a token for backwards compatibility
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Campaign With Token",
+          description: "Has token, default status",
+          user_id: gm.id,
+          notion_access_token: "test-token"
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
+      response = json_response(conn, 200)
+
+      # Database default is "disconnected", returned as-is
+      # (the compute_notion_status fallback only applies if status is nil,
+      # which can't happen with NOT NULL constraint)
+      assert response["notion_status"] == "disconnected"
+      assert response["notion_connected"] == true
+    end
+
+    test "notion_status is included in campaign list response", %{
+      conn: conn,
+      gamemaster: gm
+    } do
+      {:ok, _campaign} =
+        Campaigns.create_campaign(%{
+          name: "Listed Campaign",
+          description: "Should have notion_status in list",
+          user_id: gm.id,
+          notion_status: "needs_attention"
+        })
+
+      conn = authenticate(conn, gm)
+      conn = get(conn, ~p"/api/v2/campaigns")
+      response = json_response(conn, 200)
+
+      listed_campaign = Enum.find(response["campaigns"], &(&1["name"] == "Listed Campaign"))
+      assert listed_campaign["notion_status"] == "needs_attention"
+    end
+  end
+
   describe "reset_ai_credits" do
     setup %{gamemaster: gm} do
       {:ok, campaign} =

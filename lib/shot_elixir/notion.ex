@@ -8,6 +8,7 @@ defmodule ShotElixir.Notion do
   alias ShotElixir.Repo
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.Adventures
+  alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Factions
   alias ShotElixir.Junctures
@@ -108,8 +109,12 @@ defmodule ShotElixir.Notion do
 
   @doc """
   Logs a successful sync operation.
+  Also resets the campaign's notion_status to "working" if it was "needs_attention".
   """
   def log_success(entity_type, entity_id, payload, response) do
+    # Reset campaign status to working if it was needs_attention
+    maybe_reset_campaign_status(entity_type, entity_id)
+
     create_sync_log(%{
       entity_type: entity_type,
       entity_id: entity_id,
@@ -121,8 +126,12 @@ defmodule ShotElixir.Notion do
 
   @doc """
   Logs a failed sync operation.
+  Also sets the campaign's notion_status to "needs_attention".
   """
   def log_error(entity_type, entity_id, payload, response, error_message) do
+    # Set campaign status to needs_attention on sync failure
+    set_campaign_needs_attention(entity_type, entity_id)
+
     create_sync_log(%{
       entity_type: entity_type,
       entity_id: entity_id,
@@ -223,6 +232,114 @@ defmodule ShotElixir.Notion do
 
   def prune_sync_logs_for_character(character_id, opts \\ []) do
     prune_sync_logs("character", character_id, opts)
+  end
+
+  # Sets the campaign's notion_status to "needs_attention" when a sync fails
+  defp set_campaign_needs_attention(entity_type, entity_id) do
+    case get_campaign_for_entity(entity_type, entity_id) do
+      nil ->
+        :ok
+
+      %{notion_status: "needs_attention"} ->
+        # Already needs_attention, don't send another email
+        :ok
+
+      campaign ->
+        case Campaigns.update_campaign(campaign, %{notion_status: "needs_attention"}) do
+          {:ok, _updated} ->
+            queue_status_change_email(campaign.id, "needs_attention")
+
+          {:error, reason} ->
+            Logger.error(
+              "Notion: Failed to set campaign #{campaign.id} status to needs_attention: #{inspect(reason)}"
+            )
+
+            :ok
+        end
+    end
+  end
+
+  # Resets the campaign's notion_status to "working" if it was "needs_attention"
+  defp maybe_reset_campaign_status(entity_type, entity_id) do
+    case get_campaign_for_entity(entity_type, entity_id) do
+      nil ->
+        :ok
+
+      %{notion_status: "needs_attention"} = campaign ->
+        case Campaigns.update_campaign(campaign, %{notion_status: "working"}) do
+          {:ok, _updated} ->
+            queue_status_change_email(campaign.id, "working")
+
+          {:error, reason} ->
+            Logger.error(
+              "Notion: Failed to reset campaign #{campaign.id} status to working: #{inspect(reason)}"
+            )
+
+            :ok
+        end
+
+      _campaign ->
+        :ok
+    end
+  end
+
+  @doc """
+  Queues an email notification for Notion status change.
+  Used by both Notion sync operations and OAuth controller.
+  """
+  def queue_status_change_email(campaign_id, new_status) do
+    job =
+      %{
+        "type" => "notion_status_changed",
+        "campaign_id" => campaign_id,
+        "new_status" => new_status
+      }
+      |> ShotElixir.Workers.EmailWorker.new()
+
+    case Oban.insert(job) do
+      {:ok, _job} = ok ->
+        ok
+
+      {:error, reason} = error ->
+        Logger.error(
+          "Notion: Failed to queue status change email for campaign #{campaign_id} " <>
+            "to status #{inspect(new_status)}: #{inspect(reason)}"
+        )
+
+        error
+    end
+  end
+
+  # Gets the campaign for an entity using an optimized single query
+  defp get_campaign_for_entity(entity_type, entity_id) do
+    schema = entity_type_to_schema(entity_type)
+
+    if schema do
+      # Single query with join to get campaign directly
+      query =
+        from e in schema,
+          join: c in Campaigns.Campaign,
+          on: c.id == e.campaign_id,
+          where: e.id == ^entity_id,
+          select: c
+
+      Repo.one(query)
+    else
+      nil
+    end
+  end
+
+  # Maps entity type strings to their Ecto schema modules
+  defp entity_type_to_schema(entity_type) do
+    case entity_type do
+      "character" -> ShotElixir.Characters.Character
+      "site" -> ShotElixir.Sites.Site
+      "party" -> ShotElixir.Parties.Party
+      "faction" -> ShotElixir.Factions.Faction
+      "juncture" -> ShotElixir.Junctures.Juncture
+      "adventure" -> ShotElixir.Adventures.Adventure
+      _ -> nil
+    end
   end
 
   # Private helper for pagination params

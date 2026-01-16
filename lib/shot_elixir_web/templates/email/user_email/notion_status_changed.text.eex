@@ -1,0 +1,71 @@
+<%= case @new_status do %>
+<% "working" -> %>
+NOTION INTEGRATION CONNECTED
+============================
+
+Hello <%= @user.first_name || @user.email %>,
+
+Great news! The Notion integration for your campaign "<%= @campaign.name %>" is now working.
+
+CONNECTION STATUS: Working
+
+Your campaign data is syncing with Notion successfully.
+
+WHAT THIS MEANS:
+- Characters, sites, parties, and other entities will sync to Notion
+- Changes made in Chi War will be reflected in your Notion workspace
+- Any previous sync issues have been resolved
+
+<% "needs_attention" -> %>
+NOTION INTEGRATION NEEDS ATTENTION
+==================================
+
+Hello <%= @user.first_name || @user.email %>,
+
+We encountered an issue syncing data to Notion for your campaign "<%= @campaign.name %>".
+
+CONNECTION STATUS: Needs Attention
+
+Some sync operations have failed. Your data may not be up to date in Notion.
+
+WHAT YOU CAN DO:
+- Check your Notion connection - The access token may have expired
+- Reconnect to Notion - Go to Campaign Settings and reconnect
+- Verify database permissions - Ensure Chi War has access to your databases
+
+Go to Campaign Settings: <%= ShotElixirWeb.EmailView.root_url() %>/campaigns/<%= @campaign.id %>
+
+<% "disconnected" -> %>
+NOTION INTEGRATION DISCONNECTED
+===============================
+
+Hello <%= @user.first_name || @user.email %>,
+
+The Notion integration for your campaign "<%= @campaign.name %>" has been disconnected.
+
+CONNECTION STATUS: Disconnected
+
+Syncing to Notion is currently disabled for this campaign.
+
+WHAT THIS MEANS:
+- Changes in Chi War will not sync to Notion
+- Your existing Notion data remains unchanged
+- You can reconnect at any time from Campaign Settings
+
+<% _ -> %>
+NOTION INTEGRATION STATUS UPDATE
+================================
+
+Hello <%= @user.first_name || @user.email %>,
+
+The Notion integration status for your campaign "<%= @campaign.name %>" has changed to: <%= @new_status %>.
+
+<% end %>
+
+If you have questions or need assistance, please contact support.
+
+Go to Chi War: <%= ShotElixirWeb.EmailView.root_url() %>
+
+--
+Chi War - Campaign & Character Manager for Feng Shui 2
+<%= ShotElixirWeb.EmailView.root_url() %>
