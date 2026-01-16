@@ -295,17 +295,17 @@ defmodule ShotElixirWeb.CampaignChannel do
     base = String.downcase(entity_class)
 
     case base do
-      "fight" -> "fights"
-      "character" -> "characters"
-      "vehicle" -> "vehicles"
-      "campaign" -> "campaigns"
-      "site" -> "sites"
-      "party" -> "parties"
-      "faction" -> "factions"
-      "weapon" -> "weapons"
-      "schtick" -> "schticks"
-      "image" -> "images"
       "adventure" -> "adventures"
+      "campaign" -> "campaigns"
+      "character" -> "characters"
+      "faction" -> "factions"
+      "fight" -> "fights"
+      "image" -> "images"
+      "party" -> "parties"
+      "schtick" -> "schticks"
+      "site" -> "sites"
+      "vehicle" -> "vehicles"
+      "weapon" -> "weapons"
       _ -> base <> "s"
     end
   end
