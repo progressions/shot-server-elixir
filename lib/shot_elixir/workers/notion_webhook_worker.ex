@@ -187,17 +187,20 @@ defmodule ShotElixir.Workers.NotionWebhookWorker do
 
   # Normalize UUID format (Notion sometimes sends without dashes)
   defp normalize_uuid(uuid) when is_binary(uuid) do
-    # If already has dashes, return as-is
-    if String.contains?(uuid, "-") do
-      uuid
-    else
-      # Insert dashes: 8-4-4-4-12
-      <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
-        e::binary-size(12)>> = uuid
+    cond do
+      String.contains?(uuid, "-") ->
+        uuid
 
-      "#{a}-#{b}-#{c}-#{d}-#{e}"
+      String.length(uuid) == 32 ->
+        # Insert dashes: 8-4-4-4-12
+        <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
+          e::binary-size(12)>> = uuid
+
+        "#{a}-#{b}-#{c}-#{d}-#{e}"
+
+      true ->
+        # Malformed UUID length; return as-is to preserve existing behavior
+        uuid
     end
-  rescue
-    _ -> uuid
   end
 end
