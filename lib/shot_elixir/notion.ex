@@ -249,7 +249,11 @@ defmodule ShotElixir.Notion do
           {:ok, _updated} ->
             queue_status_change_email(campaign.id, "needs_attention")
 
-          _ ->
+          {:error, reason} ->
+            Logger.error(
+              "Notion: Failed to set campaign #{campaign.id} status to needs_attention: #{inspect(reason)}"
+            )
+
             :ok
         end
     end
@@ -266,7 +270,11 @@ defmodule ShotElixir.Notion do
           {:ok, _updated} ->
             queue_status_change_email(campaign.id, "working")
 
-          _ ->
+          {:error, reason} ->
+            Logger.error(
+              "Notion: Failed to reset campaign #{campaign.id} status to working: #{inspect(reason)}"
+            )
+
             :ok
         end
 
@@ -275,61 +283,62 @@ defmodule ShotElixir.Notion do
     end
   end
 
-  # Queues an email notification for Notion status change
-  defp queue_status_change_email(campaign_id, new_status) do
-    %{"type" => "notion_status_changed", "campaign_id" => campaign_id, "new_status" => new_status}
-    |> ShotElixir.Workers.EmailWorker.new()
-    |> Oban.insert()
+  @doc """
+  Queues an email notification for Notion status change.
+  Used by both Notion sync operations and OAuth controller.
+  """
+  def queue_status_change_email(campaign_id, new_status) do
+    job =
+      %{
+        "type" => "notion_status_changed",
+        "campaign_id" => campaign_id,
+        "new_status" => new_status
+      }
+      |> ShotElixir.Workers.EmailWorker.new()
+
+    case Oban.insert(job) do
+      {:ok, _job} = ok ->
+        ok
+
+      {:error, reason} = error ->
+        Logger.error(
+          "Notion: Failed to queue status change email for campaign #{campaign_id} " <>
+            "to status #{inspect(new_status)}: #{inspect(reason)}"
+        )
+
+        error
+    end
   end
 
-  # Gets the campaign for an entity
+  # Gets the campaign for an entity using an optimized single query
   defp get_campaign_for_entity(entity_type, entity_id) do
-    campaign_id =
-      case entity_type do
-        "character" ->
-          case Characters.get_character(entity_id) do
-            nil -> nil
-            character -> character.campaign_id
-          end
+    schema = entity_type_to_schema(entity_type)
 
-        "site" ->
-          case Sites.get_site(entity_id) do
-            nil -> nil
-            site -> site.campaign_id
-          end
+    if schema do
+      # Single query with join to get campaign directly
+      query =
+        from e in schema,
+          join: c in Campaigns.Campaign,
+          on: c.id == e.campaign_id,
+          where: e.id == ^entity_id,
+          select: c
 
-        "party" ->
-          case Parties.get_party(entity_id) do
-            nil -> nil
-            party -> party.campaign_id
-          end
-
-        "faction" ->
-          case Factions.get_faction(entity_id) do
-            nil -> nil
-            faction -> faction.campaign_id
-          end
-
-        "juncture" ->
-          case Junctures.get_juncture(entity_id) do
-            nil -> nil
-            juncture -> juncture.campaign_id
-          end
-
-        "adventure" ->
-          case Adventures.get_adventure(entity_id) do
-            nil -> nil
-            adventure -> adventure.campaign_id
-          end
-
-        _ ->
-          nil
-      end
-
-    if campaign_id do
-      Campaigns.get_campaign(campaign_id)
+      Repo.one(query)
     else
       nil
+    end
+  end
+
+  # Maps entity type strings to their Ecto schema modules
+  defp entity_type_to_schema(entity_type) do
+    case entity_type do
+      "character" -> ShotElixir.Characters.Character
+      "site" -> ShotElixir.Sites.Site
+      "party" -> ShotElixir.Parties.Party
+      "faction" -> ShotElixir.Factions.Faction
+      "juncture" -> ShotElixir.Junctures.Juncture
+      "adventure" -> ShotElixir.Adventures.Adventure
+      _ -> nil
     end
   end
 

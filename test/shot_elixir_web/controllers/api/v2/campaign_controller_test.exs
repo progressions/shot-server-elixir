@@ -581,30 +581,30 @@ defmodule ShotElixirWeb.Api.V2.CampaignControllerTest do
       assert response["notion_connected"] == true
     end
 
-    test "computes notion_status as 'working' when status is nil but token exists", %{
+    test "notion_status defaults to 'disconnected' for new campaigns with token", %{
       conn: conn,
       gamemaster: gm
     } do
-      # Create campaign first
+      # Create campaign with token but no explicit status
+      # The database default is "disconnected", but the view will compute "working"
+      # based on having a token for backwards compatibility
       {:ok, campaign} =
         Campaigns.create_campaign(%{
-          name: "Legacy Campaign",
-          description: "Has token but no status",
+          name: "Campaign With Token",
+          description: "Has token, default status",
           user_id: gm.id,
           notion_access_token: "test-token"
         })
-
-      # Directly set notion_status to nil to simulate legacy data
-      campaign
-      |> Ecto.Changeset.change(%{notion_status: nil})
-      |> ShotElixir.Repo.update!()
 
       conn = authenticate(conn, gm)
       conn = get(conn, ~p"/api/v2/campaigns/#{campaign.id}")
       response = json_response(conn, 200)
 
-      # Should compute as "working" based on having a token
-      assert response["notion_status"] == "working"
+      # Database default is "disconnected", returned as-is
+      # (the compute_notion_status fallback only applies if status is nil,
+      # which can't happen with NOT NULL constraint)
+      assert response["notion_status"] == "disconnected"
+      assert response["notion_connected"] == true
     end
 
     test "notion_status is included in campaign list response", %{
