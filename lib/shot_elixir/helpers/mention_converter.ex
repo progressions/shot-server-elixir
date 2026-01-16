@@ -452,15 +452,30 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp entity_type_from_href(_), do: nil
 
   # Find entity by type and ID
+  # Uses process-level caching to avoid N+1 queries when processing multiple mentions
   defp find_entity_by_id(entity_type, id, campaign_id) do
     schema = entity_type_to_schema(entity_type)
 
     if schema do
-      query =
-        from e in schema,
-          where: e.id == ^id and e.campaign_id == ^campaign_id
+      # Use process dictionary to cache entities by type for this request
+      cache_key = {__MODULE__, :entities_by_campaign_and_type, campaign_id, entity_type}
 
-      case Repo.one(query) do
+      entities =
+        case Process.get(cache_key) do
+          nil ->
+            query =
+              from e in schema,
+                where: e.campaign_id == ^campaign_id
+
+            loaded_entities = Repo.all(query)
+            Process.put(cache_key, loaded_entities)
+            loaded_entities
+
+          cached_entities ->
+            cached_entities
+        end
+
+      case Enum.find(entities, &(&1.id == id)) do
         nil -> {:error, :not_found}
         entity -> {:ok, entity}
       end
