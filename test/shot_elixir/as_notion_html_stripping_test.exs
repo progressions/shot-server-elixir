@@ -24,7 +24,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "This is a test site."
     end
@@ -37,7 +39,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "First paragraph.\nSecond paragraph."
     end
@@ -50,7 +54,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Line one\nLine two\nLine three"
     end
@@ -63,7 +69,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == ""
     end
@@ -76,7 +84,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Just plain text"
     end
@@ -91,7 +101,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Party.as_notion(party)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "A group of heroes."
     end
@@ -104,7 +116,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Party.as_notion(party)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Dragon Hunters\nBased in Hong Kong"
     end
@@ -117,7 +131,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Party.as_notion(party)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == ""
     end
@@ -132,7 +148,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Faction.as_notion(faction)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "An evil organization."
     end
@@ -145,7 +163,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Faction.as_notion(faction)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "The Ascended\nMasters of the Secret War"
     end
@@ -158,7 +178,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Faction.as_notion(faction)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == ""
     end
@@ -173,7 +195,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Adventure.as_notion(adventure)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "A dangerous mission."
     end
@@ -186,7 +210,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Adventure.as_notion(adventure)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Episode One\nThe heroes begin their journey"
     end
@@ -199,7 +225,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Adventure.as_notion(adventure)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == ""
     end
@@ -214,7 +242,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Juncture.as_notion(juncture)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "The modern era."
     end
@@ -227,7 +257,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Juncture.as_notion(juncture)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Contemporary Era\n1996-Present Day"
     end
@@ -240,7 +272,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Juncture.as_notion(juncture)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == ""
     end
@@ -257,7 +291,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Character.as_notion(character)
-      hook_content = get_in(result, ["Melodramatic Hook", "rich_text", Access.at(0), "text", "content"])
+
+      hook_content =
+        get_in(result, ["Melodramatic Hook", "rich_text", Access.at(0), "text", "content"])
 
       assert hook_content == "Seeks revenge for father's death."
     end
@@ -287,7 +323,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Character.as_notion(character)
-      hook_content = get_in(result, ["Melodramatic Hook", "rich_text", Access.at(0), "text", "content"])
+
+      hook_content =
+        get_in(result, ["Melodramatic Hook", "rich_text", Access.at(0), "text", "content"])
 
       assert hook_content == "First hook line.\nSecond hook line."
     end
@@ -302,7 +340,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Bold italic text."
     end
@@ -315,7 +355,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       # HTML tags are stripped, list items become plain text
       assert description_content == "Item oneItem two"
@@ -329,7 +371,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Visit here for more."
     end
@@ -342,7 +386,9 @@ defmodule ShotElixir.AsNotionHtmlStrippingTest do
       }
 
       result = Site.as_notion(site)
-      description_content = get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
+
+      description_content =
+        get_in(result, ["Description", "rich_text", Access.at(0), "text", "content"])
 
       assert description_content == "Spaced content"
     end
