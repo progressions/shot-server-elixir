@@ -135,6 +135,26 @@ defmodule ShotElixir.Workers.EmailWorker do
     UserEmail.notion_status_changed(campaign.user, campaign, new_status)
   end
 
+  # Build Discord linked notification email
+  defp build_email(%{
+         "type" => "discord_linked",
+         "user_id" => user_id,
+         "discord_username" => discord_username
+       }) do
+    user = Repo.get!(ShotElixir.Accounts.User, user_id)
+    UserEmail.discord_linked(user, discord_username)
+  end
+
+  # Build Discord unlinked notification email
+  defp build_email(%{
+         "type" => "discord_unlinked",
+         "user_id" => user_id,
+         "discord_username" => discord_username
+       }) do
+    user = Repo.get!(ShotElixir.Accounts.User, user_id)
+    UserEmail.discord_unlinked(user, discord_username)
+  end
+
   # Build admin error notification email
   defp build_email(%{
          "type" => "admin_error",
