@@ -69,7 +69,7 @@ defmodule ShotElixir.Adventures.Adventure do
     base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => adventure.name || ""}}]},
       "Description" => %{
-        "rich_text" => [%{"text" => %{"content" => adventure.description || ""}}]
+        "rich_text" => [%{"text" => %{"content" => strip_html(adventure.description || "")}}]
       },
       "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
     }
@@ -172,4 +172,16 @@ defmodule ShotElixir.Adventures.Adventure do
         attrs
     end
   end
+
+  # Strip HTML tags from text, converting paragraph and line breaks to newlines
+  defp strip_html(text) when is_binary(text) do
+    text
+    |> String.replace(~r/<p>/, "")
+    |> String.replace(~r/<\/p>/, "\n")
+    |> String.replace(~r/<br\s*\/?>/, "\n")
+    |> String.replace(~r/<[^>]+>/, "")
+    |> String.trim()
+  end
+
+  defp strip_html(_), do: ""
 end
