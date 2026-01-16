@@ -89,7 +89,8 @@ config :shot_elixir, Oban,
     high_priority: 5,
     notion: 3,
     discord: 10,
-    images: 5
+    images: 5,
+    webhooks: 5
   ],
   plugins: [
     Oban.Plugins.Pruner,

@@ -104,6 +104,9 @@ defmodule ShotElixirWeb.Router do
     # CLI device authorization (public endpoints)
     post "/cli/auth/start", CliAuthController, :start
     post "/cli/auth/poll", CliAuthController, :poll
+
+    # Notion webhook (public - receives events from Notion)
+    post "/webhooks/notion", NotionWebhookController, :webhook
   end
 
   # API V2 endpoints - Authenticated
