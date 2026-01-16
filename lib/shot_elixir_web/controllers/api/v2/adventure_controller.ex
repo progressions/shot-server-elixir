@@ -134,12 +134,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
                 {:ok, adventure} ->
                   adventure = maybe_handle_image_upload(conn, adventure)
 
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    current_user.current_campaign_id,
-                    "Adventure"
-                  )
-
                   conn
                   |> put_status(:created)
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
@@ -211,12 +205,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
 
                 case Adventures.update_adventure(adventure, parsed_params) do
                   {:ok, updated_adventure} ->
-                    # Broadcast reload signal to campaign channel
-                    ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                      updated_adventure.campaign_id,
-                      "Adventure"
-                    )
-
                     conn
                     |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                     |> render("show.json", adventure: updated_adventure)
@@ -258,12 +246,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.delete_adventure(adventure) do
                 {:ok, _deleted_adventure} ->
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    adventure.campaign_id,
-                    "Adventure"
-                  )
-
                   send_resp(conn, :no_content, "")
 
                 {:error, _} ->
@@ -332,9 +314,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
          campaign <- Campaigns.get_campaign(campaign_id),
          true <- authorize_campaign_modification(campaign, current_user),
          {:ok, new_adventure} <- Adventures.duplicate_adventure(adventure) do
-      # Broadcast reload signal to campaign channel
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Adventure")
-
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.AdventureView)
@@ -384,12 +363,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.add_character(adventure_id, character_id) do
                 {:ok, updated_adventure} ->
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    adventure.campaign_id,
-                    "Adventure"
-                  )
-
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                   |> render("show.json", adventure: updated_adventure)
@@ -430,12 +403,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.remove_character(adventure_id, character_id) do
                 {:ok, updated_adventure} ->
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    adventure.campaign_id,
-                    "Adventure"
-                  )
-
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                   |> render("show.json", adventure: updated_adventure)
@@ -480,12 +447,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.add_villain(adventure_id, character_id) do
                 {:ok, updated_adventure} ->
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    adventure.campaign_id,
-                    "Adventure"
-                  )
-
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                   |> render("show.json", adventure: updated_adventure)
@@ -526,12 +487,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.remove_villain(adventure_id, character_id) do
                 {:ok, updated_adventure} ->
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    adventure.campaign_id,
-                    "Adventure"
-                  )
-
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                   |> render("show.json", adventure: updated_adventure)
@@ -576,12 +531,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.add_fight(adventure_id, fight_id) do
                 {:ok, updated_adventure} ->
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    adventure.campaign_id,
-                    "Adventure"
-                  )
-
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                   |> render("show.json", adventure: updated_adventure)
@@ -622,12 +571,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.remove_fight(adventure_id, fight_id) do
                 {:ok, updated_adventure} ->
-                  # Broadcast reload signal to campaign channel
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(
-                    adventure.campaign_id,
-                    "Adventure"
-                  )
-
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                   |> render("show.json", adventure: updated_adventure)
