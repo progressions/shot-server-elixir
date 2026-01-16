@@ -100,7 +100,7 @@ defmodule ShotElixir.Adventures.Adventure do
       "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
     }
 
-    add_optional_fields(base, adventure)
+    maybe_add_optional_fields(base, adventure)
   end
 
   # Simple version without mention conversion (fallback)
@@ -113,11 +113,11 @@ defmodule ShotElixir.Adventures.Adventure do
       "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
     }
 
-    add_optional_fields(base, adventure)
+    maybe_add_optional_fields(base, adventure)
   end
 
   # Helper to add optional fields (season, dates)
-  defp add_optional_fields(base, adventure) do
+  defp maybe_add_optional_fields(base, adventure) do
     base =
       if adventure.season do
         Map.put(base, "Season", %{"number" => adventure.season})

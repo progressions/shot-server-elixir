@@ -103,21 +103,19 @@ defmodule ShotElixir.Helpers.MentionConverter do
   """
   @spec extract_mentions(String.t(), Campaign.t()) :: [map()]
   def extract_mentions(html, %Campaign{} = campaign) do
-    # Try primary regex first
-    mentions = Regex.scan(@mention_regex, html, return: :index)
+    # Try primary regex first for positions
+    mentions_primary = Regex.scan(@mention_regex, html, return: :index)
 
-    mentions =
-      if Enum.empty?(mentions) do
-        # Try alternative regex (different attribute order)
-        Regex.scan(@mention_regex_alt, html, return: :index)
+    {mentions, content_matches} =
+      if Enum.empty?(mentions_primary) do
+        # Fallback: try alternative regex (different attribute order)
+        mentions_alt = Regex.scan(@mention_regex_alt, html, return: :index)
+        content_alt = Regex.scan(@mention_regex_alt, html)
+        {mentions_alt, content_alt}
       else
-        mentions
+        content_primary = Regex.scan(@mention_regex, html)
+        {mentions_primary, content_primary}
       end
-
-    # Get the actual content matches
-    content_matches =
-      Regex.scan(@mention_regex, html) ++
-        Regex.scan(@mention_regex_alt, html)
 
     # Build mention info with positions
     Enum.zip(mentions, content_matches)
@@ -139,8 +137,9 @@ defmodule ShotElixir.Helpers.MentionConverter do
   end
 
   # Build the Notion rich_text array from text and mentions
+  # Uses cons [item | acc] pattern and reverses at the end for O(n) complexity
   defp build_notion_rich_text(text, mentions, _campaign) do
-    {rich_text, last_pos} =
+    {rich_text_reversed, last_pos} =
       Enum.reduce(mentions, {[], 0}, fn mention, {acc, current_pos} ->
         # Add text before this mention
         text_before = String.slice(text, current_pos, mention.start_pos - current_pos)
@@ -151,7 +150,7 @@ defmodule ShotElixir.Helpers.MentionConverter do
             plain_before = strip_html_preserve_whitespace(text_before)
 
             if plain_before != "" do
-              acc ++ [%{"type" => "text", "text" => %{"content" => plain_before}}]
+              [%{"type" => "text", "text" => %{"content" => plain_before}} | acc]
             else
               acc
             end
@@ -159,9 +158,9 @@ defmodule ShotElixir.Helpers.MentionConverter do
             acc
           end
 
-        # Add the mention
+        # Add the mention (prepend to accumulator)
         mention_rich_text = mention_to_notion_rich_text(mention)
-        acc = acc ++ [mention_rich_text]
+        acc = [mention_rich_text | acc]
 
         {acc, mention.start_pos + mention.length}
       end)
@@ -169,21 +168,25 @@ defmodule ShotElixir.Helpers.MentionConverter do
     # Add any remaining text after the last mention
     remaining = String.slice(text, last_pos, String.length(text) - last_pos)
 
-    if remaining != "" do
-      # For trailing text, strip HTML and trim trailing newlines (from </p> conversion)
-      plain_remaining =
-        remaining
-        |> strip_html_preserve_whitespace()
-        |> String.trim_trailing("\n")
+    rich_text_reversed =
+      if remaining != "" do
+        # For trailing text, strip HTML and trim trailing newlines (from </p> conversion)
+        plain_remaining =
+          remaining
+          |> strip_html_preserve_whitespace()
+          |> String.trim_trailing("\n")
 
-      if plain_remaining != "" do
-        rich_text ++ [%{"type" => "text", "text" => %{"content" => plain_remaining}}]
+        if plain_remaining != "" do
+          [%{"type" => "text", "text" => %{"content" => plain_remaining}} | rich_text_reversed]
+        else
+          rich_text_reversed
+        end
       else
-        rich_text
+        rich_text_reversed
       end
-    else
-      rich_text
-    end
+
+    # Reverse to restore correct order
+    Enum.reverse(rich_text_reversed)
   end
 
   # Convert a single mention to Notion rich_text format

@@ -89,7 +89,7 @@ defmodule ShotElixir.Parties.Party do
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
-    add_character_relations(base, party)
+    maybe_add_character_relations(base, party)
   end
 
   # Simple version without mention conversion (fallback)
@@ -102,11 +102,11 @@ defmodule ShotElixir.Parties.Party do
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
-    add_character_relations(base, party)
+    maybe_add_character_relations(base, party)
   end
 
   # Helper to add character relations to base properties
-  defp add_character_relations(base, party) do
+  defp maybe_add_character_relations(base, party) do
     if Ecto.assoc_loaded?(party.memberships) do
       character_ids =
         party.memberships

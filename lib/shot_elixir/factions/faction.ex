@@ -92,7 +92,7 @@ defmodule ShotElixir.Factions.Faction do
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
 
-    add_character_relations(base, faction)
+    maybe_add_character_relations(base, faction)
   end
 
   # Simple version without mention conversion (fallback)
@@ -105,11 +105,11 @@ defmodule ShotElixir.Factions.Faction do
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
 
-    add_character_relations(base, faction)
+    maybe_add_character_relations(base, faction)
   end
 
   # Helper to add character relations to base properties
-  defp add_character_relations(base, faction) do
+  defp maybe_add_character_relations(base, faction) do
     if Ecto.assoc_loaded?(faction.characters) do
       character_ids =
         faction.characters

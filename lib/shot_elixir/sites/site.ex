@@ -89,7 +89,7 @@ defmodule ShotElixir.Sites.Site do
       "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
 
-    add_character_relations(base, site)
+    maybe_add_character_relations(base, site)
   end
 
   # Simple version without mention conversion (fallback)
@@ -102,11 +102,11 @@ defmodule ShotElixir.Sites.Site do
       "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
 
-    add_character_relations(base, site)
+    maybe_add_character_relations(base, site)
   end
 
   # Helper to add character relations to base properties
-  defp add_character_relations(base, site) do
+  defp maybe_add_character_relations(base, site) do
     if Ecto.assoc_loaded?(site.attunements) do
       character_ids =
         site.attunements
