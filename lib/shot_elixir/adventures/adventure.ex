@@ -2,6 +2,7 @@ defmodule ShotElixir.Adventures.Adventure do
   use Ecto.Schema
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Helpers.MentionConverter
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -65,8 +66,45 @@ defmodule ShotElixir.Adventures.Adventure do
 
   @doc """
   Convert adventure to Notion page properties format.
+
+  If campaign is preloaded, uses MentionConverter to convert @mentions to Notion page links.
+  Otherwise, falls back to simple HTML stripping.
   """
   def as_notion(%__MODULE__{} = adventure) do
+    # Check if campaign is preloaded - if so, use mention-aware conversion
+    if Ecto.assoc_loaded?(adventure.campaign) and adventure.campaign != nil do
+      as_notion(adventure, adventure.campaign)
+    else
+      as_notion_simple(adventure)
+    end
+  end
+
+  @doc """
+  Convert adventure to Notion page properties format with mention support.
+  Uses MentionConverter to convert @mentions to Notion page links.
+  """
+  def as_notion(%__MODULE__{} = adventure, %ShotElixir.Campaigns.Campaign{} = campaign) do
+    description_rich_text =
+      MentionConverter.html_to_notion_rich_text(adventure.description || "", campaign)
+
+    description_rich_text =
+      if Enum.empty?(description_rich_text) do
+        [%{"text" => %{"content" => ""}}]
+      else
+        description_rich_text
+      end
+
+    base = %{
+      "Name" => %{"title" => [%{"text" => %{"content" => adventure.name || ""}}]},
+      "Description" => %{"rich_text" => description_rich_text},
+      "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
+    }
+
+    add_optional_fields(base, adventure)
+  end
+
+  # Simple version without mention conversion (fallback)
+  defp as_notion_simple(%__MODULE__{} = adventure) do
     base = %{
       "Name" => %{"title" => [%{"text" => %{"content" => adventure.name || ""}}]},
       "Description" => %{
@@ -75,6 +113,11 @@ defmodule ShotElixir.Adventures.Adventure do
       "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
     }
 
+    add_optional_fields(base, adventure)
+  end
+
+  # Helper to add optional fields (season, dates)
+  defp add_optional_fields(base, adventure) do
     base =
       if adventure.season do
         Map.put(base, "Season", %{"number" => adventure.season})
@@ -119,14 +162,20 @@ defmodule ShotElixir.Adventures.Adventure do
           if existing_adventure, do: attrs, else: Map.put(attrs, :name, "Untitled Adventure")
       end
 
-    # Description from rich_text (using plain_text to handle all rich_text types)
+    # Description from rich_text (using MentionConverter to preserve @mentions)
     attrs =
       case get_in(props, ["Description", "rich_text"]) do
         rich_text when is_list(rich_text) and length(rich_text) > 0 ->
+          # Use MentionConverter if we have an existing adventure with campaign_id
           description =
-            rich_text
-            |> Enum.map(& &1["plain_text"])
-            |> Enum.join("")
+            if existing_adventure && existing_adventure.campaign_id do
+              MentionConverter.notion_rich_text_to_html(rich_text, existing_adventure.campaign_id)
+            else
+              # Fallback to plain text concatenation
+              rich_text
+              |> Enum.map(& &1["plain_text"])
+              |> Enum.join("")
+            end
 
           Map.put(attrs, :description, description)
 

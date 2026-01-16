@@ -9,6 +9,7 @@ defmodule ShotElixir.Factions.Faction do
   alias ShotElixir.Sites.Site
   alias ShotElixir.Parties.Party
   alias ShotElixir.Junctures.Juncture
+  alias ShotElixir.Helpers.MentionConverter
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -57,8 +58,45 @@ defmodule ShotElixir.Factions.Faction do
   @doc """
   Convert faction to Notion page properties format.
   Note: Factions in Notion use rich_text for Name, not title.
+
+  If campaign is preloaded, uses MentionConverter to convert @mentions to Notion page links.
+  Otherwise, falls back to simple HTML stripping.
   """
   def as_notion(%__MODULE__{} = faction) do
+    # Check if campaign is preloaded - if so, use mention-aware conversion
+    if Ecto.assoc_loaded?(faction.campaign) and faction.campaign != nil do
+      as_notion(faction, faction.campaign)
+    else
+      as_notion_simple(faction)
+    end
+  end
+
+  @doc """
+  Convert faction to Notion page properties format with mention support.
+  Uses MentionConverter to convert @mentions to Notion page links.
+  """
+  def as_notion(%__MODULE__{} = faction, %ShotElixir.Campaigns.Campaign{} = campaign) do
+    description_rich_text =
+      MentionConverter.html_to_notion_rich_text(faction.description || "", campaign)
+
+    description_rich_text =
+      if Enum.empty?(description_rich_text) do
+        [%{"text" => %{"content" => ""}}]
+      else
+        description_rich_text
+      end
+
+    base = %{
+      "Name" => %{"rich_text" => [%{"text" => %{"content" => faction.name || ""}}]},
+      "Description" => %{"rich_text" => description_rich_text},
+      "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
+    }
+
+    add_character_relations(base, faction)
+  end
+
+  # Simple version without mention conversion (fallback)
+  defp as_notion_simple(%__MODULE__{} = faction) do
     base = %{
       "Name" => %{"rich_text" => [%{"text" => %{"content" => faction.name || ""}}]},
       "Description" => %{
@@ -67,6 +105,11 @@ defmodule ShotElixir.Factions.Faction do
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
 
+    add_character_relations(base, faction)
+  end
+
+  # Helper to add character relations to base properties
+  defp add_character_relations(base, faction) do
     if Ecto.assoc_loaded?(faction.characters) do
       character_ids =
         faction.characters

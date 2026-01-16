@@ -21,6 +21,7 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Sites.Site
   alias ShotElixir.Adventures
   alias ShotElixir.Adventures.Adventure
+  alias ShotElixir.Helpers.MentionConverter
 
   import Ecto.Query
 
@@ -1381,15 +1382,26 @@ defmodule ShotElixir.Services.NotionService do
     Notion.log_error(entity_type, entity_id, payload, response, message)
   end
 
-  defp entity_attributes_from_notion(page) do
+  # Version with mention conversion support
+  defp entity_attributes_from_notion(page, campaign_id) do
     props = page["properties"] || %{}
 
     %{
       notion_page_id: page["id"],
       name: get_entity_name(props),
-      description: get_rich_text_content(props, "Description")
+      description: get_rich_text_as_html(props, "Description", campaign_id)
     }
     |> maybe_put_at_a_glance(get_checkbox_content(props, "At a Glance"))
+  end
+
+  # Convert Notion rich_text to Chi War HTML with mention support
+  defp get_rich_text_as_html(props, key, campaign_id) do
+    rich_text =
+      props
+      |> Map.get(key, %{})
+      |> Map.get("rich_text", [])
+
+    MentionConverter.notion_rich_text_to_html(rich_text, campaign_id)
   end
 
   defp juncture_as_notion(%Juncture{} = juncture) do
@@ -2130,7 +2142,8 @@ defmodule ShotElixir.Services.NotionService do
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
-        attributes = entity_attributes_from_notion(page)
+        # Use mention-aware conversion with campaign_id
+        attributes = entity_attributes_from_notion(page, site.campaign_id)
 
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Sites.update_site(site, attributes, skip_notion_sync: true) do
@@ -2196,7 +2209,8 @@ defmodule ShotElixir.Services.NotionService do
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
-        attributes = entity_attributes_from_notion(page)
+        # Use mention-aware conversion with campaign_id
+        attributes = entity_attributes_from_notion(page, party.campaign_id)
 
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Parties.update_party(party, attributes, skip_notion_sync: true) do
@@ -2262,7 +2276,8 @@ defmodule ShotElixir.Services.NotionService do
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
-        attributes = entity_attributes_from_notion(page)
+        # Use mention-aware conversion with campaign_id
+        attributes = entity_attributes_from_notion(page, faction.campaign_id)
 
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Factions.update_faction(faction, attributes, skip_notion_sync: true) do
@@ -2329,7 +2344,8 @@ defmodule ShotElixir.Services.NotionService do
         {:error, {:notion_api_error, error_code, message}}
 
       page when is_map(page) ->
-        attributes = entity_attributes_from_notion(page)
+        # Use mention-aware conversion with campaign_id
+        attributes = entity_attributes_from_notion(page, juncture.campaign_id)
 
         attributes =
           case character_ids_from_notion(page, juncture.campaign_id) do

@@ -2,6 +2,7 @@ defmodule ShotElixir.Junctures.Juncture do
   use Ecto.Schema
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
+  alias ShotElixir.Helpers.MentionConverter
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -44,8 +45,43 @@ defmodule ShotElixir.Junctures.Juncture do
 
   @doc """
   Convert juncture to Notion page properties format.
+
+  If campaign is preloaded, uses MentionConverter to convert @mentions to Notion page links.
+  Otherwise, falls back to simple HTML stripping.
   """
   def as_notion(%__MODULE__{} = juncture) do
+    # Check if campaign is preloaded - if so, use mention-aware conversion
+    if Ecto.assoc_loaded?(juncture.campaign) and juncture.campaign != nil do
+      as_notion(juncture, juncture.campaign)
+    else
+      as_notion_simple(juncture)
+    end
+  end
+
+  @doc """
+  Convert juncture to Notion page properties format with mention support.
+  Uses MentionConverter to convert @mentions to Notion page links.
+  """
+  def as_notion(%__MODULE__{} = juncture, %ShotElixir.Campaigns.Campaign{} = campaign) do
+    description_rich_text =
+      MentionConverter.html_to_notion_rich_text(juncture.description || "", campaign)
+
+    description_rich_text =
+      if Enum.empty?(description_rich_text) do
+        [%{"text" => %{"content" => ""}}]
+      else
+        description_rich_text
+      end
+
+    %{
+      "Name" => %{"title" => [%{"text" => %{"content" => juncture.name || ""}}]},
+      "Description" => %{"rich_text" => description_rich_text},
+      "At a Glance" => %{"checkbox" => !!juncture.at_a_glance}
+    }
+  end
+
+  # Simple version without mention conversion (fallback)
+  defp as_notion_simple(%__MODULE__{} = juncture) do
     %{
       "Name" => %{"title" => [%{"text" => %{"content" => juncture.name || ""}}]},
       "Description" => %{
