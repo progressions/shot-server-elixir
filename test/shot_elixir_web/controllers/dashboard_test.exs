@@ -1,5 +1,5 @@
 defmodule ShotElixirWeb.DashboardTest do
-  use ShotElixirWeb.ConnCase
+  use ShotElixirWeb.ConnCase, async: true
 
   test "GET /dev/dashboard", %{conn: conn} do
     conn = get(conn, ~p"/dev/dashboard")
