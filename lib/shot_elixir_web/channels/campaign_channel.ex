@@ -305,6 +305,7 @@ defmodule ShotElixirWeb.CampaignChannel do
       "weapon" -> "weapons"
       "schtick" -> "schticks"
       "image" -> "images"
+      "adventure" -> "adventures"
       _ -> base <> "s"
     end
   end

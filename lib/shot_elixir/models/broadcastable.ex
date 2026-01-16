@@ -74,6 +74,9 @@ defmodule ShotElixir.Models.Broadcastable do
             "fight" ->
               ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
 
+            "adventure" ->
+              ShotElixirWeb.Api.V2.AdventureView.render("show.json", %{adventure: entity})
+
             "campaign" ->
               ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
 
@@ -190,6 +193,9 @@ defmodule ShotElixir.Models.Broadcastable do
 
         "fight" ->
           ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
+
+        "adventure" ->
+          ShotElixirWeb.Api.V2.AdventureView.render("show.json", %{adventure: entity})
 
         "campaign" ->
           ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
