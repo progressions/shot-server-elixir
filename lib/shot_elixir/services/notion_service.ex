@@ -999,6 +999,7 @@ defmodule ShotElixir.Services.NotionService do
 
   @doc """
   Find image block in Notion page.
+  Handles pagination to check all blocks, not just the first page.
 
   ## Parameters
     * `page` - Notion page with "id" field
@@ -1006,12 +1007,27 @@ defmodule ShotElixir.Services.NotionService do
   ## Returns
     * Image block if found, nil otherwise
   """
-  def find_image_block(page) do
-    response = NotionClient.get_block_children(page["id"])
-    results = response["results"]
+  def find_image_block(page, opts \\ []) do
+    client = Keyword.get(opts, :client, NotionClient)
+    find_image_block_paginated(page["id"], nil, client)
+  end
 
-    if results do
-      Enum.find(results, fn block -> block["type"] == "image" end)
+  defp find_image_block_paginated(page_id, start_cursor, client) do
+    response = client.get_block_children(page_id, %{start_cursor: start_cursor})
+    results = response["results"] || []
+
+    # Check if there's an image in this page of results
+    case Enum.find(results, fn block -> block["type"] == "image" end) do
+      nil ->
+        # No image found in this page - check if there are more pages
+        if response["has_more"] do
+          find_image_block_paginated(page_id, response["next_cursor"], client)
+        else
+          nil
+        end
+
+      image_block ->
+        image_block
     end
   end
 

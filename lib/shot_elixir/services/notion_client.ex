@@ -91,8 +91,15 @@ defmodule ShotElixir.Services.NotionClient do
   def get_block_children(block_id, opts \\ %{}) do
     token = Map.get(opts, :token)
 
+    # Build query params for pagination (start_cursor, page_size)
+    query_params =
+      opts
+      |> Map.drop([:token])
+      |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+      |> Map.new()
+
     client(token)
-    |> Req.get!(url: "/blocks/#{block_id}/children")
+    |> Req.get!(url: "/blocks/#{block_id}/children", params: query_params)
     |> Map.get(:body)
   end
 
