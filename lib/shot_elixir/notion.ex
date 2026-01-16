@@ -8,6 +8,7 @@ defmodule ShotElixir.Notion do
   alias ShotElixir.Repo
   alias ShotElixir.Notion.NotionSyncLog
   alias ShotElixir.Adventures
+  alias ShotElixir.Campaigns
   alias ShotElixir.Characters
   alias ShotElixir.Factions
   alias ShotElixir.Junctures
@@ -108,8 +109,12 @@ defmodule ShotElixir.Notion do
 
   @doc """
   Logs a successful sync operation.
+  Also resets the campaign's notion_status to "working" if it was "needs_attention".
   """
   def log_success(entity_type, entity_id, payload, response) do
+    # Reset campaign status to working if it was needs_attention
+    maybe_reset_campaign_status(entity_type, entity_id)
+
     create_sync_log(%{
       entity_type: entity_type,
       entity_id: entity_id,
@@ -121,8 +126,12 @@ defmodule ShotElixir.Notion do
 
   @doc """
   Logs a failed sync operation.
+  Also sets the campaign's notion_status to "needs_attention".
   """
   def log_error(entity_type, entity_id, payload, response, error_message) do
+    # Set campaign status to needs_attention on sync failure
+    set_campaign_needs_attention(entity_type, entity_id)
+
     create_sync_log(%{
       entity_type: entity_type,
       entity_id: entity_id,
@@ -223,6 +232,82 @@ defmodule ShotElixir.Notion do
 
   def prune_sync_logs_for_character(character_id, opts \\ []) do
     prune_sync_logs("character", character_id, opts)
+  end
+
+  # Sets the campaign's notion_status to "needs_attention" when a sync fails
+  defp set_campaign_needs_attention(entity_type, entity_id) do
+    case get_campaign_for_entity(entity_type, entity_id) do
+      nil ->
+        :ok
+
+      campaign ->
+        Campaigns.update_campaign(campaign, %{notion_status: "needs_attention"})
+    end
+  end
+
+  # Resets the campaign's notion_status to "working" if it was "needs_attention"
+  defp maybe_reset_campaign_status(entity_type, entity_id) do
+    case get_campaign_for_entity(entity_type, entity_id) do
+      nil ->
+        :ok
+
+      %{notion_status: "needs_attention"} = campaign ->
+        Campaigns.update_campaign(campaign, %{notion_status: "working"})
+
+      _campaign ->
+        :ok
+    end
+  end
+
+  # Gets the campaign for an entity
+  defp get_campaign_for_entity(entity_type, entity_id) do
+    campaign_id =
+      case entity_type do
+        "character" ->
+          case Characters.get_character(entity_id) do
+            nil -> nil
+            character -> character.campaign_id
+          end
+
+        "site" ->
+          case Sites.get_site(entity_id) do
+            nil -> nil
+            site -> site.campaign_id
+          end
+
+        "party" ->
+          case Parties.get_party(entity_id) do
+            nil -> nil
+            party -> party.campaign_id
+          end
+
+        "faction" ->
+          case Factions.get_faction(entity_id) do
+            nil -> nil
+            faction -> faction.campaign_id
+          end
+
+        "juncture" ->
+          case Junctures.get_juncture(entity_id) do
+            nil -> nil
+            juncture -> juncture.campaign_id
+          end
+
+        "adventure" ->
+          case Adventures.get_adventure(entity_id) do
+            nil -> nil
+            adventure -> adventure.campaign_id
+          end
+
+        _ ->
+          nil
+      end
+
+    if campaign_id do
+      Campaigns.get_campaign(campaign_id)
+    else
+      nil
+    end
   end
 
   # Private helper for pagination params
