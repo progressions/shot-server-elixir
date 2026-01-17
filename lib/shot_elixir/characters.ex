@@ -451,7 +451,9 @@ defmodule ShotElixir.Characters do
   end
 
   def get_character(id) do
-    case Repo.get(Character, Slug.extract_uuid(id)) do
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(Character, id) do
       nil ->
         nil
 

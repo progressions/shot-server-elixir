@@ -299,7 +299,9 @@ defmodule ShotElixir.Factions do
   end
 
   def get_faction(id) do
-    case Repo.get(Faction, Slug.extract_uuid(id)) do
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(Faction, id) do
       nil ->
         nil
 

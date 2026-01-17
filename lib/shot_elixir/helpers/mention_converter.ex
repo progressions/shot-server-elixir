@@ -641,9 +641,8 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp entity_type_to_schema(:vehicle), do: Vehicle
   defp entity_type_to_schema(:weapon), do: Weapon
   defp entity_type_to_schema(:schtick), do: Schtick
-  defp entity_type_to_schema(:campaign), do: Campaign
+  # :campaign and :user don't have campaign_id; letting them fall through avoids bad filters
   defp entity_type_to_schema(:fight), do: Fight
-  defp entity_type_to_schema(:user), do: User
   defp entity_type_to_schema(_), do: nil
 
   # =============================================================================

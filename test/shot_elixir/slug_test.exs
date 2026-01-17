@@ -18,6 +18,18 @@ defmodule ShotElixir.SlugTest do
     test "falls back to input when no uuid present" do
       assert Slug.extract_uuid("not-a-uuid") == "not-a-uuid"
     end
+
+    test "ignores empty and invalid uuid-like strings" do
+      assert Slug.extract_uuid("") == ""
+      assert Slug.extract_uuid("123e4567-e89b-12d3-a456-42661417400Z") ==
+               "123e4567-e89b-12d3-a456-42661417400Z"
+    end
+
+    test "handles long strings with trailing uuid" do
+      uuid = "123e4567-e89b-12d3-a456-426614174000"
+      prefix = String.duplicate("prefix-", 10)
+      assert Slug.extract_uuid(prefix <> uuid) == uuid
+    end
   end
 
   describe "slugify_name/1" do
@@ -31,6 +43,15 @@ defmodule ShotElixir.SlugTest do
 
     test "returns empty string for nil" do
       assert Slug.slugify_name(nil) == ""
+    end
+
+    test "strips accents and emoji to ascii-safe slug" do
+      assert Slug.slugify_name("Café Society") == "cafe-society"
+      assert Slug.slugify_name("Dragon 🐉 Style!") == "dragon-style"
+    end
+
+    test "returns empty string when everything is stripped" do
+      assert Slug.slugify_name("!!!") == ""
     end
   end
 
