@@ -1503,7 +1503,7 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Backwards-compatible arity without token (logs and skips fetch)
-  defp add_rich_description(attributes, page_id, campaign_id) do
+  defp add_rich_description(attributes, _page_id, campaign_id) do
     Logger.warning(
       "add_rich_description/3 called without Notion OAuth token for campaign " <>
         "#{inspect(campaign_id)}; rich descriptions will not be fetched. " <>
@@ -1512,6 +1512,7 @@ defmodule ShotElixir.Services.NotionService do
 
     attributes
   end
+
   # Convert Notion rich_text to Chi War HTML with mention support
   defp get_rich_text_as_html(props, key, campaign_id) do
     rich_text =
