@@ -434,9 +434,9 @@ defmodule ShotElixir.Characters do
   end
 
   def get_character!(id) do
-    id
-    |> Slug.extract_uuid()
-    |> Repo.get!(Character)
+    id = Slug.extract_uuid(id)
+
+    Repo.get!(Character, id)
     |> Repo.preload([
       :image_positions,
       :weapons,

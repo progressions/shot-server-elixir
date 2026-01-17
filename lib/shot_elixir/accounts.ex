@@ -289,18 +289,17 @@ defmodule ShotElixir.Accounts do
   end
 
   def get_user!(id) do
-    id
-    |> Slug.extract_uuid()
-    |> Repo.get!(User)
+    id = Slug.extract_uuid(id)
+
+    Repo.get!(User, id)
     |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("User")
   end
 
   def get_user(id) do
-    id
-    |> Slug.extract_uuid()
-    |> Repo.get(User)
-    |> case do
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(User, id) do
       nil ->
         nil
 

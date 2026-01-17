@@ -110,17 +110,19 @@ defmodule ShotElixir.Weapons do
   end
 
   def get_weapon!(id) do
-    id
-    |> Slug.extract_uuid()
-    |> Repo.get!(Weapon)
+    id = Slug.extract_uuid(id)
+
+    Repo.get!(Weapon, id)
     |> ImageLoader.load_image_url("Weapon")
   end
 
   def get_weapon(id) do
-    id
-    |> Slug.extract_uuid()
-    |> Repo.get(Weapon)
-    |> ImageLoader.load_image_url("Weapon")
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(Weapon, id) do
+      nil -> nil
+      weapon -> ImageLoader.load_image_url(weapon, "Weapon")
+    end
   end
 
   def get_weapon_by_name(campaign_id, name) do

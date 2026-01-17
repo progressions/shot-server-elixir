@@ -291,9 +291,9 @@ defmodule ShotElixir.Factions do
   end
 
   def get_faction!(id) do
-    id
-    |> Slug.extract_uuid()
-    |> Repo.get!(Faction)
+    id = Slug.extract_uuid(id)
+
+    Repo.get!(Faction, id)
     |> Repo.preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
     |> ImageLoader.load_image_url("Faction")
   end
