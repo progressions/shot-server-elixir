@@ -17,7 +17,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubSuccess do
     def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -33,7 +33,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubError do
     def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
 
-    def get_page(_page_id) do
+    def get_page(_page_id, _opts \\ []) do
       %{"code" => "object_not_found", "message" => "Page not found"}
     end
   end
@@ -41,7 +41,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubCharacterSuccess do
     def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -63,7 +63,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubCharacterBotEdited do
     def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -85,7 +85,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubCharacterGetMeError do
     def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -112,7 +112,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
     def character_notion_id, do: "c0a80123-4567-489a-bcde-1234567890ab"
     def site_notion_id, do: "e5b1b80e-2a50-4a43-92b1-8d1f5f4dd721"
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -159,7 +159,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubSiteBotEdited do
     def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -175,7 +175,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubSiteGetMeError do
     def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -191,7 +191,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubAdventureBotEdited do
     def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -207,7 +207,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   defmodule NotionClientStubAdventureGetMeError do
     def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
 
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ []) do
       %{
         "id" => page_id,
         "properties" => %{

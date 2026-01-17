@@ -284,117 +284,123 @@ defmodule ShotElixir.Services.NotionService do
   This updates both the Chi War record and the Notion page with merged values.
   """
   def merge_with_notion(%Character{} = character, notion_page_id) do
-    character = Repo.preload(character, :faction)
+    character = Repo.preload(character, [:faction, :campaign])
+    token = get_token(character.campaign)
 
-    # Fetch the Notion page
-    case NotionClient.get_page(notion_page_id) do
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
-        {:error, {:notion_api_error, error_code, message}}
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      # Fetch the Notion page
+      case NotionClient.get_page(notion_page_id, token: token) do
+        %{"code" => error_code, "message" => message} ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
+          {:error, {:notion_api_error, error_code, message}}
 
-      nil ->
-        {:error, :notion_page_not_found}
+        nil ->
+          {:error, :notion_page_not_found}
 
-      page when is_map(page) ->
-        # Extract RAW values from Notion (not using attributes_from_notion which applies av_or_new)
-        # This ensures we're merging with the actual Notion values, not pre-processed ones
-        raw_notion_action_values = get_raw_action_values_from_notion(page)
-        notion_description = get_description(page)
-        notion_name = get_notion_name(page)
-        notion_at_a_glance = get_in(page, ["properties", "At a Glance", "checkbox"])
+        page when is_map(page) ->
+          # Extract RAW values from Notion (not using attributes_from_notion which applies av_or_new)
+          # This ensures we're merging with the actual Notion values, not pre-processed ones
+          raw_notion_action_values = get_raw_action_values_from_notion(page)
+          notion_description = get_description(page)
+          notion_name = get_notion_name(page)
+          notion_at_a_glance = get_in(page, ["properties", "At a Glance", "checkbox"])
 
-        # Perform smart merge for action_values
-        merged_action_values =
-          smart_merge_action_values(
-            character.action_values || Character.default_action_values(),
-            raw_notion_action_values
-          )
+          # Perform smart merge for action_values
+          merged_action_values =
+            smart_merge_action_values(
+              character.action_values || Character.default_action_values(),
+              raw_notion_action_values
+            )
 
-        # Perform smart merge for description
-        merged_description =
-          smart_merge_description(
-            character.description || %{},
-            notion_description
-          )
+          # Perform smart merge for description
+          merged_description =
+            smart_merge_description(
+              character.description || %{},
+              notion_description
+            )
 
-        # Merge name (Notion wins only if Chi War is blank)
-        merged_name =
-          if blank?(character.name),
-            do: notion_name || character.name,
-            else: character.name
+          # Merge name (Notion wins only if Chi War is blank)
+          merged_name =
+            if blank?(character.name),
+              do: notion_name || character.name,
+              else: character.name
 
-        # Update Chi War record with merged values
-        update_attrs =
-          %{
-            notion_page_id: notion_page_id,
-            name: merged_name,
-            action_values: merged_action_values,
-            description: merged_description
-          }
-          |> Character.maybe_put_at_a_glance(notion_at_a_glance)
+          # Update Chi War record with merged values
+          update_attrs =
+            %{
+              notion_page_id: notion_page_id,
+              name: merged_name,
+              action_values: merged_action_values,
+              description: merged_description
+            }
+            |> Character.maybe_put_at_a_glance(notion_at_a_glance)
 
-        case Characters.update_character(character, update_attrs) do
-          {:ok, updated_character} ->
-            # Now sync the merged data back to Notion
-            updated_character = Repo.preload(updated_character, :faction)
+          case Characters.update_character(character, update_attrs) do
+            {:ok, updated_character} ->
+              # Now sync the merged data back to Notion
+              updated_character = Repo.preload(updated_character, :faction)
 
-            # Log warning if Notion update fails (but don't fail the merge)
-            case update_notion_from_character(updated_character) do
-              {:ok, _} ->
-                :ok
+              # Log warning if Notion update fails (but don't fail the merge)
+              case update_notion_from_character(updated_character) do
+                {:ok, _} ->
+                  :ok
 
-              {:error, reason} ->
-                Logger.warning(
-                  "Failed to update Notion after merge for character #{updated_character.id}: #{inspect(reason)}"
-                )
+                {:error, reason} ->
+                  Logger.warning(
+                    "Failed to update Notion after merge for character #{updated_character.id}: #{inspect(reason)}"
+                  )
 
-              other ->
-                Logger.warning(
-                  "Unexpected response when updating Notion after merge for character #{updated_character.id}: #{inspect(other)}"
-                )
-            end
-
-            # Set faction from Notion if not already set
-            updated_character =
-              if is_nil(updated_character.faction_id) do
-                case set_faction_from_notion(
-                       updated_character,
-                       page,
-                       updated_character.campaign_id
-                     ) do
-                  {:ok, char} -> char
-                  {:error, _} -> updated_character
-                end
-              else
-                updated_character
+                other ->
+                  Logger.warning(
+                    "Unexpected response when updating Notion after merge for character #{updated_character.id}: #{inspect(other)}"
+                  )
               end
 
-            # Set juncture from Notion if not already set
-            updated_character =
-              if is_nil(updated_character.juncture_id) do
-                case set_juncture_from_notion(
-                       updated_character,
-                       page,
-                       updated_character.campaign_id
-                     ) do
-                  {:ok, char} -> char
-                  {:error, _} -> updated_character
+              # Set faction from Notion if not already set
+              updated_character =
+                if is_nil(updated_character.faction_id) do
+                  case set_faction_from_notion(
+                         updated_character,
+                         page,
+                         updated_character.campaign_id,
+                         token
+                       ) do
+                    {:ok, char} -> char
+                    {:error, _} -> updated_character
+                  end
+                else
+                  updated_character
                 end
-              else
-                updated_character
-              end
 
-            # Add image from Notion if character doesn't have one
-            add_image(page, updated_character)
+              # Set juncture from Notion if not already set
+              updated_character =
+                if is_nil(updated_character.juncture_id) do
+                  case set_juncture_from_notion(
+                         updated_character,
+                         page,
+                         updated_character.campaign_id
+                       ) do
+                    {:ok, char} -> char
+                    {:error, _} -> updated_character
+                  end
+                else
+                  updated_character
+                end
 
-            # Log successful merge
-            Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
+              # Add image from Notion if character doesn't have one
+              add_image(page, updated_character)
 
-            {:ok, updated_character}
+              # Log successful merge
+              Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
 
-          {:error, changeset} ->
-            {:error, changeset}
-        end
+              {:ok, updated_character}
+
+            {:error, changeset} ->
+              {:error, changeset}
+          end
+      end
     end
   rescue
     error ->
@@ -683,7 +689,7 @@ defmodule ShotElixir.Services.NotionService do
   - Juncture (from Notion multi_select, matched by name to local juncture)
   - Fortune and other action values
   """
-  def create_character_from_notion(page, campaign_id) do
+  def create_character_from_notion(page, campaign_id, token) do
     name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
 
     # Generate unique name to avoid overwriting existing characters
@@ -695,13 +701,13 @@ defmodule ShotElixir.Services.NotionService do
 
     character = Repo.preload(character, :faction)
     attributes = Character.attributes_from_notion(character, page)
-    attributes = add_rich_description(attributes, page["id"], campaign_id)
+    attributes = add_rich_description(attributes, page["id"], campaign_id, token)
 
     {:ok, character} =
       Characters.update_character(character, Map.put(attributes, :notion_page_id, page["id"]))
 
     # Look up and set faction from Notion relation
-    {:ok, character} = set_faction_from_notion(character, page, campaign_id)
+    {:ok, character} = set_faction_from_notion(character, page, campaign_id, token)
 
     # Look up and set juncture from Notion multi_select
     {:ok, character} = set_juncture_from_notion(character, page, campaign_id)
@@ -717,8 +723,8 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Look up faction from Notion relation and set on character
-  defp set_faction_from_notion(character, page, campaign_id) do
-    case get_faction_name_from_notion(page) do
+  defp set_faction_from_notion(character, page, campaign_id, token) do
+    case get_faction_name_from_notion(page, token) do
       nil ->
         {:ok, character}
 
@@ -753,10 +759,10 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Get faction name from Notion relation by fetching the related page
-  defp get_faction_name_from_notion(page) do
+  defp get_faction_name_from_notion(page, token) do
     case get_in(page, ["properties", "Faction", "relation"]) do
       [%{"id" => faction_page_id} | _] ->
-        faction_page = NotionClient.get_page(faction_page_id)
+        faction_page = NotionClient.get_page(faction_page_id, token: token)
 
         # Faction pages use rich_text for Name, not title
         get_in(faction_page, ["properties", "Name", "rich_text", Access.at(0), "plain_text"]) ||
@@ -828,67 +834,79 @@ defmodule ShotElixir.Services.NotionService do
     do: {:error, :no_page_id}
 
   def update_character_from_notion(%Character{} = character, opts) do
-    payload = %{"page_id" => character.notion_page_id}
-    client = notion_client(opts)
+    character = Repo.preload(character, :campaign)
+    token = get_token(character.campaign)
 
-    case client.get_page(character.notion_page_id) do
-      # Defensive check: Req.get! typically raises on failure, but we handle
-      # the unlikely case of a nil body for robustness
-      nil ->
-        Logger.error("Failed to fetch Notion page: #{character.notion_page_id}")
-        log_sync_error("character", character.id, payload, %{}, "Notion page not found")
-        {:error, :notion_page_not_found}
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      payload = %{"page_id" => character.notion_page_id}
+      client = notion_client(opts)
 
-      # Handle Notion API error responses (e.g., page not found, unauthorized)
-      %{"code" => error_code, "message" => message} = response ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
+      case client.get_page(character.notion_page_id, token: token) do
+        # Defensive check: Req.get! typically raises on failure, but we handle
+        # the unlikely case of a nil body for robustness
+        nil ->
+          Logger.error("Failed to fetch Notion page: #{character.notion_page_id}")
+          log_sync_error("character", character.id, payload, %{}, "Notion page not found")
+          {:error, :notion_page_not_found}
 
-        log_sync_error(
-          "character",
-          character.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
-        )
+        # Handle Notion API error responses (e.g., page not found, unauthorized)
+        %{"code" => error_code, "message" => message} = response ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
 
-        {:error, {:notion_api_error, error_code, message}}
-
-      # Success case: page data returned as a map
-      page when is_map(page) ->
-        if should_skip_bot_update?(page, opts) do
-          Logger.info(
-            "Skipping update for character #{character.id} as it was last edited by the bot"
+          log_sync_error(
+            "character",
+            character.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
           )
 
-          {:ok, character}
-        else
-          attributes = Character.attributes_from_notion(character, page)
+          {:error, {:notion_api_error, error_code, message}}
 
-          # Fetch rich description from page content (blocks)
-          attributes =
-            add_rich_description(attributes, character.notion_page_id, character.campaign_id)
+        # Success case: page data returned as a map
+        page when is_map(page) ->
+          if should_skip_bot_update?(page, opts) do
+            Logger.info(
+              "Skipping update for character #{character.id} as it was last edited by the bot"
+            )
 
-          # Add image if not already present
-          add_image(page, character)
+            {:ok, character}
+          else
+            attributes = Character.attributes_from_notion(character, page)
 
-          # Skip Notion sync to prevent ping-pong loops when updating from webhook
-          case Characters.update_character(character, attributes, skip_notion_sync: true) do
-            {:ok, updated_character} = result ->
-              Notion.log_success("character", updated_character.id, payload, page)
-              result
-
-            {:error, changeset} = error ->
-              log_sync_error(
-                "character",
-                character.id,
-                payload,
-                page,
-                "Failed to update character from Notion: #{inspect(changeset)}"
+            # Fetch rich description from page content (blocks)
+            attributes =
+              add_rich_description(
+                attributes,
+                character.notion_page_id,
+                character.campaign_id,
+                token
               )
 
-              error
+            # Add image if not already present
+            add_image(page, character)
+
+            # Skip Notion sync to prevent ping-pong loops when updating from webhook
+            case Characters.update_character(character, attributes, skip_notion_sync: true) do
+              {:ok, updated_character} = result ->
+                Notion.log_success("character", updated_character.id, payload, page)
+                result
+
+              {:error, changeset} = error ->
+                log_sync_error(
+                  "character",
+                  character.id,
+                  payload,
+                  page,
+                  "Failed to update character from Notion: #{inspect(changeset)}"
+                )
+
+                error
+            end
           end
-        end
+      end
     end
   rescue
     error ->
@@ -1509,8 +1527,8 @@ defmodule ShotElixir.Services.NotionService do
   defp maybe_put_if_not_nil(map, key, value), do: Map.put(map, key, value)
 
   # Fetch rich description from page content and add to attributes
-  defp add_rich_description(attributes, page_id, campaign_id) do
-    case fetch_rich_description(page_id, campaign_id) do
+  defp add_rich_description(attributes, page_id, campaign_id, token) do
+    case fetch_rich_description(page_id, campaign_id, token) do
       {:ok, %{markdown: markdown, mentions: mentions}} ->
         attributes
         |> Map.put(:rich_description, markdown)
@@ -1699,33 +1717,38 @@ defmodule ShotElixir.Services.NotionService do
     * `{:ok, %{pages: [...], content: "..."}}` with matching pages and content of first match
     * `{:error, :not_found}` if no pages match
   """
-  def fetch_session_notes(query) do
-    search_query = if String.contains?(query, "session"), do: query, else: "session #{query}"
+  def fetch_session_notes(query, token) do
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      search_query = if String.contains?(query, "session"), do: query, else: "session #{query}"
 
-    results =
-      NotionClient.search(search_query, %{
-        "filter" => %{"property" => "object", "value" => "page"}
-      })
+      results =
+        NotionClient.search(search_query, %{
+          "filter" => %{"property" => "object", "value" => "page"},
+          token: token
+        })
 
-    case results["results"] do
-      [page | _rest] = pages ->
-        # Fetch content of the first (most relevant) match
-        blocks = NotionClient.get_block_children(page["id"])
-        content = parse_blocks_to_text(blocks["results"] || [])
+      case results["results"] do
+        [page | _rest] = pages ->
+          # Fetch content of the first (most relevant) match
+          blocks = NotionClient.get_block_children(page["id"], token: token)
+          content = parse_blocks_to_text(blocks["results"] || [])
 
-        {:ok,
-         %{
-           title: extract_page_title(page),
-           page_id: page["id"],
-           content: content,
-           pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
-         }}
+          {:ok,
+           %{
+             title: extract_page_title(page),
+             page_id: page["id"],
+             content: content,
+             pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
+           }}
 
-      [] ->
-        {:error, :not_found}
+        [] ->
+          {:error, :not_found}
 
-      nil ->
-        {:error, :not_found}
+        nil ->
+          {:error, :not_found}
+      end
     end
   rescue
     error ->
@@ -1740,20 +1763,24 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Fetch a specific session page by ID.
   """
-  def fetch_session_by_id(page_id) do
-    page = NotionClient.get_page(page_id)
+  def fetch_session_by_id(page_id, token) do
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      page = NotionClient.get_page(page_id, token: token)
 
-    case page do
-      %{"id" => _id} ->
-        blocks = NotionClient.get_block_children(page_id)
-        content = parse_blocks_to_text(blocks["results"] || [])
-        {:ok, %{title: extract_page_title(page), page_id: page_id, content: content}}
+      case page do
+        %{"id" => _id} ->
+          blocks = NotionClient.get_block_children(page_id, token: token)
+          content = parse_blocks_to_text(blocks["results"] || [])
+          {:ok, %{title: extract_page_title(page), page_id: page_id, content: content}}
 
-      %{"code" => error_code, "message" => message} ->
-        {:error, {:notion_api_error, error_code, message}}
+        %{"code" => error_code, "message" => message} ->
+          {:error, {:notion_api_error, error_code, message}}
 
-      _ ->
-        {:error, :not_found}
+        _ ->
+          {:error, :not_found}
+      end
     end
   rescue
     error ->
@@ -2020,8 +2047,8 @@ defmodule ShotElixir.Services.NotionService do
   The mentions map contains resolved entity IDs for quick lookup:
   `%{"character" => [uuid1, uuid2], "site" => [uuid3]}`
   """
-  def fetch_rich_description(page_id, campaign_id) do
-    response = NotionClient.get_block_children(page_id)
+  def fetch_rich_description(page_id, campaign_id, token) do
+    response = NotionClient.get_block_children(page_id, token: token)
 
     case response do
       %{"results" => blocks} when is_list(blocks) ->
@@ -2557,58 +2584,66 @@ defmodule ShotElixir.Services.NotionService do
   def update_site_from_notion(%Site{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
 
   def update_site_from_notion(%Site{} = site, opts) do
-    payload = %{"page_id" => site.notion_page_id}
-    client = notion_client(opts)
+    site = Repo.preload(site, :campaign)
+    token = get_token(site.campaign)
 
-    case client.get_page(site.notion_page_id) do
-      nil ->
-        Logger.error("Failed to fetch Notion page: #{site.notion_page_id}")
-        log_sync_error("site", site.id, payload, %{}, "Notion page not found")
-        {:error, :notion_page_not_found}
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      payload = %{"page_id" => site.notion_page_id}
+      client = notion_client(opts)
 
-      %{"code" => error_code, "message" => message} = response ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
+      case client.get_page(site.notion_page_id, token: token) do
+        nil ->
+          Logger.error("Failed to fetch Notion page: #{site.notion_page_id}")
+          log_sync_error("site", site.id, payload, %{}, "Notion page not found")
+          {:error, :notion_page_not_found}
 
-        log_sync_error(
-          "site",
-          site.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
-        )
+        %{"code" => error_code, "message" => message} = response ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
 
-        {:error, {:notion_api_error, error_code, message}}
+          log_sync_error(
+            "site",
+            site.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
+          )
 
-      page when is_map(page) ->
-        if should_skip_bot_update?(page, opts) do
-          Logger.info("Skipping update for site #{site.id} as it was last edited by the bot")
+          {:error, {:notion_api_error, error_code, message}}
 
-          {:ok, site}
-        else
-          # Use mention-aware conversion with campaign_id
-          attributes = entity_attributes_from_notion(page, site.campaign_id)
+        page when is_map(page) ->
+          if should_skip_bot_update?(page, opts) do
+            Logger.info("Skipping update for site #{site.id} as it was last edited by the bot")
 
-          # Fetch rich description from page content (blocks)
-          attributes = add_rich_description(attributes, site.notion_page_id, site.campaign_id)
+            {:ok, site}
+          else
+            # Use mention-aware conversion with campaign_id
+            attributes = entity_attributes_from_notion(page, site.campaign_id)
 
-          # Skip Notion sync to prevent ping-pong loops when updating from webhook
-          case Sites.update_site(site, attributes, skip_notion_sync: true) do
-            {:ok, updated_site} = result ->
-              Notion.log_success("site", updated_site.id, payload, page)
-              result
+            # Fetch rich description from page content (blocks)
+            attributes =
+              add_rich_description(attributes, site.notion_page_id, site.campaign_id, token)
 
-            {:error, changeset} = error ->
-              log_sync_error(
-                "site",
-                site.id,
-                payload,
-                page,
-                "Failed to update site from Notion: #{inspect(changeset)}"
-              )
+            # Skip Notion sync to prevent ping-pong loops when updating from webhook
+            case Sites.update_site(site, attributes, skip_notion_sync: true) do
+              {:ok, updated_site} = result ->
+                Notion.log_success("site", updated_site.id, payload, page)
+                result
 
-              error
+              {:error, changeset} = error ->
+                log_sync_error(
+                  "site",
+                  site.id,
+                  payload,
+                  page,
+                  "Failed to update site from Notion: #{inspect(changeset)}"
+                )
+
+                error
+            end
           end
-        end
+      end
     end
   rescue
     error ->
@@ -2633,58 +2668,66 @@ defmodule ShotElixir.Services.NotionService do
   def update_party_from_notion(%Party{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
 
   def update_party_from_notion(%Party{} = party, opts) do
-    payload = %{"page_id" => party.notion_page_id}
-    client = notion_client(opts)
+    party = Repo.preload(party, :campaign)
+    token = get_token(party.campaign)
 
-    case client.get_page(party.notion_page_id) do
-      nil ->
-        Logger.error("Failed to fetch Notion page: #{party.notion_page_id}")
-        log_sync_error("party", party.id, payload, %{}, "Notion page not found")
-        {:error, :notion_page_not_found}
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      payload = %{"page_id" => party.notion_page_id}
+      client = notion_client(opts)
 
-      %{"code" => error_code, "message" => message} = response ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
+      case client.get_page(party.notion_page_id, token: token) do
+        nil ->
+          Logger.error("Failed to fetch Notion page: #{party.notion_page_id}")
+          log_sync_error("party", party.id, payload, %{}, "Notion page not found")
+          {:error, :notion_page_not_found}
 
-        log_sync_error(
-          "party",
-          party.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
-        )
+        %{"code" => error_code, "message" => message} = response ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
 
-        {:error, {:notion_api_error, error_code, message}}
+          log_sync_error(
+            "party",
+            party.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
+          )
 
-      page when is_map(page) ->
-        if should_skip_bot_update?(page, opts) do
-          Logger.info("Skipping update for party #{party.id} as it was last edited by the bot")
+          {:error, {:notion_api_error, error_code, message}}
 
-          {:ok, party}
-        else
-          # Use mention-aware conversion with campaign_id
-          attributes = entity_attributes_from_notion(page, party.campaign_id)
+        page when is_map(page) ->
+          if should_skip_bot_update?(page, opts) do
+            Logger.info("Skipping update for party #{party.id} as it was last edited by the bot")
 
-          # Fetch rich description from page content (blocks)
-          attributes = add_rich_description(attributes, party.notion_page_id, party.campaign_id)
+            {:ok, party}
+          else
+            # Use mention-aware conversion with campaign_id
+            attributes = entity_attributes_from_notion(page, party.campaign_id)
 
-          # Skip Notion sync to prevent ping-pong loops when updating from webhook
-          case Parties.update_party(party, attributes, skip_notion_sync: true) do
-            {:ok, updated_party} = result ->
-              Notion.log_success("party", updated_party.id, payload, page)
-              result
+            # Fetch rich description from page content (blocks)
+            attributes =
+              add_rich_description(attributes, party.notion_page_id, party.campaign_id, token)
 
-            {:error, changeset} = error ->
-              log_sync_error(
-                "party",
-                party.id,
-                payload,
-                page,
-                "Failed to update party from Notion: #{inspect(changeset)}"
-              )
+            # Skip Notion sync to prevent ping-pong loops when updating from webhook
+            case Parties.update_party(party, attributes, skip_notion_sync: true) do
+              {:ok, updated_party} = result ->
+                Notion.log_success("party", updated_party.id, payload, page)
+                result
 
-              error
+              {:error, changeset} = error ->
+                log_sync_error(
+                  "party",
+                  party.id,
+                  payload,
+                  page,
+                  "Failed to update party from Notion: #{inspect(changeset)}"
+                )
+
+                error
+            end
           end
-        end
+      end
     end
   rescue
     error ->
@@ -2709,61 +2752,68 @@ defmodule ShotElixir.Services.NotionService do
   def update_faction_from_notion(%Faction{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
 
   def update_faction_from_notion(%Faction{} = faction, opts) do
-    payload = %{"page_id" => faction.notion_page_id}
-    client = notion_client(opts)
+    faction = Repo.preload(faction, :campaign)
+    token = get_token(faction.campaign)
 
-    case client.get_page(faction.notion_page_id) do
-      nil ->
-        Logger.error("Failed to fetch Notion page: #{faction.notion_page_id}")
-        log_sync_error("faction", faction.id, payload, %{}, "Notion page not found")
-        {:error, :notion_page_not_found}
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      payload = %{"page_id" => faction.notion_page_id}
+      client = notion_client(opts)
 
-      %{"code" => error_code, "message" => message} = response ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
+      case client.get_page(faction.notion_page_id, token: token) do
+        nil ->
+          Logger.error("Failed to fetch Notion page: #{faction.notion_page_id}")
+          log_sync_error("faction", faction.id, payload, %{}, "Notion page not found")
+          {:error, :notion_page_not_found}
 
-        log_sync_error(
-          "faction",
-          faction.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
-        )
+        %{"code" => error_code, "message" => message} = response ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
 
-        {:error, {:notion_api_error, error_code, message}}
-
-      page when is_map(page) ->
-        if should_skip_bot_update?(page, opts) do
-          Logger.info(
-            "Skipping update for faction #{faction.id} as it was last edited by the bot"
+          log_sync_error(
+            "faction",
+            faction.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
           )
 
-          {:ok, faction}
-        else
-          # Use mention-aware conversion with campaign_id
-          attributes = entity_attributes_from_notion(page, faction.campaign_id)
+          {:error, {:notion_api_error, error_code, message}}
 
-          # Fetch rich description from page content (blocks)
-          attributes =
-            add_rich_description(attributes, faction.notion_page_id, faction.campaign_id)
+        page when is_map(page) ->
+          if should_skip_bot_update?(page, opts) do
+            Logger.info(
+              "Skipping update for faction #{faction.id} as it was last edited by the bot"
+            )
 
-          # Skip Notion sync to prevent ping-pong loops when updating from webhook
-          case Factions.update_faction(faction, attributes, skip_notion_sync: true) do
-            {:ok, updated_faction} = result ->
-              Notion.log_success("faction", updated_faction.id, payload, page)
-              result
+            {:ok, faction}
+          else
+            # Use mention-aware conversion with campaign_id
+            attributes = entity_attributes_from_notion(page, faction.campaign_id)
 
-            {:error, changeset} = error ->
-              log_sync_error(
-                "faction",
-                faction.id,
-                payload,
-                page,
-                "Failed to update faction from Notion: #{inspect(changeset)}"
-              )
+            # Fetch rich description from page content (blocks)
+            attributes =
+              add_rich_description(attributes, faction.notion_page_id, faction.campaign_id, token)
 
-              error
+            # Skip Notion sync to prevent ping-pong loops when updating from webhook
+            case Factions.update_faction(faction, attributes, skip_notion_sync: true) do
+              {:ok, updated_faction} = result ->
+                Notion.log_success("faction", updated_faction.id, payload, page)
+                result
+
+              {:error, changeset} = error ->
+                log_sync_error(
+                  "faction",
+                  faction.id,
+                  payload,
+                  page,
+                  "Failed to update faction from Notion: #{inspect(changeset)}"
+                )
+
+                error
+            end
           end
-        end
+      end
     end
   rescue
     error ->
@@ -2789,72 +2839,84 @@ defmodule ShotElixir.Services.NotionService do
     do: {:error, :no_page_id}
 
   def update_juncture_from_notion(%Juncture{} = juncture, opts) do
-    payload = %{"page_id" => juncture.notion_page_id}
-    client = notion_client(opts)
+    juncture = Repo.preload(juncture, :campaign)
+    token = get_token(juncture.campaign)
 
-    case client.get_page(juncture.notion_page_id) do
-      nil ->
-        Logger.error("Failed to fetch Notion page: #{juncture.notion_page_id}")
-        log_sync_error("juncture", juncture.id, payload, %{}, "Notion page not found")
-        {:error, :notion_page_not_found}
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      payload = %{"page_id" => juncture.notion_page_id}
+      client = notion_client(opts)
 
-      %{"code" => error_code, "message" => message} = response ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
+      case client.get_page(juncture.notion_page_id, token: token) do
+        nil ->
+          Logger.error("Failed to fetch Notion page: #{juncture.notion_page_id}")
+          log_sync_error("juncture", juncture.id, payload, %{}, "Notion page not found")
+          {:error, :notion_page_not_found}
 
-        log_sync_error(
-          "juncture",
-          juncture.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
-        )
+        %{"code" => error_code, "message" => message} = response ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
 
-        {:error, {:notion_api_error, error_code, message}}
-
-      page when is_map(page) ->
-        if should_skip_bot_update?(page, opts) do
-          Logger.info(
-            "Skipping update for juncture #{juncture.id} as it was last edited by the bot"
+          log_sync_error(
+            "juncture",
+            juncture.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
           )
 
-          {:ok, juncture}
-        else
-          # Use mention-aware conversion with campaign_id
-          attributes = entity_attributes_from_notion(page, juncture.campaign_id)
+          {:error, {:notion_api_error, error_code, message}}
 
-          attributes =
-            case character_ids_from_notion(page, juncture.campaign_id) do
-              {:ok, character_ids} -> Map.put(attributes, :character_ids, character_ids)
-              :skip -> attributes
-            end
+        page when is_map(page) ->
+          if should_skip_bot_update?(page, opts) do
+            Logger.info(
+              "Skipping update for juncture #{juncture.id} as it was last edited by the bot"
+            )
 
-          attributes =
-            case site_ids_from_notion(page, juncture.campaign_id) do
-              {:ok, site_ids} -> Map.put(attributes, :site_ids, site_ids)
-              :skip -> attributes
-            end
+            {:ok, juncture}
+          else
+            # Use mention-aware conversion with campaign_id
+            attributes = entity_attributes_from_notion(page, juncture.campaign_id)
 
-          # Fetch rich description from page content (blocks)
-          attributes =
-            add_rich_description(attributes, juncture.notion_page_id, juncture.campaign_id)
+            attributes =
+              case character_ids_from_notion(page, juncture.campaign_id) do
+                {:ok, character_ids} -> Map.put(attributes, :character_ids, character_ids)
+                :skip -> attributes
+              end
 
-          case Junctures.update_juncture(juncture, attributes) do
-            {:ok, updated_juncture} = result ->
-              Notion.log_success("juncture", updated_juncture.id, payload, page)
-              result
+            attributes =
+              case site_ids_from_notion(page, juncture.campaign_id) do
+                {:ok, site_ids} -> Map.put(attributes, :site_ids, site_ids)
+                :skip -> attributes
+              end
 
-            {:error, changeset} = error ->
-              log_sync_error(
-                "juncture",
-                juncture.id,
-                payload,
-                page,
-                "Failed to update juncture from Notion: #{inspect(changeset)}"
+            # Fetch rich description from page content (blocks)
+            attributes =
+              add_rich_description(
+                attributes,
+                juncture.notion_page_id,
+                juncture.campaign_id,
+                token
               )
 
-              error
+            case Junctures.update_juncture(juncture, attributes) do
+              {:ok, updated_juncture} = result ->
+                Notion.log_success("juncture", updated_juncture.id, payload, page)
+                result
+
+              {:error, changeset} = error ->
+                log_sync_error(
+                  "juncture",
+                  juncture.id,
+                  payload,
+                  page,
+                  "Failed to update juncture from Notion: #{inspect(changeset)}"
+                )
+
+                error
+            end
           end
-        end
+      end
     end
   rescue
     error ->
@@ -2880,61 +2942,73 @@ defmodule ShotElixir.Services.NotionService do
     do: {:error, :no_page_id}
 
   def update_adventure_from_notion(%Adventure{} = adventure, opts) do
-    payload = %{"page_id" => adventure.notion_page_id}
-    client = notion_client(opts)
+    adventure = Repo.preload(adventure, :campaign)
+    token = get_token(adventure.campaign)
 
-    case client.get_page(adventure.notion_page_id) do
-      nil ->
-        Logger.error("Failed to fetch Notion page: #{adventure.notion_page_id}")
-        log_sync_error("adventure", adventure.id, payload, %{}, "Notion page not found")
-        {:error, :notion_page_not_found}
+    unless token do
+      {:error, :no_notion_oauth_token}
+    else
+      payload = %{"page_id" => adventure.notion_page_id}
+      client = notion_client(opts)
 
-      %{"code" => error_code, "message" => message} = response ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
+      case client.get_page(adventure.notion_page_id, token: token) do
+        nil ->
+          Logger.error("Failed to fetch Notion page: #{adventure.notion_page_id}")
+          log_sync_error("adventure", adventure.id, payload, %{}, "Notion page not found")
+          {:error, :notion_page_not_found}
 
-        log_sync_error(
-          "adventure",
-          adventure.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
-        )
+        %{"code" => error_code, "message" => message} = response ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
 
-        {:error, {:notion_api_error, error_code, message}}
-
-      page when is_map(page) ->
-        if should_skip_bot_update?(page, opts) do
-          Logger.info(
-            "Skipping update for adventure #{adventure.id} as it was last edited by the bot"
+          log_sync_error(
+            "adventure",
+            adventure.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
           )
 
-          {:ok, adventure}
-        else
-          # Use centralized mention-aware conversion with campaign_id
-          attributes = adventure_attributes_from_notion(page, adventure.campaign_id)
+          {:error, {:notion_api_error, error_code, message}}
 
-          # Fetch rich description from page content (blocks)
-          attributes =
-            add_rich_description(attributes, adventure.notion_page_id, adventure.campaign_id)
+        page when is_map(page) ->
+          if should_skip_bot_update?(page, opts) do
+            Logger.info(
+              "Skipping update for adventure #{adventure.id} as it was last edited by the bot"
+            )
 
-          # Skip Notion sync to prevent ping-pong loops when updating from webhook
-          case Adventures.update_adventure(adventure, attributes, skip_notion_sync: true) do
-            {:ok, updated_adventure} = result ->
-              Notion.log_success("adventure", updated_adventure.id, payload, page)
-              result
+            {:ok, adventure}
+          else
+            # Use centralized mention-aware conversion with campaign_id
+            attributes = adventure_attributes_from_notion(page, adventure.campaign_id)
 
-            {:error, changeset} = error ->
-              log_sync_error(
-                "adventure",
-                adventure.id,
-                payload,
-                page,
-                "Failed to update adventure from Notion: #{inspect(changeset)}"
+            # Fetch rich description from page content (blocks)
+            attributes =
+              add_rich_description(
+                attributes,
+                adventure.notion_page_id,
+                adventure.campaign_id,
+                token
               )
 
-              error
+            # Skip Notion sync to prevent ping-pong loops when updating from webhook
+            case Adventures.update_adventure(adventure, attributes, skip_notion_sync: true) do
+              {:ok, updated_adventure} = result ->
+                Notion.log_success("adventure", updated_adventure.id, payload, page)
+                result
+
+              {:error, changeset} = error ->
+                log_sync_error(
+                  "adventure",
+                  adventure.id,
+                  payload,
+                  page,
+                  "Failed to update adventure from Notion: #{inspect(changeset)}"
+                )
+
+                error
+            end
           end
-        end
+      end
     end
   rescue
     error ->

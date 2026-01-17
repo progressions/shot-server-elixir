@@ -79,7 +79,6 @@ For local development, defaults are configured in `config/dev.exs`. For producti
 | `SECRET_KEY_BASE` | Phoenix secret key (generate with `mix phx.gen.secret`) |
 | `PHX_HOST` | Hostname (e.g., `shot-elixir.fly.dev`) |
 | `DISCORD_TOKEN` | Discord bot token (optional) |
-| `NOTION_TOKEN` | Notion API key (optional) |
 | `IMAGEKIT_PUBLIC_KEY` | ImageKit public key |
 | `IMAGEKIT_PRIVATE_KEY` | ImageKit private key |
 | `IMAGEKIT_URL_ENDPOINT` | ImageKit URL endpoint |

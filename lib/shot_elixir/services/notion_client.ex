@@ -7,15 +7,25 @@ defmodule ShotElixir.Services.NotionClient do
   @notion_version "2025-09-03"
   @base_url "https://api.notion.com/v1"
 
-  def client(token \\ nil) do
-    # Use provided token, then environment, then config
-    token =
-      token ||
-        System.get_env("NOTION_TOKEN") ||
-        Application.get_env(:shot_elixir, :notion)[:token]
+  defp require_token(token) do
+    if is_binary(token) and token != "" do
+      :ok
+    else
+      {:error, %{"code" => "missing_token", "message" => "Notion OAuth token missing"}}
+    end
+  end
 
-    unless token do
-      raise "NOTION_TOKEN environment variable is not set"
+  # Normalize options: convert keyword lists to maps for consistent handling
+  defp normalize_opts(opts) when is_list(opts), do: Map.new(opts)
+  defp normalize_opts(opts) when is_map(opts), do: opts
+  defp normalize_opts(_), do: %{}
+
+  def client(token \\ nil) do
+    # Token must be provided (from campaign OAuth). We intentionally do not
+    # fall back to environment or application config to avoid accidental use of
+    # stale or shared credentials.
+    unless is_binary(token) and token != "" do
+      raise "Notion token missing (campaign OAuth required)"
     end
 
     Req.new(
@@ -32,63 +42,99 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def search(query, opts \\ %{}) do
+    opts = normalize_opts(opts)
     {token, opts} = Map.pop(opts, :token)
     body = Map.merge(%{"query" => query}, opts)
 
-    client(token)
-    |> Req.post!(url: "/search", json: body)
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.post!(url: "/search", json: body)
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def data_source_query(data_source_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     {token, opts} = Map.pop(opts, :token)
 
-    client(token)
-    |> Req.post!(url: "/data_sources/#{data_source_id}/query", json: opts)
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.post!(url: "/data_sources/#{data_source_id}/query", json: opts)
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def database_query(database_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     {token, opts} = Map.pop(opts, :token)
 
-    client(token)
-    |> Req.post!(url: "/databases/#{database_id}/query", json: opts)
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.post!(url: "/databases/#{database_id}/query", json: opts)
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def create_page(params) do
+    params = normalize_opts(params)
     {token, params} = Map.pop(params, :token)
 
-    client(token)
-    |> Req.post!(url: "/pages", json: params)
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.post!(url: "/pages", json: params)
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def update_page(page_id, properties, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
-    client(token)
-    |> Req.patch!(url: "/pages/#{page_id}", json: %{"properties" => properties})
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.patch!(url: "/pages/#{page_id}", json: %{"properties" => properties})
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def get_page(page_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
-    client(token)
-    |> Req.get!(url: "/pages/#{page_id}")
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.get!(url: "/pages/#{page_id}")
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def get_database(database_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
-    client(token)
-    |> Req.get!(url: "/databases/#{database_id}")
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.get!(url: "/databases/#{database_id}")
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def get_block_children(block_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     # Build query params for pagination (start_cursor, page_size)
@@ -98,17 +144,26 @@ defmodule ShotElixir.Services.NotionClient do
       |> Enum.reject(fn {_k, v} -> is_nil(v) end)
       |> Map.new()
 
-    client(token)
-    |> Req.get!(url: "/blocks/#{block_id}/children", params: query_params)
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.get!(url: "/blocks/#{block_id}/children", params: query_params)
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   def append_block_children(block_id, children, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
-    client(token)
-    |> Req.patch!(url: "/blocks/#{block_id}/children", json: %{"children" => children})
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.patch!(url: "/blocks/#{block_id}/children", json: %{"children" => children})
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 
   @doc """
@@ -118,6 +173,7 @@ defmodule ShotElixir.Services.NotionClient do
   Returns the response body from Notion's `/users/me` endpoint.
   """
   def get_me(opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     client(token)
