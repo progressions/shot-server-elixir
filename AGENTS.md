@@ -97,3 +97,43 @@ custom classes must fully style the input
 <!-- phoenix:ecto-end -->
 
 <!-- usage-rules-end -->
+
+## PR review workflow (no GitHub MCP available)
+
+- Fetch review threads via `gh api graphql`:
+
+  ```bash
+  gh api graphql -f query='
+  query($owner:String!, $repo:String!, $pr:Int!){
+    repository(owner:$owner,name:$repo){
+      pullRequest(number:$pr){
+        reviewThreads(first:50){
+          nodes{
+            id
+            isResolved
+            isOutdated
+            comments(first:10){
+              nodes{ id databaseId body path position author{login} }
+            }
+          }
+        }
+      }
+    }
+  }' -F owner=progressions -F repo=shot-server-elixir -F pr=278
+  ```
+
+- For each unresolved comment:
+  1) edit the referenced file and add tests as needed;
+  2) run `mix format` (and tests if relevant);
+  3) commit and push.
+
+- Resolve addressed threads with `gh api graphql`:
+
+  ```bash
+  gh api graphql -f query='
+  mutation($id:ID!){
+    resolveReviewThread(input:{threadId:$id}){ thread{ isResolved } }
+  }' -F id=THREAD_ID
+  ```
+
+- Re-run the first query to confirm `isResolved: true` for all threads.
