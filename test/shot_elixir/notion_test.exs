@@ -207,4 +207,163 @@ defmodule ShotElixir.NotionTest do
       assert count == 0
     end
   end
+
+  describe "failure threshold behavior" do
+    setup do
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "threshold_test@example.com",
+          password: "password123",
+          first_name: "Test",
+          last_name: "User",
+          gamemaster: true
+        })
+
+      {:ok, campaign} =
+        Campaigns.create_campaign(%{
+          name: "Threshold Test Campaign",
+          description: "Testing failure thresholds",
+          user_id: user.id,
+          notion_status: "working"
+        })
+
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Threshold Test Character",
+          campaign_id: campaign.id,
+          user_id: user.id,
+          action_values: %{"Type" => "PC"}
+        })
+
+      {:ok, user: user, campaign: campaign, character: character}
+    end
+
+    test "does not set needs_attention before reaching threshold", %{
+      character: character,
+      campaign: campaign
+    } do
+      # First failure - should NOT set needs_attention (threshold is 3)
+      Notion.log_error("character", character.id, %{}, %{}, "Test error 1")
+
+      campaign = Repo.get!(Campaigns.Campaign, campaign.id)
+      assert campaign.notion_status == "working"
+      assert campaign.notion_failure_count == 1
+      assert campaign.notion_failure_window_start != nil
+
+      # Second failure - still should NOT set needs_attention
+      Notion.log_error("character", character.id, %{}, %{}, "Test error 2")
+
+      campaign = Repo.get!(Campaigns.Campaign, campaign.id)
+      assert campaign.notion_status == "working"
+      assert campaign.notion_failure_count == 2
+    end
+
+    test "sets needs_attention when threshold is reached", %{
+      character: character,
+      campaign: campaign
+    } do
+      # Trigger 3 failures (default threshold)
+      Notion.log_error("character", character.id, %{}, %{}, "Test error 1")
+      Notion.log_error("character", character.id, %{}, %{}, "Test error 2")
+      Notion.log_error("character", character.id, %{}, %{}, "Test error 3")
+
+      campaign = Repo.get!(Campaigns.Campaign, campaign.id)
+      assert campaign.notion_status == "needs_attention"
+      assert campaign.notion_failure_count == 3
+    end
+
+    test "resets window and counter when window expires", %{
+      character: character,
+      campaign: campaign
+    } do
+      now = DateTime.utc_now() |> DateTime.truncate(:second)
+
+      # Simulate 2 failures that happened 2 hours ago (outside the 1 hour window)
+      {:ok, campaign} =
+        Campaigns.update_campaign(campaign, %{
+          notion_failure_count: 2,
+          notion_failure_window_start: DateTime.add(now, -2, :hour)
+        })
+
+      # Now trigger a new failure - should reset window and start count at 1
+      Notion.log_error("character", character.id, %{}, %{}, "New error after window expired")
+
+      campaign = Repo.get!(Campaigns.Campaign, campaign.id)
+      # Status should still be working because we only have 1 failure in new window
+      assert campaign.notion_status == "working"
+      # Count should be 1 (reset, not 3)
+      assert campaign.notion_failure_count == 1
+      # Window should be recent (within last minute)
+      assert DateTime.diff(now, campaign.notion_failure_window_start, :second) < 60
+    end
+
+    test "success resets failure tracking counters", %{
+      character: character,
+      campaign: campaign
+    } do
+      # Set up some failure state
+      {:ok, campaign} =
+        Campaigns.update_campaign(campaign, %{
+          notion_failure_count: 2,
+          notion_failure_window_start: DateTime.utc_now()
+        })
+
+      # Trigger a success
+      Notion.log_success("character", character.id, %{}, %{})
+
+      campaign = Repo.get!(Campaigns.Campaign, campaign.id)
+      # Counter should be reset
+      assert campaign.notion_failure_count == 0
+      # Window should be cleared
+      assert campaign.notion_failure_window_start == nil
+      # Status should remain working
+      assert campaign.notion_status == "working"
+    end
+
+    test "success after needs_attention resets status to working", %{
+      character: character,
+      campaign: campaign
+    } do
+      # Set up needs_attention state with failure tracking
+      {:ok, campaign} =
+        Campaigns.update_campaign(campaign, %{
+          notion_status: "needs_attention",
+          notion_failure_count: 3,
+          notion_failure_window_start: DateTime.utc_now()
+        })
+
+      # Trigger a success
+      Notion.log_success("character", character.id, %{}, %{})
+
+      campaign = Repo.get!(Campaigns.Campaign, campaign.id)
+      # Status should be reset to working
+      assert campaign.notion_status == "working"
+      # Counter should be reset
+      assert campaign.notion_failure_count == 0
+      # Window should be cleared
+      assert campaign.notion_failure_window_start == nil
+    end
+
+    test "does not send additional email if already needs_attention", %{
+      character: character,
+      campaign: campaign
+    } do
+      # Set campaign to needs_attention
+      {:ok, _campaign} =
+        Campaigns.update_campaign(campaign, %{
+          notion_status: "needs_attention",
+          notion_failure_count: 3,
+          notion_failure_window_start: DateTime.utc_now()
+        })
+
+      # Trigger another failure - should not change anything
+      Notion.log_error("character", character.id, %{}, %{}, "Another error")
+
+      campaign = Repo.get!(Campaigns.Campaign, campaign.id)
+      # Status should still be needs_attention
+      assert campaign.notion_status == "needs_attention"
+      # Count should not have changed (we skip processing when already needs_attention)
+      assert campaign.notion_failure_count == 3
+    end
+  end
 end
