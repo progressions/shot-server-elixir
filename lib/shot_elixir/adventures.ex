@@ -222,6 +222,7 @@ defmodule ShotElixir.Adventures do
   """
   def get_adventure!(id) do
     id = Slug.extract_uuid(id)
+
     Adventure
     |> preload([
       :user,
@@ -236,6 +237,7 @@ defmodule ShotElixir.Adventures do
 
   def get_adventure(id) do
     id = Slug.extract_uuid(id)
+
     Adventure
     |> preload([
       :user,

@@ -319,6 +319,7 @@ defmodule ShotElixir.Parties do
 
   def get_party!(id) do
     id = Slug.extract_uuid(id)
+
     Party
     |> preload([:faction, :juncture, :image_positions, memberships: [:character, :vehicle]])
     |> Repo.get!(id)
@@ -327,6 +328,7 @@ defmodule ShotElixir.Parties do
 
   def get_party(id) do
     id = Slug.extract_uuid(id)
+
     Party
     |> preload([:faction, :juncture, :image_positions, memberships: [:character, :vehicle]])
     |> Repo.get(id)

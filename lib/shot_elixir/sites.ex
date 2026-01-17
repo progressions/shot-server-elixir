@@ -291,6 +291,7 @@ defmodule ShotElixir.Sites do
 
   def get_site!(id) do
     id = Slug.extract_uuid(id)
+
     Site
     |> preload([:faction, :juncture, :image_positions, attunements: [:character]])
     |> Repo.get!(id)
@@ -299,6 +300,7 @@ defmodule ShotElixir.Sites do
 
   def get_site(id) do
     id = Slug.extract_uuid(id)
+
     Site
     |> preload([:faction, :juncture, :image_positions, attunements: [:character]])
     |> Repo.get(id)

@@ -333,6 +333,7 @@ defmodule ShotElixir.Schticks do
 
   def get_schtick!(id) do
     id = Slug.extract_uuid(id)
+
     Schtick
     |> preload(:prerequisite)
     |> Repo.get!(id)
@@ -341,6 +342,7 @@ defmodule ShotElixir.Schticks do
 
   def get_schtick(id) do
     id = Slug.extract_uuid(id)
+
     Schtick
     |> preload(:prerequisite)
     |> Repo.get(id)
