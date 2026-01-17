@@ -823,6 +823,22 @@ defmodule ShotElixir.Services.NotionService do
       page when is_map(page) ->
         attributes = Character.attributes_from_notion(character, page)
 
+        # Override description with mention-aware conversion
+        # Character.attributes_from_notion extracts plain text, but we need to preserve
+        # Notion page mentions and convert them to TipTap HTML format
+        description_with_mentions =
+          character_description_with_mentions(page, character.campaign_id)
+
+        attributes =
+          Map.update(
+            attributes,
+            :description,
+            description_with_mentions,
+            fn existing_desc ->
+              Map.merge(existing_desc || %{}, description_with_mentions)
+            end
+          )
+
         # Fetch rich description from page content (blocks)
         attributes =
           add_rich_description(attributes, character.notion_page_id, character.campaign_id)
@@ -1478,6 +1494,26 @@ defmodule ShotElixir.Services.NotionService do
         Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")
         attributes
     end
+  end
+
+  # Extract character description map with proper mention conversion
+  # This converts Notion rich_text to TipTap HTML with mention spans preserved
+  defp character_description_with_mentions(page, campaign_id) do
+    props = page["properties"] || %{}
+
+    %{
+      "Age" => get_rich_text_as_html(props, "Age", campaign_id),
+      "Height" => get_rich_text_as_html(props, "Height", campaign_id),
+      "Weight" => get_rich_text_as_html(props, "Weight", campaign_id),
+      "Eye Color" => get_rich_text_as_html(props, "Eye Color", campaign_id),
+      "Hair Color" => get_rich_text_as_html(props, "Hair Color", campaign_id),
+      "Appearance" => get_rich_text_as_html(props, "Description", campaign_id),
+      "Style of Dress" => get_rich_text_as_html(props, "Style of Dress", campaign_id),
+      "Melodramatic Hook" => get_rich_text_as_html(props, "Melodramatic Hook", campaign_id)
+    }
+    # Filter out empty strings to preserve existing description values
+    |> Enum.reject(fn {_k, v} -> is_nil(v) || v == "" end)
+    |> Map.new()
   end
 
   # Convert Notion rich_text to Chi War HTML with mention support
