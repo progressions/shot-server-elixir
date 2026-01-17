@@ -529,7 +529,6 @@ defmodule ShotElixir.Helpers.MentionConverter do
   # - This assumes entities don't change during a single request (safe assumption)
   # - For long-running processes, consider implementing explicit cache invalidation
   defp find_entity_by_id(entity_type, id, campaign_id) do
-    id = Slug.extract_uuid(id)
     schema = entity_type_to_schema(entity_type)
 
     if schema do
