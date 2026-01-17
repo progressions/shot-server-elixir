@@ -139,7 +139,7 @@ defmodule ShotElixir.Services.NotionService do
     end)
   end
 
-  defp data_source_id_for(database_id, opts \\ []) do
+  defp data_source_id_for(database_id, opts) do
     case cached_data_source_id(database_id) do
       {:ok, data_source_id} ->
         {:ok, data_source_id}
@@ -1501,6 +1501,10 @@ defmodule ShotElixir.Services.NotionService do
         attributes
     end
   end
+
+  # Backwards-compatible arity without token (falls back to nil token)
+  defp add_rich_description(attributes, page_id, campaign_id),
+    do: add_rich_description(attributes, page_id, campaign_id, nil)
 
   # Convert Notion rich_text to Chi War HTML with mention support
   defp get_rich_text_as_html(props, key, campaign_id) do
@@ -2930,35 +2934,42 @@ defmodule ShotElixir.Services.NotionService do
 
   # Generic sync function for any entity type (site, party, faction, juncture)
   defp sync_entity(entity, %{entity_type: entity_type} = opts) do
-    token = Map.get(opts, :token)
+    case Map.get(opts, :token) do
+      nil ->
+        Logger.warning("Notion sync skipped for #{entity_type}: missing OAuth token")
+        Notion.log_error(entity_type, entity.id, %{}, %{}, "Notion OAuth token missing")
+        {:error, :no_notion_oauth_token}
 
-    if is_nil(token) do
-      Logger.warning("Notion sync skipped for #{entity_type}: missing OAuth token")
-      Notion.log_error(entity_type, entity.id, %{}, %{}, "Notion OAuth token missing")
-      {:error, :no_notion_oauth_token}
-    else
-      result =
-        if entity.notion_page_id do
-          update_notion_page(entity, opts)
-        else
-          create_notion_page(entity, opts)
+      token ->
+        try do
+          opts = Map.put(opts, :token, token)
+
+          result =
+            if entity.notion_page_id do
+              update_notion_page(entity, opts)
+            else
+              create_notion_page(entity, opts)
+            end
+
+          case result do
+            {:ok, :unlinked} ->
+              {:ok, :unlinked}
+
+            {:ok, _} ->
+              opts.update_fn.(entity, %{last_synced_to_notion_at: DateTime.utc_now()})
+
+            {:error, reason} ->
+              Logger.error("Failed to sync #{entity_type} to Notion: #{inspect(reason)}")
+              {:error, reason}
+          end
+        rescue
+          error ->
+            Logger.error(
+              "Exception syncing #{entity_type} to Notion: #{Exception.message(error)}"
+            )
+
+            {:error, error}
         end
-
-      case result do
-        {:ok, :unlinked} ->
-          {:ok, :unlinked}
-
-        {:ok, _} ->
-          opts.update_fn.(entity, %{last_synced_to_notion_at: DateTime.utc_now()})
-
-        {:error, reason} ->
-          Logger.error("Failed to sync #{entity_type} to Notion: #{inspect(reason)}")
-          {:error, reason}
-      end
-    rescue
-      error ->
-        Logger.error("Exception syncing #{entity_type} to Notion: #{Exception.message(error)}")
-        {:error, error}
     end
   end
 
