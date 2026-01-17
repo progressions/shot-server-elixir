@@ -50,6 +50,41 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
+  defmodule NotionClientStubCharacterWithMentions do
+    @faction_notion_id "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+
+    def faction_notion_id, do: @faction_notion_id
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Character With Mention"}]},
+          "Type" => %{"select" => %{"name" => "npc"}},
+          "Description" => %{
+            "rich_text" => [
+              %{"plain_text" => "A member of ", "type" => "text"},
+              %{
+                "plain_text" => "The Ascended",
+                "type" => "mention",
+                "mention" => %{
+                  "type" => "page",
+                  "page" => %{"id" => @faction_notion_id}
+                }
+              }
+            ]
+          },
+          "Age" => %{"rich_text" => [%{"plain_text" => "45", "type" => "text"}]},
+          "Height" => %{"rich_text" => [%{"plain_text" => "6'0\"", "type" => "text"}]}
+        }
+      }
+    end
+
+    def get_blocks(_page_id) do
+      %{"results" => []}
+    end
+  end
+
   defmodule NotionClientStubJunctureSuccess do
     def character_notion_id, do: "c0a80123-4567-489a-bcde-1234567890ab"
     def site_notion_id, do: "e5b1b80e-2a50-4a43-92b1-8d1f5f4dd721"
@@ -469,6 +504,36 @@ defmodule ShotElixir.Services.NotionServiceTest do
 
       assert log.status == "error"
       assert String.contains?(log.error_message, "Notion API error")
+    end
+
+    test "update_character_from_notion preserves Notion page mentions as TipTap HTML", %{
+      character: character,
+      campaign: campaign
+    } do
+      # Create a faction with a notion_page_id that matches the stub
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "The Ascended",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubCharacterWithMentions.faction_notion_id()
+        })
+
+      {:ok, updated_character} =
+        NotionService.update_character_from_notion(character,
+          client: NotionClientStubCharacterWithMentions
+        )
+
+      # Verify the Appearance field contains TipTap mention HTML span
+      appearance = updated_character.description["Appearance"]
+      assert appearance =~ "A member of"
+      assert appearance =~ ~r/<span[^>]*data-type="mention"/
+      assert appearance =~ ~r/data-id="#{faction.id}"/
+      assert appearance =~ ~r/data-label="The Ascended"/
+      assert appearance =~ ~r/data-mention-class-name="Faction"/
+
+      # Verify simple fields remain as plain text (no <p> tags)
+      assert updated_character.description["Age"] == "45"
+      assert updated_character.description["Height"] == "6'0\""
     end
   end
 

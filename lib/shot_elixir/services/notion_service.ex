@@ -821,22 +821,19 @@ defmodule ShotElixir.Services.NotionService do
 
       # Success case: page data returned as a map
       page when is_map(page) ->
+        # Get base attributes (action_values, name, notion_page_id)
+        # Note: Character.attributes_from_notion also extracts description as plain text,
+        # but we replace it below with mention-aware HTML to preserve Notion page mentions
         attributes = Character.attributes_from_notion(character, page)
 
-        # Override description with mention-aware conversion
-        # Character.attributes_from_notion extracts plain text, but we need to preserve
-        # Notion page mentions and convert them to TipTap HTML format
-        description_with_mentions =
-          character_description_with_mentions(page, character.campaign_id)
-
+        # Replace description with mention-aware conversion
+        # This extracts description fields using MentionConverter to preserve
+        # Notion page mentions as TipTap HTML spans
         attributes =
-          Map.update(
+          Map.put(
             attributes,
             :description,
-            description_with_mentions,
-            fn existing_desc ->
-              Map.merge(existing_desc || %{}, description_with_mentions)
-            end
+            character_description_with_mentions(page, character.campaign_id)
           )
 
         # Fetch rich description from page content (blocks)
