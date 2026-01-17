@@ -193,6 +193,50 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   @doc """
+  Fetches and caches the Notion bot user ID for the provided token.
+
+  opts:
+    * `:token` - optional token override for multi-workspace support
+    * `:client` - optional Notion client module (defaults to NotionClient)
+
+  Returns `{:ok, bot_id}` on success or `{:error, :failed_to_fetch_bot_id}` on failure.
+  Caches results in ETS keyed by `{:bot_user_id, token}` to support multiple integrations.
+  """
+  def get_bot_user_id(opts) do
+    token = Keyword.get(opts, :token)
+    # Use token as part of key to support multiple bots/integrations
+    key = {:bot_user_id, token}
+    table = data_source_cache_table()
+    client = notion_client(opts)
+    opts_map = Enum.into(opts, %{})
+
+    case :ets.lookup(table, key) do
+      [{^key, bot_id}] ->
+        {:ok, bot_id}
+
+      [] ->
+        case client.get_me(opts_map) do
+          %{"id" => bot_id} ->
+            :ets.insert(table, {key, bot_id})
+            {:ok, bot_id}
+
+          _ ->
+            {:error, :failed_to_fetch_bot_id}
+        end
+    end
+  end
+
+  defp should_skip_bot_update?(page, opts) do
+    case get_bot_user_id(opts) do
+      {:ok, bot_id} ->
+        get_in(page, ["last_edited_by", "id"]) == bot_id
+
+      _ ->
+        false
+    end
+  end
+
+  @doc """
   Main sync function - creates or updates character in Notion.
   Environment check performed at worker level.
   """
@@ -658,9 +702,8 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, character} = Characters.create_character(%{name: unique_name, campaign_id: campaign_id})
 
     character = Repo.preload(character, :faction)
-
-    # Extract attributes with mention-aware description in a single pass
-    attributes = character_attributes_with_mentions(character, page, campaign_id)
+    attributes = Character.attributes_from_notion(character, page)
+    attributes = add_rich_description(attributes, page["id"], campaign_id)
 
     {:ok, character} =
       Characters.update_character(character, Map.put(attributes, :notion_page_id, page["id"]))
@@ -823,24 +866,23 @@ defmodule ShotElixir.Services.NotionService do
             "Notion API error: #{error_code} - #{message}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
+      # Success case: page data returned as a map
+      page when is_map(page) ->
+        if should_skip_bot_update?(page, opts) do
+          Logger.info(
+            "Skipping update for character #{character.id} as it was last edited by the bot"
+          )
 
-        # Success case: page data returned as a map
-        page when is_map(page) ->
-          # Extract attributes with mention-aware description in a single pass
-          attributes = character_attributes_with_mentions(character, page, character.campaign_id)
+          {:ok, character}
+        else
+          attributes = Character.attributes_from_notion(character, page)
 
           # Fetch rich description from page content (blocks)
           attributes =
-            add_rich_description(
-              attributes,
-              character.notion_page_id,
-              character.campaign_id,
-              token
-            )
+            add_rich_description(attributes, character.notion_page_id, character.campaign_id)
 
           # Add image if not already present
-          add_image(page, character, token: token)
+          add_image(page, character)
 
           # Skip Notion sync to prevent ping-pong loops when updating from webhook
           case Characters.update_character(character, attributes, skip_notion_sync: true) do
@@ -859,7 +901,7 @@ defmodule ShotElixir.Services.NotionService do
 
               error
           end
-      end
+        end
     end
   rescue
     error ->
@@ -1492,49 +1534,6 @@ defmodule ShotElixir.Services.NotionService do
         Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")
         attributes
     end
-  end
-
-  # Extract character attributes from Notion with mention-aware description
-  # Combines Character.attributes_from_notion (for action values, name, etc.)
-  # with mention-aware description extraction (for Appearance, Melodramatic Hook)
-  defp character_attributes_with_mentions(character, page, campaign_id) do
-    # Get base attributes (action values, name, etc.) - description is plain text here
-    base_attributes = Character.attributes_from_notion(character, page)
-
-    # Extract description with mention support, replacing the plain text version
-    description_with_mentions = character_description_with_mentions(page, campaign_id)
-
-    # Merge mention-aware description with any existing character description
-    merged_description =
-      Map.merge(
-        character.description || %{},
-        description_with_mentions
-      )
-
-    Map.put(base_attributes, :description, merged_description)
-  end
-
-  # Extract character description map with proper mention conversion
-  # Only "Appearance" and "Melodramatic Hook" use HTML (they can contain mentions)
-  # Simple fields like Age, Height, etc. stay as plain text
-  defp character_description_with_mentions(page, campaign_id) do
-    props = page["properties"] || %{}
-
-    %{
-      # Simple fields - plain text only
-      "Age" => get_rich_text_content(props, "Age"),
-      "Height" => get_rich_text_content(props, "Height"),
-      "Weight" => get_rich_text_content(props, "Weight"),
-      "Eye Color" => get_rich_text_content(props, "Eye Color"),
-      "Hair Color" => get_rich_text_content(props, "Hair Color"),
-      "Style of Dress" => get_rich_text_content(props, "Style of Dress"),
-      # Rich text fields - HTML with mention support
-      "Appearance" => get_rich_text_as_html(props, "Description", campaign_id),
-      "Melodramatic Hook" => get_rich_text_as_html(props, "Melodramatic Hook", campaign_id)
-    }
-    # Filter out empty strings to preserve existing description values
-    |> Enum.reject(fn {_k, v} -> is_nil(v) || v == "" end)
-    |> Map.new()
   end
 
   # Convert Notion rich_text to Chi War HTML with mention support
@@ -2629,15 +2628,17 @@ defmodule ShotElixir.Services.NotionService do
             "Notion API error: #{error_code} - #{message}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
+      page when is_map(page) ->
+        if should_skip_bot_update?(page, opts) do
+          Logger.info("Skipping update for site #{site.id} as it was last edited by the bot")
 
-        page when is_map(page) ->
+          {:ok, site}
+        else
           # Use mention-aware conversion with campaign_id
           attributes = entity_attributes_from_notion(page, site.campaign_id)
 
           # Fetch rich description from page content (blocks)
-          attributes =
-            add_rich_description(attributes, site.notion_page_id, site.campaign_id, token)
+          attributes = add_rich_description(attributes, site.notion_page_id, site.campaign_id)
 
           # Skip Notion sync to prevent ping-pong loops when updating from webhook
           case Sites.update_site(site, attributes, skip_notion_sync: true) do
@@ -2656,7 +2657,7 @@ defmodule ShotElixir.Services.NotionService do
 
               error
           end
-      end
+        end
     end
   rescue
     error ->
@@ -2708,15 +2709,17 @@ defmodule ShotElixir.Services.NotionService do
             "Notion API error: #{error_code} - #{message}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
+      page when is_map(page) ->
+        if should_skip_bot_update?(page, opts) do
+          Logger.info("Skipping update for party #{party.id} as it was last edited by the bot")
 
-        page when is_map(page) ->
+          {:ok, party}
+        else
           # Use mention-aware conversion with campaign_id
           attributes = entity_attributes_from_notion(page, party.campaign_id)
 
           # Fetch rich description from page content (blocks)
-          attributes =
-            add_rich_description(attributes, party.notion_page_id, party.campaign_id, token)
+          attributes = add_rich_description(attributes, party.notion_page_id, party.campaign_id)
 
           # Skip Notion sync to prevent ping-pong loops when updating from webhook
           case Parties.update_party(party, attributes, skip_notion_sync: true) do
@@ -2735,7 +2738,7 @@ defmodule ShotElixir.Services.NotionService do
 
               error
           end
-      end
+        end
     end
   rescue
     error ->
@@ -2787,15 +2790,20 @@ defmodule ShotElixir.Services.NotionService do
             "Notion API error: #{error_code} - #{message}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
+      page when is_map(page) ->
+        if should_skip_bot_update?(page, opts) do
+          Logger.info(
+            "Skipping update for faction #{faction.id} as it was last edited by the bot"
+          )
 
-        page when is_map(page) ->
+          {:ok, faction}
+        else
           # Use mention-aware conversion with campaign_id
           attributes = entity_attributes_from_notion(page, faction.campaign_id)
 
           # Fetch rich description from page content (blocks)
           attributes =
-            add_rich_description(attributes, faction.notion_page_id, faction.campaign_id, token)
+            add_rich_description(attributes, faction.notion_page_id, faction.campaign_id)
 
           # Skip Notion sync to prevent ping-pong loops when updating from webhook
           case Factions.update_faction(faction, attributes, skip_notion_sync: true) do
@@ -2814,7 +2822,7 @@ defmodule ShotElixir.Services.NotionService do
 
               error
           end
-      end
+        end
     end
   rescue
     error ->
@@ -2867,9 +2875,14 @@ defmodule ShotElixir.Services.NotionService do
             "Notion API error: #{error_code} - #{message}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
+      page when is_map(page) ->
+        if should_skip_bot_update?(page, opts) do
+          Logger.info(
+            "Skipping update for juncture #{juncture.id} as it was last edited by the bot"
+          )
 
-        page when is_map(page) ->
+          {:ok, juncture}
+        else
           # Use mention-aware conversion with campaign_id
           attributes = entity_attributes_from_notion(page, juncture.campaign_id)
 
@@ -2887,7 +2900,7 @@ defmodule ShotElixir.Services.NotionService do
 
           # Fetch rich description from page content (blocks)
           attributes =
-            add_rich_description(attributes, juncture.notion_page_id, juncture.campaign_id, token)
+            add_rich_description(attributes, juncture.notion_page_id, juncture.campaign_id)
 
           case Junctures.update_juncture(juncture, attributes) do
             {:ok, updated_juncture} = result ->
@@ -2905,7 +2918,7 @@ defmodule ShotElixir.Services.NotionService do
 
               error
           end
-      end
+        end
     end
   rescue
     error ->
@@ -2958,20 +2971,20 @@ defmodule ShotElixir.Services.NotionService do
             "Notion API error: #{error_code} - #{message}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
+      page when is_map(page) ->
+        if should_skip_bot_update?(page, opts) do
+          Logger.info(
+            "Skipping update for adventure #{adventure.id} as it was last edited by the bot"
+          )
 
-        page when is_map(page) ->
+          {:ok, adventure}
+        else
           # Use centralized mention-aware conversion with campaign_id
           attributes = adventure_attributes_from_notion(page, adventure.campaign_id)
 
           # Fetch rich description from page content (blocks)
           attributes =
-            add_rich_description(
-              attributes,
-              adventure.notion_page_id,
-              adventure.campaign_id,
-              token
-            )
+            add_rich_description(attributes, adventure.notion_page_id, adventure.campaign_id)
 
           # Skip Notion sync to prevent ping-pong loops when updating from webhook
           case Adventures.update_adventure(adventure, attributes, skip_notion_sync: true) do
@@ -2990,7 +3003,7 @@ defmodule ShotElixir.Services.NotionService do
 
               error
           end
-      end
+        end
     end
   rescue
     error ->

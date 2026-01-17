@@ -151,4 +151,18 @@ defmodule ShotElixir.Services.NotionClient do
       {:error, err} -> err
     end
   end
+
+  @doc """
+  Fetches details about the authenticated Notion integration/bot user.
+
+  Accepts an optional `:token` override in opts to target a specific workspace.
+  Returns the response body from Notion's `/users/me` endpoint.
+  """
+  def get_me(opts \\ %{}) do
+    token = Map.get(opts, :token)
+
+    client(token)
+    |> Req.get!(url: "/users/me")
+    |> Map.get(:body)
+  end
 end

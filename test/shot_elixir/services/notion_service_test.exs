@@ -10,29 +10,38 @@ defmodule ShotElixir.Services.NotionServiceTest do
   alias ShotElixir.Junctures
   alias ShotElixir.Parties
   alias ShotElixir.Sites
+  alias ShotElixir.Adventures
+  alias ShotElixir.Adventures.Adventure
   alias ShotElixir.Notion.NotionSyncLog
 
   defmodule NotionClientStubSuccess do
-    def get_page(page_id, _opts \\ %{}) do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+    def get_page(page_id) do
       %{
         "id" => page_id,
         "properties" => %{
           "Name" => %{"title" => [%{"plain_text" => "Notion Name"}]},
           "Description" => %{"rich_text" => [%{"plain_text" => "Notion Description"}]},
           "At a Glance" => %{"checkbox" => true}
-        }
+        },
+        "last_edited_by" => %{"id" => "some-other-user-id"}
       }
     end
   end
 
   defmodule NotionClientStubError do
-    def get_page(_page_id, _opts \\ %{}) do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
+    def get_page(_page_id) do
       %{"code" => "object_not_found", "message" => "Page not found"}
     end
   end
 
   defmodule NotionClientStubCharacterSuccess do
-    def get_page(page_id, _opts \\ %{}) do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+    def get_page(page_id) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -41,7 +50,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
           "Defense" => %{"number" => 14},
           "Toughness" => %{"number" => 7},
           "Speed" => %{"number" => 6}
-        }
+        },
+        "last_edited_by" => %{"id" => "some-other-user-id"}
       }
     end
 
@@ -50,33 +60,44 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
-  defmodule NotionClientStubCharacterWithMentions do
-    @faction_notion_id "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-
-    def faction_notion_id, do: @faction_notion_id
+  defmodule NotionClientStubCharacterBotEdited do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
 
     def get_page(page_id, _opts \\ %{}) do
       %{
         "id" => page_id,
         "properties" => %{
-          "Name" => %{"title" => [%{"plain_text" => "Character With Mention"}]},
+          "Name" => %{"title" => [%{"plain_text" => "Bot Authored Name"}]},
           "Type" => %{"select" => %{"name" => "npc"}},
-          "Description" => %{
-            "rich_text" => [
-              %{"plain_text" => "A member of ", "type" => "text"},
-              %{
-                "plain_text" => "The Ascended",
-                "type" => "mention",
-                "mention" => %{
-                  "type" => "page",
-                  "page" => %{"id" => @faction_notion_id}
-                }
-              }
-            ]
-          },
-          "Age" => %{"rich_text" => [%{"plain_text" => "45", "type" => "text"}]},
-          "Height" => %{"rich_text" => [%{"plain_text" => "6'0\"", "type" => "text"}]}
-        }
+          "Defense" => %{"number" => 14},
+          "Toughness" => %{"number" => 7},
+          "Speed" => %{"number" => 6}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+
+    def get_blocks(_page_id) do
+      %{"results" => []}
+    end
+  end
+
+  defmodule NotionClientStubCharacterGetMeError do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Fallback Notion Name"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Fallback description"}]},
+          "At a Glance" => %{"checkbox" => true},
+          "Type" => %{"select" => %{"name" => "npc"}},
+          "Defense" => %{"number" => 14},
+          "Toughness" => %{"number" => 7},
+          "Speed" => %{"number" => 6}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
       }
     end
 
@@ -86,6 +107,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
   end
 
   defmodule NotionClientStubJunctureSuccess do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     def character_notion_id, do: "c0a80123-4567-489a-bcde-1234567890ab"
     def site_notion_id, do: "e5b1b80e-2a50-4a43-92b1-8d1f5f4dd721"
 
@@ -98,12 +121,15 @@ defmodule ShotElixir.Services.NotionServiceTest do
           "At a Glance" => %{"checkbox" => true},
           "People" => %{"relation" => [%{"id" => character_notion_id()}]},
           "Locations" => %{"relation" => [%{"id" => site_notion_id()}]}
-        }
+        },
+        "last_edited_by" => %{"id" => "some-other-user-id"}
       }
     end
   end
 
   defmodule NotionClientStubDataSource do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     # Now find_pages_in_database uses the ID directly as a data_source_id,
     # so we just need to stub data_source_query
     def data_source_query("ds-id-success", _filter) do
@@ -122,9 +148,75 @@ defmodule ShotElixir.Services.NotionServiceTest do
   end
 
   defmodule NotionClientStubDataSourceMissing do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     # Stub that returns an error from data_source_query
     def data_source_query("ds-id-missing", _filter) do
       %{"code" => "object_not_found", "message" => "Data source not found"}
+    end
+  end
+
+  defmodule NotionClientStubSiteBotEdited do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Bot Authored Site"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Bot Description"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+  end
+
+  defmodule NotionClientStubSiteGetMeError do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Fail-open Site"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Site Desc"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+  end
+
+  defmodule NotionClientStubAdventureBotEdited do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Bot Adventure"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Adventure Desc"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+  end
+
+  defmodule NotionClientStubAdventureGetMeError do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Fail-open Adventure"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Adventure Desc"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
     end
   end
 
@@ -319,12 +411,20 @@ defmodule ShotElixir.Services.NotionServiceTest do
           notion_page_id: Ecto.UUID.generate()
         })
 
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Local Adventure",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
       {:ok,
        site: site,
        party: party,
        faction: faction,
        juncture: juncture,
        character: character,
+       adventure: adventure,
        campaign: campaign}
     end
 
@@ -356,6 +456,25 @@ defmodule ShotElixir.Services.NotionServiceTest do
 
       assert log.status == "error"
       assert String.contains?(log.error_message, "Notion API error")
+    end
+
+    test "skips site update when page was last edited by the bot", %{site: site} do
+      {:ok, returned_site} =
+        NotionService.update_site_from_notion(site, client: NotionClientStubSiteBotEdited)
+
+      reloaded = Sites.get_site(site.id)
+      assert returned_site.id == site.id
+      assert reloaded.description == site.description
+    end
+
+    test "continues site update when bot user lookup fails (fail-open)", %{site: site} do
+      {:ok, updated_site} =
+        NotionService.update_site_from_notion(site,
+          client: NotionClientStubSiteGetMeError,
+          token: "fail-open-token"
+        )
+
+      assert updated_site.description == "<p>Site Desc</p>"
     end
 
     test "update_party_from_notion logs success and updates attributes", %{party: party} do
@@ -509,35 +628,84 @@ defmodule ShotElixir.Services.NotionServiceTest do
       assert String.contains?(log.error_message, "Notion API error")
     end
 
-    test "update_character_from_notion preserves Notion page mentions as TipTap HTML", %{
-      character: character,
-      campaign: campaign
-    } do
-      # Create a faction with a notion_page_id that matches the stub
-      {:ok, faction} =
-        Factions.create_faction(%{
-          name: "The Ascended",
-          campaign_id: campaign.id,
-          notion_page_id: NotionClientStubCharacterWithMentions.faction_notion_id()
-        })
+    test "skips character update when page was last edited by the bot", %{character: character} do
+      original_name = character.name
 
+      assert {:ok, returned_character} =
+               NotionService.update_character_from_notion(character,
+                 client: NotionClientStubCharacterBotEdited
+               )
+
+      reloaded = Repo.get(Character, character.id)
+      assert returned_character.id == character.id
+      assert reloaded.name == original_name
+
+      logs =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "character", entity_id: ^character.id)
+        |> Repo.all()
+
+      assert logs == []
+    end
+
+    test "continues character update when bot user lookup fails (fail-open)", %{
+      character: character
+    } do
       {:ok, updated_character} =
         NotionService.update_character_from_notion(character,
-          client: NotionClientStubCharacterWithMentions,
-          token: "test-token"
+          client: NotionClientStubCharacterGetMeError,
+          token: "fail-open-token"
         )
 
-      # Verify the Appearance field contains TipTap mention HTML span
-      appearance = updated_character.description["Appearance"]
-      assert appearance =~ "A member of"
-      assert appearance =~ ~r/<span[^>]*data-type="mention"/
-      assert appearance =~ ~r/data-id="#{faction.id}"/
-      assert appearance =~ ~r/data-label="The Ascended"/
-      assert appearance =~ ~r/data-mention-class-name="Faction"/
+      assert updated_character.name == "Fallback Notion Name"
 
-      # Verify simple fields remain as plain text (no <p> tags)
-      assert updated_character.description["Age"] == "45"
-      assert updated_character.description["Height"] == "6'0\""
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "character", entity_id: ^character.id)
+        |> Repo.all()
+
+      assert log.status == "success"
+    end
+
+    test "update_adventure_from_notion logs success and updates attributes", %{
+      adventure: adventure
+    } do
+      {:ok, updated_adventure} =
+        NotionService.update_adventure_from_notion(adventure, client: NotionClientStubSuccess)
+
+      assert updated_adventure.name == "Notion Name"
+      assert updated_adventure.description == "<p>Notion Description</p>"
+      assert updated_adventure.at_a_glance == true
+    end
+
+    test "update_adventure_from_notion logs errors from Notion API", %{adventure: adventure} do
+      assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
+               NotionService.update_adventure_from_notion(adventure,
+                 client: NotionClientStubError
+               )
+    end
+
+    test "skips adventure update when page was last edited by the bot", %{adventure: adventure} do
+      {:ok, returned_adventure} =
+        NotionService.update_adventure_from_notion(adventure,
+          client: NotionClientStubAdventureBotEdited
+        )
+
+      reloaded = Repo.get(Adventure, adventure.id)
+      assert returned_adventure.id == adventure.id
+      assert reloaded.description == adventure.description
+    end
+
+    test "continues adventure update when bot user lookup fails (fail-open)", %{
+      adventure: adventure
+    } do
+      {:ok, updated_adventure} =
+        NotionService.update_adventure_from_notion(adventure,
+          client: NotionClientStubAdventureGetMeError,
+          token: "fail-open-token"
+        )
+
+      assert updated_adventure.description == "<p>Adventure Desc</p>"
     end
   end
 
@@ -816,161 +984,6 @@ defmodule ShotElixir.Services.NotionServiceTest do
       result = NotionService.find_image_block(page, client: NotionClientStubEmptyResults)
 
       assert result == nil
-    end
-  end
-
-  describe "update_character_from_notion preserves mentions" do
-    # Use valid UUIDs for Notion page IDs
-    @mentioned_char_notion_id "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-    @main_char_notion_id "b2c3d4e5-f6a7-8901-bcde-f12345678901"
-
-    setup do
-      {:ok, user} =
-        Accounts.create_user(%{
-          email: "gm-mention-test@example.com",
-          password: "password123",
-          first_name: "Mention",
-          last_name: "Tester",
-          gamemaster: true
-        })
-
-      {:ok, campaign} =
-        %Campaign{}
-        |> Campaign.changeset(%{
-          name: "Mention Test Campaign",
-          user_id: user.id,
-          notion_access_token: "test-token"
-        })
-        |> Repo.insert()
-
-      # Create a character that will be mentioned
-      {:ok, mentioned_char} =
-        Characters.create_character(%{
-          name: "Big Boss",
-          campaign_id: campaign.id,
-          notion_page_id: @mentioned_char_notion_id
-        })
-
-      # Create the main character being synced
-      {:ok, character} =
-        Characters.create_character(%{
-          name: "Test Character",
-          campaign_id: campaign.id,
-          notion_page_id: @main_char_notion_id
-        })
-
-      {:ok, user: user, campaign: campaign, character: character, mentioned_char: mentioned_char}
-    end
-
-    defmodule NotionClientStubWithMentions do
-      @mentioned_char_notion_id "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-
-      def get_page(page_id, _opts \\ %{}) do
-        %{
-          "id" => page_id,
-          "properties" => %{
-            "Name" => %{"title" => [%{"plain_text" => "Updated Character Name"}]},
-            "Description" => %{
-              "rich_text" => [
-                %{"type" => "text", "plain_text" => "Works for "},
-                %{
-                  "type" => "mention",
-                  "plain_text" => "Big Boss",
-                  "mention" => %{
-                    "type" => "page",
-                    "page" => %{"id" => @mentioned_char_notion_id}
-                  }
-                },
-                %{"type" => "text", "plain_text" => " at the docks."}
-              ]
-            },
-            "Age" => %{"rich_text" => [%{"plain_text" => "35"}]},
-            "Melodramatic Hook" => %{
-              "rich_text" => [
-                %{"type" => "text", "plain_text" => "Owes a debt to "},
-                %{
-                  "type" => "mention",
-                  "plain_text" => "Big Boss",
-                  "mention" => %{
-                    "type" => "page",
-                    "page" => %{"id" => @mentioned_char_notion_id}
-                  }
-                }
-              ]
-            }
-          }
-        }
-      end
-
-      def get_blocks(_page_id) do
-        %{"results" => []}
-      end
-    end
-
-    test "converts Notion page mentions to TipTap HTML in description fields", %{
-      character: character,
-      mentioned_char: mentioned_char
-    } do
-      {:ok, updated_character} =
-        NotionService.update_character_from_notion(character,
-          client: NotionClientStubWithMentions,
-          token: "test-token"
-        )
-
-      # Verify name was updated
-      assert updated_character.name == "Updated Character Name"
-
-      # Verify simple description fields are plain text
-      assert updated_character.description["Age"] == "35"
-
-      # Verify Appearance field (from Notion "Description") contains HTML mention
-      appearance = updated_character.description["Appearance"]
-      assert appearance != nil
-      assert String.contains?(appearance, "data-type=\"mention\"")
-      assert String.contains?(appearance, "data-id=\"#{mentioned_char.id}\"")
-      assert String.contains?(appearance, "Big Boss")
-
-      # Verify Melodramatic Hook contains HTML mention
-      hook = updated_character.description["Melodramatic Hook"]
-      assert hook != nil
-      assert String.contains?(hook, "data-type=\"mention\"")
-      assert String.contains?(hook, "data-id=\"#{mentioned_char.id}\"")
-    end
-
-    defmodule NotionClientStubPlainText do
-      def get_page(page_id, _opts \\ %{}) do
-        %{
-          "id" => page_id,
-          "properties" => %{
-            "Name" => %{"title" => [%{"plain_text" => "Plain Character"}]},
-            "Description" => %{
-              "rich_text" => [%{"type" => "text", "plain_text" => "A simple description"}]
-            },
-            "Age" => %{"rich_text" => [%{"plain_text" => "25"}]},
-            "Height" => %{"rich_text" => [%{"plain_text" => "6 feet"}]}
-          }
-        }
-      end
-
-      def get_blocks(_page_id) do
-        %{"results" => []}
-      end
-    end
-
-    test "handles plain text descriptions without mentions", %{character: character} do
-      {:ok, updated_character} =
-        NotionService.update_character_from_notion(character,
-          client: NotionClientStubPlainText,
-          token: "test-token"
-        )
-
-      assert updated_character.name == "Plain Character"
-      assert updated_character.description["Age"] == "25"
-      assert updated_character.description["Height"] == "6 feet"
-      # Plain text gets wrapped in HTML but should not contain mention markup
-      appearance = updated_character.description["Appearance"]
-      assert String.contains?(appearance, "A simple description")
-      refute String.contains?(appearance || "", "data-type=\"mention\"")
     end
   end
 end
