@@ -8,6 +8,7 @@ defmodule ShotElixir.Fights do
   alias ShotElixir.Fights.{Fight, Shot, FightEvent}
   alias ShotElixir.Adventures.AdventureFight
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   use ShotElixir.Models.Broadcastable
 
   def list_fights(campaign_id) do
@@ -339,20 +340,25 @@ defmodule ShotElixir.Fights do
   end
 
   def get_fight!(id) do
-    Repo.get!(Fight, id)
+    id
+    |> Slug.extract_uuid()
+    |> Repo.get!(Fight)
     |> Repo.preload([:image_positions, adventure_fights: [:adventure]])
     |> ImageLoader.load_image_url("Fight")
   end
 
   def get_fight(id) do
-    Repo.get(Fight, id)
+    id
+    |> Slug.extract_uuid()
+    |> Repo.get(Fight)
     |> Repo.preload([:image_positions, adventure_fights: [:adventure]])
     |> ImageLoader.load_image_url("Fight")
   end
 
   def get_fight_with_shots(id) do
-    Fight
-    |> Repo.get(id)
+    id
+    |> Slug.extract_uuid()
+    |> Repo.get(Fight)
     |> Repo.preload(shots: [:character, :vehicle, :character_effects])
     |> Repo.preload([:characters, :vehicles, :image_positions, adventure_fights: [:adventure]])
     |> ImageLoader.load_image_url("Fight")

@@ -7,6 +7,7 @@ defmodule ShotElixir.Adventures do
   alias ShotElixir.Repo
   alias ShotElixir.Adventures.{Adventure, AdventureCharacter, AdventureVillain, AdventureFight}
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   alias ShotElixir.Workers.SyncAdventureToNotionWorker
   use ShotElixir.Models.Broadcastable
@@ -220,6 +221,7 @@ defmodule ShotElixir.Adventures do
   Gets a single adventure by ID.
   """
   def get_adventure!(id) do
+    id = Slug.extract_uuid(id)
     Adventure
     |> preload([
       :user,
@@ -233,6 +235,7 @@ defmodule ShotElixir.Adventures do
   end
 
   def get_adventure(id) do
+    id = Slug.extract_uuid(id)
     Adventure
     |> preload([
       :user,

@@ -8,6 +8,7 @@ defmodule ShotElixir.Weapons do
   alias ShotElixir.Repo
   alias ShotElixir.Weapons.Weapon
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
@@ -109,12 +110,16 @@ defmodule ShotElixir.Weapons do
   end
 
   def get_weapon!(id) do
-    Repo.get!(Weapon, id)
+    id
+    |> Slug.extract_uuid()
+    |> Repo.get!(Weapon)
     |> ImageLoader.load_image_url("Weapon")
   end
 
   def get_weapon(id) do
-    Repo.get(Weapon, id)
+    id
+    |> Slug.extract_uuid()
+    |> Repo.get(Weapon)
     |> ImageLoader.load_image_url("Weapon")
   end
 

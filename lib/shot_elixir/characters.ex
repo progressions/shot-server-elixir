@@ -10,6 +10,7 @@ defmodule ShotElixir.Characters do
   alias ShotElixir.Parties.Membership
   alias ShotElixir.Sites.Attunement
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   alias ShotElixir.Workers.SyncCharacterToNotionWorker
   alias Ecto.Multi
@@ -433,7 +434,9 @@ defmodule ShotElixir.Characters do
   end
 
   def get_character!(id) do
-    Repo.get!(Character, id)
+    id
+    |> Slug.extract_uuid()
+    |> Repo.get!(Character)
     |> Repo.preload([
       :image_positions,
       :weapons,
@@ -448,7 +451,7 @@ defmodule ShotElixir.Characters do
   end
 
   def get_character(id) do
-    case Repo.get(Character, id) do
+    case Repo.get(Character, Slug.extract_uuid(id)) do
       nil ->
         nil
 
