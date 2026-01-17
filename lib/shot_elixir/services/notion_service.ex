@@ -647,7 +647,7 @@ defmodule ShotElixir.Services.NotionService do
   - Juncture (from Notion multi_select, matched by name to local juncture)
   - Fortune and other action values
   """
-  def create_character_from_notion(page, campaign_id) do
+  def create_character_from_notion(page, campaign_id, token \\ nil) do
     name = get_in(page, ["properties", "Name", "title", Access.at(0), "plain_text"])
 
     # Generate unique name to avoid overwriting existing characters
@@ -1686,40 +1686,42 @@ defmodule ShotElixir.Services.NotionService do
     else
       search_query = if String.contains?(query, "session"), do: query, else: "session #{query}"
 
-      results =
-        NotionClient.search(search_query, %{
-          "filter" => %{"property" => "object", "value" => "page"},
-          token: token
-        })
+      try do
+        results =
+          NotionClient.search(search_query, %{
+            "filter" => %{"property" => "object", "value" => "page"},
+            token: token
+          })
 
-      case results["results"] do
-        [page | _rest] = pages ->
-          # Fetch content of the first (most relevant) match
-          blocks = NotionClient.get_block_children(page["id"], %{token: token})
-          content = parse_blocks_to_text(blocks["results"] || [])
+        case results["results"] do
+          [page | _rest] = pages ->
+            # Fetch content of the first (most relevant) match
+            blocks = NotionClient.get_block_children(page["id"], %{token: token})
+            content = parse_blocks_to_text(blocks["results"] || [])
 
-          {:ok,
-           %{
-             title: extract_page_title(page),
-             page_id: page["id"],
-             content: content,
-             pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
-           }}
+            {:ok,
+             %{
+               title: extract_page_title(page),
+               page_id: page["id"],
+               content: content,
+               pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
+             }}
 
-        [] ->
-          {:error, :not_found}
+          [] ->
+            {:error, :not_found}
 
-        nil ->
-          {:error, :not_found}
+          nil ->
+            {:error, :not_found}
+        end
+      rescue
+        error ->
+          Logger.error(
+            "Failed to fetch session notes for query=#{inspect(query)}: " <>
+              Exception.format(:error, error, __STACKTRACE__)
+          )
+
+          {:error, error}
       end
-    rescue
-      error ->
-        Logger.error(
-          "Failed to fetch session notes for query=#{inspect(query)}: " <>
-            Exception.format(:error, error, __STACKTRACE__)
-        )
-
-        {:error, error}
     end
   end
 
