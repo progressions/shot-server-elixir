@@ -1963,35 +1963,37 @@ defmodule ShotElixir.Services.NotionService do
       Logger.warning("Adventure fetch skipped: missing Notion OAuth token")
       {:error, :no_notion_oauth_token}
     else
-      page = NotionClient.get_page(page_id, %{token: token})
+      try do
+        page = NotionClient.get_page(page_id, %{token: token})
 
-      case page do
-        %{"code" => error_code, "message" => message} ->
-          {:error, {:notion_api_error, error_code, message}}
+        case page do
+          %{"code" => error_code, "message" => message} ->
+            {:error, {:notion_api_error, error_code, message}}
 
-        %{"id" => id} ->
-          title = extract_page_title(page)
+          %{"id" => id} ->
+            title = extract_page_title(page)
 
-          case fetch_page_content(id, token) do
-            {:ok, content} ->
-              {:ok,
-               %{
-                 title: title,
-                 page_id: id,
-                 content: content
-               }}
+            case fetch_page_content(id, token) do
+              {:ok, content} ->
+                {:ok,
+                 %{
+                   title: title,
+                   page_id: id,
+                   content: content
+                 }}
 
-            {:error, reason} ->
-              {:error, reason}
-          end
+              {:error, reason} ->
+                {:error, reason}
+            end
 
-        _ ->
-          {:error, :unexpected_notion_response}
+          _ ->
+            {:error, :unexpected_notion_response}
+        end
+      rescue
+        error ->
+          Logger.error("Failed to fetch adventure by ID: #{Exception.message(error)}")
+          {:error, error}
       end
-    rescue
-      error ->
-        Logger.error("Failed to fetch adventure by ID: #{Exception.message(error)}")
-        {:error, error}
     end
   end
 
