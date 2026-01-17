@@ -1904,45 +1904,47 @@ defmodule ShotElixir.Services.NotionService do
       Logger.warning("Adventure fetch skipped: missing Notion OAuth token")
       {:error, :no_notion_oauth_token}
     else
-      # Search Notion for pages matching the query
-      response =
-        NotionClient.search(query, %{
-          "filter" => %{"property" => "object", "value" => "page"},
-          token: token
-        })
+      try do
+        # Search Notion for pages matching the query
+        response =
+          NotionClient.search(query, %{
+            "filter" => %{"property" => "object", "value" => "page"},
+            token: token
+          })
 
-      pages =
-        (response["results"] || [])
-        |> Enum.map(fn page ->
-          title = extract_page_title(page)
-          %{id: page["id"], title: title}
-        end)
-        |> Enum.filter(fn page -> page.title && page.title != "" end)
+        pages =
+          (response["results"] || [])
+          |> Enum.map(fn page ->
+            title = extract_page_title(page)
+            %{id: page["id"], title: title}
+          end)
+          |> Enum.filter(fn page -> page.title && page.title != "" end)
 
-      case pages do
-        [] ->
-          {:ok, %{pages: [], title: nil, page_id: nil, content: nil}}
+        case pages do
+          [] ->
+            {:ok, %{pages: [], title: nil, page_id: nil, content: nil}}
 
-        [first | _rest] ->
-          # Fetch content for the first matching page
-          case fetch_page_content(first.id, token) do
-            {:ok, content} ->
-              {:ok,
-               %{
-                 pages: pages,
-                 title: first.title,
-                 page_id: first.id,
-                 content: content
-               }}
+          [first | _rest] ->
+            # Fetch content for the first matching page
+            case fetch_page_content(first.id, token) do
+              {:ok, content} ->
+                {:ok,
+                 %{
+                   pages: pages,
+                   title: first.title,
+                   page_id: first.id,
+                   content: content
+                 }}
 
-            {:error, reason} ->
-              {:error, reason}
-          end
+              {:error, reason} ->
+                {:error, reason}
+            end
+        end
+      rescue
+        error ->
+          Logger.error("Failed to search adventures: #{Exception.message(error)}")
+          {:error, error}
       end
-    rescue
-      error ->
-        Logger.error("Failed to search adventures: #{Exception.message(error)}")
-        {:error, error}
     end
   end
 
