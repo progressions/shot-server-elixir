@@ -332,7 +332,7 @@ defmodule ShotElixir.Services.NotionService do
                   updated_character
                 end
 
-            add_image(page, updated_character, token: token)
+              add_image(page, updated_character, token: token)
               Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
               {:ok, updated_character}
 
@@ -427,18 +427,18 @@ defmodule ShotElixir.Services.NotionService do
     else
       properties = Character.as_notion(character)
 
-    properties =
-      if character.faction do
-        faction_props = notion_faction_properties(character.campaign, character.faction.name)
-        # Only add Faction if we found a matching faction in Notion
-        if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
-      else
-        properties
-      end
+      properties =
+        if character.faction do
+          faction_props = notion_faction_properties(character.campaign, character.faction.name)
+          # Only add Faction if we found a matching faction in Notion
+          if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
+        else
+          properties
+        end
 
       with {:ok, database_id} <- get_database_id_for_entity(character.campaign, "characters"),
            {:ok, data_source_id} <- data_source_id_for(database_id, token: token) do
-      Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
+        Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
 
         # Capture payload for logging
         payload = %{
@@ -449,7 +449,7 @@ defmodule ShotElixir.Services.NotionService do
 
         page = NotionClient.create_page(payload)
 
-      Logger.debug("Notion API response received")
+        Logger.debug("Notion API response received")
 
         # Check if Notion returned an error response
         case page do
@@ -547,91 +547,91 @@ defmodule ShotElixir.Services.NotionService do
       Notion.log_error("character", character.id, %{}, %{}, "Notion OAuth token missing")
       {:error, :no_notion_oauth_token}
     else
-    properties = Character.as_notion(character)
+      properties = Character.as_notion(character)
 
-    properties =
-      if character.faction do
-        faction_props = notion_faction_properties(character.campaign, character.faction.name)
-        # Only add Faction if we found a matching faction in Notion
-        if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
-      else
-        properties
-      end
-
-    # Capture payload for logging
-    payload = %{
-      "page_id" => character.notion_page_id,
-      "properties" => properties
-    }
-
-    response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
-
-    # Check if Notion returned an error response
-    case response do
-      # Handle archived/deleted page - unlink from character
-      %{"code" => "validation_error", "message" => message}
-      when is_binary(message) ->
-        if String.contains?(String.downcase(message), "archived") do
-          handle_archived_page(character, payload, response, message)
+      properties =
+        if character.faction do
+          faction_props = notion_faction_properties(character.campaign, character.faction.name)
+          # Only add Faction if we found a matching faction in Notion
+          if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
         else
-          # Other validation errors - log and return error
-          Logger.error("Notion API validation error on update: #{message}")
+          properties
+        end
+
+      # Capture payload for logging
+      payload = %{
+        "page_id" => character.notion_page_id,
+        "properties" => properties
+      }
+
+      response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
+
+      # Check if Notion returned an error response
+      case response do
+        # Handle archived/deleted page - unlink from character
+        %{"code" => "validation_error", "message" => message}
+        when is_binary(message) ->
+          if String.contains?(String.downcase(message), "archived") do
+            handle_archived_page(character, payload, response, message)
+          else
+            # Other validation errors - log and return error
+            Logger.error("Notion API validation error on update: #{message}")
+
+            Notion.log_error(
+              "character",
+              character.id,
+              payload,
+              response,
+              "Notion API error: validation_error - #{message}"
+            )
+
+            {:error, {:notion_api_error, "validation_error", message}}
+          end
+
+        # Handle object_not_found - page was deleted, unlink from character
+        %{"code" => "object_not_found", "message" => message} ->
+          handle_archived_page(character, payload, response, message)
+
+        %{"code" => error_code, "message" => message} ->
+          Logger.error("Notion API error on update: #{error_code}")
 
           Notion.log_error(
             "character",
             character.id,
             payload,
             response,
-            "Notion API error: validation_error - #{message}"
+            "Notion API error: #{error_code} - #{message}"
           )
 
-          {:error, {:notion_api_error, "validation_error", message}}
-        end
+          {:error, {:notion_api_error, error_code, message}}
 
-      # Handle object_not_found - page was deleted, unlink from character
-      %{"code" => "object_not_found", "message" => message} ->
-        handle_archived_page(character, payload, response, message)
+        _ ->
+          # Add image if not present in Notion
+          page = NotionClient.get_page(character.notion_page_id, %{token: token})
+          image = find_image_block(page, token: token)
 
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error on update: #{error_code}")
+          unless image do
+            add_image_to_notion(character)
+          end
 
+          # Log successful sync
+          Notion.log_success("character", character.id, payload, response || page)
+
+          {:ok, page}
+      end
+    rescue
+      error ->
+        Logger.error("Failed to update Notion page: #{Exception.message(error)}")
+        # Log error sync
         Notion.log_error(
           "character",
           character.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
+          %{"page_id" => character.notion_page_id},
+          %{},
+          "Exception: #{Exception.message(error)}"
         )
 
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        # Add image if not present in Notion
-        page = NotionClient.get_page(character.notion_page_id, %{token: token})
-        image = find_image_block(page, token: token)
-
-        unless image do
-          add_image_to_notion(character)
-        end
-
-        # Log successful sync
-        Notion.log_success("character", character.id, payload, response || page)
-
-        {:ok, page}
-    end
-  rescue
-    error ->
-      Logger.error("Failed to update Notion page: #{Exception.message(error)}")
-      # Log error sync
-      Notion.log_error(
-        "character",
-        character.id,
-        %{"page_id" => character.notion_page_id},
-        %{},
-        "Exception: #{Exception.message(error)}"
-      )
-
-      {:error, error}
+        {:error, error}
     end
   end
 
@@ -811,54 +811,60 @@ defmodule ShotElixir.Services.NotionService do
       client = notion_client(Keyword.merge(opts, token: token))
 
       case client.get_page(character.notion_page_id, %{token: token}) do
-      # Defensive check: Req.get! typically raises on failure, but we handle
-      # the unlikely case of a nil body for robustness
-      nil ->
-        Logger.error("Failed to fetch Notion page: #{character.notion_page_id}")
-        log_sync_error("character", character.id, payload, %{}, "Notion page not found")
-        {:error, :notion_page_not_found}
+        # Defensive check: Req.get! typically raises on failure, but we handle
+        # the unlikely case of a nil body for robustness
+        nil ->
+          Logger.error("Failed to fetch Notion page: #{character.notion_page_id}")
+          log_sync_error("character", character.id, payload, %{}, "Notion page not found")
+          {:error, :notion_page_not_found}
 
-      # Handle Notion API error responses (e.g., page not found, unauthorized)
-      %{"code" => error_code, "message" => message} = response ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
+        # Handle Notion API error responses (e.g., page not found, unauthorized)
+        %{"code" => error_code, "message" => message} = response ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
 
-        log_sync_error(
-          "character",
-          character.id,
-          payload,
-          response,
-          "Notion API error: #{error_code} - #{message}"
-        )
+          log_sync_error(
+            "character",
+            character.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
+          )
 
-        {:error, {:notion_api_error, error_code, message}}
+          {:error, {:notion_api_error, error_code, message}}
 
-      # Success case: page data returned as a map
-      page when is_map(page) ->
-        attributes = Character.attributes_from_notion(character, page)
+        # Success case: page data returned as a map
+        page when is_map(page) ->
+          attributes = Character.attributes_from_notion(character, page)
 
-        # Fetch rich description from page content (blocks)
-        attributes =
-          add_rich_description(attributes, character.notion_page_id, character.campaign_id, token)
-
-        # Add image if not already present
-        add_image(page, character, token: token)
-
-        # Skip Notion sync to prevent ping-pong loops when updating from webhook
-        case Characters.update_character(character, attributes, skip_notion_sync: true) do
-          {:ok, updated_character} = result ->
-            Notion.log_success("character", updated_character.id, payload, page)
-            result
-
-          {:error, changeset} = error ->
-            log_sync_error(
-              "character",
-              character.id,
-              payload,
-              page,
-              "Failed to update character from Notion: #{inspect(changeset)}"
+          # Fetch rich description from page content (blocks)
+          attributes =
+            add_rich_description(
+              attributes,
+              character.notion_page_id,
+              character.campaign_id,
+              token
             )
 
-            error
+          # Add image if not already present
+          add_image(page, character, token: token)
+
+          # Skip Notion sync to prevent ping-pong loops when updating from webhook
+          case Characters.update_character(character, attributes, skip_notion_sync: true) do
+            {:ok, updated_character} = result ->
+              Notion.log_success("character", updated_character.id, payload, page)
+              result
+
+            {:error, changeset} = error ->
+              log_sync_error(
+                "character",
+                character.id,
+                payload,
+                page,
+                "Failed to update character from Notion: #{inspect(changeset)}"
+              )
+
+              error
+          end
       end
     end
   rescue
@@ -1676,42 +1682,42 @@ defmodule ShotElixir.Services.NotionService do
       Logger.warning("Session search skipped: missing Notion OAuth token")
       {:error, :no_notion_oauth_token}
     else
-    search_query = if String.contains?(query, "session"), do: query, else: "session #{query}"
+      search_query = if String.contains?(query, "session"), do: query, else: "session #{query}"
 
-    results =
-      NotionClient.search(search_query, %{
-        "filter" => %{"property" => "object", "value" => "page"},
-        token: token
-      })
+      results =
+        NotionClient.search(search_query, %{
+          "filter" => %{"property" => "object", "value" => "page"},
+          token: token
+        })
 
-    case results["results"] do
-      [page | _rest] = pages ->
-        # Fetch content of the first (most relevant) match
-        blocks = NotionClient.get_block_children(page["id"], %{token: token})
-        content = parse_blocks_to_text(blocks["results"] || [])
+      case results["results"] do
+        [page | _rest] = pages ->
+          # Fetch content of the first (most relevant) match
+          blocks = NotionClient.get_block_children(page["id"], %{token: token})
+          content = parse_blocks_to_text(blocks["results"] || [])
 
-        {:ok,
-         %{
-           title: extract_page_title(page),
-           page_id: page["id"],
-           content: content,
-           pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
-         }}
+          {:ok,
+           %{
+             title: extract_page_title(page),
+             page_id: page["id"],
+             content: content,
+             pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
+           }}
 
-      [] ->
-        {:error, :not_found}
+        [] ->
+          {:error, :not_found}
 
-      nil ->
-        {:error, :not_found}
-    end
-  rescue
-    error ->
-      Logger.error(
-        "Failed to fetch session notes for query=#{inspect(query)}: " <>
-          Exception.format(:error, error, __STACKTRACE__)
-      )
+        nil ->
+          {:error, :not_found}
+      end
+    rescue
+      error ->
+        Logger.error(
+          "Failed to fetch session notes for query=#{inspect(query)}: " <>
+            Exception.format(:error, error, __STACKTRACE__)
+        )
 
-      {:error, error}
+        {:error, error}
     end
   end
 
@@ -1894,45 +1900,45 @@ defmodule ShotElixir.Services.NotionService do
       Logger.warning("Adventure fetch skipped: missing Notion OAuth token")
       {:error, :no_notion_oauth_token}
     else
-    # Search Notion for pages matching the query
-    response =
-      NotionClient.search(query, %{
-        "filter" => %{"property" => "object", "value" => "page"},
-        token: token
-      })
+      # Search Notion for pages matching the query
+      response =
+        NotionClient.search(query, %{
+          "filter" => %{"property" => "object", "value" => "page"},
+          token: token
+        })
 
-    pages =
-      (response["results"] || [])
-      |> Enum.map(fn page ->
-        title = extract_page_title(page)
-        %{id: page["id"], title: title}
-      end)
-      |> Enum.filter(fn page -> page.title && page.title != "" end)
+      pages =
+        (response["results"] || [])
+        |> Enum.map(fn page ->
+          title = extract_page_title(page)
+          %{id: page["id"], title: title}
+        end)
+        |> Enum.filter(fn page -> page.title && page.title != "" end)
 
-    case pages do
-      [] ->
-        {:ok, %{pages: [], title: nil, page_id: nil, content: nil}}
+      case pages do
+        [] ->
+          {:ok, %{pages: [], title: nil, page_id: nil, content: nil}}
 
-      [first | _rest] ->
-        # Fetch content for the first matching page
-        case fetch_page_content(first.id, token) do
-          {:ok, content} ->
-            {:ok,
-             %{
-               pages: pages,
-               title: first.title,
-               page_id: first.id,
-               content: content
-             }}
+        [first | _rest] ->
+          # Fetch content for the first matching page
+          case fetch_page_content(first.id, token) do
+            {:ok, content} ->
+              {:ok,
+               %{
+                 pages: pages,
+                 title: first.title,
+                 page_id: first.id,
+                 content: content
+               }}
 
-          {:error, reason} ->
-            {:error, reason}
-        end
-    end
-  rescue
-    error ->
-      Logger.error("Failed to search adventures: #{Exception.message(error)}")
-      {:error, error}
+            {:error, reason} ->
+              {:error, reason}
+          end
+      end
+    rescue
+      error ->
+        Logger.error("Failed to search adventures: #{Exception.message(error)}")
+        {:error, error}
     end
   end
 
@@ -1953,33 +1959,33 @@ defmodule ShotElixir.Services.NotionService do
     else
       page = NotionClient.get_page(page_id, %{token: token})
 
-    case page do
-      %{"code" => error_code, "message" => message} ->
-        {:error, {:notion_api_error, error_code, message}}
+      case page do
+        %{"code" => error_code, "message" => message} ->
+          {:error, {:notion_api_error, error_code, message}}
 
-      %{"id" => id} ->
-        title = extract_page_title(page)
+        %{"id" => id} ->
+          title = extract_page_title(page)
 
-        case fetch_page_content(id, token) do
-          {:ok, content} ->
-            {:ok,
-             %{
-               title: title,
-               page_id: id,
-               content: content
-             }}
+          case fetch_page_content(id, token) do
+            {:ok, content} ->
+              {:ok,
+               %{
+                 title: title,
+                 page_id: id,
+                 content: content
+               }}
 
-          {:error, reason} ->
-            {:error, reason}
-        end
+            {:error, reason} ->
+              {:error, reason}
+          end
 
-      _ ->
-        {:error, :unexpected_notion_response}
-    end
-  rescue
-    error ->
-      Logger.error("Failed to fetch adventure by ID: #{Exception.message(error)}")
-      {:error, error}
+        _ ->
+          {:error, :unexpected_notion_response}
+      end
+    rescue
+      error ->
+        Logger.error("Failed to fetch adventure by ID: #{Exception.message(error)}")
+        {:error, error}
     end
   end
 
@@ -2923,28 +2929,28 @@ defmodule ShotElixir.Services.NotionService do
       Notion.log_error(entity_type, entity.id, %{}, %{}, "Notion OAuth token missing")
       {:error, :no_notion_oauth_token}
     else
-    result =
-      if entity.notion_page_id do
-        update_notion_page(entity, opts)
-      else
-        create_notion_page(entity, opts)
+      result =
+        if entity.notion_page_id do
+          update_notion_page(entity, opts)
+        else
+          create_notion_page(entity, opts)
+        end
+
+      case result do
+        {:ok, :unlinked} ->
+          {:ok, :unlinked}
+
+        {:ok, _} ->
+          opts.update_fn.(entity, %{last_synced_to_notion_at: DateTime.utc_now()})
+
+        {:error, reason} ->
+          Logger.error("Failed to sync #{entity_type} to Notion: #{inspect(reason)}")
+          {:error, reason}
       end
-
-    case result do
-      {:ok, :unlinked} ->
-        {:ok, :unlinked}
-
-      {:ok, _} ->
-        opts.update_fn.(entity, %{last_synced_to_notion_at: DateTime.utc_now()})
-
-      {:error, reason} ->
-        Logger.error("Failed to sync #{entity_type} to Notion: #{inspect(reason)}")
-        {:error, reason}
-    end
-  rescue
-    error ->
-      Logger.error("Exception syncing #{entity_type} to Notion: #{Exception.message(error)}")
-      {:error, error}
+    rescue
+      error ->
+        Logger.error("Exception syncing #{entity_type} to Notion: #{Exception.message(error)}")
+        {:error, error}
     end
   end
 
