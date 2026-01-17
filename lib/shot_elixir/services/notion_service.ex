@@ -788,19 +788,35 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Update character from Notion page data.
   """
-  def update_character_from_notion(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
+  def update_character_from_notion(character, opts \\ [])
 
-  def update_character_from_notion(%Character{} = character) do
-    case NotionClient.get_page(character.notion_page_id) do
+  def update_character_from_notion(%Character{notion_page_id: nil}, _opts),
+    do: {:error, :no_page_id}
+
+  def update_character_from_notion(%Character{} = character, opts) do
+    payload = %{"page_id" => character.notion_page_id}
+    client = notion_client(opts)
+
+    case client.get_page(character.notion_page_id) do
       # Defensive check: Req.get! typically raises on failure, but we handle
       # the unlikely case of a nil body for robustness
       nil ->
         Logger.error("Failed to fetch Notion page: #{character.notion_page_id}")
+        log_sync_error("character", character.id, payload, %{}, "Notion page not found")
         {:error, :notion_page_not_found}
 
       # Handle Notion API error responses (e.g., page not found, unauthorized)
-      %{"code" => error_code, "message" => message} ->
+      %{"code" => error_code, "message" => message} = response ->
         Logger.error("Notion API error: #{error_code} - #{message}")
+
+        log_sync_error(
+          "character",
+          character.id,
+          payload,
+          response,
+          "Notion API error: #{error_code} - #{message}"
+        )
+
         {:error, {:notion_api_error, error_code, message}}
 
       # Success case: page data returned as a map
@@ -815,11 +831,35 @@ defmodule ShotElixir.Services.NotionService do
         add_image(page, character)
 
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
-        Characters.update_character(character, attributes, skip_notion_sync: true)
+        case Characters.update_character(character, attributes, skip_notion_sync: true) do
+          {:ok, updated_character} = result ->
+            Notion.log_success("character", updated_character.id, payload, page)
+            result
+
+          {:error, changeset} = error ->
+            log_sync_error(
+              "character",
+              character.id,
+              payload,
+              page,
+              "Failed to update character from Notion: #{inspect(changeset)}"
+            )
+
+            error
+        end
     end
   rescue
     error ->
       Logger.error("Failed to update character from Notion: #{Exception.message(error)}")
+
+      log_sync_error(
+        "character",
+        character.id,
+        %{"page_id" => character.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
+
       {:error, error}
   end
 
