@@ -7,7 +7,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
   - character_controller_authorization_test.exs - Authorization and ownership
   - character_controller_features_test.exs - Association rendering, wounds, impairments
   """
-  use ShotElixirWeb.ConnCase, async: true
+  use ShotElixirWeb.ConnCase, async: false
 
   alias ShotElixir.{
     Characters,

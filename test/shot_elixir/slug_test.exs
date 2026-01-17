@@ -21,6 +21,7 @@ defmodule ShotElixir.SlugTest do
 
     test "ignores empty and invalid uuid-like strings" do
       assert Slug.extract_uuid("") == ""
+
       assert Slug.extract_uuid("123e4567-e89b-12d3-a456-42661417400Z") ==
                "123e4567-e89b-12d3-a456-42661417400Z"
     end

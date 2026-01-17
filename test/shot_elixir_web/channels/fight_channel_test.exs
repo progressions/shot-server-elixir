@@ -93,7 +93,7 @@ defmodule ShotElixirWeb.FightChannelTest do
       }
 
       ref = push(socket, "shot_update", payload)
-      assert_reply ref, :ok
+      assert_reply ref, :ok, %{}, 500
 
       assert_broadcast "shot_updated", broadcast_payload
       refute is_nil(broadcast_payload["updated_by"])

@@ -26,7 +26,6 @@ defmodule ShotElixir.Helpers.MentionConverter do
   alias ShotElixir.Weapons.Weapon
   alias ShotElixir.Schticks.Schtick
   alias ShotElixir.Fights.Fight
-  alias ShotElixir.Accounts.User
   alias ShotElixir.Slug
 
   import Ecto.Query
