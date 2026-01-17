@@ -31,6 +31,25 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
+  defmodule NotionClientStubCharacterSuccess do
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Notion Character Name"}]},
+          "Type" => %{"select" => %{"name" => "npc"}},
+          "Defense" => %{"number" => 14},
+          "Toughness" => %{"number" => 7},
+          "Speed" => %{"number" => 6}
+        }
+      }
+    end
+
+    def get_blocks(_page_id) do
+      %{"results" => []}
+    end
+  end
+
   defmodule NotionClientStubJunctureSuccess do
     def character_notion_id, do: "c0a80123-4567-489a-bcde-1234567890ab"
     def site_notion_id, do: "e5b1b80e-2a50-4a43-92b1-8d1f5f4dd721"
@@ -257,7 +276,20 @@ defmodule ShotElixir.Services.NotionServiceTest do
           notion_page_id: Ecto.UUID.generate()
         })
 
-      {:ok, site: site, party: party, faction: faction, juncture: juncture, campaign: campaign}
+      {:ok, character} =
+        Characters.create_character(%{
+          name: "Local Character",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      {:ok,
+       site: site,
+       party: party,
+       faction: faction,
+       juncture: juncture,
+       character: character,
+       campaign: campaign}
     end
 
     test "update_site_from_notion logs success and updates attributes", %{site: site} do
@@ -399,6 +431,40 @@ defmodule ShotElixir.Services.NotionServiceTest do
       [log] =
         NotionSyncLog
         |> Ecto.Query.where(entity_type: "juncture", entity_id: ^juncture.id)
+        |> Repo.all()
+
+      assert log.status == "error"
+      assert String.contains?(log.error_message, "Notion API error")
+    end
+
+    test "update_character_from_notion logs success and updates attributes", %{
+      character: character
+    } do
+      {:ok, updated_character} =
+        NotionService.update_character_from_notion(character,
+          client: NotionClientStubCharacterSuccess
+        )
+
+      assert updated_character.name == "Notion Character Name"
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "character", entity_id: ^character.id)
+        |> Repo.all()
+
+      assert log.status == "success"
+      assert log.payload["page_id"] == character.notion_page_id
+    end
+
+    test "update_character_from_notion logs errors from Notion API", %{character: character} do
+      assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
+               NotionService.update_character_from_notion(character,
+                 client: NotionClientStubError
+               )
+
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "character", entity_id: ^character.id)
         |> Repo.all()
 
       assert log.status == "error"

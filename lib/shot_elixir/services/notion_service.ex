@@ -788,12 +788,16 @@ defmodule ShotElixir.Services.NotionService do
   @doc """
   Update character from Notion page data.
   """
-  def update_character_from_notion(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
+  def update_character_from_notion(character, opts \\ [])
 
-  def update_character_from_notion(%Character{} = character) do
+  def update_character_from_notion(%Character{notion_page_id: nil}, _opts),
+    do: {:error, :no_page_id}
+
+  def update_character_from_notion(%Character{} = character, opts) do
     payload = %{"page_id" => character.notion_page_id}
+    client = notion_client(opts)
 
-    case NotionClient.get_page(character.notion_page_id) do
+    case client.get_page(character.notion_page_id) do
       # Defensive check: Req.get! typically raises on failure, but we handle
       # the unlikely case of a nil body for robustness
       nil ->
