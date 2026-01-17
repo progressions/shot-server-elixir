@@ -1497,18 +1497,21 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Extract character description map with proper mention conversion
-  # This converts Notion rich_text to TipTap HTML with mention spans preserved
+  # Only "Appearance" and "Melodramatic Hook" use HTML (they can contain mentions)
+  # Simple fields like Age, Height, etc. stay as plain text
   defp character_description_with_mentions(page, campaign_id) do
     props = page["properties"] || %{}
 
     %{
-      "Age" => get_rich_text_as_html(props, "Age", campaign_id),
-      "Height" => get_rich_text_as_html(props, "Height", campaign_id),
-      "Weight" => get_rich_text_as_html(props, "Weight", campaign_id),
-      "Eye Color" => get_rich_text_as_html(props, "Eye Color", campaign_id),
-      "Hair Color" => get_rich_text_as_html(props, "Hair Color", campaign_id),
+      # Simple fields - plain text only
+      "Age" => get_rich_text_content(props, "Age"),
+      "Height" => get_rich_text_content(props, "Height"),
+      "Weight" => get_rich_text_content(props, "Weight"),
+      "Eye Color" => get_rich_text_content(props, "Eye Color"),
+      "Hair Color" => get_rich_text_content(props, "Hair Color"),
+      "Style of Dress" => get_rich_text_content(props, "Style of Dress"),
+      # Rich text fields - HTML with mention support
       "Appearance" => get_rich_text_as_html(props, "Description", campaign_id),
-      "Style of Dress" => get_rich_text_as_html(props, "Style of Dress", campaign_id),
       "Melodramatic Hook" => get_rich_text_as_html(props, "Melodramatic Hook", campaign_id)
     }
     # Filter out empty strings to preserve existing description values
