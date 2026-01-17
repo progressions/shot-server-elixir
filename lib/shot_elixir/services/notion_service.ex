@@ -650,21 +650,12 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, character} = Characters.create_character(%{name: unique_name, campaign_id: campaign_id})
 
     character = Repo.preload(character, :faction)
-    attributes = Character.attributes_from_notion(character, page)
+
+    # Extract attributes with mention-aware description in a single pass
+    attributes = character_attributes_with_mentions(character, page, campaign_id)
 
     {:ok, character} =
       Characters.update_character(character, Map.put(attributes, :notion_page_id, page["id"]))
-
-    description = get_description(page)
-
-    merged_description =
-      Map.merge(
-        description,
-        character.description || %{},
-        fn _k, v1, v2 -> if v2 == "" or is_nil(v2), do: v1, else: v2 end
-      )
-
-    {:ok, character} = Characters.update_character(character, %{description: merged_description})
 
     # Look up and set faction from Notion relation
     {:ok, character} = set_faction_from_notion(character, page, campaign_id)
@@ -821,20 +812,8 @@ defmodule ShotElixir.Services.NotionService do
 
       # Success case: page data returned as a map
       page when is_map(page) ->
-        # Get base attributes (action_values, name, notion_page_id)
-        # Note: Character.attributes_from_notion also extracts description as plain text,
-        # but we replace it below with mention-aware HTML to preserve Notion page mentions
-        attributes = Character.attributes_from_notion(character, page)
-
-        # Replace description with mention-aware conversion
-        # This extracts description fields using MentionConverter to preserve
-        # Notion page mentions as TipTap HTML spans
-        attributes =
-          Map.put(
-            attributes,
-            :description,
-            character_description_with_mentions(page, character.campaign_id)
-          )
+        # Extract attributes with mention-aware description in a single pass
+        attributes = character_attributes_with_mentions(character, page, character.campaign_id)
 
         # Fetch rich description from page content (blocks)
         attributes =
@@ -1491,6 +1470,26 @@ defmodule ShotElixir.Services.NotionService do
         Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")
         attributes
     end
+  end
+
+  # Extract character attributes from Notion with mention-aware description
+  # Combines Character.attributes_from_notion (for action values, name, etc.)
+  # with mention-aware description extraction (for Appearance, Melodramatic Hook)
+  defp character_attributes_with_mentions(character, page, campaign_id) do
+    # Get base attributes (action values, name, etc.) - description is plain text here
+    base_attributes = Character.attributes_from_notion(character, page)
+
+    # Extract description with mention support, replacing the plain text version
+    description_with_mentions = character_description_with_mentions(page, campaign_id)
+
+    # Merge mention-aware description with any existing character description
+    merged_description =
+      Map.merge(
+        character.description || %{},
+        description_with_mentions
+      )
+
+    Map.put(base_attributes, :description, merged_description)
   end
 
   # Extract character description map with proper mention conversion
