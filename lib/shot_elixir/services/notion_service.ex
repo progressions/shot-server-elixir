@@ -547,91 +547,93 @@ defmodule ShotElixir.Services.NotionService do
       Notion.log_error("character", character.id, %{}, %{}, "Notion OAuth token missing")
       {:error, :no_notion_oauth_token}
     else
-      properties = Character.as_notion(character)
+      try do
+        properties = Character.as_notion(character)
 
-      properties =
-        if character.faction do
-          faction_props = notion_faction_properties(character.campaign, character.faction.name)
-          # Only add Faction if we found a matching faction in Notion
-          if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
-        else
-          properties
-        end
-
-      # Capture payload for logging
-      payload = %{
-        "page_id" => character.notion_page_id,
-        "properties" => properties
-      }
-
-      response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
-
-      # Check if Notion returned an error response
-      case response do
-        # Handle archived/deleted page - unlink from character
-        %{"code" => "validation_error", "message" => message}
-        when is_binary(message) ->
-          if String.contains?(String.downcase(message), "archived") do
-            handle_archived_page(character, payload, response, message)
+        properties =
+          if character.faction do
+            faction_props = notion_faction_properties(character.campaign, character.faction.name)
+            # Only add Faction if we found a matching faction in Notion
+            if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
           else
-            # Other validation errors - log and return error
-            Logger.error("Notion API validation error on update: #{message}")
+            properties
+          end
+
+        # Capture payload for logging
+        payload = %{
+          "page_id" => character.notion_page_id,
+          "properties" => properties
+        }
+
+        response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
+
+        # Check if Notion returned an error response
+        case response do
+          # Handle archived/deleted page - unlink from character
+          %{"code" => "validation_error", "message" => message}
+          when is_binary(message) ->
+            if String.contains?(String.downcase(message), "archived") do
+              handle_archived_page(character, payload, response, message)
+            else
+              # Other validation errors - log and return error
+              Logger.error("Notion API validation error on update: #{message}")
+
+              Notion.log_error(
+                "character",
+                character.id,
+                payload,
+                response,
+                "Notion API error: validation_error - #{message}"
+              )
+
+              {:error, {:notion_api_error, "validation_error", message}}
+            end
+
+          # Handle object_not_found - page was deleted, unlink from character
+          %{"code" => "object_not_found", "message" => message} ->
+            handle_archived_page(character, payload, response, message)
+
+          %{"code" => error_code, "message" => message} ->
+            Logger.error("Notion API error on update: #{error_code}")
 
             Notion.log_error(
               "character",
               character.id,
               payload,
               response,
-              "Notion API error: validation_error - #{message}"
+              "Notion API error: #{error_code} - #{message}"
             )
 
-            {:error, {:notion_api_error, "validation_error", message}}
-          end
+            {:error, {:notion_api_error, error_code, message}}
 
-        # Handle object_not_found - page was deleted, unlink from character
-        %{"code" => "object_not_found", "message" => message} ->
-          handle_archived_page(character, payload, response, message)
+          _ ->
+            # Add image if not present in Notion
+            page = NotionClient.get_page(character.notion_page_id, %{token: token})
+            image = find_image_block(page, token: token)
 
-        %{"code" => error_code, "message" => message} ->
-          Logger.error("Notion API error on update: #{error_code}")
+            unless image do
+              add_image_to_notion(character)
+            end
 
+            # Log successful sync
+            Notion.log_success("character", character.id, payload, response || page)
+
+            {:ok, page}
+        end
+      rescue
+        error ->
+          Logger.error("Failed to update Notion page: #{Exception.message(error)}")
+          # Log error sync
           Notion.log_error(
             "character",
             character.id,
-            payload,
-            response,
-            "Notion API error: #{error_code} - #{message}"
+            %{"page_id" => character.notion_page_id},
+            %{},
+            "Exception: #{Exception.message(error)}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
-
-        _ ->
-          # Add image if not present in Notion
-          page = NotionClient.get_page(character.notion_page_id, %{token: token})
-          image = find_image_block(page, token: token)
-
-          unless image do
-            add_image_to_notion(character)
-          end
-
-          # Log successful sync
-          Notion.log_success("character", character.id, payload, response || page)
-
-          {:ok, page}
+          {:error, error}
       end
-    rescue
-      error ->
-        Logger.error("Failed to update Notion page: #{Exception.message(error)}")
-        # Log error sync
-        Notion.log_error(
-          "character",
-          character.id,
-          %{"page_id" => character.notion_page_id},
-          %{},
-          "Exception: #{Exception.message(error)}"
-        )
-
-        {:error, error}
     end
   end
 
