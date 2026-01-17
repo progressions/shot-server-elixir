@@ -695,20 +695,10 @@ defmodule ShotElixir.Services.NotionService do
 
     character = Repo.preload(character, :faction)
     attributes = Character.attributes_from_notion(character, page)
+    attributes = add_rich_description(attributes, page["id"], campaign_id)
 
     {:ok, character} =
       Characters.update_character(character, Map.put(attributes, :notion_page_id, page["id"]))
-
-    description = get_description(page)
-
-    merged_description =
-      Map.merge(
-        description,
-        character.description || %{},
-        fn _k, v1, v2 -> if v2 == "" or is_nil(v2), do: v1, else: v2 end
-      )
-
-    {:ok, character} = Characters.update_character(character, %{description: merged_description})
 
     # Look up and set faction from Notion relation
     {:ok, character} = set_faction_from_notion(character, page, campaign_id)

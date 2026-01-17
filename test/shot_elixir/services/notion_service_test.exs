@@ -10,6 +10,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
   alias ShotElixir.Junctures
   alias ShotElixir.Parties
   alias ShotElixir.Sites
+  alias ShotElixir.Adventures
+  alias ShotElixir.Adventures.Adventure
   alias ShotElixir.Notion.NotionSyncLog
 
   defmodule NotionClientStubSuccess do
@@ -151,6 +153,70 @@ defmodule ShotElixir.Services.NotionServiceTest do
     # Stub that returns an error from data_source_query
     def data_source_query("ds-id-missing", _filter) do
       %{"code" => "object_not_found", "message" => "Data source not found"}
+    end
+  end
+
+  defmodule NotionClientStubSiteBotEdited do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Bot Authored Site"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Bot Description"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+  end
+
+  defmodule NotionClientStubSiteGetMeError do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Fail-open Site"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Site Desc"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+  end
+
+  defmodule NotionClientStubAdventureBotEdited do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Bot Adventure"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Adventure Desc"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+  end
+
+  defmodule NotionClientStubAdventureGetMeError do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Fail-open Adventure"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Adventure Desc"}]},
+          "At a Glance" => %{"checkbox" => true}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
     end
   end
 
@@ -344,12 +410,20 @@ defmodule ShotElixir.Services.NotionServiceTest do
           notion_page_id: Ecto.UUID.generate()
         })
 
+      {:ok, adventure} =
+        Adventures.create_adventure(%{
+          name: "Local Adventure",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
       {:ok,
        site: site,
        party: party,
        faction: faction,
        juncture: juncture,
        character: character,
+       adventure: adventure,
        campaign: campaign}
     end
 
@@ -381,6 +455,25 @@ defmodule ShotElixir.Services.NotionServiceTest do
 
       assert log.status == "error"
       assert String.contains?(log.error_message, "Notion API error")
+    end
+
+    test "skips site update when page was last edited by the bot", %{site: site} do
+      {:ok, returned_site} =
+        NotionService.update_site_from_notion(site, client: NotionClientStubSiteBotEdited)
+
+      reloaded = Sites.get_site(site.id)
+      assert returned_site.id == site.id
+      assert reloaded.description == site.description
+    end
+
+    test "continues site update when bot user lookup fails (fail-open)", %{site: site} do
+      {:ok, updated_site} =
+        NotionService.update_site_from_notion(site,
+          client: NotionClientStubSiteGetMeError,
+          token: "fail-open-token"
+        )
+
+      assert updated_site.description == "<p>Site Desc</p>"
     end
 
     test "update_party_from_notion logs success and updates attributes", %{party: party} do
@@ -569,6 +662,47 @@ defmodule ShotElixir.Services.NotionServiceTest do
         |> Repo.all()
 
       assert log.status == "success"
+    end
+
+    test "update_adventure_from_notion logs success and updates attributes", %{
+      adventure: adventure
+    } do
+      {:ok, updated_adventure} =
+        NotionService.update_adventure_from_notion(adventure, client: NotionClientStubSuccess)
+
+      assert updated_adventure.name == "Notion Name"
+      assert updated_adventure.description == "<p>Notion Description</p>"
+      assert updated_adventure.at_a_glance == true
+    end
+
+    test "update_adventure_from_notion logs errors from Notion API", %{adventure: adventure} do
+      assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
+               NotionService.update_adventure_from_notion(adventure,
+                 client: NotionClientStubError
+               )
+    end
+
+    test "skips adventure update when page was last edited by the bot", %{adventure: adventure} do
+      {:ok, returned_adventure} =
+        NotionService.update_adventure_from_notion(adventure,
+          client: NotionClientStubAdventureBotEdited
+        )
+
+      reloaded = Repo.get(Adventure, adventure.id)
+      assert returned_adventure.id == adventure.id
+      assert reloaded.description == adventure.description
+    end
+
+    test "continues adventure update when bot user lookup fails (fail-open)", %{
+      adventure: adventure
+    } do
+      {:ok, updated_adventure} =
+        NotionService.update_adventure_from_notion(adventure,
+          client: NotionClientStubAdventureGetMeError,
+          token: "fail-open-token"
+        )
+
+      assert updated_adventure.description == "<p>Adventure Desc</p>"
     end
   end
 
