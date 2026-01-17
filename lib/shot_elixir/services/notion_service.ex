@@ -650,21 +650,12 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, character} = Characters.create_character(%{name: unique_name, campaign_id: campaign_id})
 
     character = Repo.preload(character, :faction)
-    attributes = Character.attributes_from_notion(character, page)
+
+    # Extract attributes with mention-aware description in a single pass
+    attributes = character_attributes_with_mentions(character, page, campaign_id)
 
     {:ok, character} =
       Characters.update_character(character, Map.put(attributes, :notion_page_id, page["id"]))
-
-    description = get_description(page)
-
-    merged_description =
-      Map.merge(
-        description,
-        character.description || %{},
-        fn _k, v1, v2 -> if v2 == "" or is_nil(v2), do: v1, else: v2 end
-      )
-
-    {:ok, character} = Characters.update_character(character, %{description: merged_description})
 
     # Look up and set faction from Notion relation
     {:ok, character} = set_faction_from_notion(character, page, campaign_id)
@@ -821,7 +812,8 @@ defmodule ShotElixir.Services.NotionService do
 
       # Success case: page data returned as a map
       page when is_map(page) ->
-        attributes = Character.attributes_from_notion(character, page)
+        # Extract attributes with mention-aware description in a single pass
+        attributes = character_attributes_with_mentions(character, page, character.campaign_id)
 
         # Fetch rich description from page content (blocks)
         attributes =
@@ -1478,6 +1470,49 @@ defmodule ShotElixir.Services.NotionService do
         Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")
         attributes
     end
+  end
+
+  # Extract character attributes from Notion with mention-aware description
+  # Combines Character.attributes_from_notion (for action values, name, etc.)
+  # with mention-aware description extraction (for Appearance, Melodramatic Hook)
+  defp character_attributes_with_mentions(character, page, campaign_id) do
+    # Get base attributes (action values, name, etc.) - description is plain text here
+    base_attributes = Character.attributes_from_notion(character, page)
+
+    # Extract description with mention support, replacing the plain text version
+    description_with_mentions = character_description_with_mentions(page, campaign_id)
+
+    # Merge mention-aware description with any existing character description
+    merged_description =
+      Map.merge(
+        character.description || %{},
+        description_with_mentions
+      )
+
+    Map.put(base_attributes, :description, merged_description)
+  end
+
+  # Extract character description map with proper mention conversion
+  # Only "Appearance" and "Melodramatic Hook" use HTML (they can contain mentions)
+  # Simple fields like Age, Height, etc. stay as plain text
+  defp character_description_with_mentions(page, campaign_id) do
+    props = page["properties"] || %{}
+
+    %{
+      # Simple fields - plain text only
+      "Age" => get_rich_text_content(props, "Age"),
+      "Height" => get_rich_text_content(props, "Height"),
+      "Weight" => get_rich_text_content(props, "Weight"),
+      "Eye Color" => get_rich_text_content(props, "Eye Color"),
+      "Hair Color" => get_rich_text_content(props, "Hair Color"),
+      "Style of Dress" => get_rich_text_content(props, "Style of Dress"),
+      # Rich text fields - HTML with mention support
+      "Appearance" => get_rich_text_as_html(props, "Description", campaign_id),
+      "Melodramatic Hook" => get_rich_text_as_html(props, "Melodramatic Hook", campaign_id)
+    }
+    # Filter out empty strings to preserve existing description values
+    |> Enum.reject(fn {_k, v} -> is_nil(v) || v == "" end)
+    |> Map.new()
   end
 
   # Convert Notion rich_text to Chi War HTML with mention support
