@@ -552,7 +552,9 @@ defmodule ShotElixir.Services.NotionServiceTest do
       assert logs == []
     end
 
-    test "continues character update when bot user lookup fails (fail-open)", %{character: character} do
+    test "continues character update when bot user lookup fails (fail-open)", %{
+      character: character
+    } do
       {:ok, updated_character} =
         NotionService.update_character_from_notion(character,
           client: NotionClientStubCharacterGetMeError,
