@@ -31,6 +31,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
       created_at: juncture.created_at,
       updated_at: juncture.updated_at,
       notion_page_id: juncture.notion_page_id,
+      rich_description: juncture.rich_description,
+      mentions: juncture.mentions,
       image_url: get_image_url(juncture),
       characters: render_characters_if_loaded(juncture),
       vehicles: render_vehicles_if_loaded(juncture),

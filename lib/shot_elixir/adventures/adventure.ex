@@ -20,6 +20,10 @@ defmodule ShotElixir.Adventures.Adventure do
     field :notion_page_id, :string
     field :last_synced_to_notion_at, :utc_datetime
 
+    # Rich content from Notion (read-only in chi-war)
+    field :rich_description, :string
+    field :mentions, :map, default: %{}
+
     # Virtual fields for relationship IDs
     field :character_ids, {:array, :binary_id}, virtual: true, default: []
     field :villain_ids, {:array, :binary_id}, virtual: true, default: []
@@ -55,7 +59,9 @@ defmodule ShotElixir.Adventures.Adventure do
       :user_id,
       :campaign_id,
       :notion_page_id,
-      :last_synced_to_notion_at
+      :last_synced_to_notion_at,
+      :rich_description,
+      :mentions
     ])
     |> validate_required([:name, :campaign_id])
     |> validate_length(:name, min: 1, max: 255)
