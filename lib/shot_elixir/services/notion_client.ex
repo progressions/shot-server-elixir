@@ -176,8 +176,12 @@ defmodule ShotElixir.Services.NotionClient do
     opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
-    client(token)
-    |> Req.get!(url: "/users/me")
-    |> Map.get(:body)
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.get!(url: "/users/me")
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
   end
 end

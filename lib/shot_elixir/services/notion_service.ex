@@ -840,6 +840,8 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
+      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => character.notion_page_id}
       client = notion_client(opts)
 
@@ -2590,6 +2592,8 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
+      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => site.notion_page_id}
       client = notion_client(opts)
 
@@ -2674,6 +2678,8 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
+      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => party.notion_page_id}
       client = notion_client(opts)
 
@@ -2758,6 +2764,8 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
+      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => faction.notion_page_id}
       client = notion_client(opts)
 
@@ -2845,6 +2853,8 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
+      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => juncture.notion_page_id}
       client = notion_client(opts)
 
@@ -2948,6 +2958,8 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
+      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => adventure.notion_page_id}
       client = notion_client(opts)
 
