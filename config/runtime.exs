@@ -23,19 +23,6 @@ if discord_token = System.get_env("DISCORD_TOKEN") do
   config :nostrum, token: discord_token
 end
 
-# Notion API configuration - token loaded from environment variables
-# Must be set AFTER dotenvy loads .env above
-#
-# NOTE: Notion database IDs are NO LONGER configured here.
-# Database IDs are stored dynamically per-campaign in campaign.notion_database_ids
-# This is set up via the Notion OAuth flow when a user connects their Notion workspace.
-# See NotionService.get_database_id_for_entity/2 for the dynamic lookup.
-if notion_token = System.get_env("NOTION_TOKEN") do
-  config :shot_elixir, :notion,
-    periodic_sync_enabled: true,
-    token: notion_token
-end
-
 # ## Using releases
 #
 # If you use `mix release`, you need to explicitly enable the server

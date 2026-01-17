@@ -131,43 +131,63 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     * 500 - Internal server error if Notion API fails
   """
   def sessions(conn, %{"id" => page_id}) when is_binary(page_id) and page_id != "" do
-    case NotionService.fetch_session_by_id(page_id) do
-      {:ok, session} ->
-        json(conn, session)
+    with {:ok, _campaign, token} <- fetch_campaign_and_token(conn) do
+      case NotionService.fetch_session_by_id(page_id, token) do
+        {:ok, session} ->
+          json(conn, session)
 
-      {:error, :not_found} ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "Session not found"})
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Session not found"})
 
-      {:error, {:notion_api_error, code, message}} ->
-        conn
-        |> put_status(:bad_gateway)
-        |> json(%{error: "Notion API error", code: code, message: message})
+        {:error, {:notion_api_error, code, message}} ->
+          conn
+          |> put_status(:bad_gateway)
+          |> json(%{error: "Notion API error", code: code, message: message})
 
-      {:error, _reason} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to fetch session"})
+        {:error, :no_notion_oauth_token} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Notion not connected for this campaign"})
+
+        {:error, _reason} ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "Failed to fetch session"})
+      end
+    else
+      {:error, status, body} ->
+        conn |> put_status(status) |> json(body)
     end
   end
 
   # Parameter 'q' is used for search queries following common API conventions (e.g., GitHub, Google).
   # Parameter 'id' is used for direct page ID lookup, providing explicit intent.
   def sessions(conn, %{"q" => query}) when is_binary(query) and query != "" do
-    case NotionService.fetch_session_notes(query) do
-      {:ok, session} ->
-        json(conn, session)
+    with {:ok, _campaign, token} <- fetch_campaign_and_token(conn) do
+      case NotionService.fetch_session_notes(query, token) do
+        {:ok, session} ->
+          json(conn, session)
 
-      {:error, :not_found} ->
-        conn
-        |> put_status(:not_found)
-        |> json(%{error: "No session found matching '#{query}'"})
+        {:error, :not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "No session found matching '#{query}'"})
 
-      {:error, _reason} ->
-        conn
-        |> put_status(:internal_server_error)
-        |> json(%{error: "Failed to fetch session notes"})
+        {:error, :no_notion_oauth_token} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Notion not connected for this campaign"})
+
+        {:error, _reason} ->
+          conn
+          |> put_status(:internal_server_error)
+          |> json(%{error: "Failed to fetch session notes"})
+      end
+    else
+      {:error, status, body} ->
+        conn |> put_status(status) |> json(body)
     end
   end
 
@@ -175,6 +195,28 @@ defmodule ShotElixirWeb.Api.V2.NotionController do
     conn
     |> put_status(:bad_request)
     |> json(%{error: "Missing required parameter: 'q' (search query) or 'id' (page ID)"})
+  end
+
+  defp fetch_campaign_and_token(conn) do
+    user = Guardian.Plug.current_resource(conn)
+
+    with {:current_campaign, campaign_id} when not is_nil(campaign_id) <-
+           {:current_campaign, user.current_campaign_id},
+         {:campaign, %Campaigns.Campaign{} = campaign} <-
+           {:campaign, Campaigns.get_campaign(campaign_id)},
+         {:token, token} when is_binary(token) and token != "" <-
+           {:token, campaign.notion_access_token} do
+      {:ok, campaign, token}
+    else
+      {:current_campaign, nil} ->
+        {:error, :bad_request, %{error: "No current campaign set"}}
+
+      {:campaign, nil} ->
+        {:error, :not_found, %{error: "Campaign not found"}}
+
+      {:token, _} ->
+        {:error, :not_found, %{error: "Notion not connected for this campaign"}}
+    end
   end
 
   @doc """

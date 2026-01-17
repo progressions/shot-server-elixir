@@ -42,21 +42,18 @@ defmodule ShotElixir.Services.NotionService do
   alias ShotElixir.Campaigns.Campaign
 
   @doc """
-  Get Notion API token for a campaign.
+  Get the Notion API token for a campaign.
 
-  Uses the campaign's OAuth token (notion_access_token) if available,
-  otherwise falls back to the environment variable for backwards compatibility.
+  Only the OAuth token stored on the campaign is considered valid. We no longer
+  fall back to environment variables or application config for Notion tokens.
+  If a campaign is missing an OAuth token, callers should treat that as
+  "not configured" and skip syncing.
   """
-  def get_token(campaign) when is_struct(campaign, Campaign) do
-    campaign.notion_access_token ||
-      System.get_env("NOTION_TOKEN") ||
-      Application.get_env(:shot_elixir, :notion)[:token]
+  def get_token(%Campaign{notion_access_token: token}) when is_binary(token) and token != "" do
+    token
   end
 
-  def get_token(_campaign_id) do
-    # Legacy fallback for non-campaign calls
-    System.get_env("NOTION_TOKEN") || Application.get_env(:shot_elixir, :notion)[:token]
-  end
+  def get_token(_), do: nil
 
   @doc """
   Get Notion database ID for an entity type from campaign settings.
@@ -240,117 +237,109 @@ defmodule ShotElixir.Services.NotionService do
   This updates both the Chi War record and the Notion page with merged values.
   """
   def merge_with_notion(%Character{} = character, notion_page_id) do
-    character = Repo.preload(character, :faction)
+    character = Repo.preload(character, [:faction, :campaign])
+    token = get_token(character.campaign)
 
-    # Fetch the Notion page
-    case NotionClient.get_page(notion_page_id) do
-      %{"code" => error_code, "message" => message} ->
-        Logger.error("Notion API error: #{error_code} - #{message}")
-        {:error, {:notion_api_error, error_code, message}}
+    if is_nil(token) do
+      Logger.warning("Notion merge skipped: campaign missing OAuth token")
+      {:error, :no_notion_oauth_token}
+    else
+      case NotionClient.get_page(notion_page_id, %{token: token}) do
+        %{"code" => error_code, "message" => message} ->
+          Logger.error("Notion API error: #{error_code} - #{message}")
+          {:error, {:notion_api_error, error_code, message}}
 
-      nil ->
-        {:error, :notion_page_not_found}
+        nil ->
+          {:error, :notion_page_not_found}
 
-      page when is_map(page) ->
-        # Extract RAW values from Notion (not using attributes_from_notion which applies av_or_new)
-        # This ensures we're merging with the actual Notion values, not pre-processed ones
-        raw_notion_action_values = get_raw_action_values_from_notion(page)
-        notion_description = get_description(page)
-        notion_name = get_notion_name(page)
-        notion_at_a_glance = get_in(page, ["properties", "At a Glance", "checkbox"])
+        page when is_map(page) ->
+          raw_notion_action_values = get_raw_action_values_from_notion(page)
+          notion_description = get_description(page)
+          notion_name = get_notion_name(page)
+          notion_at_a_glance = get_in(page, ["properties", "At a Glance", "checkbox"])
 
-        # Perform smart merge for action_values
-        merged_action_values =
-          smart_merge_action_values(
-            character.action_values || Character.default_action_values(),
-            raw_notion_action_values
-          )
+          merged_action_values =
+            smart_merge_action_values(
+              character.action_values || Character.default_action_values(),
+              raw_notion_action_values
+            )
 
-        # Perform smart merge for description
-        merged_description =
-          smart_merge_description(
-            character.description || %{},
-            notion_description
-          )
+          merged_description =
+            smart_merge_description(
+              character.description || %{},
+              notion_description
+            )
 
-        # Merge name (Notion wins only if Chi War is blank)
-        merged_name =
-          if blank?(character.name),
-            do: notion_name || character.name,
-            else: character.name
+          merged_name =
+            if blank?(character.name),
+              do: notion_name || character.name,
+              else: character.name
 
-        # Update Chi War record with merged values
-        update_attrs =
-          %{
-            notion_page_id: notion_page_id,
-            name: merged_name,
-            action_values: merged_action_values,
-            description: merged_description
-          }
-          |> Character.maybe_put_at_a_glance(notion_at_a_glance)
+          update_attrs =
+            %{
+              notion_page_id: notion_page_id,
+              name: merged_name,
+              action_values: merged_action_values,
+              description: merged_description
+            }
+            |> Character.maybe_put_at_a_glance(notion_at_a_glance)
 
-        case Characters.update_character(character, update_attrs) do
-          {:ok, updated_character} ->
-            # Now sync the merged data back to Notion
-            updated_character = Repo.preload(updated_character, :faction)
+          case Characters.update_character(character, update_attrs) do
+            {:ok, updated_character} ->
+              updated_character = Repo.preload(updated_character, :faction)
 
-            # Log warning if Notion update fails (but don't fail the merge)
-            case update_notion_from_character(updated_character) do
-              {:ok, _} ->
-                :ok
+              case update_notion_from_character(updated_character) do
+                {:ok, _} ->
+                  :ok
 
-              {:error, reason} ->
-                Logger.warning(
-                  "Failed to update Notion after merge for character #{updated_character.id}: #{inspect(reason)}"
-                )
+                {:error, reason} ->
+                  Logger.warning(
+                    "Failed to update Notion after merge for character #{updated_character.id}: #{inspect(reason)}"
+                  )
 
-              other ->
-                Logger.warning(
-                  "Unexpected response when updating Notion after merge for character #{updated_character.id}: #{inspect(other)}"
-                )
-            end
-
-            # Set faction from Notion if not already set
-            updated_character =
-              if is_nil(updated_character.faction_id) do
-                case set_faction_from_notion(
-                       updated_character,
-                       page,
-                       updated_character.campaign_id
-                     ) do
-                  {:ok, char} -> char
-                  {:error, _} -> updated_character
-                end
-              else
-                updated_character
+                other ->
+                  Logger.warning(
+                    "Unexpected response when updating Notion after merge for character #{updated_character.id}: #{inspect(other)}"
+                  )
               end
 
-            # Set juncture from Notion if not already set
-            updated_character =
-              if is_nil(updated_character.juncture_id) do
-                case set_juncture_from_notion(
-                       updated_character,
-                       page,
-                       updated_character.campaign_id
-                     ) do
-                  {:ok, char} -> char
-                  {:error, _} -> updated_character
+              updated_character =
+                if is_nil(updated_character.faction_id) do
+                  case set_faction_from_notion(
+                         updated_character,
+                         page,
+                         updated_character.campaign_id,
+                         token
+                       ) do
+                    {:ok, char} -> char
+                    {:error, _} -> updated_character
+                  end
+                else
+                  updated_character
                 end
-              else
-                updated_character
-              end
 
-            # Add image from Notion if character doesn't have one
-            add_image(page, updated_character)
+              updated_character =
+                if is_nil(updated_character.juncture_id) do
+                  case set_juncture_from_notion(
+                         updated_character,
+                         page,
+                         updated_character.campaign_id
+                       ) do
+                    {:ok, char} -> char
+                    {:error, _} -> updated_character
+                  end
+                else
+                  updated_character
+                end
 
-            # Log successful merge
-            Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
+            add_image(page, updated_character, token: token)
+              Notion.log_success("character", updated_character.id, %{action: "merge"}, page)
+              {:ok, updated_character}
 
-            {:ok, updated_character}
-
-          {:error, changeset} ->
-            {:error, changeset}
-        end
+            {:error, changeset} ->
+              {:error, changeset}
+          end
+      end
     end
   rescue
     error ->
@@ -429,7 +418,14 @@ defmodule ShotElixir.Services.NotionService do
   def create_notion_from_character(%Character{} = character) do
     # Ensure faction and campaign are loaded for Notion properties and database ID
     character = Repo.preload(character, [:faction, :campaign])
-    properties = Character.as_notion(character)
+    token = get_token(character.campaign)
+
+    if is_nil(token) do
+      Logger.warning("Notion sync skipped: campaign missing OAuth token")
+      Notion.log_error("character", character.id, %{}, %{}, "Notion OAuth token missing")
+      {:error, :no_notion_oauth_token}
+    else
+      properties = Character.as_notion(character)
 
     properties =
       if character.faction do
@@ -440,83 +436,85 @@ defmodule ShotElixir.Services.NotionService do
         properties
       end
 
-    with {:ok, database_id} <- get_database_id_for_entity(character.campaign, "characters"),
-         {:ok, data_source_id} <- data_source_id_for(database_id) do
+      with {:ok, database_id} <- get_database_id_for_entity(character.campaign, "characters"),
+           {:ok, data_source_id} <- data_source_id_for(database_id, token: token) do
       Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
 
-      # Capture payload for logging
-      payload = %{
-        "parent" => %{"data_source_id" => data_source_id},
-        "properties" => properties
-      }
+        # Capture payload for logging
+        payload = %{
+          "parent" => %{"data_source_id" => data_source_id},
+          "properties" => properties,
+          token: token
+        }
 
-      page = NotionClient.create_page(payload)
+        page = NotionClient.create_page(payload)
 
       Logger.debug("Notion API response received")
 
-      # Check if Notion returned an error response
-      case page do
-        %{"id" => page_id} when is_binary(page_id) ->
-          Logger.debug("Extracted page ID: #{inspect(page_id)}")
+        # Check if Notion returned an error response
+        case page do
+          %{"id" => page_id} when is_binary(page_id) ->
+            Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
-          # Log successful sync
-          Notion.log_success("character", character.id, payload, page)
+            # Log successful sync
+            Notion.log_success("character", character.id, payload, page)
 
-          # Update character with notion_page_id
-          case Characters.update_character(character, %{notion_page_id: page_id}) do
-            {:ok, updated_character} ->
-              Logger.debug(
-                "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
-              )
+            # Update character with notion_page_id
+            case Characters.update_character(character, %{notion_page_id: page_id}) do
+              {:ok, updated_character} ->
+                Logger.debug(
+                  "Character updated with notion_page_id: #{inspect(updated_character.notion_page_id)}"
+                )
 
-              # Add image if present
-              add_image_to_notion(updated_character)
-              {:ok, page}
+                # Add image if present
+                add_image_to_notion(updated_character)
+                {:ok, page}
 
-            {:error, changeset} ->
-              Logger.error("Failed to update character with notion_page_id")
-              {:error, changeset}
-          end
+              {:error, changeset} ->
+                Logger.error("Failed to update character with notion_page_id")
+                {:error, changeset}
+            end
 
-        %{"code" => error_code, "message" => message} ->
-          Logger.error("Notion API error: #{error_code}")
-          # Log error sync
+          %{"code" => error_code, "message" => message} ->
+            Logger.error("Notion API error: #{error_code}")
+            # Log error sync
+            Notion.log_error(
+              "character",
+              character.id,
+              payload,
+              page,
+              "Notion API error: #{error_code} - #{message}"
+            )
+
+            {:error, {:notion_api_error, error_code, message}}
+
+          _ ->
+            Logger.error("Unexpected response from Notion API")
+            # Log error sync
+            Notion.log_error(
+              "character",
+              character.id,
+              payload,
+              page,
+              "Unexpected response from Notion API"
+            )
+
+            {:error, :unexpected_notion_response}
+        end
+      else
+        {:error, reason} ->
+          Logger.error("Failed to resolve Notion data source for characters: #{inspect(reason)}")
+
           Notion.log_error(
             "character",
             character.id,
-            payload,
-            page,
-            "Notion API error: #{error_code} - #{message}"
+            %{},
+            %{},
+            "Notion data source lookup failed: #{inspect(reason)}"
           )
 
-          {:error, {:notion_api_error, error_code, message}}
-
-        _ ->
-          Logger.error("Unexpected response from Notion API")
-          # Log error sync
-          Notion.log_error(
-            "character",
-            character.id,
-            payload,
-            page,
-            "Unexpected response from Notion API"
-          )
-
-          {:error, :unexpected_notion_response}
+          {:error, reason}
       end
-    else
-      {:error, reason} ->
-        Logger.error("Failed to resolve Notion data source for characters: #{inspect(reason)}")
-
-        Notion.log_error(
-          "character",
-          character.id,
-          %{},
-          %{},
-          "Notion data source lookup failed: #{inspect(reason)}"
-        )
-
-        {:error, reason}
     end
   rescue
     error ->
@@ -542,6 +540,13 @@ defmodule ShotElixir.Services.NotionService do
   def update_notion_from_character(%Character{} = character) do
     # Ensure campaign and faction are loaded for faction properties lookup
     character = Repo.preload(character, [:campaign, :faction])
+    token = get_token(character.campaign)
+
+    if is_nil(token) do
+      Logger.warning("Notion sync skipped: campaign missing OAuth token")
+      Notion.log_error("character", character.id, %{}, %{}, "Notion OAuth token missing")
+      {:error, :no_notion_oauth_token}
+    else
     properties = Character.as_notion(character)
 
     properties =
@@ -559,7 +564,7 @@ defmodule ShotElixir.Services.NotionService do
       "properties" => properties
     }
 
-    response = NotionClient.update_page(character.notion_page_id, properties)
+    response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
 
     # Check if Notion returned an error response
     case response do
@@ -602,8 +607,8 @@ defmodule ShotElixir.Services.NotionService do
 
       _ ->
         # Add image if not present in Notion
-        page = NotionClient.get_page(character.notion_page_id)
-        image = find_image_block(page)
+        page = NotionClient.get_page(character.notion_page_id, %{token: token})
+        image = find_image_block(page, token: token)
 
         unless image do
           add_image_to_notion(character)
@@ -627,6 +632,7 @@ defmodule ShotElixir.Services.NotionService do
       )
 
       {:error, error}
+    end
   end
 
   @doc """
@@ -667,13 +673,13 @@ defmodule ShotElixir.Services.NotionService do
     {:ok, character} = Characters.update_character(character, %{description: merged_description})
 
     # Look up and set faction from Notion relation
-    {:ok, character} = set_faction_from_notion(character, page, campaign_id)
+    {:ok, character} = set_faction_from_notion(character, page, campaign_id, token)
 
     # Look up and set juncture from Notion multi_select
     {:ok, character} = set_juncture_from_notion(character, page, campaign_id)
 
     # Add image if not already present
-    add_image(page, character)
+    add_image(page, character, token: token)
 
     {:ok, character}
   rescue
@@ -683,8 +689,8 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Look up faction from Notion relation and set on character
-  defp set_faction_from_notion(character, page, campaign_id) do
-    case get_faction_name_from_notion(page) do
+  defp set_faction_from_notion(character, page, campaign_id, token) do
+    case get_faction_name_from_notion(page, token) do
       nil ->
         {:ok, character}
 
@@ -719,10 +725,10 @@ defmodule ShotElixir.Services.NotionService do
   end
 
   # Get faction name from Notion relation by fetching the related page
-  defp get_faction_name_from_notion(page) do
+  defp get_faction_name_from_notion(page, token) do
     case get_in(page, ["properties", "Faction", "relation"]) do
       [%{"id" => faction_page_id} | _] ->
-        faction_page = NotionClient.get_page(faction_page_id)
+        faction_page = NotionClient.get_page(faction_page_id, %{token: token})
 
         # Faction pages use rich_text for Name, not title
         get_in(faction_page, ["properties", "Name", "rich_text", Access.at(0), "plain_text"]) ||
@@ -853,7 +859,7 @@ defmodule ShotElixir.Services.NotionService do
             )
 
             error
-        end
+      end
     end
   rescue
     error ->
@@ -1061,11 +1067,12 @@ defmodule ShotElixir.Services.NotionService do
   """
   def find_image_block(page, opts \\ []) do
     client = Keyword.get(opts, :client, NotionClient)
-    find_image_block_paginated(page["id"], nil, client)
+    token = Keyword.get(opts, :token)
+    find_image_block_paginated(page["id"], nil, client, token)
   end
 
-  defp find_image_block_paginated(page_id, start_cursor, client) do
-    response = client.get_block_children(page_id, %{start_cursor: start_cursor})
+  defp find_image_block_paginated(page_id, start_cursor, client, token) do
+    response = client.get_block_children(page_id, %{start_cursor: start_cursor, token: token})
     results = response["results"] || []
 
     # Check if there's an image in this page of results
@@ -1073,7 +1080,7 @@ defmodule ShotElixir.Services.NotionService do
       nil ->
         # No image found in this page - check if there are more pages
         if response["has_more"] do
-          find_image_block_paginated(page_id, response["next_cursor"], client)
+          find_image_block_paginated(page_id, response["next_cursor"], client, token)
         else
           nil
         end
@@ -1117,14 +1124,14 @@ defmodule ShotElixir.Services.NotionService do
   This function should be called immediately after extracting the URL from Notion,
   not in a delayed or asynchronous context.
   """
-  def add_image(page, %Character{} = character) do
+  def add_image(page, %Character{} = character, opts \\ []) do
     # Check if character already has an image via ActiveStorage
     existing_image_url = ShotElixir.ActiveStorage.get_image_url("Character", character.id)
 
     if existing_image_url do
       {:ok, :skipped_existing_image}
     else
-      case find_image_block(page) do
+      case find_image_block(page, opts) do
         nil ->
           {:ok, :no_image_block}
 
@@ -1474,8 +1481,8 @@ defmodule ShotElixir.Services.NotionService do
   defp maybe_put_if_not_nil(map, key, value), do: Map.put(map, key, value)
 
   # Fetch rich description from page content and add to attributes
-  defp add_rich_description(attributes, page_id, campaign_id) do
-    case fetch_rich_description(page_id, campaign_id) do
+  defp add_rich_description(attributes, page_id, campaign_id, token) do
+    case fetch_rich_description(page_id, campaign_id, token) do
       {:ok, %{markdown: markdown, mentions: mentions}} ->
         attributes
         |> Map.put(:rich_description, markdown)
@@ -1664,18 +1671,23 @@ defmodule ShotElixir.Services.NotionService do
     * `{:ok, %{pages: [...], content: "..."}}` with matching pages and content of first match
     * `{:error, :not_found}` if no pages match
   """
-  def fetch_session_notes(query) do
+  def fetch_session_notes(query, token) do
+    if is_nil(token) do
+      Logger.warning("Session search skipped: missing Notion OAuth token")
+      {:error, :no_notion_oauth_token}
+    else
     search_query = if String.contains?(query, "session"), do: query, else: "session #{query}"
 
     results =
       NotionClient.search(search_query, %{
-        "filter" => %{"property" => "object", "value" => "page"}
+        "filter" => %{"property" => "object", "value" => "page"},
+        token: token
       })
 
     case results["results"] do
       [page | _rest] = pages ->
         # Fetch content of the first (most relevant) match
-        blocks = NotionClient.get_block_children(page["id"])
+        blocks = NotionClient.get_block_children(page["id"], %{token: token})
         content = parse_blocks_to_text(blocks["results"] || [])
 
         {:ok,
@@ -1700,25 +1712,31 @@ defmodule ShotElixir.Services.NotionService do
       )
 
       {:error, error}
+    end
   end
 
   @doc """
   Fetch a specific session page by ID.
   """
-  def fetch_session_by_id(page_id) do
-    page = NotionClient.get_page(page_id)
+  def fetch_session_by_id(page_id, token) do
+    if is_nil(token) do
+      Logger.warning("Session fetch skipped: missing Notion OAuth token")
+      {:error, :no_notion_oauth_token}
+    else
+      page = NotionClient.get_page(page_id, %{token: token})
 
-    case page do
-      %{"id" => _id} ->
-        blocks = NotionClient.get_block_children(page_id)
-        content = parse_blocks_to_text(blocks["results"] || [])
-        {:ok, %{title: extract_page_title(page), page_id: page_id, content: content}}
+      case page do
+        %{"id" => _id} ->
+          blocks = NotionClient.get_block_children(page_id, %{token: token})
+          content = parse_blocks_to_text(blocks["results"] || [])
+          {:ok, %{title: extract_page_title(page), page_id: page_id, content: content}}
 
-      %{"code" => error_code, "message" => message} ->
-        {:error, {:notion_api_error, error_code, message}}
+        %{"code" => error_code, "message" => message} ->
+          {:error, {:notion_api_error, error_code, message}}
 
-      _ ->
-        {:error, :not_found}
+        _ ->
+          {:error, :not_found}
+      end
     end
   rescue
     error ->
@@ -1871,10 +1889,17 @@ defmodule ShotElixir.Services.NotionService do
     * `{:ok, %{pages: [...], title: ..., page_id: ..., content: ...}}` on success
     * `{:error, reason}` on failure
   """
-  def fetch_adventure(query) do
+  def fetch_adventure(query, token) do
+    if is_nil(token) do
+      Logger.warning("Adventure fetch skipped: missing Notion OAuth token")
+      {:error, :no_notion_oauth_token}
+    else
     # Search Notion for pages matching the query
     response =
-      NotionClient.search(query, %{"filter" => %{"property" => "object", "value" => "page"}})
+      NotionClient.search(query, %{
+        "filter" => %{"property" => "object", "value" => "page"},
+        token: token
+      })
 
     pages =
       (response["results"] || [])
@@ -1890,7 +1915,7 @@ defmodule ShotElixir.Services.NotionService do
 
       [first | _rest] ->
         # Fetch content for the first matching page
-        case fetch_page_content(first.id) do
+        case fetch_page_content(first.id, token) do
           {:ok, content} ->
             {:ok,
              %{
@@ -1908,6 +1933,7 @@ defmodule ShotElixir.Services.NotionService do
     error ->
       Logger.error("Failed to search adventures: #{Exception.message(error)}")
       {:error, error}
+    end
   end
 
   @doc """
@@ -1920,8 +1946,12 @@ defmodule ShotElixir.Services.NotionService do
     * `{:ok, %{title: ..., page_id: ..., content: ...}}` on success
     * `{:error, reason}` on failure
   """
-  def fetch_adventure_by_id(page_id) do
-    page = NotionClient.get_page(page_id)
+  def fetch_adventure_by_id(page_id, token) do
+    if is_nil(token) do
+      Logger.warning("Adventure fetch skipped: missing Notion OAuth token")
+      {:error, :no_notion_oauth_token}
+    else
+      page = NotionClient.get_page(page_id, %{token: token})
 
     case page do
       %{"code" => error_code, "message" => message} ->
@@ -1930,7 +1960,7 @@ defmodule ShotElixir.Services.NotionService do
       %{"id" => id} ->
         title = extract_page_title(page)
 
-        case fetch_page_content(id) do
+        case fetch_page_content(id, token) do
           {:ok, content} ->
             {:ok,
              %{
@@ -1950,13 +1980,14 @@ defmodule ShotElixir.Services.NotionService do
     error ->
       Logger.error("Failed to fetch adventure by ID: #{Exception.message(error)}")
       {:error, error}
+    end
   end
 
   @doc """
   Fetch page content (blocks) and convert to plain text.
   """
-  def fetch_page_content(page_id) do
-    response = NotionClient.get_block_children(page_id)
+  def fetch_page_content(page_id, token) do
+    response = NotionClient.get_block_children(page_id, %{token: token})
 
     case response do
       %{"results" => blocks} when is_list(blocks) ->
@@ -1985,8 +2016,8 @@ defmodule ShotElixir.Services.NotionService do
   The mentions map contains resolved entity IDs for quick lookup:
   `%{"character" => [uuid1, uuid2], "site" => [uuid3]}`
   """
-  def fetch_rich_description(page_id, campaign_id) do
-    response = NotionClient.get_block_children(page_id)
+  def fetch_rich_description(page_id, campaign_id, token) do
+    response = NotionClient.get_block_children(page_id, %{token: token})
 
     case response do
       %{"results" => blocks} when is_list(blocks) ->
@@ -2885,6 +2916,13 @@ defmodule ShotElixir.Services.NotionService do
 
   # Generic sync function for any entity type (site, party, faction, juncture)
   defp sync_entity(entity, %{entity_type: entity_type} = opts) do
+    token = Map.get(opts, :token)
+
+    if is_nil(token) do
+      Logger.warning("Notion sync skipped for #{entity_type}: missing OAuth token")
+      Notion.log_error(entity_type, entity.id, %{}, %{}, "Notion OAuth token missing")
+      {:error, :no_notion_oauth_token}
+    else
     result =
       if entity.notion_page_id do
         update_notion_page(entity, opts)
@@ -2907,6 +2945,7 @@ defmodule ShotElixir.Services.NotionService do
     error ->
       Logger.error("Exception syncing #{entity_type} to Notion: #{Exception.message(error)}")
       {:error, error}
+    end
   end
 
   # Generic create function for any entity type
