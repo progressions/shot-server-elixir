@@ -13,7 +13,7 @@ defmodule ShotElixir.Services.NotionServiceTest do
   alias ShotElixir.Notion.NotionSyncLog
 
   defmodule NotionClientStubSuccess do
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ %{}) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -26,13 +26,13 @@ defmodule ShotElixir.Services.NotionServiceTest do
   end
 
   defmodule NotionClientStubError do
-    def get_page(_page_id) do
+    def get_page(_page_id, _opts \\ %{}) do
       %{"code" => "object_not_found", "message" => "Page not found"}
     end
   end
 
   defmodule NotionClientStubCharacterSuccess do
-    def get_page(page_id) do
+    def get_page(page_id, _opts \\ %{}) do
       %{
         "id" => page_id,
         "properties" => %{
@@ -244,7 +244,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
         %Campaign{}
         |> Campaign.changeset(%{
           name: "Notion Entity Campaign",
-          user_id: user.id
+          user_id: user.id,
+          notion_access_token: "test-token"
         })
         |> Repo.insert()
 
@@ -442,7 +443,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
     } do
       {:ok, updated_character} =
         NotionService.update_character_from_notion(character,
-          client: NotionClientStubCharacterSuccess
+          client: NotionClientStubCharacterSuccess,
+          token: "test-token"
         )
 
       assert updated_character.name == "Notion Character Name"
@@ -459,7 +461,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
     test "update_character_from_notion logs errors from Notion API", %{character: character} do
       assert {:error, {:notion_api_error, "object_not_found", "Page not found"}} =
                NotionService.update_character_from_notion(character,
-                 client: NotionClientStubError
+                 client: NotionClientStubError,
+                 token: "test-token"
                )
 
       [log] =

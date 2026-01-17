@@ -803,7 +803,7 @@ defmodule ShotElixir.Services.NotionService do
 
   def update_character_from_notion(%Character{} = character, opts) do
     payload = %{"page_id" => character.notion_page_id}
-    token = get_token(character.campaign)
+    token = Keyword.get(opts, :token) || get_token(character.campaign)
 
     if is_nil(token) do
       Logger.warning("Notion inbound sync skipped: campaign missing OAuth token")
