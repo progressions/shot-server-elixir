@@ -795,9 +795,16 @@ defmodule ShotElixir.Services.NotionService do
 
   def update_character_from_notion(%Character{} = character, opts) do
     payload = %{"page_id" => character.notion_page_id}
-    client = notion_client(opts)
+    token = get_token(character.campaign)
 
-    case client.get_page(character.notion_page_id) do
+    if is_nil(token) do
+      Logger.warning("Notion inbound sync skipped: campaign missing OAuth token")
+      log_sync_error("character", character.id, payload, %{}, "Notion OAuth token missing")
+      {:error, :no_notion_oauth_token}
+    else
+      client = notion_client(Keyword.merge(opts, token: token))
+
+      case client.get_page(character.notion_page_id, %{token: token}) do
       # Defensive check: Req.get! typically raises on failure, but we handle
       # the unlikely case of a nil body for robustness
       nil ->
@@ -825,10 +832,10 @@ defmodule ShotElixir.Services.NotionService do
 
         # Fetch rich description from page content (blocks)
         attributes =
-          add_rich_description(attributes, character.notion_page_id, character.campaign_id)
+          add_rich_description(attributes, character.notion_page_id, character.campaign_id, token)
 
         # Add image if not already present
-        add_image(page, character)
+        add_image(page, character, token: token)
 
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Characters.update_character(character, attributes, skip_notion_sync: true) do
