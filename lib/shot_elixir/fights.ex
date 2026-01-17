@@ -356,12 +356,23 @@ defmodule ShotElixir.Fights do
   end
 
   def get_fight_with_shots(id) do
-    id
-    |> Slug.extract_uuid()
-    |> Repo.get(Fight)
-    |> Repo.preload(shots: [:character, :vehicle, :character_effects])
-    |> Repo.preload([:characters, :vehicles, :image_positions, adventure_fights: [:adventure]])
-    |> ImageLoader.load_image_url("Fight")
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(Fight, id) do
+      nil ->
+        nil
+
+      fight ->
+        fight
+        |> Repo.preload(shots: [:character, :vehicle, :character_effects])
+        |> Repo.preload([
+          :characters,
+          :vehicles,
+          :image_positions,
+          adventure_fights: [:adventure]
+        ])
+        |> ImageLoader.load_image_url("Fight")
+    end
   end
 
   def create_fight(attrs \\ %{}) do
