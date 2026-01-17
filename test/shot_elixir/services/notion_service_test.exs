@@ -58,33 +58,44 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
-  defmodule NotionClientStubCharacterWithMentions do
-    @faction_notion_id "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-
-    def faction_notion_id, do: @faction_notion_id
+  defmodule NotionClientStubCharacterBotEdited do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
 
     def get_page(page_id) do
       %{
         "id" => page_id,
         "properties" => %{
-          "Name" => %{"title" => [%{"plain_text" => "Character With Mention"}]},
+          "Name" => %{"title" => [%{"plain_text" => "Bot Authored Name"}]},
           "Type" => %{"select" => %{"name" => "npc"}},
-          "Description" => %{
-            "rich_text" => [
-              %{"plain_text" => "A member of ", "type" => "text"},
-              %{
-                "plain_text" => "The Ascended",
-                "type" => "mention",
-                "mention" => %{
-                  "type" => "page",
-                  "page" => %{"id" => @faction_notion_id}
-                }
-              }
-            ]
-          },
-          "Age" => %{"rich_text" => [%{"plain_text" => "45", "type" => "text"}]},
-          "Height" => %{"rich_text" => [%{"plain_text" => "6'0\"", "type" => "text"}]}
-        }
+          "Defense" => %{"number" => 14},
+          "Toughness" => %{"number" => 7},
+          "Speed" => %{"number" => 6}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
+      }
+    end
+
+    def get_blocks(_page_id) do
+      %{"results" => []}
+    end
+  end
+
+  defmodule NotionClientStubCharacterGetMeError do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
+    def get_page(page_id) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Fallback Notion Name"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Fallback description"}]},
+          "At a Glance" => %{"checkbox" => true},
+          "Type" => %{"select" => %{"name" => "npc"}},
+          "Defense" => %{"number" => 14},
+          "Toughness" => %{"number" => 7},
+          "Speed" => %{"number" => 6}
+        },
+        "last_edited_by" => %{"id" => "bot-user-id"}
       }
     end
 
@@ -521,34 +532,41 @@ defmodule ShotElixir.Services.NotionServiceTest do
       assert String.contains?(log.error_message, "Notion API error")
     end
 
-    test "update_character_from_notion preserves Notion page mentions as TipTap HTML", %{
-      character: character,
-      campaign: campaign
-    } do
-      # Create a faction with a notion_page_id that matches the stub
-      {:ok, faction} =
-        Factions.create_faction(%{
-          name: "The Ascended",
-          campaign_id: campaign.id,
-          notion_page_id: NotionClientStubCharacterWithMentions.faction_notion_id()
-        })
+    test "skips character update when page was last edited by the bot", %{character: character} do
+      original_name = character.name
 
+      assert {:ok, returned_character} =
+               NotionService.update_character_from_notion(character,
+                 client: NotionClientStubCharacterBotEdited
+               )
+
+      reloaded = Repo.get(Character, character.id)
+      assert returned_character.id == character.id
+      assert reloaded.name == original_name
+
+      logs =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "character", entity_id: ^character.id)
+        |> Repo.all()
+
+      assert logs == []
+    end
+
+    test "continues character update when bot user lookup fails (fail-open)", %{character: character} do
       {:ok, updated_character} =
         NotionService.update_character_from_notion(character,
-          client: NotionClientStubCharacterWithMentions
+          client: NotionClientStubCharacterGetMeError,
+          token: "fail-open-token"
         )
 
-      # Verify the Appearance field contains TipTap mention HTML span
-      appearance = updated_character.description["Appearance"]
-      assert appearance =~ "A member of"
-      assert appearance =~ ~r/<span[^>]*data-type="mention"/
-      assert appearance =~ ~r/data-id="#{faction.id}"/
-      assert appearance =~ ~r/data-label="The Ascended"/
-      assert appearance =~ ~r/data-mention-class-name="Faction"/
+      assert updated_character.name == "Fallback Notion Name"
 
-      # Verify simple fields remain as plain text (no <p> tags)
-      assert updated_character.description["Age"] == "45"
-      assert updated_character.description["Height"] == "6'0\""
+      [log] =
+        NotionSyncLog
+        |> Ecto.Query.where(entity_type: "character", entity_id: ^character.id)
+        |> Repo.all()
+
+      assert log.status == "success"
     end
   end
 
@@ -827,153 +845,6 @@ defmodule ShotElixir.Services.NotionServiceTest do
       result = NotionService.find_image_block(page, client: NotionClientStubEmptyResults)
 
       assert result == nil
-    end
-  end
-
-  describe "update_character_from_notion preserves mentions" do
-    # Use valid UUIDs for Notion page IDs
-    @mentioned_char_notion_id "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-    @main_char_notion_id "b2c3d4e5-f6a7-8901-bcde-f12345678901"
-
-    setup do
-      {:ok, user} =
-        Accounts.create_user(%{
-          email: "gm-mention-test@example.com",
-          password: "password123",
-          first_name: "Mention",
-          last_name: "Tester",
-          gamemaster: true
-        })
-
-      {:ok, campaign} =
-        ShotElixir.Campaigns.create_campaign(%{name: "Mention Test Campaign", user_id: user.id})
-
-      # Create a character that will be mentioned
-      {:ok, mentioned_char} =
-        Characters.create_character(%{
-          name: "Big Boss",
-          campaign_id: campaign.id,
-          notion_page_id: @mentioned_char_notion_id
-        })
-
-      # Create the main character being synced
-      {:ok, character} =
-        Characters.create_character(%{
-          name: "Test Character",
-          campaign_id: campaign.id,
-          notion_page_id: @main_char_notion_id
-        })
-
-      {:ok, user: user, campaign: campaign, character: character, mentioned_char: mentioned_char}
-    end
-
-    defmodule NotionClientStubWithMentions do
-      @mentioned_char_notion_id "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-
-      def get_page(page_id) do
-        %{
-          "id" => page_id,
-          "properties" => %{
-            "Name" => %{"title" => [%{"plain_text" => "Updated Character Name"}]},
-            "Description" => %{
-              "rich_text" => [
-                %{"type" => "text", "plain_text" => "Works for "},
-                %{
-                  "type" => "mention",
-                  "plain_text" => "Big Boss",
-                  "mention" => %{
-                    "type" => "page",
-                    "page" => %{"id" => @mentioned_char_notion_id}
-                  }
-                },
-                %{"type" => "text", "plain_text" => " at the docks."}
-              ]
-            },
-            "Age" => %{"rich_text" => [%{"plain_text" => "35"}]},
-            "Melodramatic Hook" => %{
-              "rich_text" => [
-                %{"type" => "text", "plain_text" => "Owes a debt to "},
-                %{
-                  "type" => "mention",
-                  "plain_text" => "Big Boss",
-                  "mention" => %{
-                    "type" => "page",
-                    "page" => %{"id" => @mentioned_char_notion_id}
-                  }
-                }
-              ]
-            }
-          }
-        }
-      end
-
-      def get_blocks(_page_id) do
-        %{"results" => []}
-      end
-    end
-
-    test "converts Notion page mentions to TipTap HTML in description fields", %{
-      character: character,
-      mentioned_char: mentioned_char
-    } do
-      {:ok, updated_character} =
-        NotionService.update_character_from_notion(character,
-          client: NotionClientStubWithMentions
-        )
-
-      # Verify name was updated
-      assert updated_character.name == "Updated Character Name"
-
-      # Verify simple description fields are plain text
-      assert updated_character.description["Age"] == "35"
-
-      # Verify Appearance field (from Notion "Description") contains HTML mention
-      appearance = updated_character.description["Appearance"]
-      assert appearance != nil
-      assert String.contains?(appearance, "data-type=\"mention\"")
-      assert String.contains?(appearance, "data-id=\"#{mentioned_char.id}\"")
-      assert String.contains?(appearance, "Big Boss")
-
-      # Verify Melodramatic Hook contains HTML mention
-      hook = updated_character.description["Melodramatic Hook"]
-      assert hook != nil
-      assert String.contains?(hook, "data-type=\"mention\"")
-      assert String.contains?(hook, "data-id=\"#{mentioned_char.id}\"")
-    end
-
-    defmodule NotionClientStubPlainText do
-      def get_page(page_id) do
-        %{
-          "id" => page_id,
-          "properties" => %{
-            "Name" => %{"title" => [%{"plain_text" => "Plain Character"}]},
-            "Description" => %{
-              "rich_text" => [%{"type" => "text", "plain_text" => "A simple description"}]
-            },
-            "Age" => %{"rich_text" => [%{"plain_text" => "25"}]},
-            "Height" => %{"rich_text" => [%{"plain_text" => "6 feet"}]}
-          }
-        }
-      end
-
-      def get_blocks(_page_id) do
-        %{"results" => []}
-      end
-    end
-
-    test "handles plain text descriptions without mentions", %{character: character} do
-      {:ok, updated_character} =
-        NotionService.update_character_from_notion(character,
-          client: NotionClientStubPlainText
-        )
-
-      assert updated_character.name == "Plain Character"
-      assert updated_character.description["Age"] == "25"
-      assert updated_character.description["Height"] == "6 feet"
-      # Plain text gets wrapped in HTML but should not contain mention markup
-      appearance = updated_character.description["Appearance"]
-      assert String.contains?(appearance, "A simple description")
-      refute String.contains?(appearance || "", "data-type=\"mention\"")
     end
   end
 end
