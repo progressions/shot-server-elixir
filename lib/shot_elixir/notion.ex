@@ -15,6 +15,11 @@ defmodule ShotElixir.Notion do
   alias ShotElixir.Parties
   alias ShotElixir.Sites
 
+  # Notion failure threshold configuration
+  # Only notify after N failures within a time window to avoid "ping-pong" notifications
+  @failure_threshold Application.compile_env(:shot_elixir, [:notion, :failure_threshold], 3)
+  @failure_window_hours Application.compile_env(:shot_elixir, [:notion, :failure_window_hours], 1)
+
   @doc """
   Creates a sync log entry.
 
@@ -234,7 +239,8 @@ defmodule ShotElixir.Notion do
     prune_sync_logs("character", character_id, opts)
   end
 
-  # Sets the campaign's notion_status to "needs_attention" when a sync fails
+  # Sets the campaign's notion_status to "needs_attention" when a sync fails.
+  # Uses a threshold system: only notifies after N failures within a time window.
   defp set_campaign_needs_attention(entity_type, entity_id) do
     case get_campaign_for_entity(entity_type, entity_id) do
       nil ->
@@ -245,40 +251,109 @@ defmodule ShotElixir.Notion do
         :ok
 
       campaign ->
-        case Campaigns.update_campaign(campaign, %{notion_status: "needs_attention"}) do
-          {:ok, _updated} ->
-            queue_status_change_email(campaign.id, "needs_attention")
+        handle_sync_failure(campaign)
+    end
+  end
 
-          {:error, reason} ->
-            Logger.error(
-              "Notion: Failed to set campaign #{campaign.id} status to needs_attention: #{inspect(reason)}"
-            )
+  # Handles sync failure with threshold logic to avoid "ping-pong" notifications.
+  # Only notifies after @failure_threshold failures within @failure_window_hours.
+  defp handle_sync_failure(campaign) do
+    now = DateTime.utc_now()
+    window_cutoff = DateTime.add(now, -@failure_window_hours, :hour)
 
-            :ok
-        end
+    # Check if we need to reset the window (no previous window or window expired)
+    {new_count, new_window_start} =
+      if is_nil(campaign.notion_failure_window_start) or
+           DateTime.compare(campaign.notion_failure_window_start, window_cutoff) == :lt do
+        # Start new window
+        {1, now}
+      else
+        # Continue existing window
+        {campaign.notion_failure_count + 1, campaign.notion_failure_window_start}
+      end
+
+    attrs = %{
+      notion_failure_count: new_count,
+      notion_failure_window_start: new_window_start
+    }
+
+    # Only set needs_attention and email if threshold reached
+    attrs =
+      if new_count >= @failure_threshold do
+        Map.put(attrs, :notion_status, "needs_attention")
+      else
+        attrs
+      end
+
+    case Campaigns.update_campaign(campaign, attrs) do
+      {:ok, _updated} when new_count >= @failure_threshold ->
+        Logger.info(
+          "Notion: Campaign #{campaign.id} reached failure threshold (#{new_count}/#{@failure_threshold}), " <>
+            "setting status to needs_attention"
+        )
+
+        queue_status_change_email(campaign.id, "needs_attention")
+
+      {:ok, _updated} ->
+        Logger.debug(
+          "Notion: Campaign #{campaign.id} failure count: #{new_count}/#{@failure_threshold} " <>
+            "within window (not notifying yet)"
+        )
+
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "Notion: Failed to update failure tracking for campaign #{campaign.id}: #{inspect(reason)}"
+        )
+
+        :ok
     end
   end
 
   # Resets the campaign's notion_status to "working" if it was "needs_attention"
+  # and always resets the failure tracking counters on successful sync.
   defp maybe_reset_campaign_status(entity_type, entity_id) do
     case get_campaign_for_entity(entity_type, entity_id) do
       nil ->
         :ok
 
-      %{notion_status: "needs_attention"} = campaign ->
-        case Campaigns.update_campaign(campaign, %{notion_status: "working"}) do
-          {:ok, _updated} ->
-            queue_status_change_email(campaign.id, "working")
+      campaign ->
+        reset_failure_tracking(campaign)
+    end
+  end
 
-          {:error, reason} ->
-            Logger.error(
-              "Notion: Failed to reset campaign #{campaign.id} status to working: #{inspect(reason)}"
-            )
+  # Resets failure tracking and optionally updates status to "working".
+  # Always resets counters on success to prevent old failures from accumulating.
+  defp reset_failure_tracking(campaign) do
+    was_needs_attention = campaign.notion_status == "needs_attention"
 
-            :ok
-        end
+    attrs = %{
+      notion_failure_count: 0,
+      notion_failure_window_start: nil
+    }
 
-      _campaign ->
+    attrs =
+      if was_needs_attention do
+        Map.put(attrs, :notion_status, "working")
+      else
+        attrs
+      end
+
+    case Campaigns.update_campaign(campaign, attrs) do
+      {:ok, _updated} when was_needs_attention ->
+        Logger.info("Notion: Campaign #{campaign.id} sync succeeded, resetting status to working")
+        queue_status_change_email(campaign.id, "working")
+
+      {:ok, _updated} ->
+        Logger.debug("Notion: Campaign #{campaign.id} sync succeeded, resetting failure tracking")
+        :ok
+
+      {:error, reason} ->
+        Logger.error(
+          "Notion: Failed to reset failure tracking for campaign #{campaign.id}: #{inspect(reason)}"
+        )
+
         :ok
     end
   end

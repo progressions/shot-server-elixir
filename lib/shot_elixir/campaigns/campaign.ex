@@ -46,6 +46,10 @@ defmodule ShotElixir.Campaigns.Campaign do
     field :notion_database_ids, :map, default: %{}
     field :notion_status, :string, default: "disconnected"
 
+    # Notion failure tracking (for notification throttling)
+    field :notion_failure_count, :integer, default: 0
+    field :notion_failure_window_start, :utc_datetime
+
     belongs_to :user, ShotElixir.Accounts.User
 
     has_many :campaign_memberships, ShotElixir.Campaigns.CampaignMembership
@@ -98,7 +102,9 @@ defmodule ShotElixir.Campaigns.Campaign do
       :notion_workspace_icon,
       :notion_owner,
       :notion_database_ids,
-      :notion_status
+      :notion_status,
+      :notion_failure_count,
+      :notion_failure_window_start
     ])
     |> validate_required([:name, :user_id])
     |> validate_inclusion(:ai_provider, @valid_ai_providers ++ [nil])
