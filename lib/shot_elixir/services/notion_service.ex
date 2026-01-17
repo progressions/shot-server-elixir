@@ -2055,8 +2055,10 @@ defmodule ShotElixir.Services.NotionService do
       "table_of_contents" ->
         {nil, %{}}
 
+      # Skip image blocks - Notion uses temporary signed URLs that expire
+      # See Fizzy card for future implementation to re-host images
       "image" ->
-        {"![Image]()", %{}}
+        {nil, %{}}
 
       "video" ->
         {"[Video]", %{}}
@@ -2293,8 +2295,9 @@ defmodule ShotElixir.Services.NotionService do
       "table_of_contents" ->
         nil
 
+      # Skip image blocks - Notion uses temporary signed URLs that expire
       "image" ->
-        "[Image]"
+        nil
 
       "video" ->
         "[Video]"
