@@ -15,6 +15,11 @@ defmodule ShotElixir.Services.NotionClient do
     end
   end
 
+  # Normalize options: convert keyword lists to maps for consistent handling
+  defp normalize_opts(opts) when is_list(opts), do: Map.new(opts)
+  defp normalize_opts(opts) when is_map(opts), do: opts
+  defp normalize_opts(_), do: %{}
+
   def client(token \\ nil) do
     # Token must be provided (from campaign OAuth). We intentionally do not
     # fall back to environment or application config to avoid accidental use of
@@ -37,6 +42,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def search(query, opts \\ %{}) do
+    opts = normalize_opts(opts)
     {token, opts} = Map.pop(opts, :token)
     body = Map.merge(%{"query" => query}, opts)
 
@@ -50,6 +56,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def data_source_query(data_source_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     {token, opts} = Map.pop(opts, :token)
 
     with :ok <- require_token(token) do
@@ -62,6 +69,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def database_query(database_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     {token, opts} = Map.pop(opts, :token)
 
     with :ok <- require_token(token) do
@@ -74,6 +82,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def create_page(params) do
+    params = normalize_opts(params)
     {token, params} = Map.pop(params, :token)
 
     with :ok <- require_token(token) do
@@ -86,6 +95,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def update_page(page_id, properties, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     with :ok <- require_token(token) do
@@ -98,6 +108,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def get_page(page_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     with :ok <- require_token(token) do
@@ -110,6 +121,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def get_database(database_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     with :ok <- require_token(token) do
@@ -122,6 +134,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def get_block_children(block_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     # Build query params for pagination (start_cursor, page_size)
@@ -141,6 +154,7 @@ defmodule ShotElixir.Services.NotionClient do
   end
 
   def append_block_children(block_id, children, opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     with :ok <- require_token(token) do
@@ -159,6 +173,7 @@ defmodule ShotElixir.Services.NotionClient do
   Returns the response body from Notion's `/users/me` endpoint.
   """
   def get_me(opts \\ %{}) do
+    opts = normalize_opts(opts)
     token = Map.get(opts, :token)
 
     client(token)

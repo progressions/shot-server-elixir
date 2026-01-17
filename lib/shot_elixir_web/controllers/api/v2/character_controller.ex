@@ -464,7 +464,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   @doc """
   Create a new character from a Notion page.
   Fetches the Notion page data and creates a character from it.
-  Requires the campaign to have a Notion OAuth token configured.
   """
   def create_from_notion(conn, %{"notion_page_id" => notion_page_id}) do
     current_user = Guardian.Plug.current_resource(conn)
@@ -475,13 +474,14 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       |> put_status(:bad_request)
       |> json(%{error: "No current campaign set"})
     else
-      campaign = ShotElixir.Campaigns.get_campaign!(campaign_id)
+      # Get campaign and OAuth token
+      campaign = Campaigns.get_campaign(campaign_id)
       token = ShotElixir.Services.NotionService.get_token(campaign)
 
       unless token do
         conn
         |> put_status(:unprocessable_entity)
-        |> json(%{error: "Campaign does not have a Notion OAuth token configured"})
+        |> json(%{error: "Campaign does not have Notion OAuth configured"})
       else
         # Fetch the Notion page with error handling for HTTP exceptions
         page_result =
