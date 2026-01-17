@@ -13,6 +13,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
   alias ShotElixir.Notion.NotionSyncLog
 
   defmodule NotionClientStubSuccess do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     def get_page(page_id) do
       %{
         "id" => page_id,
@@ -20,18 +22,23 @@ defmodule ShotElixir.Services.NotionServiceTest do
           "Name" => %{"title" => [%{"plain_text" => "Notion Name"}]},
           "Description" => %{"rich_text" => [%{"plain_text" => "Notion Description"}]},
           "At a Glance" => %{"checkbox" => true}
-        }
+        },
+        "last_edited_by" => %{"id" => "some-other-user-id"}
       }
     end
   end
 
   defmodule NotionClientStubError do
+    def get_me(_opts), do: %{"code" => "error", "message" => "Failed to get user"}
+
     def get_page(_page_id) do
       %{"code" => "object_not_found", "message" => "Page not found"}
     end
   end
 
   defmodule NotionClientStubCharacterSuccess do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     def get_page(page_id) do
       %{
         "id" => page_id,
@@ -41,7 +48,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
           "Defense" => %{"number" => 14},
           "Toughness" => %{"number" => 7},
           "Speed" => %{"number" => 6}
-        }
+        },
+        "last_edited_by" => %{"id" => "some-other-user-id"}
       }
     end
 
@@ -86,6 +94,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
   end
 
   defmodule NotionClientStubJunctureSuccess do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     def character_notion_id, do: "c0a80123-4567-489a-bcde-1234567890ab"
     def site_notion_id, do: "e5b1b80e-2a50-4a43-92b1-8d1f5f4dd721"
 
@@ -98,12 +108,15 @@ defmodule ShotElixir.Services.NotionServiceTest do
           "At a Glance" => %{"checkbox" => true},
           "People" => %{"relation" => [%{"id" => character_notion_id()}]},
           "Locations" => %{"relation" => [%{"id" => site_notion_id()}]}
-        }
+        },
+        "last_edited_by" => %{"id" => "some-other-user-id"}
       }
     end
   end
 
   defmodule NotionClientStubDataSource do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     # Now find_pages_in_database uses the ID directly as a data_source_id,
     # so we just need to stub data_source_query
     def data_source_query("ds-id-success", _filter) do
@@ -122,6 +135,8 @@ defmodule ShotElixir.Services.NotionServiceTest do
   end
 
   defmodule NotionClientStubDataSourceMissing do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
     # Stub that returns an error from data_source_query
     def data_source_query("ds-id-missing", _filter) do
       %{"code" => "object_not_found", "message" => "Data source not found"}

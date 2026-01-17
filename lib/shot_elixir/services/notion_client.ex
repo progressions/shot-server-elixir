@@ -110,4 +110,12 @@ defmodule ShotElixir.Services.NotionClient do
     |> Req.patch!(url: "/blocks/#{block_id}/children", json: %{"children" => children})
     |> Map.get(:body)
   end
+
+  def get_me(opts \\ %{}) do
+    token = Map.get(opts, :token)
+
+    client(token)
+    |> Req.get!(url: "/users/me")
+    |> Map.get(:body)
+  end
 end
