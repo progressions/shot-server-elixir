@@ -807,6 +807,10 @@ defmodule ShotElixir.Services.NotionService do
       page when is_map(page) ->
         attributes = Character.attributes_from_notion(character, page)
 
+        # Fetch rich description from page content (blocks)
+        attributes =
+          add_rich_description(attributes, character.notion_page_id, character.campaign_id)
+
         # Add image if not already present
         add_image(page, character)
 
@@ -1422,6 +1426,20 @@ defmodule ShotElixir.Services.NotionService do
   defp maybe_put_if_not_nil(map, _key, nil), do: map
   defp maybe_put_if_not_nil(map, key, value), do: Map.put(map, key, value)
 
+  # Fetch rich description from page content and add to attributes
+  defp add_rich_description(attributes, page_id, campaign_id) do
+    case fetch_rich_description(page_id, campaign_id) do
+      {:ok, %{markdown: markdown, mentions: mentions}} ->
+        attributes
+        |> Map.put(:rich_description, markdown)
+        |> Map.put(:mentions, mentions)
+
+      {:error, reason} ->
+        Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")
+        attributes
+    end
+  end
+
   # Convert Notion rich_text to Chi War HTML with mention support
   defp get_rich_text_as_html(props, key, campaign_id) do
     rich_text =
@@ -1910,6 +1928,313 @@ defmodule ShotElixir.Services.NotionService do
       {:error, error}
   end
 
+  @doc """
+  Fetch page content (blocks) and convert to markdown with mention resolution.
+  Returns `{:ok, %{markdown: string, mentions: map}}` or `{:error, reason}`.
+
+  Mentions are resolved to the format `[[@entity_type:uuid|Display Name]]` for
+  later rendering as clickable links in the frontend.
+
+  The mentions map contains resolved entity IDs for quick lookup:
+  `%{"character" => [uuid1, uuid2], "site" => [uuid3]}`
+  """
+  def fetch_rich_description(page_id, campaign_id) do
+    response = NotionClient.get_block_children(page_id)
+
+    case response do
+      %{"results" => blocks} when is_list(blocks) ->
+        {markdown, mentions} = blocks_to_markdown_with_mentions(blocks, campaign_id)
+        {:ok, %{markdown: markdown, mentions: mentions}}
+
+      %{"code" => error_code, "message" => message} ->
+        {:error, {:notion_api_error, error_code, message}}
+
+      _ ->
+        {:error, :unexpected_notion_response}
+    end
+  rescue
+    error ->
+      Logger.error("Failed to fetch rich description: #{Exception.message(error)}")
+      {:error, error}
+  end
+
+  # Convert Notion blocks to markdown with mention resolution
+  defp blocks_to_markdown_with_mentions(blocks, campaign_id) do
+    # Accumulate markdown text and collect mentions
+    {text_parts, all_mentions} =
+      blocks
+      |> Enum.reduce({[], %{}}, fn block, {texts, mentions} ->
+        {text, block_mentions} = block_to_markdown(block, campaign_id)
+
+        if text do
+          merged_mentions = merge_mentions(mentions, block_mentions)
+          {[text | texts], merged_mentions}
+        else
+          {texts, mentions}
+        end
+      end)
+
+    markdown = text_parts |> Enum.reverse() |> Enum.join("\n\n")
+    {markdown, all_mentions}
+  end
+
+  # Convert a single block to markdown with mentions
+  defp block_to_markdown(%{"type" => type} = block, campaign_id) do
+    case type do
+      "paragraph" ->
+        extract_rich_text_with_mentions(get_in(block, ["paragraph", "rich_text"]), campaign_id)
+
+      "heading_1" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["heading_1", "rich_text"]), campaign_id)
+
+        {"# #{text}", mentions}
+
+      "heading_2" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["heading_2", "rich_text"]), campaign_id)
+
+        {"## #{text}", mentions}
+
+      "heading_3" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["heading_3", "rich_text"]), campaign_id)
+
+        {"### #{text}", mentions}
+
+      "bulleted_list_item" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(
+            get_in(block, ["bulleted_list_item", "rich_text"]),
+            campaign_id
+          )
+
+        {"- #{text}", mentions}
+
+      "numbered_list_item" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(
+            get_in(block, ["numbered_list_item", "rich_text"]),
+            campaign_id
+          )
+
+        {"1. #{text}", mentions}
+
+      "to_do" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["to_do", "rich_text"]), campaign_id)
+
+        checked = if get_in(block, ["to_do", "checked"]), do: "[x]", else: "[ ]"
+        {"- #{checked} #{text}", mentions}
+
+      "toggle" ->
+        extract_rich_text_with_mentions(get_in(block, ["toggle", "rich_text"]), campaign_id)
+
+      "quote" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["quote", "rich_text"]), campaign_id)
+
+        {"> #{text}", mentions}
+
+      "callout" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["callout", "rich_text"]), campaign_id)
+
+        {"> #{text}", mentions}
+
+      "code" ->
+        {text, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["code", "rich_text"]), campaign_id)
+
+        language = get_in(block, ["code", "language"]) || ""
+        {"```#{language}\n#{text}\n```", mentions}
+
+      "divider" ->
+        {"---", %{}}
+
+      "table_of_contents" ->
+        {nil, %{}}
+
+      "image" ->
+        {"![Image]()", %{}}
+
+      "video" ->
+        {"[Video]", %{}}
+
+      "file" ->
+        {"[File]", %{}}
+
+      "pdf" ->
+        {"[PDF]", %{}}
+
+      "bookmark" ->
+        url = get_in(block, ["bookmark", "url"])
+        {"[Bookmark](#{url})", %{}}
+
+      "link_preview" ->
+        url = get_in(block, ["link_preview", "url"])
+        {"[Link](#{url})", %{}}
+
+      "child_page" ->
+        title = get_in(block, ["child_page", "title"]) || "Untitled page"
+        {"[Page: #{title}]", %{}}
+
+      "child_database" ->
+        title = get_in(block, ["child_database", "title"]) || "Untitled database"
+        {"[Database: #{title}]", %{}}
+
+      _ ->
+        {nil, %{}}
+    end
+  end
+
+  defp block_to_markdown(_, _campaign_id), do: {nil, %{}}
+
+  # Extract rich text with mention resolution
+  defp extract_rich_text_with_mentions(nil, _campaign_id), do: {"", %{}}
+  defp extract_rich_text_with_mentions([], _campaign_id), do: {"", %{}}
+
+  defp extract_rich_text_with_mentions(rich_text, campaign_id) when is_list(rich_text) do
+    {text_parts, mentions} =
+      rich_text
+      |> Enum.reduce({[], %{}}, fn item, {texts, acc_mentions} ->
+        {text, item_mentions} = rich_text_item_to_markdown(item, campaign_id)
+        merged_mentions = merge_mentions(acc_mentions, item_mentions)
+        {[text | texts], merged_mentions}
+      end)
+
+    text = text_parts |> Enum.reverse() |> Enum.join("")
+    {text, mentions}
+  end
+
+  # Convert a single rich text item to markdown, handling mentions
+  defp rich_text_item_to_markdown(
+         %{"type" => "mention", "mention" => mention} = item,
+         campaign_id
+       ) do
+    case mention do
+      %{"type" => "page", "page" => %{"id" => page_id}} ->
+        # This is a page mention - try to resolve it to an entity
+        resolve_page_mention(page_id, item["plain_text"] || "Unknown", campaign_id)
+
+      %{"type" => "user"} ->
+        # User mention - just use the plain text
+        {item["plain_text"] || "@User", %{}}
+
+      %{"type" => "date"} ->
+        # Date mention
+        {item["plain_text"] || "", %{}}
+
+      %{"type" => "database"} ->
+        # Database mention
+        {item["plain_text"] || "[Database]", %{}}
+
+      _ ->
+        {item["plain_text"] || "", %{}}
+    end
+  end
+
+  defp rich_text_item_to_markdown(%{"type" => "text"} = item, _campaign_id) do
+    text = get_in(item, ["text", "content"]) || ""
+    annotations = item["annotations"] || %{}
+
+    # Apply markdown formatting based on annotations
+    formatted =
+      text
+      |> maybe_apply_bold(annotations["bold"])
+      |> maybe_apply_italic(annotations["italic"])
+      |> maybe_apply_strikethrough(annotations["strikethrough"])
+      |> maybe_apply_code(annotations["code"])
+
+    # Handle links
+    formatted =
+      case get_in(item, ["text", "link", "url"]) do
+        nil -> formatted
+        url -> "[#{formatted}](#{url})"
+      end
+
+    {formatted, %{}}
+  end
+
+  defp rich_text_item_to_markdown(item, _campaign_id) do
+    {item["plain_text"] || "", %{}}
+  end
+
+  # Resolve a page mention to an entity reference
+  defp resolve_page_mention(page_id, display_name, campaign_id) do
+    # Normalize the page_id (Notion uses UUIDs without dashes sometimes)
+    normalized_id = normalize_uuid(page_id)
+
+    # Try to find the entity by notion_page_id
+    cond do
+      character = Repo.get_by(Character, notion_page_id: normalized_id, campaign_id: campaign_id) ->
+        mention_text = "[[@character:#{character.id}|#{display_name}]]"
+        {mention_text, %{"character" => [character.id]}}
+
+      site = Repo.get_by(Site, notion_page_id: normalized_id, campaign_id: campaign_id) ->
+        mention_text = "[[@site:#{site.id}|#{display_name}]]"
+        {mention_text, %{"site" => [site.id]}}
+
+      party = Repo.get_by(Party, notion_page_id: normalized_id, campaign_id: campaign_id) ->
+        mention_text = "[[@party:#{party.id}|#{display_name}]]"
+        {mention_text, %{"party" => [party.id]}}
+
+      faction = Repo.get_by(Faction, notion_page_id: normalized_id, campaign_id: campaign_id) ->
+        mention_text = "[[@faction:#{faction.id}|#{display_name}]]"
+        {mention_text, %{"faction" => [faction.id]}}
+
+      juncture = Repo.get_by(Juncture, notion_page_id: normalized_id, campaign_id: campaign_id) ->
+        mention_text = "[[@juncture:#{juncture.id}|#{display_name}]]"
+        {mention_text, %{"juncture" => [juncture.id]}}
+
+      adventure = Repo.get_by(Adventure, notion_page_id: normalized_id, campaign_id: campaign_id) ->
+        mention_text = "[[@adventure:#{adventure.id}|#{display_name}]]"
+        {mention_text, %{"adventure" => [adventure.id]}}
+
+      true ->
+        # Entity not found - just use the display name with a generic link marker
+        {"[[#{display_name}]]", %{}}
+    end
+  end
+
+  # Helper to normalize UUID format
+  defp normalize_uuid(uuid) when is_binary(uuid) do
+    cond do
+      String.contains?(uuid, "-") ->
+        uuid
+
+      String.length(uuid) == 32 ->
+        # Insert dashes: 8-4-4-4-12
+        <<a::binary-size(8), b::binary-size(4), c::binary-size(4), d::binary-size(4),
+          e::binary-size(12)>> = uuid
+
+        "#{a}-#{b}-#{c}-#{d}-#{e}"
+
+      true ->
+        uuid
+    end
+  end
+
+  # Merge mentions maps
+  defp merge_mentions(map1, map2) do
+    Map.merge(map1, map2, fn _k, v1, v2 ->
+      Enum.uniq(v1 ++ v2)
+    end)
+  end
+
+  # Markdown formatting helpers
+  defp maybe_apply_bold(text, true), do: "**#{text}**"
+  defp maybe_apply_bold(text, _), do: text
+
+  defp maybe_apply_italic(text, true), do: "_#{text}_"
+  defp maybe_apply_italic(text, _), do: text
+
+  defp maybe_apply_strikethrough(text, true), do: "~~#{text}~~"
+  defp maybe_apply_strikethrough(text, _), do: text
+
+  defp maybe_apply_code(text, true), do: "`#{text}`"
+  defp maybe_apply_code(text, _), do: text
+
   # Convert Notion blocks to plain text
   defp blocks_to_text(blocks) do
     blocks
@@ -2173,6 +2498,9 @@ defmodule ShotElixir.Services.NotionService do
         # Use mention-aware conversion with campaign_id
         attributes = entity_attributes_from_notion(page, site.campaign_id)
 
+        # Fetch rich description from page content (blocks)
+        attributes = add_rich_description(attributes, site.notion_page_id, site.campaign_id)
+
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Sites.update_site(site, attributes, skip_notion_sync: true) do
           {:ok, updated_site} = result ->
@@ -2240,6 +2568,9 @@ defmodule ShotElixir.Services.NotionService do
         # Use mention-aware conversion with campaign_id
         attributes = entity_attributes_from_notion(page, party.campaign_id)
 
+        # Fetch rich description from page content (blocks)
+        attributes = add_rich_description(attributes, party.notion_page_id, party.campaign_id)
+
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Parties.update_party(party, attributes, skip_notion_sync: true) do
           {:ok, updated_party} = result ->
@@ -2306,6 +2637,9 @@ defmodule ShotElixir.Services.NotionService do
       page when is_map(page) ->
         # Use mention-aware conversion with campaign_id
         attributes = entity_attributes_from_notion(page, faction.campaign_id)
+
+        # Fetch rich description from page content (blocks)
+        attributes = add_rich_description(attributes, faction.notion_page_id, faction.campaign_id)
 
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Factions.update_faction(faction, attributes, skip_notion_sync: true) do
@@ -2387,6 +2721,10 @@ defmodule ShotElixir.Services.NotionService do
             :skip -> attributes
           end
 
+        # Fetch rich description from page content (blocks)
+        attributes =
+          add_rich_description(attributes, juncture.notion_page_id, juncture.campaign_id)
+
         case Junctures.update_juncture(juncture, attributes) do
           {:ok, updated_juncture} = result ->
             Notion.log_success("juncture", updated_juncture.id, payload, page)
@@ -2453,6 +2791,10 @@ defmodule ShotElixir.Services.NotionService do
       page when is_map(page) ->
         # Use centralized mention-aware conversion with campaign_id
         attributes = adventure_attributes_from_notion(page, adventure.campaign_id)
+
+        # Fetch rich description from page content (blocks)
+        attributes =
+          add_rich_description(attributes, adventure.notion_page_id, adventure.campaign_id)
 
         # Skip Notion sync to prevent ping-pong loops when updating from webhook
         case Adventures.update_adventure(adventure, attributes, skip_notion_sync: true) do

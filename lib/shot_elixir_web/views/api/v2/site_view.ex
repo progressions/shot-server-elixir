@@ -39,6 +39,8 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       attunements: render_attunements_if_loaded(site),
       notion_page_id: site.notion_page_id,
       last_synced_to_notion_at: site.last_synced_to_notion_at,
+      rich_description: site.rich_description,
+      mentions: site.mentions,
       entity_class: "Site"
     }
   end

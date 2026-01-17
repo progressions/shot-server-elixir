@@ -19,6 +19,10 @@ defmodule ShotElixir.Sites.Site do
     field :notion_page_id, :string
     field :last_synced_to_notion_at, :utc_datetime
 
+    # Rich content from Notion (read-only in chi-war)
+    field :rich_description, :string
+    field :mentions, :map, default: %{}
+
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction
     belongs_to :juncture, ShotElixir.Junctures.Juncture
@@ -42,7 +46,9 @@ defmodule ShotElixir.Sites.Site do
       :faction_id,
       :juncture_id,
       :notion_page_id,
-      :last_synced_to_notion_at
+      :last_synced_to_notion_at,
+      :rich_description,
+      :mentions
     ])
     |> validate_required([:name, :campaign_id])
     |> validate_length(:name, min: 1, max: 255)

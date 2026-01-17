@@ -76,6 +76,10 @@ defmodule ShotElixir.Characters.Character do
     field :notion_page_id, Ecto.UUID
     field :last_synced_to_notion_at, :utc_datetime
 
+    # Rich content from Notion (read-only in chi-war)
+    field :rich_description, :string
+    field :mentions, :map, default: %{}
+
     belongs_to :user, ShotElixir.Accounts.User
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction
@@ -122,6 +126,8 @@ defmodule ShotElixir.Characters.Character do
       :extending,
       :notion_page_id,
       :last_synced_to_notion_at,
+      :rich_description,
+      :mentions,
       :user_id,
       :campaign_id,
       :faction_id,

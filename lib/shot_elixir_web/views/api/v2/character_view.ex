@@ -111,6 +111,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       image_url: get_image_url(character),
       task: character.task,
       notion_page_id: character.notion_page_id,
+      rich_description: character.rich_description,
+      mentions: character.mentions,
       wealth: character.wealth,
       juncture_id: character.juncture_id,
       color: character.color,

@@ -50,6 +50,8 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       has_composition: length(slots) > 0,
       notion_page_id: party.notion_page_id,
       last_synced_to_notion_at: party.last_synced_to_notion_at,
+      rich_description: party.rich_description,
+      mentions: party.mentions,
       entity_class: "Party"
     }
   end

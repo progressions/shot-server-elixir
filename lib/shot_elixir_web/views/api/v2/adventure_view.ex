@@ -42,6 +42,8 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
       image_positions: render_image_positions_if_loaded(adventure),
       notion_page_id: adventure.notion_page_id,
       last_synced_to_notion_at: adventure.last_synced_to_notion_at,
+      rich_description: adventure.rich_description,
+      mentions: adventure.mentions,
       entity_class: "Adventure"
     }
   end

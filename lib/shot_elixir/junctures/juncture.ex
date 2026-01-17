@@ -15,6 +15,10 @@ defmodule ShotElixir.Junctures.Juncture do
     field :at_a_glance, :boolean, default: false
     field :notion_page_id, :binary_id
 
+    # Rich content from Notion (read-only in chi-war)
+    field :rich_description, :string
+    field :mentions, :map, default: %{}
+
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :faction, ShotElixir.Factions.Faction
 
@@ -37,7 +41,9 @@ defmodule ShotElixir.Junctures.Juncture do
       :at_a_glance,
       :notion_page_id,
       :campaign_id,
-      :faction_id
+      :faction_id,
+      :rich_description,
+      :mentions
     ])
     |> validate_required([:name])
     |> validate_length(:name, min: 1, max: 255)

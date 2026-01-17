@@ -41,6 +41,8 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       image_positions: render_image_positions_if_loaded(faction),
       notion_page_id: faction.notion_page_id,
       last_synced_to_notion_at: faction.last_synced_to_notion_at,
+      rich_description: faction.rich_description,
+      mentions: faction.mentions,
       entity_class: "Faction"
     }
   end
