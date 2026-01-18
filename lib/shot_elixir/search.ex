@@ -4,6 +4,8 @@ defmodule ShotElixir.Search do
 
   Provides campaign-scoped search functionality that queries multiple entity
   types in parallel and returns results grouped by type.
+
+  Returns full entity data compatible with existing badge components on the frontend.
   """
 
   import Ecto.Query, warn: false
@@ -24,18 +26,18 @@ defmodule ShotElixir.Search do
   @default_limit_per_type 5
   @search_timeout_ms 5000
 
-  # Maps entity type atoms to their schema modules
+  # Maps entity type atoms to their schema modules and preloads
   @searchable_schemas %{
-    characters: Character,
-    vehicles: Vehicle,
-    fights: Fight,
-    sites: Site,
-    parties: Party,
-    factions: Faction,
-    schticks: Schtick,
-    weapons: Weapon,
-    junctures: Juncture,
-    adventures: Adventure
+    characters: {Character, [:faction]},
+    vehicles: {Vehicle, [:faction]},
+    fights: {Fight, [shots: [:character, :vehicle]]},
+    sites: {Site, [:faction, attunements: [:character]]},
+    parties: {Party, [:faction, memberships: [:character, :vehicle]]},
+    factions: {Faction, [:characters]},
+    schticks: {Schtick, []},
+    weapons: {Weapon, []},
+    junctures: {Juncture, [:faction]},
+    adventures: {Adventure, []}
   }
 
   @doc """
@@ -67,9 +69,9 @@ defmodule ShotElixir.Search do
 
     results =
       @searchable_schemas
-      |> Enum.map(fn {type, schema} ->
+      |> Enum.map(fn {type, {schema, preloads}} ->
         Task.async(fn ->
-          {type, search_schema(schema, campaign_id, search_term, limit)}
+          {type, search_schema(schema, campaign_id, search_term, limit, preloads)}
         end)
       end)
       |> Task.await_many(@search_timeout_ms)
@@ -107,7 +109,7 @@ defmodule ShotElixir.Search do
 
   # Private helpers
 
-  defp search_schema(schema, campaign_id, search_term, limit) do
+  defp search_schema(schema, campaign_id, search_term, limit, preloads) do
     base_query =
       from(e in schema,
         where: e.campaign_id == ^campaign_id,
@@ -120,8 +122,8 @@ defmodule ShotElixir.Search do
     base_query
     |> build_search_conditions(schema, search_term)
     |> Repo.all()
+    |> Repo.preload(preloads)
     |> ImageLoader.load_image_urls(record_type)
-    |> Enum.map(&format_result(&1, schema))
   end
 
   defp build_search_conditions(query, schema, search_term) do
@@ -159,42 +161,6 @@ defmodule ShotElixir.Search do
           where: ilike(e.name, ^search_term)
         )
     end
-  end
-
-  defp format_result(entity, schema) do
-    %{
-      id: entity.id,
-      name: entity.name,
-      image_url: entity.image_url,
-      entity_class: schema_to_entity_class(schema),
-      description: extract_description(entity)
-    }
-  end
-
-  defp extract_description(%{description: desc}) when is_map(desc) do
-    desc
-    |> Map.get("description", "")
-    |> to_string()
-    |> strip_html_tags()
-    |> String.slice(0, 100)
-  end
-
-  defp extract_description(%{description: desc}) when is_binary(desc) do
-    desc
-    |> strip_html_tags()
-    |> String.slice(0, 100)
-  end
-
-  defp extract_description(_), do: nil
-
-  # Strip HTML tags from a string
-  defp strip_html_tags(nil), do: nil
-
-  defp strip_html_tags(text) when is_binary(text) do
-    text
-    |> String.replace(~r/<[^>]*>/, " ")
-    |> String.replace(~r/\s+/, " ")
-    |> String.trim()
   end
 
   defp schema_to_entity_class(Character), do: "Character"

@@ -276,9 +276,10 @@ defmodule ShotElixir.SearchTest do
       result = Search.search_campaign(campaign.id, "Test")
 
       [item | _] = result.results[:characters]
+      # Search returns full entity structs
+      assert item.__struct__ == ShotElixir.Characters.Character
       assert item.id == character.id
       assert item.name == "Test Character"
-      assert item.entity_class == "Character"
       assert Map.has_key?(item, :image_url)
       assert Map.has_key?(item, :description)
     end
