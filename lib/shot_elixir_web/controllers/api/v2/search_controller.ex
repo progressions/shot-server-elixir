@@ -2,6 +2,7 @@ defmodule ShotElixirWeb.Api.V2.SearchController do
   use ShotElixirWeb, :controller
 
   alias ShotElixir.Campaigns
+  alias ShotElixir.Guardian
   alias ShotElixir.Search
 
   action_fallback ShotElixirWeb.FallbackController
