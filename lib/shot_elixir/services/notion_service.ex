@@ -65,11 +65,9 @@ defmodule ShotElixir.Services.NotionService do
   defdelegate juncture_as_notion(juncture), to: Mappers
   defdelegate character_ids_from_notion(page, campaign_id), to: Mappers
   defdelegate site_ids_from_notion(page, campaign_id), to: Mappers
+  defdelegate data_source_id_for(database_id, opts \\ []), to: Config
+  defdelegate skip_bot_update?(page, opts \\ []), to: Config
 
-  defp data_source_id_for(database_id, opts \\ []),
-    do: Config.data_source_id_for(database_id, opts)
-
-  defp should_skip_bot_update?(page, opts), do: Config.skip_bot_update?(page, opts)
   defp notion_client(opts), do: Config.client(opts)
 
   defp log_sync_error(entity_type, entity_id, payload, response, message) do
@@ -684,7 +682,7 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
-      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      # Ensure token is in opts for skip_bot_update? check (only if not already provided)
       opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => character.notion_page_id}
       client = notion_client(opts)
@@ -713,7 +711,7 @@ defmodule ShotElixir.Services.NotionService do
 
         # Success case: page data returned as a map
         page when is_map(page) ->
-          if should_skip_bot_update?(page, opts) do
+          if skip_bot_update?(page, opts) do
             Logger.info(
               "Skipping update for character #{character.id} as it was last edited by the bot"
             )
@@ -937,7 +935,7 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
-      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      # Ensure token is in opts for skip_bot_update? check (only if not already provided)
       opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => site.notion_page_id}
       client = notion_client(opts)
@@ -962,7 +960,7 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if should_skip_bot_update?(page, opts) do
+          if skip_bot_update?(page, opts) do
             Logger.info("Skipping update for site #{site.id} as it was last edited by the bot")
 
             {:ok, site}
@@ -1023,7 +1021,7 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
-      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      # Ensure token is in opts for skip_bot_update? check (only if not already provided)
       opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => party.notion_page_id}
       client = notion_client(opts)
@@ -1048,7 +1046,7 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if should_skip_bot_update?(page, opts) do
+          if skip_bot_update?(page, opts) do
             Logger.info("Skipping update for party #{party.id} as it was last edited by the bot")
 
             {:ok, party}
@@ -1109,7 +1107,7 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
-      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      # Ensure token is in opts for skip_bot_update? check (only if not already provided)
       opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => faction.notion_page_id}
       client = notion_client(opts)
@@ -1134,7 +1132,7 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if should_skip_bot_update?(page, opts) do
+          if skip_bot_update?(page, opts) do
             Logger.info(
               "Skipping update for faction #{faction.id} as it was last edited by the bot"
             )
@@ -1198,7 +1196,7 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
-      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      # Ensure token is in opts for skip_bot_update? check (only if not already provided)
       opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => juncture.notion_page_id}
       client = notion_client(opts)
@@ -1223,7 +1221,7 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if should_skip_bot_update?(page, opts) do
+          if skip_bot_update?(page, opts) do
             Logger.info(
               "Skipping update for juncture #{juncture.id} as it was last edited by the bot"
             )
@@ -1303,7 +1301,7 @@ defmodule ShotElixir.Services.NotionService do
     unless token do
       {:error, :no_notion_oauth_token}
     else
-      # Ensure token is in opts for should_skip_bot_update? check (only if not already provided)
+      # Ensure token is in opts for skip_bot_update? check (only if not already provided)
       opts = Keyword.put_new(opts, :token, token)
       payload = %{"page_id" => adventure.notion_page_id}
       client = notion_client(opts)
@@ -1328,7 +1326,7 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if should_skip_bot_update?(page, opts) do
+          if skip_bot_update?(page, opts) do
             Logger.info(
               "Skipping update for adventure #{adventure.id} as it was last edited by the bot"
             )
