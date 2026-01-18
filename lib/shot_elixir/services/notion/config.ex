@@ -84,6 +84,12 @@ defmodule ShotElixir.Services.Notion.Config do
             cache_data_source_id(database_id, data_source_id)
             {:ok, data_source_id}
 
+          # Handle standard database response where "id" is the data_source_id
+          # In Notion API 2025-09-03, database_id == data_source_id
+          %{"id" => data_source_id, "object" => "database"} when is_binary(data_source_id) ->
+            cache_data_source_id(database_id, data_source_id)
+            {:ok, data_source_id}
+
           %{"code" => error_code, "message" => message} ->
             Logger.error(
               "Notion get_database error for database_id=#{database_id}: " <>

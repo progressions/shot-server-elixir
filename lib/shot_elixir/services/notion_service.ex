@@ -332,14 +332,17 @@ defmodule ShotElixir.Services.NotionService do
         properties
       end
 
+    token = get_token(character.campaign)
+
     with {:ok, database_id} <- get_database_id_for_entity(character.campaign, "characters"),
-         {:ok, data_source_id} <- data_source_id_for(database_id) do
+         {:ok, data_source_id} <- data_source_id_for(database_id, token: token) do
       Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
 
       # Capture payload for logging
       payload = %{
         "parent" => %{"data_source_id" => data_source_id},
-        "properties" => properties
+        "properties" => properties,
+        :token => token
       }
 
       page = NotionClient.create_page(payload)
@@ -434,6 +437,7 @@ defmodule ShotElixir.Services.NotionService do
   def update_notion_from_character(%Character{} = character) do
     # Ensure campaign and faction are loaded for faction properties lookup
     character = Repo.preload(character, [:campaign, :faction])
+    token = get_token(character.campaign)
     properties = Character.as_notion(character)
 
     properties =
@@ -451,7 +455,7 @@ defmodule ShotElixir.Services.NotionService do
       "properties" => properties
     }
 
-    response = NotionClient.update_page(character.notion_page_id, properties)
+    response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
 
     # Check if Notion returned an error response
     case response do
@@ -494,7 +498,7 @@ defmodule ShotElixir.Services.NotionService do
 
       _ ->
         # Add image if not present in Notion
-        page = NotionClient.get_page(character.notion_page_id)
+        page = NotionClient.get_page(character.notion_page_id, %{token: token})
         image = find_image_block(page)
 
         unless image do
