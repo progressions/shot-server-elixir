@@ -63,6 +63,14 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     }
   end
 
+  @doc """
+  Render a character for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(character) do
+    render_character_index(character)
+  end
+
   # Rails CharacterIndexSerializer format
   defp render_character_index(character) do
     %{

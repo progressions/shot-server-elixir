@@ -48,6 +48,12 @@ defmodule ShotElixirWeb.Api.V2.SchticksView do
     }
   end
 
+  @doc """
+  Render a schtick for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(schtick), do: render_schtick(schtick)
+
   defp render_schtick(schtick) do
     %{
       id: schtick.id,

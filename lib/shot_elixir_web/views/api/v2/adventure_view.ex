@@ -17,6 +17,12 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
     }
   end
 
+  @doc """
+  Render an adventure for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(adventure), do: render_adventure(adventure)
+
   defp render_adventure(adventure) do
     %{
       id: adventure.id,

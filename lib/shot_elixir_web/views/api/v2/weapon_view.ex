@@ -24,6 +24,12 @@ defmodule ShotElixirWeb.Api.V2.WeaponView do
     }
   end
 
+  @doc """
+  Render a weapon for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(weapon), do: render_weapon(weapon)
+
   defp render_weapon(weapon) do
     %{
       id: weapon.id,

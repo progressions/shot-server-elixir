@@ -17,6 +17,12 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
     }
   end
 
+  @doc """
+  Render a faction for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(faction), do: render_faction(faction)
+
   defp render_faction(faction) do
     %{
       id: faction.id,

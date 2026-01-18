@@ -56,6 +56,12 @@ defmodule ShotElixirWeb.Api.V2.FightView do
     }
   end
 
+  @doc """
+  Render a fight for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(fight), do: render_fight(fight)
+
   defp render_fight(fight) do
     %{
       id: fight.id,
