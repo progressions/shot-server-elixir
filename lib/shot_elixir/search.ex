@@ -8,6 +8,7 @@ defmodule ShotElixir.Search do
 
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
+  alias ShotElixir.ImageLoader
 
   alias ShotElixir.Characters.Character
   alias ShotElixir.Vehicles.Vehicle
@@ -114,9 +115,12 @@ defmodule ShotElixir.Search do
         limit: ^limit
       )
 
+    record_type = schema_to_entity_class(schema)
+
     base_query
     |> build_search_conditions(schema, search_term)
     |> Repo.all()
+    |> ImageLoader.load_image_urls(record_type)
     |> Enum.map(&format_result(&1, schema))
   end
 
@@ -161,7 +165,7 @@ defmodule ShotElixir.Search do
     %{
       id: entity.id,
       name: entity.name,
-      image_url: nil,
+      image_url: entity.image_url,
       entity_class: schema_to_entity_class(schema),
       description: extract_description(entity)
     }
@@ -171,14 +175,27 @@ defmodule ShotElixir.Search do
     desc
     |> Map.get("description", "")
     |> to_string()
+    |> strip_html_tags()
     |> String.slice(0, 100)
   end
 
   defp extract_description(%{description: desc}) when is_binary(desc) do
-    String.slice(desc, 0, 100)
+    desc
+    |> strip_html_tags()
+    |> String.slice(0, 100)
   end
 
   defp extract_description(_), do: nil
+
+  # Strip HTML tags from a string
+  defp strip_html_tags(nil), do: nil
+
+  defp strip_html_tags(text) when is_binary(text) do
+    text
+    |> String.replace(~r/<[^>]*>/, " ")
+    |> String.replace(~r/\s+/, " ")
+    |> String.trim()
+  end
 
   defp schema_to_entity_class(Character), do: "Character"
   defp schema_to_entity_class(Vehicle), do: "Vehicle"
