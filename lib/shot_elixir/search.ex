@@ -75,8 +75,8 @@ defmodule ShotElixir.Search do
     fields = schema.__schema__(:fields)
 
     cond do
-      # Characters have jsonb description
-      schema == Character ->
+      # Characters and Vehicles have jsonb description
+      schema in [Character, Vehicle] ->
         from(e in query,
           where:
             ilike(e.name, ^search_term) or
@@ -118,13 +118,11 @@ defmodule ShotElixir.Search do
     }
   end
 
-  defp get_image_url(entity) do
-    if function_exported?(entity.__struct__, :image_url, 1) do
-      entity.__struct__.image_url(entity)
-    else
-      nil
-    end
-  end
+  # Returns nil for image_url in search results.
+  # Virtual image_url fields on schemas are not populated when querying
+  # directly from the database, and calling ActiveStorage for each result
+  # would add significant overhead to search.
+  defp get_image_url(_entity), do: nil
 
   defp extract_description(%{description: desc}) when is_map(desc) do
     desc

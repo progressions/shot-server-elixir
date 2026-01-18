@@ -19,10 +19,10 @@ defmodule ShotElixirWeb.Api.V2.SearchController do
 
     unless campaign_id do
       conn
-      |> put_status(:bad_request)
-      |> json(%{error: "No current campaign set"})
+      |> put_status(:unprocessable_entity)
+      |> json(%{error: "No active campaign selected"})
     else
-      query = params["q"] |> to_string() |> String.trim()
+      query = (params["q"] || "") |> to_string() |> String.trim()
 
       if query == "" do
         conn
