@@ -1,9 +1,12 @@
 defmodule ShotElixir.Search do
   @moduledoc """
   Unified search across all entity types within a campaign.
+
+  Provides campaign-scoped search functionality that queries multiple entity
+  types in parallel and returns results grouped by type.
   """
 
-  import Ecto.Query
+  import Ecto.Query, warn: false
   alias ShotElixir.Repo
 
   alias ShotElixir.Characters.Character
@@ -17,56 +20,102 @@ defmodule ShotElixir.Search do
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Adventures.Adventure
 
-  @limit_per_type 5
+  @default_limit_per_type 5
+  @search_timeout_ms 5000
 
-  @searchable_models %{
-    "characters" => Character,
-    "vehicles" => Vehicle,
-    "fights" => Fight,
-    "sites" => Site,
-    "parties" => Party,
-    "factions" => Faction,
-    "schticks" => Schtick,
-    "weapons" => Weapon,
-    "junctures" => Juncture,
-    "adventures" => Adventure
+  # Maps entity type atoms to their schema modules
+  @searchable_schemas %{
+    characters: Character,
+    vehicles: Vehicle,
+    fights: Fight,
+    sites: Site,
+    parties: Party,
+    factions: Faction,
+    schticks: Schtick,
+    weapons: Weapon,
+    junctures: Juncture,
+    adventures: Adventure
   }
 
   @doc """
-  Search across all entity types for the given query within a campaign.
+  Search across all entity types within a campaign.
 
-  Returns a map of entity type keys to lists of matching results.
-  Each entity type is limited to #{@limit_per_type} results.
+  Returns a result map with:
+  - `results`: Map of entity type atoms to lists of matching results
+  - `meta`: Metadata including query, limit per type, and result counts
+
+  ## Options
+  - `:limit` - Maximum results per entity type (default: #{@default_limit_per_type})
+
+  ## Examples
+
+      iex> Search.search_campaign(campaign_id, "dragon")
+      %{
+        results: %{
+          characters: [%{id: "...", name: "Dragon Lord", ...}],
+          sites: [%{id: "...", name: "Dragon Palace", ...}]
+        },
+        meta: %{query: "dragon", limit_per_type: 5, total_count: 2}
+      }
   """
-  def search_all(campaign_id, query) when is_binary(query) and byte_size(query) > 0 do
+  def search_campaign(campaign_id, query, opts \\ [])
+
+  def search_campaign(campaign_id, query, opts) when is_binary(query) and byte_size(query) > 0 do
+    limit = Keyword.get(opts, :limit, @default_limit_per_type)
     search_term = "%#{query}%"
 
-    @searchable_models
-    |> Enum.map(fn {key, schema} ->
-      Task.async(fn ->
-        results = search_schema(schema, campaign_id, search_term)
-        {key, results}
+    results =
+      @searchable_schemas
+      |> Enum.map(fn {type, schema} ->
+        Task.async(fn ->
+          {type, search_schema(schema, campaign_id, search_term, limit)}
+        end)
       end)
-    end)
-    |> Task.await_many(5000)
-    |> Enum.filter(fn {_key, results} -> length(results) > 0 end)
-    |> Map.new()
+      |> Task.await_many(@search_timeout_ms)
+      |> Enum.filter(fn {_type, results} -> length(results) > 0 end)
+      |> Map.new()
+
+    total_count =
+      results
+      |> Map.values()
+      |> Enum.map(&length/1)
+      |> Enum.sum()
+
+    %{
+      results: results,
+      meta: %{
+        query: query,
+        limit_per_type: limit,
+        total_count: total_count
+      }
+    }
   end
 
-  def search_all(_campaign_id, _query), do: %{}
+  def search_campaign(_campaign_id, _query, opts) do
+    limit = Keyword.get(opts, :limit, @default_limit_per_type)
 
-  defp search_schema(schema, campaign_id, search_term) do
+    %{
+      results: %{},
+      meta: %{
+        query: "",
+        limit_per_type: limit,
+        total_count: 0
+      }
+    }
+  end
+
+  # Private helpers
+
+  defp search_schema(schema, campaign_id, search_term, limit) do
     base_query =
       from(e in schema,
         where: e.campaign_id == ^campaign_id,
         order_by: [asc: fragment("LOWER(?)", e.name)],
-        limit: @limit_per_type
+        limit: ^limit
       )
 
-    # Build search conditions based on schema fields
-    query = build_search_conditions(base_query, schema, search_term)
-
-    query
+    base_query
+    |> build_search_conditions(schema, search_term)
     |> Repo.all()
     |> Enum.map(&format_result(&1, schema))
   end
@@ -75,7 +124,7 @@ defmodule ShotElixir.Search do
     fields = schema.__schema__(:fields)
 
     cond do
-      # Characters and Vehicles have jsonb description
+      # Characters and Vehicles have JSONB description field
       schema in [Character, Vehicle] ->
         from(e in query,
           where:
@@ -112,17 +161,11 @@ defmodule ShotElixir.Search do
     %{
       id: entity.id,
       name: entity.name,
-      image_url: get_image_url(entity),
+      image_url: nil,
       entity_class: schema_to_entity_class(schema),
       description: extract_description(entity)
     }
   end
-
-  # Returns nil for image_url in search results.
-  # Virtual image_url fields on schemas are not populated when querying
-  # directly from the database, and calling ActiveStorage for each result
-  # would add significant overhead to search.
-  defp get_image_url(_entity), do: nil
 
   defp extract_description(%{description: desc}) when is_map(desc) do
     desc

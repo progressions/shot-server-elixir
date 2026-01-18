@@ -24,13 +24,20 @@ defmodule ShotElixir.SearchTest do
     %{campaign: campaign, user: user}
   end
 
-  describe "search_all/2" do
-    test "returns empty map for empty query", %{campaign: campaign} do
-      assert Search.search_all(campaign.id, "") == %{}
+  describe "search_campaign/3" do
+    test "returns empty results for empty query", %{campaign: campaign} do
+      result = Search.search_campaign(campaign.id, "")
+
+      assert %{results: %{}, meta: meta} = result
+      assert meta.query == ""
+      assert meta.total_count == 0
     end
 
-    test "returns empty map for nil query", %{campaign: campaign} do
-      assert Search.search_all(campaign.id, nil) == %{}
+    test "returns empty results for nil query", %{campaign: campaign} do
+      result = Search.search_campaign(campaign.id, nil)
+
+      assert %{results: %{}, meta: meta} = result
+      assert meta.total_count == 0
     end
 
     test "searches characters by name", %{campaign: campaign} do
@@ -41,11 +48,14 @@ defmodule ShotElixir.SearchTest do
           character_type: :pc
         })
 
-      results = Search.search_all(campaign.id, "Johnny")
+      result = Search.search_campaign(campaign.id, "Johnny")
 
-      assert %{"characters" => characters} = results
+      assert %{results: results, meta: meta} = result
+      assert %{characters: characters} = results
       assert length(characters) == 1
       assert hd(characters).name == "Johnny Tango"
+      assert meta.query == "Johnny"
+      assert meta.total_count == 1
     end
 
     test "searches characters by jsonb description", %{campaign: campaign} do
@@ -57,9 +67,10 @@ defmodule ShotElixir.SearchTest do
           description: %{"description" => "A kung fu master from Hong Kong"}
         })
 
-      results = Search.search_all(campaign.id, "kung fu")
+      result = Search.search_campaign(campaign.id, "kung fu")
 
-      assert %{"characters" => characters} = results
+      assert %{results: results} = result
+      assert %{characters: characters} = results
       assert length(characters) == 1
     end
 
@@ -71,9 +82,10 @@ defmodule ShotElixir.SearchTest do
           action_values: %{"Type" => "Car"}
         })
 
-      results = Search.search_all(campaign.id, "Porsche")
+      result = Search.search_campaign(campaign.id, "Porsche")
 
-      assert %{"vehicles" => vehicles} = results
+      assert %{results: results} = result
+      assert %{vehicles: vehicles} = results
       assert length(vehicles) == 1
       assert hd(vehicles).name == "Red Porsche"
     end
@@ -87,9 +99,10 @@ defmodule ShotElixir.SearchTest do
           description: %{"description" => "A sleek sports car"}
         })
 
-      results = Search.search_all(campaign.id, "sleek sports")
+      result = Search.search_campaign(campaign.id, "sleek sports")
 
-      assert %{"vehicles" => vehicles} = results
+      assert %{results: results} = result
+      assert %{vehicles: vehicles} = results
       assert length(vehicles) == 1
     end
 
@@ -102,13 +115,13 @@ defmodule ShotElixir.SearchTest do
         })
 
       # Search by name
-      results = Search.search_all(campaign.id, "Dragon")
-      assert %{"sites" => sites} = results
+      result = Search.search_campaign(campaign.id, "Dragon")
+      assert %{results: %{sites: sites}} = result
       assert length(sites) == 1
 
       # Search by description
-      results = Search.search_all(campaign.id, "feng shui")
-      assert %{"sites" => sites} = results
+      result = Search.search_campaign(campaign.id, "feng shui")
+      assert %{results: %{sites: sites}} = result
       assert length(sites) == 1
     end
 
@@ -120,9 +133,9 @@ defmodule ShotElixir.SearchTest do
           campaign_id: campaign.id
         })
 
-      results = Search.search_all(campaign.id, "Ascended")
+      result = Search.search_campaign(campaign.id, "Ascended")
 
-      assert %{"factions" => factions} = results
+      assert %{results: %{factions: factions}} = result
       assert length(factions) == 1
     end
 
@@ -134,9 +147,9 @@ defmodule ShotElixir.SearchTest do
           character_type: :pc
         })
 
-      results = Search.search_all(campaign.id, "johnny")
+      result = Search.search_campaign(campaign.id, "johnny")
 
-      assert %{"characters" => characters} = results
+      assert %{results: %{characters: characters}} = result
       assert length(characters) == 1
     end
 
@@ -148,9 +161,9 @@ defmodule ShotElixir.SearchTest do
           character_type: :pc
         })
 
-      results = Search.search_all(campaign.id, "ang")
+      result = Search.search_campaign(campaign.id, "ang")
 
-      assert %{"characters" => characters} = results
+      assert %{results: %{characters: characters}} = result
       assert length(characters) == 1
     end
 
@@ -176,13 +189,13 @@ defmodule ShotElixir.SearchTest do
           character_type: :pc
         })
 
-      results = Search.search_all(campaign.id, "Test")
+      result = Search.search_campaign(campaign.id, "Test")
 
-      assert %{"characters" => characters} = results
+      assert %{results: %{characters: characters}} = result
       assert length(characters) == 1
     end
 
-    test "limits results to 5 per entity type", %{campaign: campaign} do
+    test "limits results to 5 per entity type by default", %{campaign: campaign} do
       for i <- 1..7 do
         {:ok, _} =
           Characters.create_character(%{
@@ -192,10 +205,28 @@ defmodule ShotElixir.SearchTest do
           })
       end
 
-      results = Search.search_all(campaign.id, "Character")
+      result = Search.search_campaign(campaign.id, "Character")
 
-      assert %{"characters" => characters} = results
+      assert %{results: %{characters: characters}, meta: meta} = result
       assert length(characters) == 5
+      assert meta.limit_per_type == 5
+    end
+
+    test "respects custom limit option", %{campaign: campaign} do
+      for i <- 1..5 do
+        {:ok, _} =
+          Characters.create_character(%{
+            name: "Character #{i}",
+            campaign_id: campaign.id,
+            character_type: :pc
+          })
+      end
+
+      result = Search.search_campaign(campaign.id, "Character", limit: 3)
+
+      assert %{results: %{characters: characters}, meta: meta} = result
+      assert length(characters) == 3
+      assert meta.limit_per_type == 3
     end
 
     test "filters out empty result groups", %{campaign: campaign} do
@@ -206,10 +237,10 @@ defmodule ShotElixir.SearchTest do
           character_type: :pc
         })
 
-      results = Search.search_all(campaign.id, "Test")
+      result = Search.search_campaign(campaign.id, "Test")
 
       # Should only have characters key, not empty keys for other types
-      assert Map.keys(results) == ["characters"]
+      assert Map.keys(result.results) == [:characters]
     end
 
     test "returns multiple entity types when matching", %{campaign: campaign} do
@@ -227,10 +258,11 @@ defmodule ShotElixir.SearchTest do
           campaign_id: campaign.id
         })
 
-      results = Search.search_all(campaign.id, "Test")
+      result = Search.search_campaign(campaign.id, "Test")
 
-      assert Map.has_key?(results, "characters")
-      assert Map.has_key?(results, "sites")
+      assert Map.has_key?(result.results, :characters)
+      assert Map.has_key?(result.results, :sites)
+      assert result.meta.total_count == 2
     end
 
     test "result format includes expected fields", %{campaign: campaign} do
@@ -241,14 +273,14 @@ defmodule ShotElixir.SearchTest do
           character_type: :pc
         })
 
-      results = Search.search_all(campaign.id, "Test")
+      result = Search.search_campaign(campaign.id, "Test")
 
-      [result | _] = results["characters"]
-      assert result.id == character.id
-      assert result.name == "Test Character"
-      assert result.entity_class == "Character"
-      assert Map.has_key?(result, :image_url)
-      assert Map.has_key?(result, :description)
+      [item | _] = result.results[:characters]
+      assert item.id == character.id
+      assert item.name == "Test Character"
+      assert item.entity_class == "Character"
+      assert Map.has_key?(item, :image_url)
+      assert Map.has_key?(item, :description)
     end
 
     test "image_url is nil in search results", %{campaign: campaign} do
@@ -259,10 +291,25 @@ defmodule ShotElixir.SearchTest do
           character_type: :pc
         })
 
-      results = Search.search_all(campaign.id, "Test")
+      result = Search.search_campaign(campaign.id, "Test")
 
-      [result | _] = results["characters"]
-      assert is_nil(result.image_url)
+      [item | _] = result.results[:characters]
+      assert is_nil(item.image_url)
+    end
+
+    test "meta includes query and counts", %{campaign: campaign} do
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Test Character",
+          campaign_id: campaign.id,
+          character_type: :pc
+        })
+
+      result = Search.search_campaign(campaign.id, "Test")
+
+      assert result.meta.query == "Test"
+      assert result.meta.limit_per_type == 5
+      assert result.meta.total_count == 1
     end
   end
 end
