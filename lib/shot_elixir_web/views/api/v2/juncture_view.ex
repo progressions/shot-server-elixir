@@ -17,6 +17,12 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
     }
   end
 
+  @doc """
+  Render a juncture for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(juncture), do: render_juncture(juncture)
+
   defp render_juncture(juncture) do
     %{
       id: juncture.id,

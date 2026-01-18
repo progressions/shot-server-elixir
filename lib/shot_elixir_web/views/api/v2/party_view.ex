@@ -24,6 +24,12 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     }
   end
 
+  @doc """
+  Render a party for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(party), do: render_party(party)
+
   defp render_party(party) do
     slots = render_slots_if_loaded(party)
 

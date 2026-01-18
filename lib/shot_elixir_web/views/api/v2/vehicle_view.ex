@@ -46,6 +46,26 @@ defmodule ShotElixirWeb.Api.V2.VehicleView do
     }
   end
 
+  @doc """
+  Render a vehicle for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(vehicle) do
+    render_vehicle(vehicle)
+    |> maybe_add_faction(vehicle)
+  end
+
+  defp maybe_add_faction(base, vehicle) do
+    faction =
+      case Map.get(vehicle, :faction) do
+        %Ecto.Association.NotLoaded{} -> nil
+        nil -> nil
+        faction -> render_faction(faction)
+      end
+
+    Map.put(base, :faction, faction)
+  end
+
   defp render_vehicle(vehicle) do
     %{
       id: vehicle.id,

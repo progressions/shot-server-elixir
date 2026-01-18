@@ -18,6 +18,12 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     }
   end
 
+  @doc """
+  Render a site for search results or index listings.
+  Public function for use by SearchView and other views.
+  """
+  def render_for_index(site), do: render_site(site)
+
   defp render_site(site) do
     %{
       id: site.id,
