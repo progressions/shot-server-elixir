@@ -7,6 +7,7 @@ defmodule ShotElixir.Accounts do
   alias ShotElixir.Repo
   alias ShotElixir.Accounts.User
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
 
   def list_users do
     User
@@ -288,14 +289,17 @@ defmodule ShotElixir.Accounts do
   end
 
   def get_user!(id) do
+    id = Slug.extract_uuid(id)
+
     Repo.get!(User, id)
     |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("User")
   end
 
   def get_user(id) do
-    Repo.get(User, id)
-    |> case do
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(User, id) do
       nil ->
         nil
 

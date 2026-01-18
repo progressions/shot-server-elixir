@@ -1767,6 +1767,11 @@ defmodule ShotElixir.Discord.CommandsTest do
           active: true
         })
 
+      # Ensure Second Fighter is the most recently updated
+      char2
+      |> Ecto.Changeset.change(%{updated_at: DateTime.add(now, 1, :second)})
+      |> Repo.update!()
+
       # Create a fight
       {:ok, fight} =
         Fights.create_fight(%{

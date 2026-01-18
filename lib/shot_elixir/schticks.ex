@@ -7,6 +7,7 @@ defmodule ShotElixir.Schticks do
   alias ShotElixir.Repo
   alias ShotElixir.Schticks.Schtick
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
@@ -331,6 +332,8 @@ defmodule ShotElixir.Schticks do
   end
 
   def get_schtick!(id) do
+    id = Slug.extract_uuid(id)
+
     Schtick
     |> preload(:prerequisite)
     |> Repo.get!(id)
@@ -338,6 +341,8 @@ defmodule ShotElixir.Schticks do
   end
 
   def get_schtick(id) do
+    id = Slug.extract_uuid(id)
+
     Schtick
     |> preload(:prerequisite)
     |> Repo.get(id)

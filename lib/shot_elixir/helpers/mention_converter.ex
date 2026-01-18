@@ -23,6 +23,10 @@ defmodule ShotElixir.Helpers.MentionConverter do
   alias ShotElixir.Adventures.Adventure
   alias ShotElixir.Vehicles.Vehicle
   alias ShotElixir.Campaigns.Campaign
+  alias ShotElixir.Weapons.Weapon
+  alias ShotElixir.Schticks.Schtick
+  alias ShotElixir.Fights.Fight
+  alias ShotElixir.Slug
 
   import Ecto.Query
 
@@ -210,7 +214,7 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp mention_to_notion_rich_text(%{entity_type: entity_type, id: id, label: label})
        when not is_nil(entity_type) do
     # No Notion page - use chiwar.net URL link
-    url = build_chiwar_url_from_entity(entity_type, id)
+    url = build_chiwar_url_from_entity(entity_type, id, label)
 
     %{
       "type" => "text",
@@ -230,9 +234,10 @@ defmodule ShotElixir.Helpers.MentionConverter do
   end
 
   # Build chiwar.net URL from entity type and ID
-  defp build_chiwar_url_from_entity(entity_type, id) do
+  defp build_chiwar_url_from_entity(entity_type, id, name) do
     path_segment = entity_type_to_url_segment(entity_type)
-    "https://chiwar.net/#{path_segment}/#{id}"
+    slugged_id = Slug.slugged_id(name, id)
+    "https://chiwar.net/#{path_segment}/#{slugged_id}"
   end
 
   # Convert entity type to URL path segment
@@ -243,6 +248,11 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp entity_type_to_url_segment(:juncture), do: "junctures"
   defp entity_type_to_url_segment(:adventure), do: "adventures"
   defp entity_type_to_url_segment(:vehicle), do: "vehicles"
+  defp entity_type_to_url_segment(:weapon), do: "weapons"
+  defp entity_type_to_url_segment(:schtick), do: "schticks"
+  defp entity_type_to_url_segment(:campaign), do: "campaigns"
+  defp entity_type_to_url_segment(:fight), do: "fights"
+  defp entity_type_to_url_segment(:user), do: "users"
   defp entity_type_to_url_segment(_), do: "unknown"
 
   # =============================================================================
@@ -394,7 +404,12 @@ defmodule ShotElixir.Helpers.MentionConverter do
       String.starts_with?(url, "/factions") or
       String.starts_with?(url, "/junctures") or
       String.starts_with?(url, "/adventures") or
-      String.starts_with?(url, "/vehicles")
+      String.starts_with?(url, "/vehicles") or
+      String.starts_with?(url, "/weapons") or
+      String.starts_with?(url, "/schticks") or
+      String.starts_with?(url, "/campaigns") or
+      String.starts_with?(url, "/fights") or
+      String.starts_with?(url, "/users")
   end
 
   defp is_chiwar_url?(_), do: false
@@ -415,12 +430,17 @@ defmodule ShotElixir.Helpers.MentionConverter do
       {"factions", :faction},
       {"junctures", :juncture},
       {"adventures", :adventure},
-      {"vehicles", :vehicle}
+      {"vehicles", :vehicle},
+      {"weapons", :weapon},
+      {"schticks", :schtick},
+      {"campaigns", :campaign},
+      {"fights", :fight},
+      {"users", :user}
     ]
 
     Enum.find_value(entity_types, :error, fn {url_segment, entity_type} ->
-      case Regex.run(~r/\/#{url_segment}\/([a-f0-9-]+)/, path) do
-        [_, id] -> {:ok, entity_type, id}
+      case Regex.run(~r/\/#{url_segment}\/([A-Za-z0-9-]+)/, path) do
+        [_, raw_id] -> {:ok, entity_type, Slug.extract_uuid(raw_id)}
         _ -> nil
       end
     end)
@@ -446,6 +466,11 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp entity_type_to_class_name(:juncture), do: "Juncture"
   defp entity_type_to_class_name(:adventure), do: "Adventure"
   defp entity_type_to_class_name(:vehicle), do: "Vehicle"
+  defp entity_type_to_class_name(:weapon), do: "Weapon"
+  defp entity_type_to_class_name(:schtick), do: "Schtick"
+  defp entity_type_to_class_name(:campaign), do: "Campaign"
+  defp entity_type_to_class_name(:fight), do: "Fight"
+  defp entity_type_to_class_name(:user), do: "User"
   defp entity_type_to_class_name(_), do: "Unknown"
 
   # =============================================================================
@@ -458,6 +483,8 @@ defmodule ShotElixir.Helpers.MentionConverter do
   """
   @spec lookup_entity_for_mention(String.t(), entity_type() | nil, Campaign.t()) :: map()
   def lookup_entity_for_mention(id, entity_type, %Campaign{} = campaign) do
+    id = Slug.extract_uuid(id)
+
     case entity_type do
       nil ->
         %{entity_type: nil, notion_page_id: nil}
@@ -484,6 +511,11 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp class_name_to_entity_type("Juncture"), do: :juncture
   defp class_name_to_entity_type("Adventure"), do: :adventure
   defp class_name_to_entity_type("Vehicle"), do: :vehicle
+  defp class_name_to_entity_type("Weapon"), do: :weapon
+  defp class_name_to_entity_type("Schtick"), do: :schtick
+  defp class_name_to_entity_type("Campaign"), do: :campaign
+  defp class_name_to_entity_type("Fight"), do: :fight
+  defp class_name_to_entity_type("User"), do: :user
   defp class_name_to_entity_type(_), do: nil
 
   # Find entity by type and ID
@@ -606,7 +638,10 @@ defmodule ShotElixir.Helpers.MentionConverter do
   defp entity_type_to_schema(:juncture), do: Juncture
   defp entity_type_to_schema(:adventure), do: Adventure
   defp entity_type_to_schema(:vehicle), do: Vehicle
-  # Weapons and Schticks don't have notion_page_id, so no schema mapping
+  defp entity_type_to_schema(:weapon), do: Weapon
+  defp entity_type_to_schema(:schtick), do: Schtick
+  # :campaign and :user don't have campaign_id; letting them fall through avoids bad filters
+  defp entity_type_to_schema(:fight), do: Fight
   defp entity_type_to_schema(_), do: nil
 
   # =============================================================================

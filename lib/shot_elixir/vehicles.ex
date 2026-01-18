@@ -7,6 +7,7 @@ defmodule ShotElixir.Vehicles do
   alias ShotElixir.Repo
   alias ShotElixir.Vehicles.Vehicle
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   use ShotElixir.Models.Broadcastable
 
@@ -425,15 +426,25 @@ defmodule ShotElixir.Vehicles do
   end
 
   def get_vehicle!(id) do
+    id = Slug.extract_uuid(id)
+
     Repo.get!(Vehicle, id)
     |> Repo.preload([:image_positions])
     |> ImageLoader.load_image_url("Vehicle")
   end
 
   def get_vehicle(id) do
-    Repo.get(Vehicle, id)
-    |> Repo.preload([:image_positions])
-    |> ImageLoader.load_image_url("Vehicle")
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(Vehicle, id) do
+      nil ->
+        nil
+
+      vehicle ->
+        vehicle
+        |> Repo.preload([:image_positions])
+        |> ImageLoader.load_image_url("Vehicle")
+    end
   end
 
   @doc """
@@ -454,9 +465,12 @@ defmodule ShotElixir.Vehicles do
   end
 
   def get_vehicle_with_preloads(id) do
-    Vehicle
-    |> Repo.get(id)
-    |> Repo.preload([:user, :faction, :image_positions])
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(Vehicle, id) do
+      nil -> nil
+      vehicle -> Repo.preload(vehicle, [:user, :faction, :image_positions])
+    end
   end
 
   def create_vehicle(attrs \\ %{}) do

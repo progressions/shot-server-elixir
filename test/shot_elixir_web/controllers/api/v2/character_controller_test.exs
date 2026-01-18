@@ -7,6 +7,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerTest do
   - character_controller_authorization_test.exs - Authorization and ownership
   - character_controller_features_test.exs - Association rendering, wounds, impairments
   """
+  # Keep async to match the rest of the controller suite; flaky DB checkout was addressed by
+  # reducing contention in the calling tests rather than disabling async.
   use ShotElixirWeb.ConnCase, async: true
 
   alias ShotElixir.{

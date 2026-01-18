@@ -7,6 +7,7 @@ defmodule ShotElixir.Sites do
   alias ShotElixir.Repo
   alias ShotElixir.Sites.{Site, Attunement}
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   alias ShotElixir.Workers.SyncSiteToNotionWorker
   use ShotElixir.Models.Broadcastable
@@ -289,6 +290,8 @@ defmodule ShotElixir.Sites do
   end
 
   def get_site!(id) do
+    id = Slug.extract_uuid(id)
+
     Site
     |> preload([:faction, :juncture, :image_positions, attunements: [:character]])
     |> Repo.get!(id)
@@ -296,6 +299,8 @@ defmodule ShotElixir.Sites do
   end
 
   def get_site(id) do
+    id = Slug.extract_uuid(id)
+
     Site
     |> preload([:faction, :juncture, :image_positions, attunements: [:character]])
     |> Repo.get(id)

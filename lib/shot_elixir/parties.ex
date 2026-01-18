@@ -7,6 +7,7 @@ defmodule ShotElixir.Parties do
   alias ShotElixir.Repo
   alias ShotElixir.Parties.{Party, Membership, PartyTemplate}
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   alias ShotElixir.Workers.SyncPartyToNotionWorker
   use ShotElixir.Models.Broadcastable
@@ -317,6 +318,8 @@ defmodule ShotElixir.Parties do
   end
 
   def get_party!(id) do
+    id = Slug.extract_uuid(id)
+
     Party
     |> preload([:faction, :juncture, :image_positions, memberships: [:character, :vehicle]])
     |> Repo.get!(id)
@@ -324,6 +327,8 @@ defmodule ShotElixir.Parties do
   end
 
   def get_party(id) do
+    id = Slug.extract_uuid(id)
+
     Party
     |> preload([:faction, :juncture, :image_positions, memberships: [:character, :vehicle]])
     |> Repo.get(id)

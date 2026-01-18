@@ -7,6 +7,7 @@ defmodule ShotElixir.Junctures do
   alias ShotElixir.Repo
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   use ShotElixir.Models.Broadcastable
 
   def list_junctures(campaign_id) do
@@ -283,18 +284,24 @@ defmodule ShotElixir.Junctures do
   end
 
   def get_juncture!(id) do
+    id = Slug.extract_uuid(id)
+
     Juncture
     |> preload([:faction, :image_positions])
     |> Repo.get!(id)
   end
 
   def get_juncture(id) do
+    id = Slug.extract_uuid(id)
+
     Juncture
     |> preload([:faction, :image_positions])
     |> Repo.get(id)
   end
 
   def get_juncture_with_preloads(id) do
+    id = Slug.extract_uuid(id)
+
     Juncture
     |> preload([:faction, :image_positions, :characters, :vehicles])
     |> Repo.get(id)

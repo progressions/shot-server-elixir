@@ -7,6 +7,7 @@ defmodule ShotElixir.Factions do
   alias ShotElixir.Repo
   alias ShotElixir.Factions.Faction
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   alias ShotElixir.Workers.ImageCopyWorker
   alias ShotElixir.Workers.SyncFactionToNotionWorker
   use ShotElixir.Models.Broadcastable
@@ -290,12 +291,16 @@ defmodule ShotElixir.Factions do
   end
 
   def get_faction!(id) do
+    id = Slug.extract_uuid(id)
+
     Repo.get!(Faction, id)
     |> Repo.preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
     |> ImageLoader.load_image_url("Faction")
   end
 
   def get_faction(id) do
+    id = Slug.extract_uuid(id)
+
     case Repo.get(Faction, id) do
       nil ->
         nil

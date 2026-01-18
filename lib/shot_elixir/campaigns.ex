@@ -8,6 +8,7 @@ defmodule ShotElixir.Campaigns do
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Campaigns.CampaignMembership
   alias ShotElixir.ImageLoader
+  alias ShotElixir.Slug
   use ShotElixir.Models.Broadcastable
 
   def list_campaigns do
@@ -17,15 +18,25 @@ defmodule ShotElixir.Campaigns do
   end
 
   def get_campaign!(id) do
+    id = Slug.extract_uuid(id)
+
     Repo.get!(Campaign, id)
     |> Repo.preload([:user, :image_positions])
     |> ImageLoader.load_image_url("Campaign")
   end
 
   def get_campaign(id) do
-    Repo.get(Campaign, id)
-    |> Repo.preload([:user, :members, :image_positions])
-    |> ImageLoader.load_image_url("Campaign")
+    id = Slug.extract_uuid(id)
+
+    case Repo.get(Campaign, id) do
+      nil ->
+        nil
+
+      campaign ->
+        campaign
+        |> Repo.preload([:user, :members, :image_positions])
+        |> ImageLoader.load_image_url("Campaign")
+    end
   end
 
   def get_user_campaigns(user_id) do
