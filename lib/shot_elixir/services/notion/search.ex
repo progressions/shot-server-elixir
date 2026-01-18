@@ -41,14 +41,17 @@ defmodule ShotElixir.Services.Notion.Search do
   end
 
   def find_pages_in_database(data_source_id, name, opts \\ []) do
+    # Normalize search term by stripping common prefixes like "The "
+    normalized_name = normalize_search_term(name)
+
     filter =
-      if name == "" do
+      if normalized_name == "" do
         %{}
       else
         %{
           "filter" => %{
             "property" => "Name",
-            "title" => %{"contains" => name}
+            "title" => %{"contains" => normalized_name}
           }
         }
       end
@@ -108,5 +111,16 @@ defmodule ShotElixir.Services.Notion.Search do
         Logger.error("Failed to resolve Notion data source for factions: #{inspect(reason)}")
         []
     end
+  end
+
+  # Strip common prefixes like "The " to make search more lenient
+  # "The Guiding Hand" -> "Guiding Hand"
+  defp normalize_search_term(nil), do: ""
+  defp normalize_search_term(""), do: ""
+
+  defp normalize_search_term(name) when is_binary(name) do
+    name
+    |> String.trim()
+    |> String.replace(~r/^(The|A|An)\s+/i, "")
   end
 end
