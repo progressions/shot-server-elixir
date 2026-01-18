@@ -27,7 +27,7 @@ defmodule ShotElixirWeb.Api.V2.SearchController do
       |> put_view(ShotElixirWeb.Api.V2.SearchView)
       |> render("index.json", result)
     else
-      {:error, :no_campaign} -> {:error, :unprocessable_entity}
+      {:error, :no_campaign} -> {:error, "No active campaign selected"}
       nil -> {:error, :not_found}
       {:error, :forbidden} -> {:error, :forbidden}
     end
