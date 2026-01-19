@@ -67,3 +67,11 @@ config :shot_elixir, :campaign_seeding, enabled: false
 
 # Allow test image URLs used in fixtures
 config :shot_elixir, :image_download, allowed_hosts: [~r/\.imagekit\.io$/, ~r/^example\.com$/]
+
+# Grok API placeholder key for tests - prevents api_key() from raising
+# Actual API calls will fail with 401/403 which is handled gracefully
+config :shot_elixir, :grok, api_key: "test-placeholder-key"
+
+# Notion API placeholder token for tests - prevents :no_notion_oauth_token errors
+# Tests use stubbed clients so actual API calls aren't made
+config :shot_elixir, :notion, token: "test-placeholder-notion-token"
