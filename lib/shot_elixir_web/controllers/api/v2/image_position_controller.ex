@@ -120,6 +120,7 @@ defmodule ShotElixirWeb.Api.V2.ImagePositionController do
   end
 
   @positionable_modules %{
+    "Adventure" => ShotElixir.Adventures.Adventure,
     "Campaign" => ShotElixir.Campaigns.Campaign,
     "Character" => ShotElixir.Characters.Character,
     "Faction" => ShotElixir.Factions.Faction,
