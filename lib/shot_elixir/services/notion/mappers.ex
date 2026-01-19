@@ -203,6 +203,80 @@ defmodule ShotElixir.Services.Notion.Mappers do
     end
   end
 
+  @doc """
+  Extract hero character IDs from a Notion page's "Heroes" relation property.
+  Returns {:ok, character_ids} if the relation is found, :skip otherwise.
+  """
+  def hero_ids_from_notion(page, campaign_id) do
+    relation = get_in(page, ["properties", "Heroes", "relation"])
+
+    case relation do
+      nil ->
+        :skip
+
+      relations when is_list(relations) ->
+        page_ids =
+          relations
+          |> Enum.map(& &1["id"])
+          |> Enum.filter(&is_binary/1)
+
+        character_ids =
+          case page_ids do
+            [] ->
+              []
+
+            _ ->
+              from(c in Character,
+                where: c.notion_page_id in ^page_ids and c.campaign_id == ^campaign_id,
+                select: c.id
+              )
+              |> Repo.all()
+          end
+
+        {:ok, character_ids}
+
+      _ ->
+        :skip
+    end
+  end
+
+  @doc """
+  Extract villain character IDs from a Notion page's "Villains" relation property.
+  Returns {:ok, character_ids} if the relation is found, :skip otherwise.
+  """
+  def villain_ids_from_notion(page, campaign_id) do
+    relation = get_in(page, ["properties", "Villains", "relation"])
+
+    case relation do
+      nil ->
+        :skip
+
+      relations when is_list(relations) ->
+        page_ids =
+          relations
+          |> Enum.map(& &1["id"])
+          |> Enum.filter(&is_binary/1)
+
+        character_ids =
+          case page_ids do
+            [] ->
+              []
+
+            _ ->
+              from(c in Character,
+                where: c.notion_page_id in ^page_ids and c.campaign_id == ^campaign_id,
+                select: c.id
+              )
+              |> Repo.all()
+          end
+
+        {:ok, character_ids}
+
+      _ ->
+        :skip
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------

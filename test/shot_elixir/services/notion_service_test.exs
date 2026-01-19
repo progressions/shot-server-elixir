@@ -220,6 +220,28 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
+  defmodule NotionClientStubAdventureWithHeroesVillains do
+    def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+    # Use valid UUID format for Notion page IDs
+    def hero_notion_id, do: "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+    def villain_notion_id, do: "b2c3d4e5-f6a7-8901-bcde-f23456789012"
+
+    def get_page(page_id, _opts \\ []) do
+      %{
+        "id" => page_id,
+        "properties" => %{
+          "Name" => %{"title" => [%{"plain_text" => "Adventure with Heroes"}]},
+          "Description" => %{"rich_text" => [%{"plain_text" => "Epic adventure"}]},
+          "At a Glance" => %{"checkbox" => false},
+          "Heroes" => %{"relation" => [%{"id" => hero_notion_id()}]},
+          "Villains" => %{"relation" => [%{"id" => villain_notion_id()}]}
+        },
+        "last_edited_by" => %{"id" => "some-other-user-id"}
+      }
+    end
+  end
+
   describe "handle_archived_page/4" do
     setup do
       {:ok, user} =
@@ -703,6 +725,48 @@ defmodule ShotElixir.Services.NotionServiceTest do
         )
 
       assert updated_adventure.description == "<p>Adventure Desc</p>"
+    end
+
+    test "update_adventure_from_notion syncs heroes and villains from Notion relations", %{
+      adventure: adventure,
+      campaign: campaign
+    } do
+      # Create characters with Notion page IDs matching the stub
+      {:ok, hero} =
+        Characters.create_character(%{
+          name: "Hero Character",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubAdventureWithHeroesVillains.hero_notion_id()
+        })
+
+      {:ok, villain} =
+        Characters.create_character(%{
+          name: "Villain Character",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubAdventureWithHeroesVillains.villain_notion_id()
+        })
+
+      # Verify adventure has no characters initially
+      loaded_adventure = Adventures.get_adventure!(adventure.id)
+      assert Enum.empty?(loaded_adventure.adventure_characters)
+      assert Enum.empty?(loaded_adventure.adventure_villains)
+
+      # Update adventure from Notion
+      {:ok, updated_adventure} =
+        NotionService.update_adventure_from_notion(adventure,
+          client: NotionClientStubAdventureWithHeroesVillains
+        )
+
+      # Reload to get associations
+      reloaded = Adventures.get_adventure!(updated_adventure.id)
+
+      # Verify hero was synced
+      hero_ids = Enum.map(reloaded.adventure_characters, & &1.character_id)
+      assert hero.id in hero_ids
+
+      # Verify villain was synced
+      villain_ids = Enum.map(reloaded.adventure_villains, & &1.character_id)
+      assert villain.id in villain_ids
     end
   end
 
