@@ -136,7 +136,7 @@ defmodule ShotElixir.Services.Notion.Search do
   #
   # Examples:
   #   "Gambler's Journey" -> "Journey" (only word without apostrophe)
-  #   "O'Brien's O'Malley's" -> "OBriens" (fallback: strip apostrophes, take longest)
+  #   "O'Brien's O'Malley's" -> "OMalleys" (fallback: strip apostrophes, take longest)
   #   "Regular Name" -> "Regular Name" (no apostrophes, unchanged)
   defp handle_apostrophes(name) do
     # Check if name contains any apostrophe variant
