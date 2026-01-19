@@ -47,27 +47,34 @@ defmodule ShotElixir.Application do
   end
 
   # Discord children are only started if a valid token is configured
-  # Nostrum is a normal dependency that auto-starts, but only connects if token is valid
+  # Skip entirely in test environment to avoid CI failures
   defp discord_children do
     require Logger
-    token = Application.get_env(:nostrum, :token)
 
-    if valid_discord_token?(token) do
-      Logger.info("DISCORD: Valid token found, starting Discord consumer")
-
-      [
-        # Discord bot consumer
-        ShotElixir.Discord.Consumer,
-        # Discord current fight Agent
-        ShotElixir.Discord.CurrentFight,
-        # Discord current campaign Agent (maps server_id -> campaign_id)
-        ShotElixir.Discord.CurrentCampaign,
-        # Discord link codes Agent (temporary codes for account linking)
-        ShotElixir.Discord.LinkCodes
-      ]
-    else
-      Logger.info("DISCORD: No valid token configured, skipping Discord bot")
+    # Never start Discord in test environment
+    if Application.get_env(:shot_elixir, :environment) == :test do
+      Logger.info("DISCORD: Test environment, skipping Discord bot")
       []
+    else
+      token = Application.get_env(:nostrum, :token)
+
+      if valid_discord_token?(token) do
+        Logger.info("DISCORD: Valid token found, starting Discord consumer")
+
+        [
+          # Discord bot consumer
+          ShotElixir.Discord.Consumer,
+          # Discord current fight Agent
+          ShotElixir.Discord.CurrentFight,
+          # Discord current campaign Agent (maps server_id -> campaign_id)
+          ShotElixir.Discord.CurrentCampaign,
+          # Discord link codes Agent (temporary codes for account linking)
+          ShotElixir.Discord.LinkCodes
+        ]
+      else
+        Logger.info("DISCORD: No valid token configured, skipping Discord bot")
+        []
+      end
     end
   end
 
