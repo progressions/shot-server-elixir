@@ -28,3 +28,4 @@ shot_elixir-*.tar
 # Local tool version config
 mise.toml
 
+.env
