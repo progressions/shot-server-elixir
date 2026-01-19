@@ -94,12 +94,16 @@ defmodule ShotElixir.Services.Notion.Mappers do
     |> maybe_put_if_not_nil(:ended_at, get_date_content(props, "Ended"))
   end
 
+  @doc """
+  Fetch rich description from Notion page blocks and add to attributes.
+  Uses string keys to maintain consistency with other attribute maps.
+  """
   def add_rich_description(attributes, page_id, campaign_id, token) do
     case Blocks.fetch_rich_description(page_id, campaign_id, token) do
       {:ok, %{markdown: markdown, mentions: mentions}} ->
         attributes
-        |> Map.put(:rich_description, markdown)
-        |> Map.put(:mentions, mentions)
+        |> Map.put("rich_description", markdown)
+        |> Map.put("mentions", mentions)
 
       {:error, reason} ->
         Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")
@@ -129,167 +133,87 @@ defmodule ShotElixir.Services.Notion.Mappers do
     |> Map.put("People", %{"relation" => Enum.map(people_ids, &%{"id" => &1})})
   end
 
+  @doc """
+  Extract character IDs from a Notion page's relation property.
+  Tries property names in order: "People", "Characters", "Natives".
+  Returns {:ok, character_ids} if the relation is found, :skip otherwise.
+  """
   def character_ids_from_notion(page, campaign_id) do
-    relation =
-      ["People", "Characters", "Natives"]
-      |> Enum.find_value(fn key ->
-        case get_in(page, ["properties", key, "relation"]) do
-          relations when is_list(relations) -> relations
-          _ -> nil
-        end
-      end)
-
-    case relation do
-      nil ->
-        :skip
-
-      relations ->
-        page_ids =
-          relations
-          |> Enum.map(& &1["id"])
-          |> Enum.filter(&is_binary/1)
-
-        character_ids =
-          case page_ids do
-            [] ->
-              []
-
-            _ ->
-              from(c in Character,
-                where: c.notion_page_id in ^page_ids and c.campaign_id == ^campaign_id,
-                select: c.id
-              )
-              |> Repo.all()
-          end
-
-        {:ok, character_ids}
-    end
-  end
-
-  def site_ids_from_notion(page, campaign_id) do
-    relation =
-      ["Locations", "Sites"]
-      |> Enum.find_value(fn key ->
-        case get_in(page, ["properties", key, "relation"]) do
-          relations when is_list(relations) -> relations
-          _ -> nil
-        end
-      end)
-
-    case relation do
-      nil ->
-        :skip
-
-      relations ->
-        page_ids =
-          relations
-          |> Enum.map(& &1["id"])
-          |> Enum.filter(&is_binary/1)
-
-        site_ids =
-          case page_ids do
-            [] ->
-              []
-
-            _ ->
-              from(s in Site,
-                where: s.notion_page_id in ^page_ids and s.campaign_id == ^campaign_id,
-                select: s.id
-              )
-              |> Repo.all()
-          end
-
-        {:ok, site_ids}
-    end
+    relation_ids_from_notion(page, campaign_id, ["People", "Characters", "Natives"], Character)
   end
 
   @doc """
-  Extract hero character IDs from a Notion page's character relation property.
-  Tries multiple property names: "Character", "Characters", "Heroes".
+  Extract site IDs from a Notion page's relation property.
+  Tries property names in order: "Locations", "Sites".
+  Returns {:ok, site_ids} if the relation is found, :skip otherwise.
+  """
+  def site_ids_from_notion(page, campaign_id) do
+    relation_ids_from_notion(page, campaign_id, ["Locations", "Sites"], Site)
+  end
+
+  @doc """
+  Extract hero character IDs from a Notion page's hero relation property.
+  Tries property names in order: "Character", "Characters", "Heroes".
+  Note: "Character"/"Characters" are checked here for adventures that use
+  singular naming conventions, distinct from the "People"/"Natives" relations
+  used by character_ids_from_notion/2 for junctures/parties.
   Returns {:ok, character_ids} if the relation is found, :skip otherwise.
   """
   def hero_ids_from_notion(page, campaign_id) do
-    relation =
-      ["Character", "Characters", "Heroes"]
-      |> Enum.find_value(fn key ->
-        case get_in(page, ["properties", key, "relation"]) do
-          relations when is_list(relations) -> relations
-          _ -> nil
-        end
-      end)
-
-    case relation do
-      nil ->
-        :skip
-
-      relations ->
-        page_ids =
-          relations
-          |> Enum.map(& &1["id"])
-          |> Enum.filter(&is_binary/1)
-
-        character_ids =
-          case page_ids do
-            [] ->
-              []
-
-            _ ->
-              from(c in Character,
-                where: c.notion_page_id in ^page_ids and c.campaign_id == ^campaign_id,
-                select: c.id
-              )
-              |> Repo.all()
-          end
-
-        {:ok, character_ids}
-    end
+    relation_ids_from_notion(page, campaign_id, ["Character", "Characters", "Heroes"], Character)
   end
 
   @doc """
   Extract villain character IDs from a Notion page's villain relation property.
-  Tries multiple property names: "Villains", "Villain", "Antagonists".
+  Tries property names in order: "Villains", "Villain", "Antagonists".
   Returns {:ok, character_ids} if the relation is found, :skip otherwise.
   """
   def villain_ids_from_notion(page, campaign_id) do
-    relation =
-      ["Villains", "Villain", "Antagonists"]
-      |> Enum.find_value(fn key ->
-        case get_in(page, ["properties", key, "relation"]) do
-          relations when is_list(relations) -> relations
-          _ -> nil
-        end
-      end)
-
-    case relation do
-      nil ->
-        :skip
-
-      relations ->
-        page_ids =
-          relations
-          |> Enum.map(& &1["id"])
-          |> Enum.filter(&is_binary/1)
-
-        character_ids =
-          case page_ids do
-            [] ->
-              []
-
-            _ ->
-              from(c in Character,
-                where: c.notion_page_id in ^page_ids and c.campaign_id == ^campaign_id,
-                select: c.id
-              )
-              |> Repo.all()
-          end
-
-        {:ok, character_ids}
-    end
+    relation_ids_from_notion(page, campaign_id, ["Villains", "Villain", "Antagonists"], Character)
   end
 
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # Shared helper for extracting entity IDs from Notion relation properties.
+  # Tries each property name in order until one is found with a relation.
+  defp relation_ids_from_notion(page, campaign_id, property_names, schema) do
+    relation =
+      property_names
+      |> Enum.find_value(fn key ->
+        case get_in(page, ["properties", key, "relation"]) do
+          relations when is_list(relations) -> relations
+          _ -> nil
+        end
+      end)
+
+    case relation do
+      nil ->
+        :skip
+
+      relations ->
+        page_ids =
+          relations
+          |> Enum.map(& &1["id"])
+          |> Enum.filter(&is_binary/1)
+
+        ids =
+          case page_ids do
+            [] ->
+              []
+
+            _ ->
+              from(entity in schema,
+                where: entity.notion_page_id in ^page_ids and entity.campaign_id == ^campaign_id,
+                select: entity.id
+              )
+              |> Repo.all()
+          end
+
+        {:ok, ids}
+    end
+  end
 
   defp get_rich_text_content(props, key) do
     props
