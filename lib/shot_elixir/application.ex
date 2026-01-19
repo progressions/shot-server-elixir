@@ -47,13 +47,21 @@ defmodule ShotElixir.Application do
   end
 
   # Discord children are only started if a valid token is configured
-  # Nostrum is a normal dependency that auto-starts, but only connects if token is valid
+  # Nostrum has runtime: false in mix.exs, so we manually start it here only if token is valid
   defp discord_children do
     require Logger
     token = Application.get_env(:nostrum, :token)
 
     if valid_discord_token?(token) do
-      Logger.info("DISCORD: Valid token found, starting Discord consumer")
+      Logger.info("DISCORD: Valid token found, starting Nostrum and Discord consumer")
+
+      # Manually start Nostrum application since it has runtime: false
+      case Application.ensure_all_started(:nostrum) do
+        {:ok, _} ->
+          Logger.info("DISCORD: Nostrum started successfully")
+        {:error, reason} ->
+          Logger.error("DISCORD: Failed to start Nostrum: #{inspect(reason)}")
+      end
 
       [
         # Discord bot consumer
