@@ -4,8 +4,12 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
   alias ShotElixir.Schticks
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixirWeb.Plugs.ETag
 
   action_fallback ShotElixirWeb.FallbackController
+
+  # Cache-Control header value for schtick responses (reference data, rarely changes)
+  @cache_control_header "public, max-age=3600"
 
   # GET /api/v2/schticks
   def index(conn, params) do
@@ -139,14 +143,23 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
     end
   end
 
+  @doc """
+  Shows a single schtick with HTTP caching support.
+
+  Schticks are reference data that rarely changes, so we use public caching:
+  - Cache-Control: public, max-age=3600 (1 hour)
+  - ETag for conditional requests
+  """
   # GET /api/v2/schticks/:id
   def show(conn, %{"id" => id}) do
     schtick = Schticks.get_schtick(id)
 
     if schtick do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.SchticksView)
-      |> render("show.json", schtick: schtick)
+      ETag.with_caching(conn, schtick, [cache_control: @cache_control_header], fn conn ->
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.SchticksView)
+        |> render("show.json", schtick: schtick)
+      end)
     else
       conn
       |> put_status(:not_found)

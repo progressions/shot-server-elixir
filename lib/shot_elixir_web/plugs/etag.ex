@@ -82,4 +82,47 @@ defmodule ShotElixirWeb.Plugs.ETag do
   def put_etag(conn, etag) when is_binary(etag) do
     put_resp_header(conn, "etag", "\"#{etag}\"")
   end
+
+  @doc """
+  Wraps a response with HTTP caching (ETag + Cache-Control).
+
+  This helper encapsulates the common pattern of:
+  1. Generating an ETag from the entity
+  2. Checking If-None-Match header
+  3. Returning 304 if cached, or rendering with cache headers
+
+  ## Options
+
+  - `:cache_control` - The Cache-Control header value (required)
+
+  ## Examples
+
+      # In a controller action:
+      ETag.with_caching(conn, site, cache_control: "private, max-age=60, must-revalidate", fn conn ->
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.SiteView)
+        |> render("show.json", site: site)
+      end)
+
+  """
+  @spec with_caching(Plug.Conn.t(), struct(), keyword(), (Plug.Conn.t() -> Plug.Conn.t())) ::
+          Plug.Conn.t()
+  def with_caching(conn, entity, opts, render_fn) do
+    cache_control = Keyword.fetch!(opts, :cache_control)
+    etag = generate_etag(entity)
+
+    case check_stale(conn, etag) do
+      {:not_modified, conn} ->
+        conn
+        |> put_etag(etag)
+        |> put_resp_header("cache-control", cache_control)
+        |> send_resp(304, "")
+
+      {:ok, conn} ->
+        conn
+        |> put_etag(etag)
+        |> put_resp_header("cache-control", cache_control)
+        |> render_fn.()
+    end
+  end
 end
