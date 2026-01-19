@@ -113,11 +113,13 @@ defmodule ShotElixir.Services.Notion.Search do
     end
   end
 
+  @apostrophe_pattern ~r/[''ʼ`´]/
+
   # Normalize search terms for more lenient matching:
   # - Strip common prefixes like "The ", "A ", "An "
   # - Handle apostrophes: Notion may use curly ' vs straight ' which don't match
-  #   Since `contains` requires exact substring, we extract the longest word
-  #   "Gambler's Journey" -> "Gambler" (will match "Gambler's Journey" in Notion)
+  #   Since `contains` requires exact substring, we extract the longest word without apostrophes
+  #   "Gambler's Journey" -> "Journey" (only word without apostrophe)
   defp normalize_search_term(nil), do: ""
   defp normalize_search_term(""), do: ""
 
@@ -128,18 +130,38 @@ defmodule ShotElixir.Services.Notion.Search do
     |> handle_apostrophes()
   end
 
-  # Handle apostrophe variants by finding the longest word that doesn't contain
-  # an apostrophe. This ensures reliable matching regardless of which apostrophe
-  # variant (straight ' vs curly ') Notion uses.
-  # "Gambler's Journey" -> "Journey" (7 chars) beats "Gambler" (7 chars), but both work
+  # Handle apostrophe variants (straight ' vs curly ' etc.) by finding the longest
+  # word that doesn't contain an apostrophe. This ensures reliable matching regardless
+  # of which apostrophe variant Notion uses.
+  #
+  # Examples:
+  #   "Gambler's Journey" -> "Journey" (only word without apostrophe)
+  #   "O'Brien's O'Malley's" -> "OBriens" (fallback: strip apostrophes, take longest)
+  #   "Regular Name" -> "Regular Name" (no apostrophes, unchanged)
   defp handle_apostrophes(name) do
     # Check if name contains any apostrophe variant
-    if String.match?(name, ~r/[''ʼ`´]/) do
-      # Split into words, filter out words with apostrophes, take the longest
-      name
-      |> String.split(~r/\s+/)
-      |> Enum.reject(&String.match?(&1, ~r/[''ʼ`´]/))
-      |> Enum.max_by(&String.length/1, fn -> name end)
+    if String.match?(name, @apostrophe_pattern) do
+      words = String.split(name, ~r/\s+/)
+
+      # First, prefer words that have no apostrophes at all
+      no_apostrophe_words = Enum.reject(words, &String.match?(&1, @apostrophe_pattern))
+
+      cond do
+        no_apostrophe_words != [] ->
+          Enum.max_by(no_apostrophe_words, &String.length/1)
+
+        true ->
+          # If all words contain apostrophes, strip the apostrophes and take the
+          # longest remaining substring, or "" if nothing remains. This avoids
+          # returning the original name unchanged, which would keep variant-
+          # specific apostrophes and can cause Notion `contains` queries to miss.
+          cleaned_words =
+            words
+            |> Enum.map(&String.replace(&1, @apostrophe_pattern, ""))
+            |> Enum.reject(&(&1 == ""))
+
+          Enum.max_by(cleaned_words, &String.length/1, fn -> "" end)
+      end
     else
       # No apostrophe, return as-is
       name
