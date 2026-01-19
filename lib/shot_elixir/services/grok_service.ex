@@ -97,7 +97,8 @@ defmodule ShotElixir.Services.GrokService do
     if disabled?() do
       Logger.info("Grok API disabled in test mode, returning mock image URL")
       mock_url = "https://example.com/mock-grok-image.png"
-      if num_images == 1, do: mock_url, else: List.duplicate(mock_url, num_images)
+      # Always return a list to match worker expectations
+      {:ok, List.duplicate(mock_url, max(num_images, 1))}
     else
       do_generate_image(prompt, num_images, response_format)
     end
