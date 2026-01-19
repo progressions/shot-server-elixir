@@ -4,13 +4,14 @@ defmodule ShotElixirWeb.Plugs.CacheControl do
 
   ## Usage
 
-  In a controller:
-
-      plug :cache_control, max_age: 60, private: true
-
-  Or in a pipeline:
+  In a router pipeline:
 
       plug ShotElixirWeb.Plugs.CacheControl, max_age: 3600, private: false
+
+  In a controller (requires import or alias):
+
+      alias ShotElixirWeb.Plugs.CacheControl
+      plug CacheControl, max_age: 60, private: true when action in [:show]
 
   ## Options
 
