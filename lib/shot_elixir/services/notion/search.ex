@@ -113,8 +113,11 @@ defmodule ShotElixir.Services.Notion.Search do
     end
   end
 
-  # Strip common prefixes like "The " to make search more lenient
-  # "The Guiding Hand" -> "Guiding Hand"
+  # Normalize search terms for more lenient matching:
+  # - Strip common prefixes like "The ", "A ", "An "
+  # - Handle apostrophes: Notion may use curly ' vs straight ' which don't match
+  #   Since `contains` requires exact substring, we extract the longest word
+  #   "Gambler's Journey" -> "Gambler" (will match "Gambler's Journey" in Notion)
   defp normalize_search_term(nil), do: ""
   defp normalize_search_term(""), do: ""
 
@@ -122,5 +125,24 @@ defmodule ShotElixir.Services.Notion.Search do
     name
     |> String.trim()
     |> String.replace(~r/^(The|A|An)\s+/i, "")
+    |> handle_apostrophes()
+  end
+
+  # Handle apostrophe variants by finding the longest word that doesn't contain
+  # an apostrophe. This ensures reliable matching regardless of which apostrophe
+  # variant (straight ' vs curly ') Notion uses.
+  # "Gambler's Journey" -> "Journey" (7 chars) beats "Gambler" (7 chars), but both work
+  defp handle_apostrophes(name) do
+    # Check if name contains any apostrophe variant
+    if String.match?(name, ~r/[''ʼ`´]/) do
+      # Split into words, filter out words with apostrophes, take the longest
+      name
+      |> String.split(~r/\s+/)
+      |> Enum.reject(&String.match?(&1, ~r/[''ʼ`´]/))
+      |> Enum.max_by(&String.length/1, fn -> name end)
+    else
+      # No apostrophe, return as-is
+      name
+    end
   end
 end
