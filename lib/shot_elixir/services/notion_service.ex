@@ -332,17 +332,20 @@ defmodule ShotElixir.Services.NotionService do
         properties
       end
 
+    token = get_token(character.campaign)
+
     with {:ok, database_id} <- get_database_id_for_entity(character.campaign, "characters"),
-         {:ok, data_source_id} <- data_source_id_for(database_id) do
+         {:ok, data_source_id} <- data_source_id_for(database_id, token: token) do
       Logger.debug("Creating Notion page with data_source_id: #{data_source_id}")
 
-      # Capture payload for logging
-      payload = %{
+      # Separate payload for logging (without token) and API call (with token)
+      log_payload = %{
         "parent" => %{"data_source_id" => data_source_id},
         "properties" => properties
       }
 
-      page = NotionClient.create_page(payload)
+      api_payload = Map.put(log_payload, :token, token)
+      page = NotionClient.create_page(api_payload)
 
       Logger.debug("Notion API response received")
 
@@ -352,7 +355,7 @@ defmodule ShotElixir.Services.NotionService do
           Logger.debug("Extracted page ID: #{inspect(page_id)}")
 
           # Log successful sync
-          Notion.log_success("character", character.id, payload, page)
+          Notion.log_success("character", character.id, log_payload, page)
 
           # Update character with notion_page_id
           case Characters.update_character(character, %{notion_page_id: page_id}) do
@@ -376,7 +379,7 @@ defmodule ShotElixir.Services.NotionService do
           Notion.log_error(
             "character",
             character.id,
-            payload,
+            log_payload,
             page,
             "Notion API error: #{error_code} - #{message}"
           )
@@ -389,7 +392,7 @@ defmodule ShotElixir.Services.NotionService do
           Notion.log_error(
             "character",
             character.id,
-            payload,
+            log_payload,
             page,
             "Unexpected response from Notion API"
           )
@@ -434,6 +437,7 @@ defmodule ShotElixir.Services.NotionService do
   def update_notion_from_character(%Character{} = character) do
     # Ensure campaign and faction are loaded for faction properties lookup
     character = Repo.preload(character, [:campaign, :faction])
+    token = get_token(character.campaign)
     properties = Character.as_notion(character)
 
     properties =
@@ -451,7 +455,7 @@ defmodule ShotElixir.Services.NotionService do
       "properties" => properties
     }
 
-    response = NotionClient.update_page(character.notion_page_id, properties)
+    response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
 
     # Check if Notion returned an error response
     case response do
@@ -494,7 +498,7 @@ defmodule ShotElixir.Services.NotionService do
 
       _ ->
         # Add image if not present in Notion
-        page = NotionClient.get_page(character.notion_page_id)
+        page = NotionClient.get_page(character.notion_page_id, %{token: token})
         image = find_image_block(page)
 
         unless image do
@@ -1417,17 +1421,18 @@ defmodule ShotElixir.Services.NotionService do
 
     case data_source_id_for(opts.database_id, token: token) do
       {:ok, data_source_id} ->
-        payload = %{
+        # Separate payload for logging (without token) and API call (with token)
+        log_payload = %{
           "parent" => %{"data_source_id" => data_source_id},
-          "properties" => properties,
-          :token => token
+          "properties" => properties
         }
 
-        page = NotionClient.create_page(payload)
+        api_payload = Map.put(log_payload, :token, token)
+        page = NotionClient.create_page(api_payload)
 
         case page do
           %{"id" => page_id} when is_binary(page_id) ->
-            Notion.log_success(entity_type, entity.id, payload, page)
+            Notion.log_success(entity_type, entity.id, log_payload, page)
 
             case opts.update_fn.(entity, %{notion_page_id: page_id}) do
               {:ok, updated_entity} ->
@@ -1451,7 +1456,7 @@ defmodule ShotElixir.Services.NotionService do
             Notion.log_error(
               entity_type,
               entity.id,
-              payload,
+              log_payload,
               page,
               "Notion API error: #{error_code} - #{message}"
             )
@@ -1464,7 +1469,7 @@ defmodule ShotElixir.Services.NotionService do
             Notion.log_error(
               entity_type,
               entity.id,
-              payload,
+              log_payload,
               page,
               "Unexpected response from Notion API"
             )

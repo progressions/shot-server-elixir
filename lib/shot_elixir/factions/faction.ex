@@ -63,7 +63,6 @@ defmodule ShotElixir.Factions.Faction do
 
   @doc """
   Convert faction to Notion page properties format.
-  Note: Factions in Notion use rich_text for Name, not title.
 
   If campaign is preloaded, uses MentionConverter to convert @mentions to Notion page links.
   Otherwise, falls back to simple HTML stripping.
@@ -93,29 +92,30 @@ defmodule ShotElixir.Factions.Faction do
       end
 
     base = %{
-      "Name" => %{"rich_text" => [%{"text" => %{"content" => faction.name || ""}}]},
+      "Name" => %{"title" => [%{"text" => %{"content" => faction.name || ""}}]},
       "Description" => %{"rich_text" => description_rich_text},
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
 
-    maybe_add_character_relations(base, faction)
+    maybe_add_member_relations(base, faction)
   end
 
   # Simple version without mention conversion (fallback)
   defp as_notion_simple(%__MODULE__{} = faction) do
     base = %{
-      "Name" => %{"rich_text" => [%{"text" => %{"content" => faction.name || ""}}]},
+      "Name" => %{"title" => [%{"text" => %{"content" => faction.name || ""}}]},
       "Description" => %{
         "rich_text" => [%{"text" => %{"content" => strip_html(faction.description || "")}}]
       },
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
 
-    maybe_add_character_relations(base, faction)
+    maybe_add_member_relations(base, faction)
   end
 
-  # Helper to add character relations to base properties
-  defp maybe_add_character_relations(base, faction) do
+  # Helper to add member (character) relations to base properties
+  # Uses "Members" property name to match Notion Factions database schema
+  defp maybe_add_member_relations(base, faction) do
     if Ecto.assoc_loaded?(faction.characters) do
       character_ids =
         faction.characters
@@ -124,7 +124,7 @@ defmodule ShotElixir.Factions.Faction do
         |> Enum.map(fn id -> %{"id" => id} end)
 
       if Enum.any?(character_ids) do
-        Map.put(base, "Characters", %{"relation" => character_ids})
+        Map.put(base, "Members", %{"relation" => character_ids})
       else
         base
       end
