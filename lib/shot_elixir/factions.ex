@@ -290,25 +290,36 @@ defmodule ShotElixir.Factions do
     end
   end
 
+  @doc """
+  Gets a single faction with all associations. Raises if not found.
+
+  Preloads all has_many associations in a single batch operation.
+  """
   def get_faction!(id) do
     id = Slug.extract_uuid(id)
 
-    Repo.get!(Faction, id)
-    |> Repo.preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
+    Faction
+    |> preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
+    |> Repo.get!(id)
     |> ImageLoader.load_image_url("Faction")
   end
 
+  @doc """
+  Gets a single faction with all associations. Returns nil if not found.
+
+  Preloads all has_many associations in a single batch operation.
+  Since Faction only has has_many relationships (not belongs_to),
+  JOINs would not reduce query count - Ecto's batch preloading is optimal here.
+  """
   def get_faction(id) do
     id = Slug.extract_uuid(id)
 
-    case Repo.get(Faction, id) do
-      nil ->
-        nil
-
-      faction ->
-        faction
-        |> Repo.preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
-        |> ImageLoader.load_image_url("Faction")
+    Faction
+    |> preload([:characters, :vehicles, :sites, :parties, :junctures, :image_positions])
+    |> Repo.get(id)
+    |> case do
+      nil -> nil
+      faction -> ImageLoader.load_image_url(faction, "Faction")
     end
   end
 
