@@ -59,6 +59,7 @@ defmodule ShotElixir.Application do
       case Application.ensure_all_started(:nostrum) do
         {:ok, _} ->
           Logger.info("DISCORD: Nostrum started successfully")
+
         {:error, reason} ->
           Logger.error("DISCORD: Failed to start Nostrum: #{inspect(reason)}")
       end
