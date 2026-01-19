@@ -65,7 +65,9 @@ defmodule ShotElixir.Services.Notion.Config do
         client = client(opts)
         token = Keyword.get(opts, :token)
 
-        case client.get_database(database_id, %{token: token}) do
+        # Use get_data_source instead of get_database for Notion API 2025-09-03
+        # The database_id can be used directly as the data_source_id
+        case client.get_data_source(database_id, %{token: token}) do
           %{"data_sources" => data_sources} when is_list(data_sources) ->
             case extract_data_source_id(data_sources) do
               nil ->
@@ -84,27 +86,26 @@ defmodule ShotElixir.Services.Notion.Config do
             cache_data_source_id(database_id, data_source_id)
             {:ok, data_source_id}
 
-          # Handle standard database response where "id" is the data_source_id
-          # In Notion API 2025-09-03, database_id == data_source_id
-          %{"id" => data_source_id, "object" => "database"} when is_binary(data_source_id) ->
+          # Handle standard data_source response where "id" is the data_source_id
+          %{"id" => data_source_id, "object" => "data_source"} when is_binary(data_source_id) ->
             cache_data_source_id(database_id, data_source_id)
             {:ok, data_source_id}
 
           %{"code" => error_code, "message" => message} ->
             Logger.error(
-              "Notion get_database error for database_id=#{database_id}: " <>
+              "Notion get_data_source error for database_id=#{database_id}: " <>
                 "#{error_code} - #{message}"
             )
 
             {:error, {:notion_api_error, error_code, message}}
 
           nil ->
-            Logger.error("Notion get_database returned nil for database_id=#{database_id}")
-            {:error, :notion_database_not_found}
+            Logger.error("Notion get_data_source returned nil for database_id=#{database_id}")
+            {:error, :notion_data_source_not_found}
 
           response ->
             Logger.error(
-              "Unexpected response from Notion get_database for database_id=#{database_id}: " <>
+              "Unexpected response from Notion get_data_source for database_id=#{database_id}: " <>
                 "#{inspect(response)}"
             )
 

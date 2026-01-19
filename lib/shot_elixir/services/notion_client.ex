@@ -55,6 +55,19 @@ defmodule ShotElixir.Services.NotionClient do
     end
   end
 
+  def get_data_source(data_source_id, opts \\ %{}) do
+    opts = normalize_opts(opts)
+    token = Map.get(opts, :token)
+
+    with :ok <- require_token(token) do
+      client(token)
+      |> Req.get!(url: "/data_sources/#{data_source_id}")
+      |> Map.get(:body)
+    else
+      {:error, err} -> err
+    end
+  end
+
   def data_source_query(data_source_id, opts \\ %{}) do
     opts = normalize_opts(opts)
     {token, opts} = Map.pop(opts, :token)
