@@ -46,28 +46,37 @@ defmodule ShotElixir.Application do
     :ok
   end
 
-  # Discord children are only started if a valid token is configured
-  # Nostrum is a normal dependency that auto-starts, but only connects if token is valid
+  # Discord helper processes (CurrentFight, CurrentCampaign, LinkCodes) are always started
+  # since they're just in-memory state storage that tests need.
+  # The Consumer (which connects to Discord) is only started with a valid token.
   defp discord_children do
     require Logger
-    token = Application.get_env(:nostrum, :token)
 
-    if valid_discord_token?(token) do
-      Logger.info("DISCORD: Valid token found, starting Discord consumer")
+    # Helper processes - always start (needed for tests)
+    helpers = [
+      # Discord current fight Agent
+      ShotElixir.Discord.CurrentFight,
+      # Discord current campaign Agent (maps server_id -> campaign_id)
+      ShotElixir.Discord.CurrentCampaign,
+      # Discord link codes Agent (temporary codes for account linking)
+      ShotElixir.Discord.LinkCodes
+    ]
 
-      [
-        # Discord bot consumer
-        ShotElixir.Discord.Consumer,
-        # Discord current fight Agent
-        ShotElixir.Discord.CurrentFight,
-        # Discord current campaign Agent (maps server_id -> campaign_id)
-        ShotElixir.Discord.CurrentCampaign,
-        # Discord link codes Agent (temporary codes for account linking)
-        ShotElixir.Discord.LinkCodes
-      ]
+    # In test environment, only start helpers (no Discord connection)
+    if Application.get_env(:shot_elixir, :environment) == :test do
+      Logger.info("DISCORD: Test environment, starting helpers only (no bot)")
+      helpers
     else
-      Logger.info("DISCORD: No valid token configured, skipping Discord bot")
-      []
+      token = Application.get_env(:nostrum, :token)
+
+      if valid_discord_token?(token) do
+        Logger.info("DISCORD: Valid token found, starting Discord consumer")
+        # Consumer first, then helpers
+        [ShotElixir.Discord.Consumer | helpers]
+      else
+        Logger.info("DISCORD: No valid token configured, starting helpers only")
+        helpers
+      end
     end
   end
 

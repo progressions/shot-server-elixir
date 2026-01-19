@@ -19,8 +19,11 @@ end
 
 # Discord bot configuration - loaded from environment variables
 # Must be set AFTER dotenvy loads .env above
-if discord_token = System.get_env("DISCORD_TOKEN") do
-  config :nostrum, token: discord_token
+# Skip in test environment - tests should not start the Discord bot
+if config_env() != :test do
+  if discord_token = System.get_env("DISCORD_TOKEN") do
+    config :nostrum, token: discord_token
+  end
 end
 
 # ## Using releases
