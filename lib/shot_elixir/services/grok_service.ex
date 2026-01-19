@@ -1,6 +1,9 @@
 defmodule ShotElixir.Services.GrokService do
   @moduledoc """
   Service for interacting with Grok (xAI) API for AI image generation.
+
+  In test mode (`:grok` config `disabled: true`), returns mock responses
+  to avoid external API calls.
   """
 
   require Logger
