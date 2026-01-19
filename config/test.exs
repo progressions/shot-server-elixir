@@ -53,8 +53,8 @@ config :shot_elixir, Oban,
   testing: :inline,
   plugins: [Oban.Plugins.Pruner]
 
-# Disable Nostrum Discord bot in test mode
-config :nostrum, :token, nil
+# Nostrum Discord bot is excluded from auto-starting in test mode via mix.exs
+# (runtime: Mix.env() != :test)
 
 # Environment identifier for services like ImageUploader
 config :shot_elixir, :environment, :test
