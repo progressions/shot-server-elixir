@@ -8,8 +8,12 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
   alias ShotElixirWeb.Api.V2.SyncFromNotion
+  alias ShotElixirWeb.Plugs.ETag
 
   action_fallback ShotElixirWeb.FallbackController
+
+  # Cache-Control header value for party responses
+  @cache_control_header "private, max-age=60, must-revalidate"
 
   # GET /api/v2/parties
   def index(conn, params) do
@@ -52,6 +56,14 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
     end
   end
 
+  @doc """
+  Shows a single party with HTTP caching support.
+
+  Implements ETag-based conditional requests for efficient caching:
+  - Returns 304 Not Modified if client's cached version is current
+  - Includes Cache-Control and ETag headers for browser caching
+  - Cache-Control: private, max-age=60, must-revalidate
+  """
   # GET /api/v2/parties/:id
   def show(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
@@ -72,9 +84,11 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              conn
-              |> put_view(ShotElixirWeb.Api.V2.PartyView)
-              |> render("show.json", party: party)
+              ETag.with_caching(conn, party, [cache_control: @cache_control_header], fn conn ->
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.PartyView)
+                |> render("show.json", party: party)
+              end)
             else
               conn
               |> put_status(:not_found)

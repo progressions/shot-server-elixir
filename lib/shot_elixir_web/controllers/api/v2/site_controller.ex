@@ -8,8 +8,12 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
   alias ShotElixirWeb.Api.V2.SyncFromNotion
+  alias ShotElixirWeb.Plugs.ETag
 
   action_fallback ShotElixirWeb.FallbackController
+
+  # Cache-Control header value for site responses
+  @cache_control_header "private, max-age=60, must-revalidate"
 
   # GET /api/v2/sites
   def index(conn, params) do
@@ -48,6 +52,14 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
     end
   end
 
+  @doc """
+  Shows a single site with HTTP caching support.
+
+  Implements ETag-based conditional requests for efficient caching:
+  - Returns 304 Not Modified if client's cached version is current
+  - Includes Cache-Control and ETag headers for browser caching
+  - Cache-Control: private, max-age=60, must-revalidate
+  """
   # GET /api/v2/sites/:id
   def show(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
@@ -68,9 +80,11 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              conn
-              |> put_view(ShotElixirWeb.Api.V2.SiteView)
-              |> render("show.json", site: site)
+              ETag.with_caching(conn, site, [cache_control: @cache_control_header], fn conn ->
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.SiteView)
+                |> render("show.json", site: site)
+              end)
             else
               conn
               |> put_status(:not_found)
