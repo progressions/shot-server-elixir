@@ -1361,6 +1361,7 @@ defmodule ShotElixir.Services.NotionService do
               end
 
             # Fetch rich description from page content (blocks)
+            # add_rich_description returns atom keys, so convert them to strings
             attributes =
               add_rich_description(
                 attributes,
@@ -1368,6 +1369,8 @@ defmodule ShotElixir.Services.NotionService do
                 adventure.campaign_id,
                 token
               )
+              |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+              |> Map.new()
 
             # Skip Notion sync to prevent ping-pong loops when updating from webhook
             case Adventures.update_adventure(adventure, attributes, skip_notion_sync: true) do
