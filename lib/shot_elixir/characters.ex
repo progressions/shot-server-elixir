@@ -433,42 +433,71 @@ defmodule ShotElixir.Characters do
     Repo.all(query)
   end
 
+  @doc """
+  Gets a single character with all associations.
+
+  Optimized to reduce database queries by JOINing direct associations
+  (faction, juncture, user) in a single query, then batch-preloading
+  many-to-many associations separately.
+
+  ## Query optimization
+  - Direct associations (faction, juncture, user): 1 query with JOINs
+  - Many-to-many associations (weapons, schticks, parties, sites): batched preloads
+  - Image positions: single preload query
+  - Total: ~5-6 queries instead of 9-10
+
+  Raises `Ecto.NoResultsError` if the Character does not exist.
+  """
   def get_character!(id) do
     id = Slug.extract_uuid(id)
 
-    Repo.get!(Character, id)
-    |> Repo.preload([
-      :image_positions,
-      :weapons,
-      :schticks,
-      :parties,
-      :sites,
-      :faction,
-      :juncture,
-      :user
-    ])
+    # Use JOINs for direct associations to reduce query count
+    query =
+      from c in Character,
+        where: c.id == ^id,
+        left_join: f in assoc(c, :faction),
+        left_join: j in assoc(c, :juncture),
+        left_join: u in assoc(c, :user),
+        preload: [faction: f, juncture: j, user: u]
+
+    query
+    |> Repo.one!()
+    |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
     |> ImageLoader.load_image_url("Character")
   end
 
+  @doc """
+  Gets a single character with all associations. Returns nil if not found.
+
+  Optimized to reduce database queries by JOINing direct associations
+  (faction, juncture, user) in a single query, then batch-preloading
+  many-to-many associations separately.
+
+  ## Query optimization
+  - Direct associations (faction, juncture, user): 1 query with JOINs
+  - Many-to-many associations (weapons, schticks, parties, sites): batched preloads
+  - Image positions: single preload query
+  - Total: ~5-6 queries instead of 9-10
+  """
   def get_character(id) do
     id = Slug.extract_uuid(id)
 
-    case Repo.get(Character, id) do
+    # Use JOINs for direct associations to reduce query count
+    query =
+      from c in Character,
+        where: c.id == ^id,
+        left_join: f in assoc(c, :faction),
+        left_join: j in assoc(c, :juncture),
+        left_join: u in assoc(c, :user),
+        preload: [faction: f, juncture: j, user: u]
+
+    case Repo.one(query) do
       nil ->
         nil
 
       character ->
         character
-        |> Repo.preload([
-          :image_positions,
-          :weapons,
-          :schticks,
-          :parties,
-          :sites,
-          :faction,
-          :juncture,
-          :user
-        ])
+        |> Repo.preload([:image_positions, :weapons, :schticks, :parties, :sites])
         |> ImageLoader.load_image_url("Character")
     end
   end

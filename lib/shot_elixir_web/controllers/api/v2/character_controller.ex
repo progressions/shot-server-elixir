@@ -44,14 +44,38 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
+  @doc """
+  Shows a single character with HTTP caching support.
+
+  Implements ETag-based conditional requests for efficient caching:
+  - Returns 304 Not Modified if client's cached version is current
+  - Includes Cache-Control and ETag headers for browser caching
+  - Cache-Control: private, max-age=60, must-revalidate
+  """
   def show(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
+    alias ShotElixirWeb.Plugs.ETag
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user) do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-      |> render("show.json", character: character)
+      etag = ETag.generate_etag(character)
+
+      case ETag.check_stale(conn, etag) do
+        {:not_modified, conn} ->
+          # Client has current version - return 304 without body
+          conn
+          |> ETag.put_etag(etag)
+          |> put_resp_header("cache-control", "private, max-age=60, must-revalidate")
+          |> send_resp(304, "")
+
+        {:ok, conn} ->
+          # Client needs fresh data
+          conn
+          |> ETag.put_etag(etag)
+          |> put_resp_header("cache-control", "private, max-age=60, must-revalidate")
+          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+          |> render("show.json", character: character)
+      end
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
