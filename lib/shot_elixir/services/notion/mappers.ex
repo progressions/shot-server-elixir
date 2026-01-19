@@ -204,17 +204,25 @@ defmodule ShotElixir.Services.Notion.Mappers do
   end
 
   @doc """
-  Extract hero character IDs from a Notion page's "Heroes" relation property.
+  Extract hero character IDs from a Notion page's character relation property.
+  Tries multiple property names: "Character", "Characters", "Heroes".
   Returns {:ok, character_ids} if the relation is found, :skip otherwise.
   """
   def hero_ids_from_notion(page, campaign_id) do
-    relation = get_in(page, ["properties", "Heroes", "relation"])
+    relation =
+      ["Character", "Characters", "Heroes"]
+      |> Enum.find_value(fn key ->
+        case get_in(page, ["properties", key, "relation"]) do
+          relations when is_list(relations) -> relations
+          _ -> nil
+        end
+      end)
 
     case relation do
       nil ->
         :skip
 
-      relations when is_list(relations) ->
+      relations ->
         page_ids =
           relations
           |> Enum.map(& &1["id"])
@@ -234,24 +242,29 @@ defmodule ShotElixir.Services.Notion.Mappers do
           end
 
         {:ok, character_ids}
-
-      _ ->
-        :skip
     end
   end
 
   @doc """
-  Extract villain character IDs from a Notion page's "Villains" relation property.
+  Extract villain character IDs from a Notion page's villain relation property.
+  Tries multiple property names: "Villains", "Villain", "Antagonists".
   Returns {:ok, character_ids} if the relation is found, :skip otherwise.
   """
   def villain_ids_from_notion(page, campaign_id) do
-    relation = get_in(page, ["properties", "Villains", "relation"])
+    relation =
+      ["Villains", "Villain", "Antagonists"]
+      |> Enum.find_value(fn key ->
+        case get_in(page, ["properties", key, "relation"]) do
+          relations when is_list(relations) -> relations
+          _ -> nil
+        end
+      end)
 
     case relation do
       nil ->
         :skip
 
-      relations when is_list(relations) ->
+      relations ->
         page_ids =
           relations
           |> Enum.map(& &1["id"])
@@ -271,9 +284,6 @@ defmodule ShotElixir.Services.Notion.Mappers do
           end
 
         {:ok, character_ids}
-
-      _ ->
-        :skip
     end
   end
 
