@@ -24,6 +24,21 @@ defmodule ShotElixir.Services.GrokService do
       {:ok, %{"choices" => [%{"message" => %{"content" => "..."}}]}}
   """
   def send_request(prompt, max_tokens \\ 2048) do
+    if disabled?() do
+      Logger.info("Grok API disabled in test mode, returning mock response")
+
+      {:ok,
+       %{
+         "choices" => [
+           %{"message" => %{"content" => "Mock response for: #{String.slice(prompt, 0, 50)}..."}}
+         ]
+       }}
+    else
+      do_send_request(prompt, max_tokens)
+    end
+  end
+
+  defp do_send_request(prompt, max_tokens) do
     Logger.info("Sending Grok API request with max_tokens: #{max_tokens}")
     Logger.debug("Prompt length: #{String.length(prompt)} characters")
 
@@ -79,6 +94,16 @@ defmodule ShotElixir.Services.GrokService do
       ["https://...", "https://...", "https://..."]
   """
   def generate_image(prompt, num_images \\ 3, response_format \\ "url") do
+    if disabled?() do
+      Logger.info("Grok API disabled in test mode, returning mock image URL")
+      mock_url = "https://example.com/mock-grok-image.png"
+      if num_images == 1, do: mock_url, else: List.duplicate(mock_url, num_images)
+    else
+      do_generate_image(prompt, num_images, response_format)
+    end
+  end
+
+  defp do_generate_image(prompt, num_images, response_format) do
     # Truncate prompt if too long
     truncated_prompt = String.slice(prompt, 0, @max_prompt_length)
 
@@ -221,6 +246,11 @@ defmodule ShotElixir.Services.GrokService do
       _ ->
         {:error, "Unexpected data format in response"}
     end
+  end
+
+  # Check if Grok API is disabled (e.g., in test environment)
+  defp disabled? do
+    Application.get_env(:shot_elixir, :grok)[:disabled] == true
   end
 
   # Get API key from config

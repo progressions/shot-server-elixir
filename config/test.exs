@@ -62,6 +62,9 @@ config :shot_elixir, :environment, :test
 # Avoid external ImageKit calls during tests
 config :shot_elixir, :imagekit, disabled: true
 
+# Avoid external Grok API calls during tests
+config :shot_elixir, :grok, disabled: true
+
 # Skip campaign seeding jobs in tests to avoid heavy background work
 config :shot_elixir, :campaign_seeding, enabled: false
 
