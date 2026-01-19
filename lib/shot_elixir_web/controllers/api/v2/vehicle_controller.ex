@@ -5,8 +5,12 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
   alias ShotElixir.Vehicles.Vehicle
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixirWeb.Plugs.ETag
 
   action_fallback ShotElixirWeb.FallbackController
+
+  # Cache-Control header value for vehicle responses
+  @cache_control_header "private, max-age=60, must-revalidate"
 
   # GET /api/v2/vehicles
   def index(conn, params) do
@@ -34,6 +38,14 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
     end
   end
 
+  @doc """
+  Shows a single vehicle with HTTP caching support.
+
+  Implements ETag-based conditional requests for efficient caching:
+  - Returns 304 Not Modified if client's cached version is current
+  - Includes Cache-Control and ETag headers for browser caching
+  - Cache-Control: private, max-age=60, must-revalidate
+  """
   # GET /api/v2/vehicles/:id
   def show(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
@@ -41,9 +53,11 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
     with %Vehicle{} = vehicle <- vehicle,
          :ok <- authorize_vehicle_access(vehicle, current_user) do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.VehicleView)
-      |> render("show.json", vehicle: vehicle)
+      ETag.with_caching(conn, vehicle, [cache_control: @cache_control_header], fn conn ->
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.VehicleView)
+        |> render("show.json", vehicle: vehicle)
+      end)
     else
       nil ->
         conn

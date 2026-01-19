@@ -3,8 +3,12 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
   alias ShotElixir.Weapons
   alias ShotElixir.Guardian
+  alias ShotElixirWeb.Plugs.ETag
 
   action_fallback ShotElixirWeb.FallbackController
+
+  # Cache-Control header value for weapon responses (reference data, rarely changes)
+  @cache_control_header "public, max-age=3600"
 
   # GET /api/v2/weapons
   def index(conn, params) do
@@ -93,14 +97,23 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
     end
   end
 
+  @doc """
+  Shows a single weapon with HTTP caching support.
+
+  Weapons are reference data that rarely changes, so we use public caching:
+  - Cache-Control: public, max-age=3600 (1 hour)
+  - ETag for conditional requests
+  """
   # GET /api/v2/weapons/:id
   def show(conn, %{"id" => id}) do
     weapon = Weapons.get_weapon(id)
 
     if weapon do
-      conn
-      |> put_view(ShotElixirWeb.Api.V2.WeaponView)
-      |> render("show.json", weapon: weapon)
+      ETag.with_caching(conn, weapon, [cache_control: @cache_control_header], fn conn ->
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.WeaponView)
+        |> render("show.json", weapon: weapon)
+      end)
     else
       conn
       |> put_status(:not_found)
