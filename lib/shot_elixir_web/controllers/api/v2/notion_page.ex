@@ -10,7 +10,6 @@ defmodule ShotElixirWeb.Api.V2.NotionPage do
   import Phoenix.Controller
   require Logger
 
-  alias ShotElixir.Campaigns
   alias ShotElixir.Services.NotionClient
   alias ShotElixir.Services.NotionService
 
@@ -93,17 +92,6 @@ defmodule ShotElixirWeb.Api.V2.NotionPage do
         conn
         |> put_status(:internal_server_error)
         |> json(%{error: "An unexpected error occurred"})
-    end
-  end
-
-  @doc """
-  Helper to get the campaign for an entity with campaign_id.
-  Returns {:ok, campaign} or {:error, :not_found}.
-  """
-  def get_campaign_for_entity(entity) do
-    case Campaigns.get_campaign(entity.campaign_id) do
-      nil -> {:error, :not_found}
-      campaign -> {:ok, campaign}
     end
   end
 end

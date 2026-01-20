@@ -454,21 +454,28 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   def notion_page(conn, %{"character_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
-    with %Character{} = character <- Characters.get_character(id),
-         {:ok, campaign} <- NotionPage.get_campaign_for_entity(character) do
-      NotionPage.fetch(conn, current_user, character, campaign,
-        authorize: &authorize_campaign_access/2,
-        entity_name: "Character"
-      )
-    else
-      nil -> {:error, :not_found}
-      {:error, :not_found} -> {:error, :not_found}
+    case Characters.get_character(id) do
+      nil ->
+        {:error, :not_found}
+
+      character ->
+        case Campaigns.get_campaign(character.campaign_id) do
+          nil ->
+            {:error, :not_found}
+
+          campaign ->
+            NotionPage.fetch(conn, current_user, character, campaign,
+              authorize: &authorize_campaign_access/2,
+              entity_name: "Character"
+            )
+        end
     end
   end
 
   defp authorize_campaign_access(campaign, user) do
-    campaigns = Campaigns.get_user_campaigns(user.id)
-    Enum.any?(campaigns, fn c -> c.id == campaign.id end)
+    campaign.user_id == user.id || user.admin ||
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)) ||
+      Campaigns.is_member?(campaign.id, user.id)
   end
 
   def pdf(conn, %{"character_id" => id}) do
