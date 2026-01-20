@@ -166,7 +166,7 @@ defmodule ShotElixir.Adventures.Adventure do
         |> Enum.map(fn id -> %{"id" => id} end)
 
       if Enum.any?(character_ids) do
-        Map.put(properties, "Characters", %{"relation" => character_ids})
+        Map.put(properties, "Character", %{"relation" => character_ids})
       else
         properties
       end
