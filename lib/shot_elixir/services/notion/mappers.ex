@@ -158,19 +158,32 @@ defmodule ShotElixir.Services.Notion.Mappers do
 
   @doc """
   Fetch rich description from Notion page blocks and add to attributes.
-  Uses string keys to maintain consistency with other attribute maps.
+  Detects whether the attributes map uses atom or string keys and matches that style.
   """
   def add_rich_description(attributes, page_id, campaign_id, token) do
     case Blocks.fetch_rich_description(page_id, campaign_id, token) do
       {:ok, %{markdown: markdown, mentions: mentions}} ->
+        # Detect key type from existing attributes and match it
+        {rich_desc_key, mentions_key} =
+          if uses_atom_keys?(attributes),
+            do: {:rich_description, :mentions},
+            else: {"rich_description", "mentions"}
+
         attributes
-        |> Map.put("rich_description", markdown)
-        |> Map.put("mentions", mentions)
+        |> Map.put(rich_desc_key, markdown)
+        |> Map.put(mentions_key, mentions)
 
       {:error, reason} ->
         Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")
         attributes
     end
+  end
+
+  # Check if a map uses atom keys (vs string keys)
+  defp uses_atom_keys?(map) when map_size(map) == 0, do: true
+
+  defp uses_atom_keys?(map) do
+    map |> Map.keys() |> List.first() |> is_atom()
   end
 
   def juncture_as_notion(%Juncture{} = juncture) do

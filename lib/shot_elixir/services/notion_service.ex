@@ -1503,7 +1503,6 @@ defmodule ShotElixir.Services.NotionService do
               end
 
             # Fetch rich description from page content (blocks)
-            # add_rich_description now uses string keys for consistency
             attributes =
               add_rich_description(
                 attributes,
