@@ -88,7 +88,7 @@ defmodule ShotElixir.Services.NotionService do
   Environment check performed at worker level.
   """
   def sync_character(%Character{} = character) do
-    character = Repo.preload(character, :faction)
+    character = Repo.preload(character, [:faction, :juncture])
 
     result =
       if character.notion_page_id do
@@ -128,7 +128,7 @@ defmodule ShotElixir.Services.NotionService do
   This updates both the Chi War record and the Notion page with merged values.
   """
   def merge_with_notion(%Character{} = character, notion_page_id) do
-    character = Repo.preload(character, [:faction, :campaign])
+    character = Repo.preload(character, [:faction, :juncture, :campaign])
     token = get_token(character.campaign)
 
     unless token do
@@ -184,7 +184,7 @@ defmodule ShotElixir.Services.NotionService do
           case Characters.update_character(character, update_attrs) do
             {:ok, updated_character} ->
               # Now sync the merged data back to Notion
-              updated_character = Repo.preload(updated_character, :faction)
+              updated_character = Repo.preload(updated_character, [:faction, :juncture])
 
               # Log warning if Notion update fails (but don't fail the merge)
               case update_notion_from_character(updated_character) do
@@ -321,8 +321,8 @@ defmodule ShotElixir.Services.NotionService do
   Create a new Notion page from character data.
   """
   def create_notion_from_character(%Character{} = character) do
-    # Ensure faction and campaign are loaded for Notion properties and database ID
-    character = Repo.preload(character, [:faction, :campaign])
+    # Ensure faction, juncture, and campaign are loaded for Notion properties and database ID
+    character = Repo.preload(character, [:faction, :juncture, :campaign])
     properties = Character.as_notion(character)
 
     properties =
@@ -437,8 +437,8 @@ defmodule ShotElixir.Services.NotionService do
   def update_notion_from_character(%Character{notion_page_id: nil}), do: {:error, :no_page_id}
 
   def update_notion_from_character(%Character{} = character) do
-    # Ensure campaign and faction are loaded for faction properties lookup
-    character = Repo.preload(character, [:campaign, :faction])
+    # Ensure campaign, faction, and juncture are loaded for relation properties
+    character = Repo.preload(character, [:campaign, :faction, :juncture])
     token = get_token(character.campaign)
     properties = Character.as_notion(character)
 
@@ -547,7 +547,7 @@ defmodule ShotElixir.Services.NotionService do
     # Always create a new character for imports from Notion
     {:ok, character} = Characters.create_character(%{name: unique_name, campaign_id: campaign_id})
 
-    character = Repo.preload(character, :faction)
+    character = Repo.preload(character, [:faction, :juncture])
     attributes = Character.attributes_from_notion(character, page)
     attributes = add_rich_description(attributes, page["id"], campaign_id, token)
 
@@ -1066,9 +1066,11 @@ defmodule ShotElixir.Services.NotionService do
 
             # Skip Notion sync to prevent ping-pong loops when updating from webhook
             case Parties.update_party(party, attributes, skip_notion_sync: true) do
-              {:ok, updated_party} = result ->
+              {:ok, updated_party} ->
+                # Sync memberships from Notion character relations
+                sync_party_memberships_from_notion(updated_party, page)
                 Notion.log_success("party", updated_party.id, payload, page)
-                result
+                {:ok, updated_party}
 
               {:error, changeset} = error ->
                 log_sync_error(
@@ -1097,6 +1099,42 @@ defmodule ShotElixir.Services.NotionService do
       )
 
       {:error, error}
+  end
+
+  # Sync party memberships from Notion character relations
+  # Creates memberships for characters linked in Notion, removes memberships for characters not in Notion
+  defp sync_party_memberships_from_notion(party, page) do
+    case character_ids_from_notion(page, party.campaign_id) do
+      {:ok, notion_character_ids} ->
+        # Get current membership character IDs
+        party = Repo.preload(party, :memberships)
+        current_character_ids = Enum.map(party.memberships, & &1.character_id)
+
+        # Characters to add (in Notion but not in Chi War)
+        to_add = notion_character_ids -- current_character_ids
+
+        # Characters to remove (in Chi War but not in Notion)
+        to_remove = current_character_ids -- notion_character_ids
+
+        # Add new memberships
+        Enum.each(to_add, fn character_id ->
+          Parties.add_member(party.id, %{"character_id" => character_id})
+        end)
+
+        # Remove old memberships
+        memberships_to_delete =
+          Enum.filter(party.memberships, fn m -> m.character_id in to_remove end)
+
+        Enum.each(memberships_to_delete, fn membership ->
+          Parties.remove_member(membership.id)
+        end)
+
+        :ok
+
+      :skip ->
+        # No character relation property found, don't modify memberships
+        :ok
+    end
   end
 
   @doc """

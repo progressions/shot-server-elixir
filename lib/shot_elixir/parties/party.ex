@@ -95,7 +95,10 @@ defmodule ShotElixir.Parties.Party do
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
-    maybe_add_character_relations(base, party)
+    base
+    |> maybe_add_character_relations(party)
+    |> maybe_add_faction_relation(party)
+    |> maybe_add_juncture_relation(party)
   end
 
   # Simple version without mention conversion (fallback)
@@ -108,7 +111,10 @@ defmodule ShotElixir.Parties.Party do
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
-    maybe_add_character_relations(base, party)
+    base
+    |> maybe_add_character_relations(party)
+    |> maybe_add_faction_relation(party)
+    |> maybe_add_juncture_relation(party)
   end
 
   # Helper to add character relations to base properties
@@ -131,6 +137,30 @@ defmodule ShotElixir.Parties.Party do
       end
     else
       base
+    end
+  end
+
+  # Add faction relation if the party has a faction with a notion_page_id
+  defp maybe_add_faction_relation(properties, party) do
+    if Ecto.assoc_loaded?(party.faction) and party.faction != nil and
+         party.faction.notion_page_id != nil do
+      Map.put(properties, "Faction", %{
+        "relation" => [%{"id" => party.faction.notion_page_id}]
+      })
+    else
+      properties
+    end
+  end
+
+  # Add juncture relation if the party has a juncture with a notion_page_id
+  defp maybe_add_juncture_relation(properties, party) do
+    if Ecto.assoc_loaded?(party.juncture) and party.juncture != nil and
+         party.juncture.notion_page_id != nil do
+      Map.put(properties, "Juncture", %{
+        "relation" => [%{"id" => party.juncture.notion_page_id}]
+      })
+    else
+      properties
     end
   end
 end

@@ -4,6 +4,7 @@ defmodule ShotElixir.Characters.Character do
   use Waffle.Ecto.Schema
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -262,6 +263,8 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
+    |> maybe_add_faction_relation(character)
+    |> maybe_add_juncture_relation(character)
   end
 
   # Simple version without mention conversion (fallback)
@@ -307,6 +310,8 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
+    |> maybe_add_faction_relation(character)
+    |> maybe_add_juncture_relation(character)
   end
 
   # Only add rich_text property if value is not empty
@@ -388,13 +393,39 @@ defmodule ShotElixir.Characters.Character do
     end
   end
 
+  # Add faction relation if the character has a faction with a notion_page_id
+  defp maybe_add_faction_relation(properties, character) do
+    if Ecto.assoc_loaded?(character.faction) and character.faction != nil and
+         character.faction.notion_page_id != nil do
+      Map.put(properties, "Faction", %{
+        "relation" => [%{"id" => character.faction.notion_page_id}]
+      })
+    else
+      properties
+    end
+  end
+
+  # Add juncture relation if the character has a juncture with a notion_page_id
+  defp maybe_add_juncture_relation(properties, character) do
+    if Ecto.assoc_loaded?(character.juncture) and character.juncture != nil and
+         character.juncture.notion_page_id != nil do
+      Map.put(properties, "Juncture", %{
+        "relation" => [%{"id" => character.juncture.notion_page_id}]
+      })
+    else
+      properties
+    end
+  end
+
   @doc """
   Extract character attributes from Notion page properties.
   Merges Notion data with existing character data, preserving local values > 7.
   Filters out nil values to avoid overwriting defaults with nil.
+  Also extracts faction_id and juncture_id from Notion relations.
   """
   def attributes_from_notion(character, page) do
     props = page["properties"]
+    campaign_id = character.campaign_id
 
     av =
       %{
@@ -443,6 +474,24 @@ defmodule ShotElixir.Characters.Character do
       description: Map.merge(character.description || %{}, description)
     }
     |> maybe_put_at_a_glance(get_checkbox(props, "At a Glance"))
+    |> maybe_put_faction_id(page, campaign_id)
+    |> maybe_put_juncture_id(page, campaign_id)
+  end
+
+  # Add faction_id from Notion relation if present
+  defp maybe_put_faction_id(attrs, page, campaign_id) do
+    case NotionMappers.faction_id_from_notion(page, campaign_id) do
+      nil -> attrs
+      faction_id -> Map.put(attrs, :faction_id, faction_id)
+    end
+  end
+
+  # Add juncture_id from Notion relation if present
+  defp maybe_put_juncture_id(attrs, page, campaign_id) do
+    case NotionMappers.juncture_id_from_notion(page, campaign_id) do
+      nil -> attrs
+      juncture_id -> Map.put(attrs, :juncture_id, juncture_id)
+    end
   end
 
   defp av_or_new(_character, _key, nil), do: nil

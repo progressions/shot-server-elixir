@@ -122,7 +122,7 @@ defmodule ShotElixir.Adventures.Adventure do
     maybe_add_optional_fields(base, adventure)
   end
 
-  # Helper to add optional fields (season, dates)
+  # Helper to add optional fields (season, dates, hero/villain relations)
   defp maybe_add_optional_fields(base, adventure) do
     base =
       if adventure.season do
@@ -140,10 +140,61 @@ defmodule ShotElixir.Adventures.Adventure do
         base
       end
 
-    if adventure.ended_at do
-      Map.put(base, "Ended", %{"date" => %{"start" => DateTime.to_iso8601(adventure.ended_at)}})
+    base =
+      if adventure.ended_at do
+        Map.put(base, "Ended", %{"date" => %{"start" => DateTime.to_iso8601(adventure.ended_at)}})
+      else
+        base
+      end
+
+    base
+    |> maybe_add_hero_relations(adventure)
+    |> maybe_add_villain_relations(adventure)
+  end
+
+  # Add hero (character) relations if adventure_characters are preloaded
+  defp maybe_add_hero_relations(properties, adventure) do
+    if Ecto.assoc_loaded?(adventure.adventure_characters) do
+      character_ids =
+        adventure.adventure_characters
+        |> Enum.map(fn ac ->
+          if Ecto.assoc_loaded?(ac.character), do: ac.character, else: nil
+        end)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(& &1.notion_page_id)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(fn id -> %{"id" => id} end)
+
+      if Enum.any?(character_ids) do
+        Map.put(properties, "Characters", %{"relation" => character_ids})
+      else
+        properties
+      end
     else
-      base
+      properties
+    end
+  end
+
+  # Add villain relations if adventure_villains are preloaded
+  defp maybe_add_villain_relations(properties, adventure) do
+    if Ecto.assoc_loaded?(adventure.adventure_villains) do
+      villain_ids =
+        adventure.adventure_villains
+        |> Enum.map(fn av ->
+          if Ecto.assoc_loaded?(av.character), do: av.character, else: nil
+        end)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(& &1.notion_page_id)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.map(fn id -> %{"id" => id} end)
+
+      if Enum.any?(villain_ids) do
+        Map.put(properties, "Villains", %{"relation" => villain_ids})
+      else
+        properties
+      end
+    else
+      properties
     end
   end
 end
