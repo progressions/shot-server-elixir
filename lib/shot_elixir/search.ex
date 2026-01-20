@@ -66,12 +66,15 @@ defmodule ShotElixir.Search do
   def search_campaign(campaign_id, query, opts) when is_binary(query) and byte_size(query) > 0 do
     limit = Keyword.get(opts, :limit, @default_limit_per_type)
     search_term = "%#{query}%"
+    # Lowercase version for case-insensitive name matching in ORDER BY
+    name_match_term = "%#{String.downcase(query)}%"
 
     results =
       @searchable_schemas
       |> Enum.map(fn {type, {schema, preloads}} ->
         Task.async(fn ->
-          {type, search_schema(schema, campaign_id, search_term, limit, preloads)}
+          {type,
+           search_schema(schema, campaign_id, search_term, name_match_term, limit, preloads)}
         end)
       end)
       |> Task.await_many(@search_timeout_ms)
@@ -109,11 +112,16 @@ defmodule ShotElixir.Search do
 
   # Private helpers
 
-  defp search_schema(schema, campaign_id, search_term, limit, preloads) do
+  defp search_schema(schema, campaign_id, search_term, name_match_term, limit, preloads) do
+    # Order by relevance: name matches first (score 1), then description-only matches (score 0)
+    # Within each group, sort alphabetically by name
     base_query =
       from(e in schema,
         where: e.campaign_id == ^campaign_id,
-        order_by: [asc: fragment("LOWER(?)", e.name)],
+        order_by: [
+          desc: fragment("CASE WHEN LOWER(?) LIKE ? THEN 1 ELSE 0 END", e.name, ^name_match_term),
+          asc: fragment("LOWER(?)", e.name)
+        ],
         limit: ^limit
       )
 
