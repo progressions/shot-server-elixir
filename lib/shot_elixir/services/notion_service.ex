@@ -1462,7 +1462,9 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if skip_bot_update?(page, opts) do
+          force = Keyword.get(opts, :force, false)
+
+          if skip_bot_update?(page, opts) and not force do
             Logger.info(
               "Skipping update for adventure #{adventure.id} as it was last edited by the bot"
             )
