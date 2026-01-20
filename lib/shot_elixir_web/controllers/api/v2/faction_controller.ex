@@ -6,6 +6,7 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
   alias ShotElixir.Factions
   alias ShotElixir.Campaigns
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.NotionPage
   alias ShotElixirWeb.Api.V2.SyncFromNotion
   alias ShotElixirWeb.Plugs.ETag
 
@@ -536,6 +537,31 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_faction_from_notion/2,
               view: ShotElixirWeb.Api.V2.FactionView
+            )
+        end
+    end
+  end
+
+  @doc """
+  Returns the raw Notion page JSON for a faction.
+  Used for debugging Notion sync issues.
+  """
+  def notion_page(conn, %{"faction_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Factions.get_faction(id) do
+      nil ->
+        {:error, :not_found}
+
+      faction ->
+        case Campaigns.get_campaign(faction.campaign_id) do
+          nil ->
+            {:error, :not_found}
+
+          campaign ->
+            NotionPage.fetch(conn, current_user, faction, campaign,
+              authorize: &authorize_campaign_access/2,
+              entity_name: "Faction"
             )
         end
     end

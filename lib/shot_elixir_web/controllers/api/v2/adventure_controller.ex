@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.NotionPage
   alias ShotElixirWeb.Api.V2.SyncFromNotion
 
   action_fallback ShotElixirWeb.FallbackController
@@ -674,6 +675,31 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_adventure_from_notion/2,
               view: ShotElixirWeb.Api.V2.AdventureView
+            )
+        end
+    end
+  end
+
+  @doc """
+  Returns the raw Notion page JSON for an adventure.
+  Used for debugging Notion sync issues.
+  """
+  def notion_page(conn, %{"adventure_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Adventures.get_adventure(id) do
+      nil ->
+        {:error, :not_found}
+
+      adventure ->
+        case Campaigns.get_campaign(adventure.campaign_id) do
+          nil ->
+            {:error, :not_found}
+
+          campaign ->
+            NotionPage.fetch(conn, current_user, adventure, campaign,
+              authorize: &authorize_campaign_access/2,
+              entity_name: "Adventure"
             )
         end
     end

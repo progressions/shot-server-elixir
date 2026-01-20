@@ -170,6 +170,7 @@ defmodule ShotElixirWeb.Router do
       get "/pdf", CharacterController, :pdf
       delete "/image", CharacterController, :remove_image
       post "/notion/create", CharacterController, :create_notion_page
+      get "/notion_page", CharacterController, :notion_page
       resources "/advancements", AdvancementController
       resources "/weapons", CharacterWeaponController, only: [:index, :create, :delete]
       resources "/schticks", CharacterSchtickController, only: [:index, :create, :delete]
@@ -239,6 +240,7 @@ defmodule ShotElixirWeb.Router do
       delete "/image", JunctureController, :remove_image
       post "/sync", JunctureController, :sync
       post "/sync_from_notion", JunctureController, :sync_from_notion
+      get "/notion_page", JunctureController, :notion_page
       resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
       delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
     end
@@ -256,6 +258,7 @@ defmodule ShotElixirWeb.Router do
       delete "/image", SiteController, :remove_image
       post "/sync", SiteController, :sync
       post "/sync_from_notion", SiteController, :sync_from_notion
+      get "/notion_page", SiteController, :notion_page
       resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
       delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
     end
@@ -271,6 +274,7 @@ defmodule ShotElixirWeb.Router do
       delete "/image", PartyController, :remove_image
       post "/sync", PartyController, :sync
       post "/sync_from_notion", PartyController, :sync_from_notion
+      get "/notion_page", PartyController, :notion_page
       resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
       delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
 
@@ -294,6 +298,7 @@ defmodule ShotElixirWeb.Router do
       delete "/fights/:fight_id", AdventureController, :remove_fight
       post "/sync", AdventureController, :sync
       post "/sync_from_notion", AdventureController, :sync_from_notion
+      get "/notion_page", AdventureController, :notion_page
       resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
       delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
     end
@@ -303,6 +308,7 @@ defmodule ShotElixirWeb.Router do
       delete "/image", FactionController, :remove_image
       post "/sync", FactionController, :sync
       post "/sync_from_notion", FactionController, :sync_from_notion
+      get "/notion_page", FactionController, :notion_page
       resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
       delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
     end

@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.NotionPage
   alias ShotElixirWeb.Api.V2.SyncFromNotion
   alias ShotElixirWeb.Plugs.ETag
 
@@ -911,6 +912,31 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_party_from_notion/2,
               view: ShotElixirWeb.Api.V2.PartyView
+            )
+        end
+    end
+  end
+
+  @doc """
+  Returns the raw Notion page JSON for a party.
+  Used for debugging Notion sync issues.
+  """
+  def notion_page(conn, %{"party_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Parties.get_party(id) do
+      nil ->
+        {:error, :not_found}
+
+      party ->
+        case Campaigns.get_campaign(party.campaign_id) do
+          nil ->
+            {:error, :not_found}
+
+          campaign ->
+            NotionPage.fetch(conn, current_user, party, campaign,
+              authorize: &authorize_campaign_access/2,
+              entity_name: "Party"
             )
         end
     end
