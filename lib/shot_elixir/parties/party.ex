@@ -3,6 +3,7 @@ defmodule ShotElixir.Parties.Party do
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -95,7 +96,10 @@ defmodule ShotElixir.Parties.Party do
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
-    maybe_add_character_relations(base, party)
+    base
+    |> maybe_add_character_relations(party)
+    |> NotionMappers.maybe_add_faction_relation(party)
+    |> NotionMappers.maybe_add_juncture_relation(party)
   end
 
   # Simple version without mention conversion (fallback)
@@ -108,7 +112,10 @@ defmodule ShotElixir.Parties.Party do
       "At a Glance" => %{"checkbox" => !!party.at_a_glance}
     }
 
-    maybe_add_character_relations(base, party)
+    base
+    |> maybe_add_character_relations(party)
+    |> NotionMappers.maybe_add_faction_relation(party)
+    |> NotionMappers.maybe_add_juncture_relation(party)
   end
 
   # Helper to add character relations to base properties

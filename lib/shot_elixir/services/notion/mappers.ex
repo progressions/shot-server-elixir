@@ -8,11 +8,55 @@ defmodule ShotElixir.Services.Notion.Mappers do
   import Ecto.Query
 
   alias ShotElixir.Characters.Character
+  alias ShotElixir.Factions.Faction
   alias ShotElixir.Helpers.MentionConverter
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Repo
   alias ShotElixir.Services.Notion.Blocks
   alias ShotElixir.Sites.Site
+
+  # ---------------------------------------------------------------------------
+  # Notion Relation Helpers (TO Notion)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Generic helper to add a Notion relation based on a loaded association.
+  Used by schema modules to add faction/juncture relations to Notion properties.
+
+  ## Parameters
+    - properties: The current Notion properties map
+    - entity: The entity struct (Character, Site, Party, etc.)
+    - assoc_field: The association field atom (e.g., :faction, :juncture)
+    - notion_property_name: The Notion property name (e.g., "Faction", "Juncture")
+
+  ## Returns
+    The properties map, potentially with the relation added.
+  """
+  def maybe_add_relation(properties, entity, assoc_field, notion_property_name) do
+    assoc = Map.get(entity, assoc_field)
+
+    if Ecto.assoc_loaded?(assoc) and not is_nil(assoc) and not is_nil(assoc.notion_page_id) do
+      Map.put(properties, notion_property_name, %{
+        "relation" => [%{"id" => assoc.notion_page_id}]
+      })
+    else
+      properties
+    end
+  end
+
+  @doc """
+  Add faction relation if the entity has a faction with a notion_page_id.
+  """
+  def maybe_add_faction_relation(properties, entity) do
+    maybe_add_relation(properties, entity, :faction, "Faction")
+  end
+
+  @doc """
+  Add juncture relation if the entity has a juncture with a notion_page_id.
+  """
+  def maybe_add_juncture_relation(properties, entity) do
+    maybe_add_relation(properties, entity, :juncture, "Juncture")
+  end
 
   # ---------------------------------------------------------------------------
   # Public API
@@ -82,6 +126,24 @@ defmodule ShotElixir.Services.Notion.Mappers do
       description: get_rich_text_as_html(props, "Description", campaign_id)
     }
     |> maybe_put_at_a_glance(get_checkbox_content(props, "At a Glance"))
+    |> maybe_put_faction_id(page, campaign_id)
+    |> maybe_put_juncture_id(page, campaign_id)
+  end
+
+  # Add faction_id from Notion relation if present
+  defp maybe_put_faction_id(attrs, page, campaign_id) do
+    case faction_id_from_notion(page, campaign_id) do
+      nil -> attrs
+      faction_id -> Map.put(attrs, :faction_id, faction_id)
+    end
+  end
+
+  # Add juncture_id from Notion relation if present
+  defp maybe_put_juncture_id(attrs, page, campaign_id) do
+    case juncture_id_from_notion(page, campaign_id) do
+      nil -> attrs
+      juncture_id -> Map.put(attrs, :juncture_id, juncture_id)
+    end
   end
 
   def adventure_attributes_from_notion(page, campaign_id) do
@@ -172,9 +234,81 @@ defmodule ShotElixir.Services.Notion.Mappers do
     relation_ids_from_notion(page, campaign_id, ["Villains", "Villain", "Antagonists"], Character)
   end
 
+  @doc """
+  Extract member character IDs from a Notion page's member relation property.
+  Tries property names in order: "Members", "Characters".
+  Returns {:ok, character_ids} if the relation is found, :skip otherwise.
+  """
+  def member_ids_from_notion(page, campaign_id) do
+    relation_ids_from_notion(page, campaign_id, ["Members", "Characters"], Character)
+  end
+
+  @doc """
+  Extract faction_id from a Notion page's faction relation property.
+  Tries property names in order: "Faction", "Factions".
+  Returns the first matching faction's ID, or nil if not found.
+  """
+  def faction_id_from_notion(page, campaign_id) do
+    case relation_id_from_notion(page, campaign_id, ["Faction", "Factions"], Faction) do
+      {:ok, id} -> id
+      :skip -> nil
+    end
+  end
+
+  @doc """
+  Extract juncture_id from a Notion page's juncture relation property.
+  Tries property names in order: "Juncture", "Junctures", "Time Period".
+  Returns the first matching juncture's ID, or nil if not found.
+  """
+  def juncture_id_from_notion(page, campaign_id) do
+    case relation_id_from_notion(
+           page,
+           campaign_id,
+           ["Juncture", "Junctures", "Time Period"],
+           Juncture
+         ) do
+      {:ok, id} -> id
+      :skip -> nil
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Private helpers
   # ---------------------------------------------------------------------------
+
+  # Extract a single entity ID from a Notion relation property (for belongs_to associations).
+  # Returns {:ok, id} if found, :skip if the relation property doesn't exist.
+  defp relation_id_from_notion(page, campaign_id, property_names, schema) do
+    relation =
+      property_names
+      |> Enum.find_value(fn key ->
+        case get_in(page, ["properties", key, "relation"]) do
+          relations when is_list(relations) and length(relations) > 0 -> relations
+          _ -> nil
+        end
+      end)
+
+    case relation do
+      nil ->
+        :skip
+
+      [first | _] ->
+        page_id = first["id"]
+
+        if is_binary(page_id) do
+          id =
+            from(entity in schema,
+              where: entity.notion_page_id == ^page_id and entity.campaign_id == ^campaign_id,
+              select: entity.id
+            )
+            |> Repo.one()
+
+          {:ok, id}
+        else
+          {:ok, nil}
+        end
+    end
+  end
 
   # Shared helper for extracting entity IDs from Notion relation properties.
   # Tries each property name in order until one is found with a relation.

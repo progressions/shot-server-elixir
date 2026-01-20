@@ -4,6 +4,7 @@ defmodule ShotElixir.Characters.Character do
   use Waffle.Ecto.Schema
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -236,6 +237,7 @@ defmodule ShotElixir.Characters.Character do
       "Mutant" => %{"number" => to_number(av["Mutant"])},
       "Scroungetech" => %{"number" => to_number(av["Scroungetech"])},
       "Creature" => %{"number" => to_number(av["Creature"])},
+      "Genome" => %{"number" => to_number(av["Genome"])},
       "Inactive" => %{"checkbox" => !character.active},
       "At a Glance" => %{"checkbox" => !!character.at_a_glance},
       "Tags" => %{"multi_select" => tags_for_notion(character)}
@@ -257,11 +259,14 @@ defmodule ShotElixir.Characters.Character do
       campaign
     )
     |> maybe_add_rich_text_with_mentions("Description", desc["Appearance"] || "", campaign)
+    |> maybe_add_rich_text_with_mentions("Background", desc["Background"] || "", campaign)
     |> maybe_add_select("MainAttack", av["MainAttack"])
     |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
+    |> NotionMappers.maybe_add_faction_relation(character)
+    |> NotionMappers.maybe_add_juncture_relation(character)
   end
 
   # Simple version without mention conversion (fallback)
@@ -285,6 +290,7 @@ defmodule ShotElixir.Characters.Character do
       "Mutant" => %{"number" => to_number(av["Mutant"])},
       "Scroungetech" => %{"number" => to_number(av["Scroungetech"])},
       "Creature" => %{"number" => to_number(av["Creature"])},
+      "Genome" => %{"number" => to_number(av["Genome"])},
       "Inactive" => %{"checkbox" => !character.active},
       "At a Glance" => %{"checkbox" => !!character.at_a_glance},
       "Tags" => %{"multi_select" => tags_for_notion(character)}
@@ -302,11 +308,14 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_rich_text("Style of Dress", to_string(desc["Style of Dress"] || ""))
     |> maybe_add_rich_text("Melodramatic Hook", strip_html(desc["Melodramatic Hook"] || ""))
     |> maybe_add_rich_text("Description", strip_html(desc["Appearance"] || ""))
+    |> maybe_add_rich_text("Background", strip_html(desc["Background"] || ""))
     |> maybe_add_select("MainAttack", av["MainAttack"])
     |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
+    |> NotionMappers.maybe_add_faction_relation(character)
+    |> NotionMappers.maybe_add_juncture_relation(character)
   end
 
   # Only add rich_text property if value is not empty
@@ -392,9 +401,11 @@ defmodule ShotElixir.Characters.Character do
   Extract character attributes from Notion page properties.
   Merges Notion data with existing character data, preserving local values > 7.
   Filters out nil values to avoid overwriting defaults with nil.
+  Also extracts faction_id and juncture_id from Notion relations.
   """
   def attributes_from_notion(character, page) do
     props = page["properties"]
+    campaign_id = character.campaign_id
 
     av =
       %{
@@ -415,6 +426,7 @@ defmodule ShotElixir.Characters.Character do
         "Creature" => av_or_new(character, "Creature", get_number(props, "Creature")),
         "Scroungetech" => av_or_new(character, "Scroungetech", get_number(props, "Scroungetech")),
         "Mutant" => av_or_new(character, "Mutant", get_number(props, "Mutant")),
+        "Genome" => av_or_new(character, "Genome", get_number(props, "Genome")),
         "Damage" => av_or_new(character, "Damage", get_number(props, "Damage"))
       }
       # Filter out nil values to preserve defaults
@@ -424,13 +436,15 @@ defmodule ShotElixir.Characters.Character do
     description =
       %{
         "Age" => get_rich_text(props, "Age"),
+        "Nicknames" => get_rich_text(props, "Nicknames"),
         "Height" => get_rich_text(props, "Height"),
         "Weight" => get_rich_text(props, "Weight"),
         "Eye Color" => get_rich_text(props, "Eye Color"),
         "Hair Color" => get_rich_text(props, "Hair Color"),
         "Appearance" => get_rich_text(props, "Description"),
         "Style of Dress" => get_rich_text(props, "Style of Dress"),
-        "Melodramatic Hook" => get_rich_text(props, "Melodramatic Hook")
+        "Melodramatic Hook" => get_rich_text(props, "Melodramatic Hook"),
+        "Background" => get_rich_text(props, "Background")
       }
       # Filter out empty strings to preserve existing description values
       |> Enum.reject(fn {_k, v} -> is_nil(v) || v == "" end)
@@ -443,6 +457,24 @@ defmodule ShotElixir.Characters.Character do
       description: Map.merge(character.description || %{}, description)
     }
     |> maybe_put_at_a_glance(get_checkbox(props, "At a Glance"))
+    |> maybe_put_faction_id(page, campaign_id)
+    |> maybe_put_juncture_id(page, campaign_id)
+  end
+
+  # Add faction_id from Notion relation if present
+  defp maybe_put_faction_id(attrs, page, campaign_id) do
+    case NotionMappers.faction_id_from_notion(page, campaign_id) do
+      nil -> attrs
+      faction_id -> Map.put(attrs, :faction_id, faction_id)
+    end
+  end
+
+  # Add juncture_id from Notion relation if present
+  defp maybe_put_juncture_id(attrs, page, campaign_id) do
+    case NotionMappers.juncture_id_from_notion(page, campaign_id) do
+      nil -> attrs
+      juncture_id -> Map.put(attrs, :juncture_id, juncture_id)
+    end
   end
 
   defp av_or_new(_character, _key, nil), do: nil

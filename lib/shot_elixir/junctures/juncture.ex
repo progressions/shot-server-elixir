@@ -3,6 +3,7 @@ defmodule ShotElixir.Junctures.Juncture do
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -84,6 +85,7 @@ defmodule ShotElixir.Junctures.Juncture do
       "Description" => %{"rich_text" => description_rich_text},
       "At a Glance" => %{"checkbox" => !!juncture.at_a_glance}
     }
+    |> NotionMappers.maybe_add_faction_relation(juncture)
   end
 
   # Simple version without mention conversion (fallback)
@@ -95,5 +97,6 @@ defmodule ShotElixir.Junctures.Juncture do
       },
       "At a Glance" => %{"checkbox" => !!juncture.at_a_glance}
     }
+    |> NotionMappers.maybe_add_faction_relation(juncture)
   end
 end

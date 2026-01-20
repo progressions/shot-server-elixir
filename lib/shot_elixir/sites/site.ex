@@ -5,6 +5,7 @@ defmodule ShotElixir.Sites.Site do
 
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -95,7 +96,10 @@ defmodule ShotElixir.Sites.Site do
       "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
 
-    maybe_add_character_relations(base, site)
+    base
+    |> maybe_add_character_relations(site)
+    |> NotionMappers.maybe_add_faction_relation(site)
+    |> NotionMappers.maybe_add_juncture_relation(site)
   end
 
   # Simple version without mention conversion (fallback)
@@ -108,7 +112,10 @@ defmodule ShotElixir.Sites.Site do
       "At a Glance" => %{"checkbox" => !!site.at_a_glance}
     }
 
-    maybe_add_character_relations(base, site)
+    base
+    |> maybe_add_character_relations(site)
+    |> NotionMappers.maybe_add_faction_relation(site)
+    |> NotionMappers.maybe_add_juncture_relation(site)
   end
 
   # Helper to add character relations to base properties
