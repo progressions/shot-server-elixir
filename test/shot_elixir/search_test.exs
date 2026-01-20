@@ -312,5 +312,69 @@ defmodule ShotElixir.SearchTest do
       assert result.meta.limit_per_type == 5
       assert result.meta.total_count == 1
     end
+
+    test "prioritizes name matches over description-only matches", %{campaign: campaign} do
+      # Create a character with "hostile" only in description
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Alpha Team",
+          campaign_id: campaign.id,
+          character_type: :pc,
+          description: %{"description" => "A hostile group of mercenaries"}
+        })
+
+      # Create a character with "hostile" in the name
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Hostile Takeover",
+          campaign_id: campaign.id,
+          character_type: :pc,
+          description: %{"description" => "A corporate raider"}
+        })
+
+      result = Search.search_campaign(campaign.id, "hostile")
+
+      assert %{results: %{characters: characters}} = result
+      assert length(characters) == 2
+
+      # "Hostile Takeover" should come first (name match)
+      # "Alpha Team" should come second (description-only match)
+      [first, second] = characters
+      assert first.name == "Hostile Takeover"
+      assert second.name == "Alpha Team"
+    end
+
+    test "within same relevance tier, results are sorted alphabetically", %{campaign: campaign} do
+      # Create multiple characters with the search term in their names
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Zebra Dragon",
+          campaign_id: campaign.id,
+          character_type: :pc
+        })
+
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Alpha Dragon",
+          campaign_id: campaign.id,
+          character_type: :pc
+        })
+
+      {:ok, _} =
+        Characters.create_character(%{
+          name: "Middle Dragon",
+          campaign_id: campaign.id,
+          character_type: :pc
+        })
+
+      result = Search.search_campaign(campaign.id, "dragon")
+
+      assert %{results: %{characters: characters}} = result
+      assert length(characters) == 3
+
+      # All have name matches, so should be sorted alphabetically
+      names = Enum.map(characters, & &1.name)
+      assert names == ["Alpha Dragon", "Middle Dragon", "Zebra Dragon"]
+    end
   end
 end
