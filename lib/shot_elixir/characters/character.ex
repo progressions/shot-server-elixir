@@ -266,7 +266,7 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
     |> NotionMappers.maybe_add_faction_relation(character)
-    |> NotionMappers.maybe_add_juncture_relation(character)
+    |> maybe_add_juncture_multi_select(character)
   end
 
   # Simple version without mention conversion (fallback)
@@ -315,7 +315,7 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
     |> NotionMappers.maybe_add_faction_relation(character)
-    |> NotionMappers.maybe_add_juncture_relation(character)
+    |> maybe_add_juncture_multi_select(character)
   end
 
   # Only add rich_text property if value is not empty
@@ -392,6 +392,19 @@ defmodule ShotElixir.Characters.Character do
     if Application.get_env(:shot_elixir, :environment) == :prod do
       url = "https://chiwar.net/characters/#{character.id}"
       Map.put(properties, "Chi War Link", %{"url" => url})
+    else
+      properties
+    end
+  end
+
+  # Add juncture as multi_select (Character database uses multi_select, not relation)
+  defp maybe_add_juncture_multi_select(properties, character) do
+    juncture = Map.get(character, :juncture)
+
+    if Ecto.assoc_loaded?(juncture) and not is_nil(juncture) do
+      Map.put(properties, "Juncture", %{
+        "multi_select" => [%{"name" => juncture.name}]
+      })
     else
       properties
     end

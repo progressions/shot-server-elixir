@@ -372,7 +372,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
          :ok <- authorize_character_edit(character, current_user),
          :ok <- require_notion_page_linked(character),
          {:ok, updated_character} <-
-           ShotElixir.Services.NotionService.update_character_from_notion(character) do
+           ShotElixir.Services.NotionService.update_character_from_notion(character, force: true) do
       conn
       |> put_view(ShotElixirWeb.Api.V2.CharacterView)
       |> render("show.json", character: updated_character)
