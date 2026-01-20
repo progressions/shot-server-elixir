@@ -73,6 +73,9 @@ defmodule ShotElixir.Services.Notion.Images do
       nil
   end
 
+  # Fallback for entities without image_url field (e.g., Juncture)
+  def add_image_to_notion(_entity), do: nil
+
   # ---------------------------------------------------------------------------
   # Pull image from Notion and attach locally
   # ---------------------------------------------------------------------------
