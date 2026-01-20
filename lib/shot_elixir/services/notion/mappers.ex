@@ -192,6 +192,15 @@ defmodule ShotElixir.Services.Notion.Mappers do
   end
 
   @doc """
+  Extract member character IDs from a Notion page's member relation property.
+  Tries property names in order: "Members", "Characters".
+  Returns {:ok, character_ids} if the relation is found, :skip otherwise.
+  """
+  def member_ids_from_notion(page, campaign_id) do
+    relation_ids_from_notion(page, campaign_id, ["Members", "Characters"], Character)
+  end
+
+  @doc """
   Extract faction_id from a Notion page's faction relation property.
   Tries property names in order: "Faction", "Factions".
   Returns the first matching faction's ID, or nil if not found.

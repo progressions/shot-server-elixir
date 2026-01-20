@@ -258,6 +258,7 @@ defmodule ShotElixir.Characters.Character do
       campaign
     )
     |> maybe_add_rich_text_with_mentions("Description", desc["Appearance"] || "", campaign)
+    |> maybe_add_rich_text_with_mentions("Background", desc["Background"] || "", campaign)
     |> maybe_add_select("MainAttack", av["MainAttack"])
     |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
     |> maybe_add_select("FortuneType", av["FortuneType"])
@@ -305,6 +306,7 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_rich_text("Style of Dress", to_string(desc["Style of Dress"] || ""))
     |> maybe_add_rich_text("Melodramatic Hook", strip_html(desc["Melodramatic Hook"] || ""))
     |> maybe_add_rich_text("Description", strip_html(desc["Appearance"] || ""))
+    |> maybe_add_rich_text("Background", strip_html(desc["Background"] || ""))
     |> maybe_add_select("MainAttack", av["MainAttack"])
     |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
     |> maybe_add_select("FortuneType", av["FortuneType"])
@@ -455,13 +457,15 @@ defmodule ShotElixir.Characters.Character do
     description =
       %{
         "Age" => get_rich_text(props, "Age"),
+        "Nicknames" => get_rich_text(props, "Nicknames"),
         "Height" => get_rich_text(props, "Height"),
         "Weight" => get_rich_text(props, "Weight"),
         "Eye Color" => get_rich_text(props, "Eye Color"),
         "Hair Color" => get_rich_text(props, "Hair Color"),
         "Appearance" => get_rich_text(props, "Description"),
         "Style of Dress" => get_rich_text(props, "Style of Dress"),
-        "Melodramatic Hook" => get_rich_text(props, "Melodramatic Hook")
+        "Melodramatic Hook" => get_rich_text(props, "Melodramatic Hook"),
+        "Background" => get_rich_text(props, "Background")
       }
       # Filter out empty strings to preserve existing description values
       |> Enum.reject(fn {_k, v} -> is_nil(v) || v == "" end)

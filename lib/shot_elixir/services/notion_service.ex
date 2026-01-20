@@ -67,6 +67,7 @@ defmodule ShotElixir.Services.NotionService do
   defdelegate site_ids_from_notion(page, campaign_id), to: Mappers
   defdelegate hero_ids_from_notion(page, campaign_id), to: Mappers
   defdelegate villain_ids_from_notion(page, campaign_id), to: Mappers
+  defdelegate member_ids_from_notion(page, campaign_id), to: Mappers
   defdelegate data_source_id_for(database_id, opts \\ []), to: Config
   defdelegate skip_bot_update?(page, opts \\ []), to: Config
 
@@ -879,8 +880,8 @@ defmodule ShotElixir.Services.NotionService do
   otherwise updates the existing page.
   """
   def sync_juncture(%Juncture{} = juncture) do
-    # Preload campaign for database IDs
-    juncture = Repo.preload(juncture, :campaign)
+    # Preload campaign for database IDs and faction for relations
+    juncture = Repo.preload(juncture, [:campaign, :faction])
 
     case get_database_id_for_entity(juncture.campaign, "junctures") do
       {:error, :no_database_configured} ->
@@ -1137,6 +1138,45 @@ defmodule ShotElixir.Services.NotionService do
     end
   end
 
+  # Sync faction members from Notion character relations
+  # Updates character faction_id fields based on Notion Members relation
+  defp sync_faction_members_from_notion(faction, page) do
+    case member_ids_from_notion(page, faction.campaign_id) do
+      {:ok, notion_character_ids} ->
+        # Get current member character IDs
+        faction = Repo.preload(faction, :characters)
+        current_character_ids = Enum.map(faction.characters, & &1.id)
+
+        # Characters to add (in Notion but not in Chi War)
+        to_add = notion_character_ids -- current_character_ids
+
+        # Characters to remove (in Chi War but not in Notion)
+        to_remove = current_character_ids -- notion_character_ids
+
+        # Add new members by setting their faction_id
+        Enum.each(to_add, fn character_id ->
+          case Repo.get(Character, character_id) do
+            nil -> :ok
+            character -> Characters.update_character(character, %{faction_id: faction.id}, skip_notion_sync: true)
+          end
+        end)
+
+        # Remove old members by clearing their faction_id
+        Enum.each(to_remove, fn character_id ->
+          case Repo.get(Character, character_id) do
+            nil -> :ok
+            character -> Characters.update_character(character, %{faction_id: nil}, skip_notion_sync: true)
+          end
+        end)
+
+        :ok
+
+      :skip ->
+        # No member relation property found, don't modify faction memberships
+        :ok
+    end
+  end
+
   @doc """
   Sync a faction FROM Notion, overwriting local data with the Notion page data.
   """
@@ -1192,9 +1232,11 @@ defmodule ShotElixir.Services.NotionService do
 
             # Skip Notion sync to prevent ping-pong loops when updating from webhook
             case Factions.update_faction(faction, attributes, skip_notion_sync: true) do
-              {:ok, updated_faction} = result ->
+              {:ok, updated_faction} ->
+                # Sync member relations from Notion
+                sync_faction_members_from_notion(updated_faction, page)
                 Notion.log_success("faction", updated_faction.id, payload, page)
-                result
+                {:ok, updated_faction}
 
               {:error, changeset} = error ->
                 log_sync_error(
