@@ -218,7 +218,12 @@ defmodule ShotElixir.Services.Notion.Mappers do
   Returns the first matching juncture's ID, or nil if not found.
   """
   def juncture_id_from_notion(page, campaign_id) do
-    case relation_id_from_notion(page, campaign_id, ["Juncture", "Junctures", "Time Period"], Juncture) do
+    case relation_id_from_notion(
+           page,
+           campaign_id,
+           ["Juncture", "Junctures", "Time Period"],
+           Juncture
+         ) do
       {:ok, id} -> id
       :skip -> nil
     end

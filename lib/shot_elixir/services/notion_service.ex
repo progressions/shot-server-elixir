@@ -1156,16 +1156,24 @@ defmodule ShotElixir.Services.NotionService do
         # Add new members by setting their faction_id
         Enum.each(to_add, fn character_id ->
           case Repo.get(Character, character_id) do
-            nil -> :ok
-            character -> Characters.update_character(character, %{faction_id: faction.id}, skip_notion_sync: true)
+            nil ->
+              :ok
+
+            character ->
+              Characters.update_character(character, %{faction_id: faction.id},
+                skip_notion_sync: true
+              )
           end
         end)
 
         # Remove old members by clearing their faction_id
         Enum.each(to_remove, fn character_id ->
           case Repo.get(Character, character_id) do
-            nil -> :ok
-            character -> Characters.update_character(character, %{faction_id: nil}, skip_notion_sync: true)
+            nil ->
+              :ok
+
+            character ->
+              Characters.update_character(character, %{faction_id: nil}, skip_notion_sync: true)
           end
         end)
 
