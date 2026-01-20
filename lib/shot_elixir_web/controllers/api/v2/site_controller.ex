@@ -599,6 +599,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
               no_page_error: "Site has no Notion page linked",
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_site_from_notion/2,
+              update_opts: [force: true],
               view: ShotElixirWeb.Api.V2.SiteView
             )
         end
