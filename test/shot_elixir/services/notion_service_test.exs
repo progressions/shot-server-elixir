@@ -371,7 +371,9 @@ defmodule ShotElixir.Services.NotionServiceTest do
         %Campaign{}
         |> Campaign.changeset(%{
           name: "Notion Entity Campaign",
-          user_id: user.id
+          user_id: user.id,
+          # Test token for NotionService tests - required for update_*_from_notion functions
+          notion_access_token: "test-notion-token"
         })
         |> Repo.insert()
 
