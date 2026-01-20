@@ -1107,9 +1107,13 @@ defmodule ShotElixir.Services.NotionService do
   defp sync_party_memberships_from_notion(party, page) do
     case character_ids_from_notion(page, party.campaign_id) do
       {:ok, notion_character_ids} ->
-        # Get current membership character IDs
+        # Get current membership character IDs (characters only, ignore vehicle-only memberships)
         party = Repo.preload(party, :memberships)
-        current_character_ids = Enum.map(party.memberships, & &1.character_id)
+
+        current_character_ids =
+          party.memberships
+          |> Enum.map(& &1.character_id)
+          |> Enum.reject(&is_nil/1)
 
         # Characters to add (in Notion but not in Chi War)
         to_add = notion_character_ids -- current_character_ids

@@ -5,6 +5,7 @@ defmodule ShotElixir.Sites.Site do
 
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -97,8 +98,8 @@ defmodule ShotElixir.Sites.Site do
 
     base
     |> maybe_add_character_relations(site)
-    |> maybe_add_faction_relation(site)
-    |> maybe_add_juncture_relation(site)
+    |> NotionMappers.maybe_add_faction_relation(site)
+    |> NotionMappers.maybe_add_juncture_relation(site)
   end
 
   # Simple version without mention conversion (fallback)
@@ -113,8 +114,8 @@ defmodule ShotElixir.Sites.Site do
 
     base
     |> maybe_add_character_relations(site)
-    |> maybe_add_faction_relation(site)
-    |> maybe_add_juncture_relation(site)
+    |> NotionMappers.maybe_add_faction_relation(site)
+    |> NotionMappers.maybe_add_juncture_relation(site)
   end
 
   # Helper to add character relations to base properties
@@ -137,30 +138,6 @@ defmodule ShotElixir.Sites.Site do
       end
     else
       base
-    end
-  end
-
-  # Add faction relation if the site has a faction with a notion_page_id
-  defp maybe_add_faction_relation(properties, site) do
-    if Ecto.assoc_loaded?(site.faction) and site.faction != nil and
-         site.faction.notion_page_id != nil do
-      Map.put(properties, "Faction", %{
-        "relation" => [%{"id" => site.faction.notion_page_id}]
-      })
-    else
-      properties
-    end
-  end
-
-  # Add juncture relation if the site has a juncture with a notion_page_id
-  defp maybe_add_juncture_relation(properties, site) do
-    if Ecto.assoc_loaded?(site.juncture) and site.juncture != nil and
-         site.juncture.notion_page_id != nil do
-      Map.put(properties, "Juncture", %{
-        "relation" => [%{"id" => site.juncture.notion_page_id}]
-      })
-    else
-      properties
     end
   end
 

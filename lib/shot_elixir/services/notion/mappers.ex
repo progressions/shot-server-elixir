@@ -16,6 +16,49 @@ defmodule ShotElixir.Services.Notion.Mappers do
   alias ShotElixir.Sites.Site
 
   # ---------------------------------------------------------------------------
+  # Notion Relation Helpers (TO Notion)
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Generic helper to add a Notion relation based on a loaded association.
+  Used by schema modules to add faction/juncture relations to Notion properties.
+
+  ## Parameters
+    - properties: The current Notion properties map
+    - entity: The entity struct (Character, Site, Party, etc.)
+    - assoc_field: The association field atom (e.g., :faction, :juncture)
+    - notion_property_name: The Notion property name (e.g., "Faction", "Juncture")
+
+  ## Returns
+    The properties map, potentially with the relation added.
+  """
+  def maybe_add_relation(properties, entity, assoc_field, notion_property_name) do
+    assoc = Map.get(entity, assoc_field)
+
+    if Ecto.assoc_loaded?(assoc) and not is_nil(assoc) and not is_nil(assoc.notion_page_id) do
+      Map.put(properties, notion_property_name, %{
+        "relation" => [%{"id" => assoc.notion_page_id}]
+      })
+    else
+      properties
+    end
+  end
+
+  @doc """
+  Add faction relation if the entity has a faction with a notion_page_id.
+  """
+  def maybe_add_faction_relation(properties, entity) do
+    maybe_add_relation(properties, entity, :faction, "Faction")
+  end
+
+  @doc """
+  Add juncture relation if the entity has a juncture with a notion_page_id.
+  """
+  def maybe_add_juncture_relation(properties, entity) do
+    maybe_add_relation(properties, entity, :juncture, "Juncture")
+  end
+
+  # ---------------------------------------------------------------------------
   # Public API
   # ---------------------------------------------------------------------------
 

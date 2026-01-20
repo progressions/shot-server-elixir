@@ -237,6 +237,7 @@ defmodule ShotElixir.Characters.Character do
       "Mutant" => %{"number" => to_number(av["Mutant"])},
       "Scroungetech" => %{"number" => to_number(av["Scroungetech"])},
       "Creature" => %{"number" => to_number(av["Creature"])},
+      "Genome" => %{"number" => to_number(av["Genome"])},
       "Inactive" => %{"checkbox" => !character.active},
       "At a Glance" => %{"checkbox" => !!character.at_a_glance},
       "Tags" => %{"multi_select" => tags_for_notion(character)}
@@ -264,8 +265,8 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
-    |> maybe_add_faction_relation(character)
-    |> maybe_add_juncture_relation(character)
+    |> NotionMappers.maybe_add_faction_relation(character)
+    |> NotionMappers.maybe_add_juncture_relation(character)
   end
 
   # Simple version without mention conversion (fallback)
@@ -289,6 +290,7 @@ defmodule ShotElixir.Characters.Character do
       "Mutant" => %{"number" => to_number(av["Mutant"])},
       "Scroungetech" => %{"number" => to_number(av["Scroungetech"])},
       "Creature" => %{"number" => to_number(av["Creature"])},
+      "Genome" => %{"number" => to_number(av["Genome"])},
       "Inactive" => %{"checkbox" => !character.active},
       "At a Glance" => %{"checkbox" => !!character.at_a_glance},
       "Tags" => %{"multi_select" => tags_for_notion(character)}
@@ -312,8 +314,8 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
     |> maybe_add_chi_war_link(character)
-    |> maybe_add_faction_relation(character)
-    |> maybe_add_juncture_relation(character)
+    |> NotionMappers.maybe_add_faction_relation(character)
+    |> NotionMappers.maybe_add_juncture_relation(character)
   end
 
   # Only add rich_text property if value is not empty
@@ -395,30 +397,6 @@ defmodule ShotElixir.Characters.Character do
     end
   end
 
-  # Add faction relation if the character has a faction with a notion_page_id
-  defp maybe_add_faction_relation(properties, character) do
-    if Ecto.assoc_loaded?(character.faction) and character.faction != nil and
-         character.faction.notion_page_id != nil do
-      Map.put(properties, "Faction", %{
-        "relation" => [%{"id" => character.faction.notion_page_id}]
-      })
-    else
-      properties
-    end
-  end
-
-  # Add juncture relation if the character has a juncture with a notion_page_id
-  defp maybe_add_juncture_relation(properties, character) do
-    if Ecto.assoc_loaded?(character.juncture) and character.juncture != nil and
-         character.juncture.notion_page_id != nil do
-      Map.put(properties, "Juncture", %{
-        "relation" => [%{"id" => character.juncture.notion_page_id}]
-      })
-    else
-      properties
-    end
-  end
-
   @doc """
   Extract character attributes from Notion page properties.
   Merges Notion data with existing character data, preserving local values > 7.
@@ -448,6 +426,7 @@ defmodule ShotElixir.Characters.Character do
         "Creature" => av_or_new(character, "Creature", get_number(props, "Creature")),
         "Scroungetech" => av_or_new(character, "Scroungetech", get_number(props, "Scroungetech")),
         "Mutant" => av_or_new(character, "Mutant", get_number(props, "Mutant")),
+        "Genome" => av_or_new(character, "Genome", get_number(props, "Genome")),
         "Damage" => av_or_new(character, "Damage", get_number(props, "Damage"))
       }
       # Filter out nil values to preserve defaults

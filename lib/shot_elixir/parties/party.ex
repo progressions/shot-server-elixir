@@ -3,6 +3,7 @@ defmodule ShotElixir.Parties.Party do
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -97,8 +98,8 @@ defmodule ShotElixir.Parties.Party do
 
     base
     |> maybe_add_character_relations(party)
-    |> maybe_add_faction_relation(party)
-    |> maybe_add_juncture_relation(party)
+    |> NotionMappers.maybe_add_faction_relation(party)
+    |> NotionMappers.maybe_add_juncture_relation(party)
   end
 
   # Simple version without mention conversion (fallback)
@@ -113,8 +114,8 @@ defmodule ShotElixir.Parties.Party do
 
     base
     |> maybe_add_character_relations(party)
-    |> maybe_add_faction_relation(party)
-    |> maybe_add_juncture_relation(party)
+    |> NotionMappers.maybe_add_faction_relation(party)
+    |> NotionMappers.maybe_add_juncture_relation(party)
   end
 
   # Helper to add character relations to base properties
@@ -137,30 +138,6 @@ defmodule ShotElixir.Parties.Party do
       end
     else
       base
-    end
-  end
-
-  # Add faction relation if the party has a faction with a notion_page_id
-  defp maybe_add_faction_relation(properties, party) do
-    if Ecto.assoc_loaded?(party.faction) and party.faction != nil and
-         party.faction.notion_page_id != nil do
-      Map.put(properties, "Faction", %{
-        "relation" => [%{"id" => party.faction.notion_page_id}]
-      })
-    else
-      properties
-    end
-  end
-
-  # Add juncture relation if the party has a juncture with a notion_page_id
-  defp maybe_add_juncture_relation(properties, party) do
-    if Ecto.assoc_loaded?(party.juncture) and party.juncture != nil and
-         party.juncture.notion_page_id != nil do
-      Map.put(properties, "Juncture", %{
-        "relation" => [%{"id" => party.juncture.notion_page_id}]
-      })
-    else
-      properties
     end
   end
 end
