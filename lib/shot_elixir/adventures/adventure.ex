@@ -3,6 +3,7 @@ defmodule ShotElixir.Adventures.Adventure do
   import Ecto.Changeset
   alias ShotElixir.ImagePositions.ImagePosition
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -106,7 +107,9 @@ defmodule ShotElixir.Adventures.Adventure do
       "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
     }
 
-    maybe_add_optional_fields(base, adventure)
+    base
+    |> maybe_add_optional_fields(adventure)
+    |> NotionMappers.maybe_add_chi_war_link("adventures", adventure)
   end
 
   # Simple version without mention conversion (fallback)
@@ -119,7 +122,9 @@ defmodule ShotElixir.Adventures.Adventure do
       "At a Glance" => %{"checkbox" => !!adventure.at_a_glance}
     }
 
-    maybe_add_optional_fields(base, adventure)
+    base
+    |> maybe_add_optional_fields(adventure)
+    |> NotionMappers.maybe_add_chi_war_link("adventures", adventure)
   end
 
   # Helper to add optional fields (season, dates, hero/villain relations)

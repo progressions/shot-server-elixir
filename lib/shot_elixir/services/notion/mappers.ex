@@ -58,6 +58,27 @@ defmodule ShotElixir.Services.Notion.Mappers do
     maybe_add_relation(properties, entity, :juncture, "Juncture")
   end
 
+  @doc """
+  Add Chi War Link URL property if in production environment.
+  Creates a clickable link back to the entity in the Chi War app.
+
+  ## Parameters
+    - properties: The current Notion properties map
+    - entity_type: String for the URL path (e.g., "characters", "sites", "parties")
+    - entity: The entity struct with an :id field
+
+  ## Returns
+    The properties map, potentially with the Chi War Link added.
+  """
+  def maybe_add_chi_war_link(properties, entity_type, entity) do
+    if Application.get_env(:shot_elixir, :environment) == :prod do
+      url = "https://chiwar.net/#{entity_type}/#{entity.id}"
+      Map.put(properties, "Chi War Link", %{"url" => url})
+    else
+      properties
+    end
+  end
+
   # ---------------------------------------------------------------------------
   # Public API
   # ---------------------------------------------------------------------------

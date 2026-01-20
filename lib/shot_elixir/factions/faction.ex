@@ -10,6 +10,7 @@ defmodule ShotElixir.Factions.Faction do
   alias ShotElixir.Parties.Party
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Helpers.MentionConverter
+  alias ShotElixir.Services.Notion.Mappers, as: NotionMappers
   import ShotElixir.Helpers.Html, only: [strip_html: 1]
 
   @primary_key {:id, :binary_id, autogenerate: true}
@@ -97,7 +98,9 @@ defmodule ShotElixir.Factions.Faction do
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
 
-    maybe_add_member_relations(base, faction)
+    base
+    |> maybe_add_member_relations(faction)
+    |> NotionMappers.maybe_add_chi_war_link("factions", faction)
   end
 
   # Simple version without mention conversion (fallback)
@@ -110,7 +113,9 @@ defmodule ShotElixir.Factions.Faction do
       "At a Glance" => %{"checkbox" => !!faction.at_a_glance}
     }
 
-    maybe_add_member_relations(base, faction)
+    base
+    |> maybe_add_member_relations(faction)
+    |> NotionMappers.maybe_add_chi_war_link("factions", faction)
   end
 
   # Helper to add member (character) relations to base properties

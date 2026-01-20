@@ -264,7 +264,7 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
-    |> maybe_add_chi_war_link(character)
+    |> NotionMappers.maybe_add_chi_war_link("characters", character)
     |> NotionMappers.maybe_add_faction_relation(character)
     |> maybe_add_juncture_multi_select(character)
   end
@@ -313,7 +313,7 @@ defmodule ShotElixir.Characters.Character do
     |> maybe_add_select("SecondaryAttack", av["SecondaryAttack"])
     |> maybe_add_select("FortuneType", av["FortuneType"])
     |> maybe_add_archetype(av["Archetype"])
-    |> maybe_add_chi_war_link(character)
+    |> NotionMappers.maybe_add_chi_war_link("characters", character)
     |> NotionMappers.maybe_add_faction_relation(character)
     |> maybe_add_juncture_multi_select(character)
   end
@@ -386,15 +386,6 @@ defmodule ShotElixir.Characters.Character do
     Map.put(properties, "Type", %{
       "rich_text" => [%{"type" => "text", "text" => %{"content" => archetype}}]
     })
-  end
-
-  defp maybe_add_chi_war_link(properties, character) do
-    if Application.get_env(:shot_elixir, :environment) == :prod do
-      url = "https://chiwar.net/characters/#{character.id}"
-      Map.put(properties, "Chi War Link", %{"url" => url})
-    else
-      properties
-    end
   end
 
   # Add juncture as multi_select (Character database uses multi_select, not relation)

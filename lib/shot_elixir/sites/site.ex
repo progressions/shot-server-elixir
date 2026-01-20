@@ -100,6 +100,7 @@ defmodule ShotElixir.Sites.Site do
     |> maybe_add_character_relations(site)
     |> NotionMappers.maybe_add_faction_relation(site)
     |> NotionMappers.maybe_add_juncture_relation(site)
+    |> NotionMappers.maybe_add_chi_war_link("sites", site)
   end
 
   # Simple version without mention conversion (fallback)
@@ -116,6 +117,7 @@ defmodule ShotElixir.Sites.Site do
     |> maybe_add_character_relations(site)
     |> NotionMappers.maybe_add_faction_relation(site)
     |> NotionMappers.maybe_add_juncture_relation(site)
+    |> NotionMappers.maybe_add_chi_war_link("sites", site)
   end
 
   # Helper to add character relations to base properties

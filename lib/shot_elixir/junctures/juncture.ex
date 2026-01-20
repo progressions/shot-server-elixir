@@ -86,6 +86,7 @@ defmodule ShotElixir.Junctures.Juncture do
       "At a Glance" => %{"checkbox" => !!juncture.at_a_glance}
     }
     |> NotionMappers.maybe_add_faction_relation(juncture)
+    |> NotionMappers.maybe_add_chi_war_link("junctures", juncture)
   end
 
   # Simple version without mention conversion (fallback)
@@ -98,5 +99,6 @@ defmodule ShotElixir.Junctures.Juncture do
       "At a Glance" => %{"checkbox" => !!juncture.at_a_glance}
     }
     |> NotionMappers.maybe_add_faction_relation(juncture)
+    |> NotionMappers.maybe_add_chi_war_link("junctures", juncture)
   end
 end
