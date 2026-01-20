@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.NotionPage
   alias ShotElixirWeb.Api.V2.SyncFromNotion
 
   action_fallback ShotElixirWeb.FallbackController
@@ -441,6 +442,31 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_juncture_from_notion/2,
               view: ShotElixirWeb.Api.V2.JunctureView
+            )
+        end
+    end
+  end
+
+  @doc """
+  Returns the raw Notion page JSON for a juncture.
+  Used for debugging Notion sync issues.
+  """
+  def notion_page(conn, %{"juncture_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Junctures.get_juncture(id) do
+      nil ->
+        {:error, :not_found}
+
+      juncture ->
+        case Campaigns.get_campaign(juncture.campaign_id) do
+          nil ->
+            {:error, :not_found}
+
+          campaign ->
+            NotionPage.fetch(conn, current_user, juncture, campaign,
+              authorize: &authorize_campaign_access/2,
+              entity_name: "Juncture"
             )
         end
     end

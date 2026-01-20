@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
+  alias ShotElixirWeb.Api.V2.NotionPage
   alias ShotElixirWeb.Api.V2.SyncFromNotion
   alias ShotElixirWeb.Plugs.ETag
 
@@ -599,6 +600,31 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_site_from_notion/2,
               view: ShotElixirWeb.Api.V2.SiteView
+            )
+        end
+    end
+  end
+
+  @doc """
+  Returns the raw Notion page JSON for a site.
+  Used for debugging Notion sync issues.
+  """
+  def notion_page(conn, %{"site_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Sites.get_site(id) do
+      nil ->
+        {:error, :not_found}
+
+      site ->
+        case Campaigns.get_campaign(site.campaign_id) do
+          nil ->
+            {:error, :not_found}
+
+          campaign ->
+            NotionPage.fetch(conn, current_user, site, campaign,
+              authorize: &authorize_campaign_access/2,
+              entity_name: "Site"
             )
         end
     end

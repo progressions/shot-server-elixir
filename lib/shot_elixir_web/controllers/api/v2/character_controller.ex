@@ -7,6 +7,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   alias ShotElixir.Characters.Character
   alias ShotElixir.Guardian
   alias ShotElixir.Workers.SyncCharacterToNotionWorker
+  alias ShotElixirWeb.Api.V2.NotionPage
   alias ShotElixirWeb.Plugs.ETag
 
   # Cache-Control header value for character responses
@@ -444,6 +445,30 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
     end
+  end
+
+  @doc """
+  Returns the raw Notion page JSON for a character.
+  Used for debugging Notion sync issues.
+  """
+  def notion_page(conn, %{"character_id" => id}) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Character{} = character <- Characters.get_character(id),
+         {:ok, campaign} <- NotionPage.get_campaign_for_entity(character) do
+      NotionPage.fetch(conn, current_user, character, campaign,
+        authorize: &authorize_campaign_access/2,
+        entity_name: "Character"
+      )
+    else
+      nil -> {:error, :not_found}
+      {:error, :not_found} -> {:error, :not_found}
+    end
+  end
+
+  defp authorize_campaign_access(campaign, user) do
+    campaigns = Campaigns.get_user_campaigns(user.id)
+    Enum.any?(campaigns, fn c -> c.id == campaign.id end)
   end
 
   def pdf(conn, %{"character_id" => id}) do
