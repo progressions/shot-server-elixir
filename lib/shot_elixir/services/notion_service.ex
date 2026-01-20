@@ -65,6 +65,8 @@ defmodule ShotElixir.Services.NotionService do
   defdelegate juncture_as_notion(juncture), to: Mappers
   defdelegate character_ids_from_notion(page, campaign_id), to: Mappers
   defdelegate site_ids_from_notion(page, campaign_id), to: Mappers
+  defdelegate hero_ids_from_notion(page, campaign_id), to: Mappers
+  defdelegate villain_ids_from_notion(page, campaign_id), to: Mappers
   defdelegate data_source_id_for(database_id, opts \\ []), to: Config
   defdelegate skip_bot_update?(page, opts \\ []), to: Config
 
@@ -1338,9 +1340,28 @@ defmodule ShotElixir.Services.NotionService do
             {:ok, adventure}
           else
             # Use centralized mention-aware conversion with campaign_id
-            attributes = adventure_attributes_from_notion(page, adventure.campaign_id)
+            # Convert all atom keys to strings for consistency with update_adventure
+            attributes =
+              adventure_attributes_from_notion(page, adventure.campaign_id)
+              |> Enum.map(fn {k, v} -> {to_string(k), v} end)
+              |> Map.new()
+
+            # Extract hero character IDs from Notion "Heroes" relation
+            attributes =
+              case hero_ids_from_notion(page, adventure.campaign_id) do
+                {:ok, character_ids} -> Map.put(attributes, "character_ids", character_ids)
+                :skip -> attributes
+              end
+
+            # Extract villain character IDs from Notion "Villains" relation
+            attributes =
+              case villain_ids_from_notion(page, adventure.campaign_id) do
+                {:ok, villain_ids} -> Map.put(attributes, "villain_ids", villain_ids)
+                :skip -> attributes
+              end
 
             # Fetch rich description from page content (blocks)
+            # add_rich_description now uses string keys for consistency
             attributes =
               add_rich_description(
                 attributes,
