@@ -77,8 +77,8 @@ defmodule ShotElixir.Services.NotionService do
     Notion.log_error(entity_type, entity_id, payload, response, message)
   end
 
-  defp notion_faction_properties(campaign, name) do
-    case find_faction_by_name(campaign, name) do
+  defp notion_faction_properties(campaign, name, opts) do
+    case find_faction_by_name(campaign, name, opts) do
       [faction | _] -> %{"relation" => [%{"id" => faction["id"]}]}
       _ -> nil
     end
@@ -324,18 +324,19 @@ defmodule ShotElixir.Services.NotionService do
   def create_notion_from_character(%Character{} = character) do
     # Ensure faction, juncture, and campaign are loaded for Notion properties and database ID
     character = Repo.preload(character, [:faction, :juncture, :campaign])
+    token = get_token(character.campaign)
     properties = Character.as_notion(character)
 
     properties =
       if character.faction do
-        faction_props = notion_faction_properties(character.campaign, character.faction.name)
+        faction_props =
+          notion_faction_properties(character.campaign, character.faction.name, token: token)
+
         # Only add Faction if we found a matching faction in Notion
         if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
         properties
       end
-
-    token = get_token(character.campaign)
 
     with {:ok, database_id} <- get_database_id_for_entity(character.campaign, "characters"),
          {:ok, data_source_id} <- data_source_id_for(database_id, token: token) do
@@ -445,7 +446,9 @@ defmodule ShotElixir.Services.NotionService do
 
     properties =
       if character.faction do
-        faction_props = notion_faction_properties(character.campaign, character.faction.name)
+        faction_props =
+          notion_faction_properties(character.campaign, character.faction.name, token: token)
+
         # Only add Faction if we found a matching faction in Notion
         if faction_props, do: Map.put(properties, "Faction", faction_props), else: properties
       else
