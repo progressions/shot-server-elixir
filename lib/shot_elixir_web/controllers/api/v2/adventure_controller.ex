@@ -650,6 +650,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
   end
 
   # POST /api/v2/adventures/:id/sync_from_notion
+  # Always forces sync - ping-pong protection only applies to webhook-triggered syncs
   def sync_from_notion(conn, %{"adventure_id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
@@ -674,6 +675,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
               no_page_error: "Adventure has no Notion page linked",
               require_page: &require_notion_page_linked/1,
               update: &NotionService.update_adventure_from_notion/2,
+              update_opts: [force: true],
               view: ShotElixirWeb.Api.V2.AdventureView
             )
         end

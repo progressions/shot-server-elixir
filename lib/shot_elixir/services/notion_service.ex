@@ -718,7 +718,9 @@ defmodule ShotElixir.Services.NotionService do
 
         # Success case: page data returned as a map
         page when is_map(page) ->
-          if skip_bot_update?(page, opts) do
+          force = Keyword.get(opts, :force, false)
+
+          if skip_bot_update?(page, opts) and not force do
             Logger.info(
               "Skipping update for character #{character.id} as it was last edited by the bot"
             )
@@ -967,7 +969,9 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if skip_bot_update?(page, opts) do
+          force = Keyword.get(opts, :force, false)
+
+          if skip_bot_update?(page, opts) and not force do
             Logger.info("Skipping update for site #{site.id} as it was last edited by the bot")
 
             {:ok, site}
@@ -1053,7 +1057,9 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if skip_bot_update?(page, opts) do
+          force = Keyword.get(opts, :force, false)
+
+          if skip_bot_update?(page, opts) and not force do
             Logger.info("Skipping update for party #{party.id} as it was last edited by the bot")
 
             {:ok, party}
@@ -1266,7 +1272,9 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if skip_bot_update?(page, opts) do
+          force = Keyword.get(opts, :force, false)
+
+          if skip_bot_update?(page, opts) and not force do
             Logger.info(
               "Skipping update for faction #{faction.id} as it was last edited by the bot"
             )
@@ -1357,7 +1365,9 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if skip_bot_update?(page, opts) do
+          force = Keyword.get(opts, :force, false)
+
+          if skip_bot_update?(page, opts) and not force do
             Logger.info(
               "Skipping update for juncture #{juncture.id} as it was last edited by the bot"
             )
@@ -1462,7 +1472,9 @@ defmodule ShotElixir.Services.NotionService do
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
-          if skip_bot_update?(page, opts) do
+          force = Keyword.get(opts, :force, false)
+
+          if skip_bot_update?(page, opts) and not force do
             Logger.info(
               "Skipping update for adventure #{adventure.id} as it was last edited by the bot"
             )

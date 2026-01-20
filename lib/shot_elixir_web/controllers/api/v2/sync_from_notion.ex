@@ -7,8 +7,11 @@ defmodule ShotElixirWeb.Api.V2.SyncFromNotion do
 
   def sync(conn, current_user, entity, campaign, opts) do
     if opts[:authorize].(campaign, current_user) do
+      # Pass through update options like force: true
+      update_opts = Keyword.get(opts, :update_opts, [])
+
       with :ok <- opts[:require_page].(entity),
-           {:ok, updated_entity} <- opts[:update].(entity, []) do
+           {:ok, updated_entity} <- opts[:update].(entity, update_opts) do
         conn
         |> put_view(opts[:view])
         |> render("show.json", %{opts[:assign_key] => updated_entity})
