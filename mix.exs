@@ -82,7 +82,9 @@ defmodule ShotElixir.MixProject do
       {:oban_met, "~> 1.0"},
 
       # Discord bot integration
-      {:nostrum, "~> 0.10", runtime: false},
+      # runtime: false in test prevents Nostrum from auto-starting and trying to connect
+      # In prod/dev, Nostrum starts normally (our Application.discord_children handles it)
+      {:nostrum, "~> 0.10", runtime: Mix.env() != :test},
 
       # YAML parsing for schtick import
       {:yaml_elixir, "~> 2.12"},
