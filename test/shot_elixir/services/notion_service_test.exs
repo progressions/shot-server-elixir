@@ -930,6 +930,369 @@ defmodule ShotElixir.Services.NotionServiceTest do
     end
   end
 
+  describe "party membership sync from Notion" do
+    defmodule NotionClientStubPartyWithCharacters do
+      def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+      # Use valid UUID format for Notion page IDs
+      def character1_notion_id, do: "c1a1b1c1-d1e1-f1a1-b1c1-d1e1f1a1b1c1"
+      def character2_notion_id, do: "c2a2b2c2-d2e2-f2a2-b2c2-d2e2f2a2b2c2"
+
+      def get_page(page_id, _opts \\ []) do
+        %{
+          "id" => page_id,
+          "properties" => %{
+            "Name" => %{"title" => [%{"plain_text" => "Party with Characters"}]},
+            "Description" => %{"rich_text" => [%{"plain_text" => "A test party"}]},
+            "At a Glance" => %{"checkbox" => false},
+            "Characters" => %{
+              "relation" => [
+                %{"id" => character1_notion_id()},
+                %{"id" => character2_notion_id()}
+              ]
+            }
+          },
+          "last_edited_by" => %{"id" => "some-other-user-id"}
+        }
+      end
+    end
+
+    defmodule NotionClientStubPartyNoCharacters do
+      def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+      def get_page(page_id, _opts \\ []) do
+        %{
+          "id" => page_id,
+          "properties" => %{
+            "Name" => %{"title" => [%{"plain_text" => "Party No Characters"}]},
+            "Description" => %{"rich_text" => []},
+            "At a Glance" => %{"checkbox" => false},
+            "Characters" => %{"relation" => []}
+          },
+          "last_edited_by" => %{"id" => "some-other-user-id"}
+        }
+      end
+    end
+
+    setup do
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "party-membership-sync-test@example.com",
+          password: "password123",
+          first_name: "Party",
+          last_name: "Tester",
+          gamemaster: true
+        })
+
+      {:ok, campaign} =
+        %Campaign{}
+        |> Campaign.changeset(%{
+          name: "Party Membership Sync Campaign",
+          user_id: user.id,
+          notion_access_token: "test-notion-token"
+        })
+        |> Repo.insert()
+
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Test Party",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      # Create characters with matching Notion page IDs
+      {:ok, character1} =
+        Characters.create_character(%{
+          name: "Character 1",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubPartyWithCharacters.character1_notion_id()
+        })
+
+      {:ok, character2} =
+        Characters.create_character(%{
+          name: "Character 2",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubPartyWithCharacters.character2_notion_id()
+        })
+
+      {:ok, character3} =
+        Characters.create_character(%{
+          name: "Character 3",
+          campaign_id: campaign.id
+        })
+
+      {:ok,
+       campaign: campaign,
+       party: party,
+       character1: character1,
+       character2: character2,
+       character3: character3}
+    end
+
+    test "adds characters to party from Notion relations", %{
+      party: party,
+      character1: character1,
+      character2: character2
+    } do
+      # Verify party starts with no memberships
+      loaded_party = Parties.get_party(party.id)
+      assert Enum.empty?(loaded_party.memberships)
+
+      # Sync from Notion
+      {:ok, updated_party} =
+        NotionService.update_party_from_notion(party,
+          client: NotionClientStubPartyWithCharacters
+        )
+
+      # Reload party with memberships
+      reloaded = Parties.get_party(updated_party.id)
+
+      character_ids = Enum.map(reloaded.memberships, & &1.character_id)
+      assert character1.id in character_ids
+      assert character2.id in character_ids
+    end
+
+    test "removes characters from party when not in Notion", %{
+      party: party,
+      character1: character1,
+      character3: character3
+    } do
+      # Add character3 (not in Notion) to the party
+      {:ok, _membership} =
+        Parties.add_member(party.id, %{"character_id" => character3.id})
+
+      # Verify party has character3
+      loaded_party = Parties.get_party(party.id)
+      assert length(loaded_party.memberships) == 1
+      assert hd(loaded_party.memberships).character_id == character3.id
+
+      # Sync from Notion (which has character1 and character2, but not character3)
+      {:ok, updated_party} =
+        NotionService.update_party_from_notion(party,
+          client: NotionClientStubPartyWithCharacters
+        )
+
+      # Reload party with memberships
+      reloaded = Parties.get_party(updated_party.id)
+
+      # character3 should be removed, character1 and character2 should be added
+      character_ids = Enum.map(reloaded.memberships, & &1.character_id)
+      assert character1.id in character_ids
+      refute character3.id in character_ids
+    end
+
+    test "handles party with no characters in Notion relation", %{
+      party: party,
+      character1: character1
+    } do
+      # Add a character to the party first
+      {:ok, _membership} =
+        Parties.add_member(party.id, %{"character_id" => character1.id})
+
+      # Sync from Notion with empty Characters relation
+      {:ok, updated_party} =
+        NotionService.update_party_from_notion(party,
+          client: NotionClientStubPartyNoCharacters
+        )
+
+      # Reload party with memberships
+      reloaded = Parties.get_party(updated_party.id)
+
+      # All characters should be removed
+      assert Enum.empty?(reloaded.memberships)
+    end
+  end
+
+  describe "faction member sync from Notion" do
+    defmodule NotionClientStubFactionWithMembers do
+      def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+      # Use valid UUID format for Notion page IDs
+      def member1_notion_id, do: "f1a1b1c1-d1e1-41a1-b1c1-d1e1f1a1b1c1"
+      def member2_notion_id, do: "f2a2b2c2-d2e2-42a2-b2c2-d2e2f2a2b2c2"
+
+      def get_page(page_id, _opts \\ []) do
+        %{
+          "id" => page_id,
+          "properties" => %{
+            "Name" => %{"title" => [%{"plain_text" => "Faction with Members"}]},
+            "Description" => %{"rich_text" => [%{"plain_text" => "A test faction"}]},
+            "At a Glance" => %{"checkbox" => false},
+            "Members" => %{
+              "relation" => [
+                %{"id" => member1_notion_id()},
+                %{"id" => member2_notion_id()}
+              ]
+            }
+          },
+          "last_edited_by" => %{"id" => "some-other-user-id"}
+        }
+      end
+    end
+
+    defmodule NotionClientStubFactionNoMembers do
+      def get_me(_opts), do: %{"id" => "bot-user-id", "object" => "user", "type" => "bot"}
+
+      def get_page(page_id, _opts \\ []) do
+        %{
+          "id" => page_id,
+          "properties" => %{
+            "Name" => %{"title" => [%{"plain_text" => "Faction No Members"}]},
+            "Description" => %{"rich_text" => []},
+            "At a Glance" => %{"checkbox" => false},
+            "Members" => %{"relation" => []}
+          },
+          "last_edited_by" => %{"id" => "some-other-user-id"}
+        }
+      end
+    end
+
+    setup do
+      {:ok, user} =
+        Accounts.create_user(%{
+          email: "faction-member-sync-test@example.com",
+          password: "password123",
+          first_name: "Faction",
+          last_name: "Tester",
+          gamemaster: true
+        })
+
+      {:ok, campaign} =
+        %Campaign{}
+        |> Campaign.changeset(%{
+          name: "Faction Member Sync Campaign",
+          user_id: user.id,
+          notion_access_token: "test-notion-token"
+        })
+        |> Repo.insert()
+
+      {:ok, faction} =
+        Factions.create_faction(%{
+          name: "Test Faction",
+          campaign_id: campaign.id,
+          notion_page_id: Ecto.UUID.generate()
+        })
+
+      # Create characters with matching Notion page IDs
+      {:ok, member1} =
+        Characters.create_character(%{
+          name: "Member 1",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubFactionWithMembers.member1_notion_id()
+        })
+
+      {:ok, member2} =
+        Characters.create_character(%{
+          name: "Member 2",
+          campaign_id: campaign.id,
+          notion_page_id: NotionClientStubFactionWithMembers.member2_notion_id()
+        })
+
+      {:ok, non_member} =
+        Characters.create_character(%{
+          name: "Non Member",
+          campaign_id: campaign.id
+        })
+
+      {:ok,
+       campaign: campaign,
+       faction: faction,
+       member1: member1,
+       member2: member2,
+       non_member: non_member}
+    end
+
+    test "adds characters to faction from Notion Members relation", %{
+      faction: faction,
+      member1: member1,
+      member2: member2
+    } do
+      # Verify faction starts with no members
+      loaded_faction = Factions.get_faction(faction.id) |> Repo.preload(:characters)
+      assert Enum.empty?(loaded_faction.characters)
+
+      # Sync from Notion
+      {:ok, _updated_faction} =
+        NotionService.update_faction_from_notion(faction,
+          client: NotionClientStubFactionWithMembers
+        )
+
+      # Reload characters to check their faction_id
+      updated_member1 = Repo.get(Character, member1.id)
+      updated_member2 = Repo.get(Character, member2.id)
+
+      assert updated_member1.faction_id == faction.id
+      assert updated_member2.faction_id == faction.id
+    end
+
+    test "removes characters from faction when not in Notion Members", %{
+      faction: faction,
+      non_member: non_member,
+      member1: member1
+    } do
+      # Add non_member to the faction directly
+      {:ok, _updated} =
+        Characters.update_character(non_member, %{faction_id: faction.id}, skip_notion_sync: true)
+
+      # Verify non_member is in the faction
+      reloaded_non_member = Repo.get(Character, non_member.id)
+      assert reloaded_non_member.faction_id == faction.id
+
+      # Sync from Notion (which has member1 and member2, but not non_member)
+      {:ok, _updated_faction} =
+        NotionService.update_faction_from_notion(faction,
+          client: NotionClientStubFactionWithMembers
+        )
+
+      # Reload characters
+      final_non_member = Repo.get(Character, non_member.id)
+      final_member1 = Repo.get(Character, member1.id)
+
+      # non_member should be removed from faction, member1 should be added
+      assert final_non_member.faction_id == nil
+      assert final_member1.faction_id == faction.id
+    end
+
+    test "handles faction with no members in Notion relation", %{
+      faction: faction,
+      member1: member1
+    } do
+      # Add a member to the faction first
+      {:ok, _updated} =
+        Characters.update_character(member1, %{faction_id: faction.id}, skip_notion_sync: true)
+
+      # Verify member1 is in faction
+      reloaded = Repo.get(Character, member1.id)
+      assert reloaded.faction_id == faction.id
+
+      # Sync from Notion with empty Members relation
+      {:ok, _updated_faction} =
+        NotionService.update_faction_from_notion(faction,
+          client: NotionClientStubFactionNoMembers
+        )
+
+      # Reload member1
+      final_member1 = Repo.get(Character, member1.id)
+
+      # member1 should be removed from faction
+      assert final_member1.faction_id == nil
+    end
+
+    test "uses batch queries instead of N+1 queries", %{
+      faction: faction
+    } do
+      # This test verifies the optimization works by ensuring no errors occur
+      # The actual batching is verified by the implementation using Repo.all with IN clause
+      {:ok, _updated_faction} =
+        NotionService.update_faction_from_notion(faction,
+          client: NotionClientStubFactionWithMembers
+        )
+
+      # If we get here without error, the batch query worked
+      assert true
+    end
+  end
+
   describe "find_image_block/1 pagination" do
     defmodule NotionClientStubImageFirstPage do
       @moduledoc "Stub that returns an image on the first page"

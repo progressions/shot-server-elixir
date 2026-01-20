@@ -1121,17 +1121,33 @@ defmodule ShotElixir.Services.NotionService do
         # Characters to remove (in Chi War but not in Notion)
         to_remove = current_character_ids -- notion_character_ids
 
-        # Add new memberships
+        # Add new memberships with error handling
         Enum.each(to_add, fn character_id ->
-          Parties.add_member(party.id, %{"character_id" => character_id})
+          case Parties.add_member(party.id, %{"character_id" => character_id}) do
+            {:ok, _membership} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning(
+                "Failed to add character #{character_id} to party #{party.id}: #{inspect(reason)}"
+              )
+          end
         end)
 
-        # Remove old memberships
+        # Remove old memberships with error handling
         memberships_to_delete =
           Enum.filter(party.memberships, fn m -> m.character_id in to_remove end)
 
         Enum.each(memberships_to_delete, fn membership ->
-          Parties.remove_member(membership.id)
+          case Parties.remove_member(membership.id) do
+            {:ok, _} ->
+              :ok
+
+            {:error, reason} ->
+              Logger.warning(
+                "Failed to remove membership #{membership.id} from party #{party.id}: #{inspect(reason)}"
+              )
+          end
         end)
 
         :ok
@@ -1157,27 +1173,49 @@ defmodule ShotElixir.Services.NotionService do
         # Characters to remove (in Chi War but not in Notion)
         to_remove = current_character_ids -- notion_character_ids
 
-        # Add new members by setting their faction_id
-        Enum.each(to_add, fn character_id ->
-          case Repo.get(Character, character_id) do
-            nil ->
+        # Batch fetch characters to add (avoid N+1 queries)
+        characters_to_add =
+          if Enum.any?(to_add) do
+            import Ecto.Query
+            Repo.all(from c in Character, where: c.id in ^to_add)
+          else
+            []
+          end
+
+        # Batch fetch characters to remove (avoid N+1 queries)
+        characters_to_remove =
+          if Enum.any?(to_remove) do
+            import Ecto.Query
+            Repo.all(from c in Character, where: c.id in ^to_remove)
+          else
+            []
+          end
+
+        # Add new members by setting their faction_id with error handling
+        Enum.each(characters_to_add, fn character ->
+          case Characters.update_character(character, %{faction_id: faction.id},
+                 skip_notion_sync: true
+               ) do
+            {:ok, _} ->
               :ok
 
-            character ->
-              Characters.update_character(character, %{faction_id: faction.id},
-                skip_notion_sync: true
+            {:error, reason} ->
+              Logger.warning(
+                "Failed to add character #{character.id} to faction #{faction.id}: #{inspect(reason)}"
               )
           end
         end)
 
-        # Remove old members by clearing their faction_id
-        Enum.each(to_remove, fn character_id ->
-          case Repo.get(Character, character_id) do
-            nil ->
+        # Remove old members by clearing their faction_id with error handling
+        Enum.each(characters_to_remove, fn character ->
+          case Characters.update_character(character, %{faction_id: nil}, skip_notion_sync: true) do
+            {:ok, _} ->
               :ok
 
-            character ->
-              Characters.update_character(character, %{faction_id: nil}, skip_notion_sync: true)
+            {:error, reason} ->
+              Logger.warning(
+                "Failed to remove character #{character.id} from faction #{faction.id}: #{inspect(reason)}"
+              )
           end
         end)
 
