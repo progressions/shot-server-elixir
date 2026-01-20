@@ -100,6 +100,7 @@ defmodule ShotElixir.Parties.Party do
     |> maybe_add_character_relations(party)
     |> NotionMappers.maybe_add_faction_relation(party)
     |> NotionMappers.maybe_add_juncture_relation(party)
+    |> NotionMappers.maybe_add_chi_war_link("parties", party)
   end
 
   # Simple version without mention conversion (fallback)
@@ -116,6 +117,7 @@ defmodule ShotElixir.Parties.Party do
     |> maybe_add_character_relations(party)
     |> NotionMappers.maybe_add_faction_relation(party)
     |> NotionMappers.maybe_add_juncture_relation(party)
+    |> NotionMappers.maybe_add_chi_war_link("parties", party)
   end
 
   # Helper to add character relations to base properties
