@@ -32,7 +32,12 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerCachingTest do
       Vehicles.create_vehicle(%{
         name: "Cacheable Vehicle",
         campaign_id: campaign.id,
-        user_id: gamemaster.id
+        user_id: gamemaster.id,
+        action_values: %{
+          "frame" => 10,
+          "handling" => 8,
+          "squeal" => 12
+        }
       })
 
     {:ok,
