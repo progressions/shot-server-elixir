@@ -407,9 +407,12 @@ defmodule ShotElixir.Parties do
   end
 
   # Syncs party character memberships to match the provided character_ids list.
-  # Removes memberships for characters not in the list (both regular and slot-based).
-  # Does not add new memberships - those should be added via add_member.
+  # Adds missing memberships and removes memberships for characters not in the list
+  # (covers both regular and slot-based).
   defp sync_character_memberships(party, character_ids) when is_list(character_ids) do
+    # Normalize incoming ids to strings to match stored binary_ids
+    desired_character_ids = Enum.map(character_ids, &to_string/1)
+
     # Get current character memberships (all memberships with a character_id)
     current_memberships =
       from(m in Membership,
@@ -417,15 +420,30 @@ defmodule ShotElixir.Parties do
       )
       |> Repo.all()
 
+    current_character_ids = Enum.map(current_memberships, & &1.character_id)
+
     # Find memberships to remove (characters not in the new list)
     memberships_to_remove =
       Enum.filter(current_memberships, fn m ->
-        m.character_id not in character_ids
+        m.character_id not in desired_character_ids
       end)
 
     # Delete memberships for removed characters
     Enum.each(memberships_to_remove, fn membership ->
       Repo.delete(membership)
+    end)
+
+    # Add memberships for any missing characters
+    desired_character_ids
+    |> Enum.uniq()
+    |> Enum.reject(&(&1 in current_character_ids))
+    |> Enum.each(fn character_id ->
+      %Membership{}
+      |> Membership.changeset(%{
+        party_id: party.id,
+        character_id: character_id
+      })
+      |> Repo.insert()
     end)
 
     party
