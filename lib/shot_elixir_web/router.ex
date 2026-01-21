@@ -113,6 +113,9 @@ defmodule ShotElixirWeb.Router do
   scope "/api/v2", ShotElixirWeb.Api.V2 do
     pipe_through [:api, :authenticated]
 
+    # Backlinks
+    get "/backlinks/:entity_type/:id", BacklinkController, :index
+
     # Search
     get "/search", SearchController, :index
 

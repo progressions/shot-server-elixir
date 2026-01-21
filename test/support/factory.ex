@@ -4,6 +4,7 @@ defmodule ShotElixir.Factory do
   """
 
   alias ShotElixir.{Accounts, Campaigns, Characters, Fights}
+  alias ShotElixir.{Sites, Parties}
 
   def insert(type, attrs \\ %{})
 
@@ -73,6 +74,42 @@ defmodule ShotElixir.Factory do
 
     {:ok, character} = Characters.create_character(Map.merge(defaults, attrs_cleaned))
     character
+  end
+
+  def insert(:site, attrs) do
+    attrs = Enum.into(attrs, %{})
+
+    user = attrs[:user] || insert(:user)
+    campaign = attrs[:campaign] || insert(:campaign)
+
+    attrs_cleaned = attrs |> Map.delete(:user) |> Map.delete(:campaign)
+
+    defaults = %{
+      name: "Test Site #{System.unique_integer([:positive])}",
+      campaign_id: campaign.id,
+      user_id: user.id
+    }
+
+    {:ok, site} = Sites.create_site(Map.merge(defaults, attrs_cleaned))
+    site
+  end
+
+  def insert(:party, attrs) do
+    attrs = Enum.into(attrs, %{})
+
+    user = attrs[:user] || insert(:user)
+    campaign = attrs[:campaign] || insert(:campaign)
+
+    attrs_cleaned = attrs |> Map.delete(:user) |> Map.delete(:campaign)
+
+    defaults = %{
+      name: "Test Party #{System.unique_integer([:positive])}",
+      campaign_id: campaign.id,
+      user_id: user.id
+    }
+
+    {:ok, party} = Parties.create_party(Map.merge(defaults, attrs_cleaned))
+    party
   end
 
   def insert(:fight, attrs) do
