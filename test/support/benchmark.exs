@@ -51,10 +51,11 @@ defmodule TestBenchmark do
     IO.puts("Running #{@runs} benchmark iterations...")
     IO.puts(String.duplicate("-", 60))
 
-    results = Enum.map(1..@runs, fn run_number ->
-      IO.puts("\n>>> Run #{run_number}/#{@runs}")
-      run_test_suite(run_number)
-    end)
+    results =
+      Enum.map(1..@runs, fn run_number ->
+        IO.puts("\n>>> Run #{run_number}/#{@runs}")
+        run_test_suite(run_number)
+      end)
 
     # Calculate statistics
     stats = calculate_stats(results)
@@ -69,7 +70,9 @@ defmodule TestBenchmark do
     report = generate_report(system_info, results, stats, slowest)
 
     # Save results
-    timestamp = DateTime.utc_now() |> DateTime.to_iso8601(:basic) |> String.replace(~r/[:\.]/, "-")
+    timestamp =
+      DateTime.utc_now() |> DateTime.to_iso8601(:basic) |> String.replace(~r/[:\.]/, "-")
+
     json_file = Path.join(@output_dir, "benchmark_#{timestamp}.json")
     text_file = Path.join(@output_dir, "benchmark_#{timestamp}.txt")
     latest_file = Path.join(@output_dir, "latest.json")
@@ -119,10 +122,11 @@ defmodule TestBenchmark do
     # Run mix test and capture output
     start_time = System.monotonic_time(:millisecond)
 
-    {output, exit_code} = System.cmd("mix", ["test", "--color"],
-      stderr_to_stdout: true,
-      env: [{"MIX_ENV", "test"}]
-    )
+    {output, exit_code} =
+      System.cmd("mix", ["test", "--color"],
+        stderr_to_stdout: true,
+        env: [{"MIX_ENV", "test"}]
+      )
 
     end_time = System.monotonic_time(:millisecond)
     wall_clock_ms = end_time - start_time
@@ -148,7 +152,9 @@ defmodule TestBenchmark do
       memory_delta: memory_after - memory_before
     }
 
-    IO.puts("    Completed in #{format_duration(wall_clock_ms)} (#{timing.test_count} tests, #{timing.failures} failures)")
+    IO.puts(
+      "    Completed in #{format_duration(wall_clock_ms)} (#{timing.test_count} tests, #{timing.failures} failures)"
+    )
 
     result
   end
@@ -216,10 +222,11 @@ defmodule TestBenchmark do
   defp get_slowest_tests(count) do
     IO.puts("    Running mix test --slowest #{count}...")
 
-    {output, _exit_code} = System.cmd("mix", ["test", "--slowest", "#{count}"],
-      stderr_to_stdout: true,
-      env: [{"MIX_ENV", "test"}]
-    )
+    {output, _exit_code} =
+      System.cmd("mix", ["test", "--slowest", "#{count}"],
+        stderr_to_stdout: true,
+        env: [{"MIX_ENV", "test"}]
+      )
 
     # Parse slowest tests output
     # Format: "  * test name (123.4ms) (test/path_test.exs:42)"
@@ -260,6 +267,7 @@ defmodule TestBenchmark do
   defp average(list), do: Enum.sum(list) / length(list)
 
   defp std_dev([]), do: 0
+
   defp std_dev(list) do
     avg = average(list)
     variance = Enum.map(list, fn x -> :math.pow(x - avg, 2) end) |> average()
@@ -342,8 +350,10 @@ defmodule TestBenchmark do
         minutes = trunc(ms / 60_000)
         seconds = Float.round((ms - minutes * 60_000) / 1000, 1)
         "#{minutes}m #{seconds}s"
+
       ms >= 1000 ->
         "#{Float.round(ms / 1000, 2)}s"
+
       true ->
         "#{Float.round(ms * 1.0, 1)}ms"
     end
