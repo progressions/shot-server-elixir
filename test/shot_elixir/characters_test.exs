@@ -659,4 +659,102 @@ defmodule ShotElixir.CharactersTest do
       assert gamma_idx < alpha_idx, "Should default to descending order"
     end
   end
+
+  describe "get_character_ids_for_user/1" do
+    test "returns character IDs owned by the user", %{campaign: campaign, user: user} do
+      # Create characters owned by this user
+      {:ok, char1} =
+        Characters.create_character(%{
+          name: "User's Character 1",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      {:ok, char2} =
+        Characters.create_character(%{
+          name: "User's Character 2",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      # Create a character owned by someone else
+      {:ok, other_user} =
+        ShotElixir.Accounts.create_user(%{
+          email: "other_user@example.com",
+          password: "password123",
+          first_name: "Other",
+          last_name: "User"
+        })
+
+      {:ok, _other_char} =
+        Characters.create_character(%{
+          name: "Other User's Character",
+          campaign_id: campaign.id,
+          user_id: other_user.id
+        })
+
+      # Create a character with no owner
+      {:ok, _unowned_char} =
+        Characters.create_character(%{
+          name: "Unowned Character",
+          campaign_id: campaign.id,
+          user_id: nil
+        })
+
+      # Get character IDs for the user
+      result = Characters.get_character_ids_for_user(user.id)
+
+      # Should only include the user's characters
+      assert length(result) == 2
+      assert char1.id in result
+      assert char2.id in result
+    end
+
+    test "returns empty list when user has no characters", %{user: _user} do
+      # Create a new user with no characters
+      {:ok, new_user} =
+        ShotElixir.Accounts.create_user(%{
+          email: "new_user_no_chars@example.com",
+          password: "password123",
+          first_name: "New",
+          last_name: "User"
+        })
+
+      result = Characters.get_character_ids_for_user(new_user.id)
+
+      assert result == []
+    end
+
+    test "returns characters across multiple campaigns", %{campaign: campaign, user: user} do
+      # Create a character in the first campaign
+      {:ok, char1} =
+        Characters.create_character(%{
+          name: "Character in Campaign 1",
+          campaign_id: campaign.id,
+          user_id: user.id
+        })
+
+      # Create a second campaign
+      {:ok, campaign2} =
+        Campaigns.create_campaign(%{
+          name: "Second Campaign",
+          user_id: user.id
+        })
+
+      # Create a character in the second campaign
+      {:ok, char2} =
+        Characters.create_character(%{
+          name: "Character in Campaign 2",
+          campaign_id: campaign2.id,
+          user_id: user.id
+        })
+
+      result = Characters.get_character_ids_for_user(user.id)
+
+      # Should include characters from both campaigns
+      assert length(result) == 2
+      assert char1.id in result
+      assert char2.id in result
+    end
+  end
 end

@@ -31,7 +31,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if is_player_for_campaign?(campaign, current_user) do
               conn
               |> put_status(:forbidden)
-              |> json(%{error: "restricted", restricted: true})
+              |> json(%{error: "Players cannot list adventures"})
             else
               result =
                 Adventures.list_campaign_adventures(
@@ -781,9 +781,13 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
 
   # Check if user is a player (not GM or admin) for this campaign
   # Players have restricted access to adventure data
+  # Returns true only when user IS a campaign member AND is NOT a GM/admin
   defp is_player_for_campaign?(campaign, user) do
-    not (campaign.user_id == user.id ||
-           user.admin ||
-           (user.gamemaster && Campaigns.is_member?(campaign.id, user.id)))
+    membership = Campaigns.is_member?(campaign.id, user.id)
+
+    membership &&
+      not (campaign.user_id == user.id ||
+             user.admin ||
+             (user.gamemaster && membership))
   end
 end
