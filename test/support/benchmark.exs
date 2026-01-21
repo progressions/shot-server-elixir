@@ -174,9 +174,9 @@ defmodule TestBenchmark do
       case timing_match do
         [_, total_s, async_s, sync_s] ->
           {
-            String.to_float(total_s) * 1000,
-            String.to_float(async_s) * 1000,
-            String.to_float(sync_s) * 1000
+            parse_float(total_s) * 1000,
+            parse_float(async_s) * 1000,
+            parse_float(sync_s) * 1000
           }
 
         _ ->
@@ -234,7 +234,7 @@ defmodule TestBenchmark do
 
     Regex.scan(slowest_regex, output)
     |> Enum.map(fn [_full, name, time_str, unit] ->
-      time = String.to_float(time_str)
+      time = parse_float(time_str)
       time_ms = if unit == "s", do: time * 1000, else: time
 
       %{
@@ -265,6 +265,12 @@ defmodule TestBenchmark do
 
   defp average([]), do: 0
   defp average(list), do: Enum.sum(list) / length(list)
+
+  # Safely parse a string to float, handling both "123" and "123.4" formats
+  defp parse_float(str) do
+    {value, ""} = Float.parse(str)
+    value
+  end
 
   defp std_dev([]), do: 0
 
