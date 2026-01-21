@@ -53,8 +53,8 @@ config :shot_elixir, Oban,
   testing: :inline,
   plugins: [Oban.Plugins.Pruner]
 
-# Nostrum Discord bot uses runtime: false in test (see mix.exs)
-# This prevents it from auto-starting and trying to authenticate
+# Nostrum Discord bot - not started in test (runtime: false + included_applications)
+# No token needed since we don't start it
 
 # Environment identifier for services like ImageUploader
 config :shot_elixir, :environment, :test
