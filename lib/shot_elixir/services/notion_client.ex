@@ -7,6 +7,16 @@ defmodule ShotElixir.Services.NotionClient do
   @notion_version "2025-09-03"
   @base_url "https://api.notion.com/v1"
 
+  # HTTP timeout configuration - can be overridden in config/test.exs for fast-fail
+  defp http_config do
+    Application.get_env(:shot_elixir, :notion_http, [])
+  end
+
+  defp receive_timeout, do: Keyword.get(http_config(), :receive_timeout, 15_000)
+  defp pool_timeout, do: Keyword.get(http_config(), :pool_timeout, 10_000)
+  defp connect_timeout, do: Keyword.get(http_config(), :connect_timeout, 10_000)
+  defp retry_config, do: Keyword.get(http_config(), :retry, :transient)
+
   defp require_token(token) do
     if is_binary(token) and token != "" do
       :ok
@@ -30,9 +40,10 @@ defmodule ShotElixir.Services.NotionClient do
 
     Req.new(
       base_url: @base_url,
-      receive_timeout: 15_000,
-      pool_timeout: 10_000,
-      connect_options: [timeout: 10_000],
+      receive_timeout: receive_timeout(),
+      pool_timeout: pool_timeout(),
+      connect_options: [timeout: connect_timeout()],
+      retry: retry_config(),
       headers: [
         {"Authorization", "Bearer #{token}"},
         {"Notion-Version", @notion_version},
