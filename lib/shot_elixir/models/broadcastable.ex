@@ -7,6 +7,7 @@ defmodule ShotElixir.Models.Broadcastable do
   defmacro __using__(_opts) do
     quote do
       import ShotElixir.Models.Broadcastable
+      require Logger
 
       @doc """
       Broadcasts entity changes after database commits.
@@ -106,6 +107,20 @@ defmodule ShotElixir.Models.Broadcastable do
             )
           else
             %{entity_plural => "reload"}
+          end
+
+        # Ensure list reloads whenever a single adventure is updated and log for debugging
+        payload =
+          case entity_name_lower do
+            "adventure" ->
+              Logger.info(
+                "Broadcasting adventure change with adventures reload payload: #{inspect(payload)}"
+              )
+
+              Map.put(payload, "adventures", "reload")
+
+            _ ->
+              payload
           end
 
         Phoenix.PubSub.broadcast(
