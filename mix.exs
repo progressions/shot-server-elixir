@@ -82,7 +82,9 @@ defmodule ShotElixir.MixProject do
       {:oban_met, "~> 1.0"},
 
       # Discord bot integration
-      {:nostrum, "~> 0.10"},
+      # runtime: false prevents Nostrum from auto-starting (which validates token)
+      # We manually start it in Application when a valid token exists
+      {:nostrum, "~> 0.10", runtime: false},
 
       # YAML parsing for schtick import
       {:yaml_elixir, "~> 2.12"},

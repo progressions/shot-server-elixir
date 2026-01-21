@@ -70,9 +70,19 @@ defmodule ShotElixir.Application do
       token = Application.get_env(:nostrum, :token)
 
       if valid_discord_token?(token) do
-        Logger.info("DISCORD: Valid token found, starting Discord consumer")
-        # Consumer first, then helpers
-        [ShotElixir.Discord.Consumer | helpers]
+        Logger.info("DISCORD: Valid token found, starting Discord bot")
+
+        # Nostrum uses runtime: false to prevent auto-starting in test/CI
+        # We must manually start it here before our Consumer can join ConsumerGroup
+        case Application.ensure_all_started(:nostrum) do
+          {:ok, _} ->
+            Logger.info("DISCORD: Nostrum application started successfully")
+            [ShotElixir.Discord.Consumer | helpers]
+
+          {:error, reason} ->
+            Logger.error("DISCORD: Failed to start Nostrum: #{inspect(reason)}")
+            helpers
+        end
       else
         Logger.info("DISCORD: No valid token configured, starting helpers only")
         helpers
