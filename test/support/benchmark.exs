@@ -5,6 +5,27 @@
 # to establish a reproducible baseline for optimization comparisons.
 
 defmodule TestBenchmark do
+  @moduledoc """
+  Benchmark script for the test suite.
+
+  This module runs the test suite multiple times, records timing data, and
+  generates reports that can be used as a baseline for performance
+  comparisons when optimizing the application or tests.
+
+  ## How to run
+
+    mix run test/support/benchmark.exs
+
+  ## Output
+
+  After running, this script writes JSON and text reports into
+  `test/benchmark_results/`:
+
+    * `benchmark_<timestamp>.json` — full benchmark data (timings, stats, system info)
+    * `benchmark_<timestamp>.txt` — human-readable text summary
+    * `latest.json` — copy of the most recent benchmark JSON report
+  """
+
   @runs 3
   @output_dir "test/benchmark_results"
 
@@ -142,13 +163,45 @@ defmodule TestBenchmark do
     timing_match = Regex.run(timing_regex, output)
     count_match = Regex.run(count_regex, output)
 
-    total_ms = if timing_match, do: String.to_float(Enum.at(timing_match, 1)) * 1000, else: 0
-    async_ms = if timing_match, do: String.to_float(Enum.at(timing_match, 2)) * 1000, else: 0
-    sync_ms = if timing_match, do: String.to_float(Enum.at(timing_match, 3)) * 1000, else: 0
+    # Use pattern matching for safer extraction with fallback to defaults
+    {total_ms, async_ms, sync_ms} =
+      case timing_match do
+        [_, total_s, async_s, sync_s] ->
+          {
+            String.to_float(total_s) * 1000,
+            String.to_float(async_s) * 1000,
+            String.to_float(sync_s) * 1000
+          }
 
-    test_count = if count_match, do: String.to_integer(Enum.at(count_match, 1)), else: 0
-    failures = if count_match, do: String.to_integer(Enum.at(count_match, 2)), else: 0
-    skipped = if count_match && Enum.at(count_match, 3), do: String.to_integer(Enum.at(count_match, 3)), else: 0
+        _ ->
+          {0, 0, 0}
+      end
+
+    {test_count, failures, skipped} =
+      case count_match do
+        [_, tests_s, failures_s, skipped_s] ->
+          skipped_count =
+            case skipped_s do
+              nil -> 0
+              _ -> String.to_integer(skipped_s)
+            end
+
+          {
+            String.to_integer(tests_s),
+            String.to_integer(failures_s),
+            skipped_count
+          }
+
+        [_, tests_s, failures_s] ->
+          {
+            String.to_integer(tests_s),
+            String.to_integer(failures_s),
+            0
+          }
+
+        _ ->
+          {0, 0, 0}
+      end
 
     %{
       total_ms: total_ms,

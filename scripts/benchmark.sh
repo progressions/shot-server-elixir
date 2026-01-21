@@ -5,6 +5,16 @@
 
 set -e
 
+# Check for required dependencies
+if ! command -v bc &> /dev/null; then
+    echo "Error: 'bc' is required for floating-point arithmetic but is not installed."
+    echo "Install it with:"
+    echo "  macOS: brew install bc"
+    echo "  Ubuntu/Debian: sudo apt-get install bc"
+    echo "  RHEL/CentOS: sudo yum install bc"
+    exit 1
+fi
+
 RUNS=${1:-3}
 OUTPUT_DIR="test/benchmark_results"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
