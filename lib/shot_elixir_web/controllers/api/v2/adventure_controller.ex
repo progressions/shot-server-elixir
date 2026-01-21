@@ -5,6 +5,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
 
   alias ShotElixir.Adventures
   alias ShotElixir.Campaigns
+  alias ShotElixir.Characters
   alias ShotElixir.Guardian
   alias ShotElixir.Services.NotionService
   alias ShotElixirWeb.Api.V2.NotionPage
@@ -13,6 +14,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
   action_fallback ShotElixirWeb.FallbackController
 
   # GET /api/v2/adventures
+  # Players are restricted from listing adventures - returns 403
   def index(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
 
@@ -25,19 +27,26 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
 
         campaign ->
           if authorize_campaign_access(campaign, current_user) do
-            result =
-              Adventures.list_campaign_adventures(
-                current_user.current_campaign_id,
-                params,
-                current_user
-              )
+            # Players cannot list adventures - they can only view individual adventures via popup
+            if is_player_for_campaign?(campaign, current_user) do
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Players cannot list adventures"})
+            else
+              result =
+                Adventures.list_campaign_adventures(
+                  current_user.current_campaign_id,
+                  params,
+                  current_user
+                )
 
-            conn
-            |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-            |> render("index.json",
-              adventures: result.adventures,
-              meta: result.meta
-            )
+              conn
+              |> put_view(ShotElixirWeb.Api.V2.AdventureView)
+              |> render("index.json",
+                adventures: result.adventures,
+                meta: result.meta
+              )
+            end
           else
             conn
             |> put_status(:forbidden)
@@ -52,6 +61,7 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
   end
 
   # GET /api/v2/adventures/:id
+  # Players receive restricted data - only their own characters, no villains/fights/rich_description
   def show(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)
 
@@ -70,9 +80,21 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              conn
-              |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-              |> render("show.json", adventure: adventure)
+              # Players get restricted view with only their own characters
+              if is_player_for_campaign?(campaign, current_user) do
+                user_character_ids = Characters.get_character_ids_for_user(current_user.id)
+
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.AdventureView)
+                |> render("player_show.json",
+                  adventure: adventure,
+                  user_character_ids: user_character_ids
+                )
+              else
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.AdventureView)
+                |> render("show.json", adventure: adventure)
+              end
             else
               conn
               |> put_status(:not_found)
@@ -756,4 +778,16 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
     do: {:error, :no_page}
 
   defp require_notion_page_linked(%Adventures.Adventure{}), do: :ok
+
+  # Check if user is a player (not GM or admin) for this campaign
+  # Players have restricted access to adventure data
+  # Returns true only when user IS a campaign member AND is NOT a GM/admin
+  defp is_player_for_campaign?(campaign, user) do
+    membership = Campaigns.is_member?(campaign.id, user.id)
+
+    membership &&
+      not (campaign.user_id == user.id ||
+             user.admin ||
+             (user.gamemaster && membership))
+  end
 end
