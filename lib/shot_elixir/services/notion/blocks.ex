@@ -37,6 +37,17 @@ defmodule ShotElixir.Services.Notion.Blocks do
     end
   end
 
+  def extract_page_date(page) do
+    props = page["properties"] || %{}
+
+    date_prop = props["Date"]
+
+    case date_prop do
+      %{"date" => %{"start" => start_date}} when is_binary(start_date) -> start_date
+      _ -> nil
+    end
+  end
+
   def fetch_session_notes(query, token) do
     unless token do
       {:error, :no_notion_oauth_token}
@@ -59,7 +70,10 @@ defmodule ShotElixir.Services.Notion.Blocks do
              title: extract_page_title(page),
              page_id: page["id"],
              content: content,
-             pages: Enum.map(pages, fn p -> %{id: p["id"], title: extract_page_title(p)} end)
+             pages:
+               Enum.map(pages, fn p ->
+                 %{id: p["id"], title: extract_page_title(p), date: extract_page_date(p)}
+               end)
            }}
 
         [] ->
