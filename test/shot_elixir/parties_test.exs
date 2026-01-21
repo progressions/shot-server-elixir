@@ -201,6 +201,49 @@ defmodule ShotElixir.PartiesTest do
       assert Repo.get(Membership, membership.id) != nil
     end
 
+    test "adds new characters when character_ids includes new ones", %{campaign: campaign} do
+      {:ok, party} =
+        Parties.create_party(%{
+          name: "Party to Add Members",
+          campaign_id: campaign.id
+        })
+
+      {:ok, existing_char} =
+        Characters.create_character(%{
+          name: "Existing Member",
+          campaign_id: campaign.id
+        })
+
+      {:ok, new_char} =
+        Characters.create_character(%{
+          name: "New Member",
+          campaign_id: campaign.id
+        })
+
+      # Existing membership
+      {:ok, _membership} =
+        Repo.insert(%Membership{
+          party_id: party.id,
+          character_id: existing_char.id
+        })
+
+      # Update party to include both characters
+      {:ok, _updated_party} =
+        Parties.update_party(party, %{
+          "character_ids" => [existing_char.id, new_char.id]
+        })
+
+      memberships =
+        Repo.all(
+          from m in Membership,
+            where: m.party_id == ^party.id and not is_nil(m.character_id)
+        )
+
+      assert Enum.any?(memberships, &(&1.character_id == existing_char.id))
+      assert Enum.any?(memberships, &(&1.character_id == new_char.id))
+      assert length(memberships) == 2
+    end
+
     test "removes slot-based memberships (with role) when character_ids is updated", %{
       campaign: campaign
     } do
