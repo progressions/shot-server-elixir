@@ -20,7 +20,9 @@ defmodule ShotElixir.MixProject do
   def application do
     [
       mod: {ShotElixir.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools],
+      # Include nostrum in release but don't auto-start it (we start it manually)
+      included_applications: [:nostrum]
     ]
   end
 
@@ -82,8 +84,8 @@ defmodule ShotElixir.MixProject do
       {:oban_met, "~> 1.0"},
 
       # Discord bot integration
-      # runtime: false prevents Nostrum from auto-starting and trying to connect to Discord
-      # Our Application.discord_children handles starting the Consumer when a valid token exists
+      # runtime: false + included_applications ensures Nostrum is in the release
+      # but doesn't auto-start (we start it manually when a valid token exists)
       {:nostrum, "~> 0.10", runtime: false},
 
       # YAML parsing for schtick import
