@@ -430,7 +430,7 @@ defmodule ShotElixir.Parties do
 
     # Delete memberships for removed characters
     Enum.each(memberships_to_remove, fn membership ->
-      Repo.delete(membership)
+      Repo.delete!(membership)
     end)
 
     # Add memberships for any missing characters
@@ -443,7 +443,8 @@ defmodule ShotElixir.Parties do
         party_id: party.id,
         character_id: character_id
       })
-      |> Repo.insert()
+      # Use bang to surface validation/constraint errors instead of silently ignoring them
+      |> Repo.insert!()
     end)
 
     party
