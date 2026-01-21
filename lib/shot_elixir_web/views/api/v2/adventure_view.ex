@@ -10,6 +10,15 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
     render_adventure(adventure)
   end
 
+  @doc """
+  Renders a player-restricted view of an adventure.
+  Only shows: id, name, description, season, active, campaign_id, image_url,
+  image_positions, entity_class, restricted_view flag, and the player's own characters.
+  """
+  def render("player_show.json", %{adventure: adventure, user_character_ids: user_character_ids}) do
+    render_adventure_for_player(adventure, user_character_ids)
+  end
+
   def render("error.json", %{changeset: changeset}) do
     %{
       success: false,
@@ -52,6 +61,70 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
       mentions: adventure.mentions,
       entity_class: "Adventure"
     }
+  end
+
+  # Player-restricted view - excludes rich_description, mentions, villains, fights, notion fields
+  defp render_adventure_for_player(adventure, user_character_ids) do
+    user_character_id_set = MapSet.new(user_character_ids)
+
+    %{
+      id: adventure.id,
+      name: adventure.name,
+      description: adventure.description,
+      season: adventure.season,
+      active: adventure.active,
+      campaign_id: adventure.campaign_id,
+      image_url: get_image_url(adventure),
+      image_positions: render_image_positions_if_loaded(adventure),
+      entity_class: "Adventure",
+      restricted_view: true,
+      # Only include the player's own characters
+      characters: render_player_characters(adventure, user_character_id_set),
+      character_ids: filter_character_ids_for_player(adventure, user_character_id_set),
+      # Empty arrays for restricted fields
+      villains: [],
+      villain_ids: [],
+      fights: [],
+      fight_ids: []
+    }
+  end
+
+  # Filter characters to only include the player's own characters
+  defp render_player_characters(adventure, user_character_id_set) do
+    case Map.get(adventure, :adventure_characters) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      adventure_characters ->
+        characters =
+          adventure_characters
+          |> Enum.map(& &1.character)
+          |> Enum.reject(&is_nil/1)
+          |> Enum.filter(&MapSet.member?(user_character_id_set, &1.id))
+
+        characters_with_images = ShotElixir.ImageLoader.load_image_urls(characters, "Character")
+        Enum.map(characters_with_images, &render_character_lite/1)
+    end
+  end
+
+  # Filter character IDs to only include the player's own characters
+  defp filter_character_ids_for_player(adventure, user_character_id_set) do
+    case Map.get(adventure, :adventure_characters) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      adventure_characters ->
+        adventure_characters
+        |> Enum.map(& &1.character_id)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.filter(&MapSet.member?(user_character_id_set, &1))
+    end
   end
 
   defp translate_errors(changeset) when is_map(changeset) do

@@ -964,4 +964,13 @@ defmodule ShotElixir.Characters do
 
     :ok
   end
+
+  @doc """
+  Returns a list of character IDs owned by the given user.
+  Used for filtering adventure characters to show only the player's own characters.
+  """
+  def get_character_ids_for_user(user_id) do
+    from(c in Character, where: c.user_id == ^user_id, select: c.id)
+    |> Repo.all()
+  end
 end
