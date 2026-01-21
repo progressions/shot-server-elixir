@@ -78,3 +78,12 @@ config :shot_elixir, :grok, api_key: "test-placeholder-key"
 # Notion API placeholder token for tests - prevents :no_notion_oauth_token errors
 # Tests use stubbed clients so actual API calls aren't made
 config :shot_elixir, :notion, token: "test-placeholder-notion-token"
+
+# Notion HTTP client timeouts for tests - fast-fail on network calls
+# This prevents tests from waiting 15s when they hit the real Notion API
+# retry: false disables Req's automatic retry mechanism (default retries 3x with backoff)
+config :shot_elixir, :notion_http,
+  receive_timeout: 100,
+  pool_timeout: 100,
+  connect_timeout: 100,
+  retry: false

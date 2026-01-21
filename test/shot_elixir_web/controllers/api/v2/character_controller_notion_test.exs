@@ -443,8 +443,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterControllerNotionTest do
           "notion_page_id" => "non-existent-page-id"
         })
 
-      # Could be 404 (not found), 422 (API error), or 503 (connection failed)
-      assert conn.status in [404, 422, 503]
+      # Could be 404 (not found), 422 (API error), 500 (timeout/internal error), or 503 (connection failed)
+      assert conn.status in [404, 422, 500, 503]
     end
 
     test "preserves ownership when importing existing character", %{
