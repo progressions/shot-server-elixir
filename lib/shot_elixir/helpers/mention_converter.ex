@@ -147,11 +147,14 @@ defmodule ShotElixir.Helpers.MentionConverter do
 
   # Build the Notion rich_text array from text and mentions
   # Uses cons [item | acc] pattern and reverses at the end for O(n) complexity
+  # NOTE: Uses binary_slice/3 instead of String.slice/3 because Regex.scan returns
+  # byte positions, not grapheme positions. For multi-byte Unicode characters,
+  # byte position != grapheme position, which would cause incorrect slicing.
   defp build_notion_rich_text(text, mentions, _campaign) do
     {rich_text_reversed, last_pos} =
       Enum.reduce(mentions, {[], 0}, fn mention, {acc, current_pos} ->
-        # Add text before this mention
-        text_before = String.slice(text, current_pos, mention.start_pos - current_pos)
+        # Add text before this mention (use binary_slice for byte positions)
+        text_before = binary_slice(text, current_pos, mention.start_pos - current_pos)
 
         acc =
           if text_before != "" do
@@ -174,8 +177,8 @@ defmodule ShotElixir.Helpers.MentionConverter do
         {acc, mention.start_pos + mention.length}
       end)
 
-    # Add any remaining text after the last mention
-    remaining = String.slice(text, last_pos, String.length(text) - last_pos)
+    # Add any remaining text after the last mention (use byte_size for byte positions)
+    remaining = binary_slice(text, last_pos, byte_size(text) - last_pos)
 
     rich_text_reversed =
       if remaining != "" do
