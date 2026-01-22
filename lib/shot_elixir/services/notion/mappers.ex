@@ -180,19 +180,21 @@ defmodule ShotElixir.Services.Notion.Mappers do
   @doc """
   Fetch rich description from Notion page blocks and add to attributes.
   Detects whether the attributes map uses atom or string keys and matches that style.
+  Content after a "GM Only" H1 heading is stored separately in rich_description_gm_only.
   """
   def add_rich_description(attributes, page_id, campaign_id, token) do
     case Blocks.fetch_rich_description(page_id, campaign_id, token) do
-      {:ok, %{markdown: markdown, mentions: mentions}} ->
+      {:ok, %{markdown: markdown, mentions: mentions, gm_only_markdown: gm_only}} ->
         # Detect key type from existing attributes and match it
-        {rich_desc_key, mentions_key} =
+        {rich_desc_key, mentions_key, gm_only_key} =
           if uses_atom_keys?(attributes),
-            do: {:rich_description, :mentions},
-            else: {"rich_description", "mentions"}
+            do: {:rich_description, :mentions, :rich_description_gm_only},
+            else: {"rich_description", "mentions", "rich_description_gm_only"}
 
         attributes
         |> Map.put(rich_desc_key, markdown)
         |> Map.put(mentions_key, mentions)
+        |> Map.put(gm_only_key, gm_only)
 
       {:error, reason} ->
         Logger.warning("Failed to fetch rich description for page #{page_id}: #{inspect(reason)}")

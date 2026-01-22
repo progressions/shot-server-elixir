@@ -26,8 +26,13 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     }
   end
 
+  def render("show.json", %{character: character, is_gm: is_gm}) do
+    render_character_full(character, is_gm)
+  end
+
   def render("show.json", %{character: character}) do
-    render_character_full(character)
+    # Default to false for backwards compatibility - non-GM users don't see GM-only content
+    render_character_full(character, false)
   end
 
   def render("autocomplete.json", %{characters: characters}) do
@@ -101,8 +106,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
   end
 
   # Rails CharacterSerializer format (full detail)
-  defp render_character_full(character) do
-    %{
+  # is_gm parameter controls whether GM-only content is included
+  defp render_character_full(character, is_gm \\ false) do
+    base = %{
       id: character.id,
       name: character.name,
       active: character.active,
@@ -141,6 +147,13 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
       juncture: render_juncture_lite_if_loaded(character),
       image_positions: render_image_positions_if_loaded(character)
     }
+
+    # Only include GM-only content for gamemasters
+    if is_gm do
+      Map.put(base, :rich_description_gm_only, character.rich_description_gm_only)
+    else
+      base
+    end
   end
 
   # Rails CharacterAutocompleteSerializer format

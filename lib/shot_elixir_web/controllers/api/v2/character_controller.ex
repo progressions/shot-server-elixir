@@ -83,11 +83,13 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
         {:ok, conn} ->
           # Client needs fresh data
+          is_gm = is_gm_for_character?(character, current_user)
+
           conn
           |> ETag.put_etag(etag)
           |> put_resp_header("cache-control", @cache_control_header)
           |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-          |> render("show.json", character: character)
+          |> render("show.json", character: character, is_gm: is_gm)
       end
     else
       nil -> {:error, :not_found}
@@ -780,6 +782,22 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}
+    end
+  end
+
+  # Helper to determine if user can see GM-only content for a character
+  defp is_gm_for_character?(character, user) do
+    campaign = Campaigns.get_campaign(character.campaign_id)
+
+    cond do
+      # Admin can see everything
+      user.admin -> true
+      # Gamemaster who owns the campaign can see GM content
+      campaign && campaign.user_id == user.id -> true
+      # User who is flagged as gamemaster and is member of campaign
+      user.gamemaster && Campaigns.is_member?(character.campaign_id, user.id) -> true
+      # Everyone else cannot see GM content
+      true -> false
     end
   end
 
