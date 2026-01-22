@@ -143,6 +143,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
           if authorize_campaign_modification(campaign, current_user) do
             case Sites.create_site(site_params) do
               {:ok, site} ->
+                # Broadcast reload signal to all clients
+                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(current_user.current_campaign_id, "Site")
+
                 # Handle image upload if present
                 case conn.params["image"] do
                   %Plug.Upload{} = upload ->
@@ -255,6 +258,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
                             # Continue with site update
                             case Sites.update_site(site, parsed_params) do
                               {:ok, site} ->
+                                # Broadcast reload signal to all clients
+                                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(site.campaign_id, "Site")
+
                                 conn
                                 |> put_view(ShotElixirWeb.Api.V2.SiteView)
                                 |> render("show.json", site: site)
@@ -283,6 +289,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
                     # No image upload, just update site
                     case Sites.update_site(site, parsed_params) do
                       {:ok, site} ->
+                        # Broadcast reload signal to all clients
+                        ShotElixirWeb.CampaignChannel.broadcast_entity_reload(site.campaign_id, "Site")
+
                         conn
                         |> put_view(ShotElixirWeb.Api.V2.SiteView)
                         |> render("show.json", site: site)
@@ -326,6 +335,8 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
             if authorize_campaign_modification(campaign, current_user) do
               case Sites.delete_site(site) do
                 {:ok, _site} ->
+                  # Broadcast reload signal to all clients
+                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(site.campaign_id, "Site")
                   send_resp(conn, :no_content, "")
 
                 {:error, _} ->
@@ -492,6 +503,9 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
          campaign <- Campaigns.get_campaign(campaign_id),
          true <- authorize_campaign_modification(campaign, current_user),
          {:ok, new_site} <- Sites.duplicate_site(site) do
+      # Broadcast reload signal to all clients
+      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Site")
+
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.SiteView)

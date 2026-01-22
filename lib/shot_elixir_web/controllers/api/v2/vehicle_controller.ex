@@ -111,6 +111,9 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
 
           case Vehicles.create_vehicle(params) do
             {:ok, vehicle} ->
+              # Broadcast reload signal to all clients
+              ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Vehicle")
+
               # Handle image upload if present
               case conn.params["image"] do
                 %Plug.Upload{} = upload ->
@@ -235,6 +238,8 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
          :ok <- authorize_vehicle_edit(vehicle, current_user),
          {:ok, _} <- Vehicles.delete_vehicle(vehicle) do
+      # Broadcast reload signal to all clients
+      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(vehicle.campaign_id, "Vehicle")
       send_resp(conn, :no_content, "")
     else
       nil ->
@@ -338,6 +343,9 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
     with %Vehicle{} = vehicle <- Vehicles.get_vehicle(id),
          :ok <- authorize_vehicle_edit(vehicle, current_user),
          {:ok, new_vehicle} <- Vehicles.duplicate_vehicle(vehicle, current_user) do
+      # Broadcast reload signal to all clients
+      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(vehicle.campaign_id, "Vehicle")
+
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.VehicleView)
@@ -400,6 +408,9 @@ defmodule ShotElixirWeb.Api.V2.VehicleController do
   defp update_vehicle_with_params(conn, vehicle, parsed_params) do
     case Vehicles.update_vehicle(vehicle, parsed_params) do
       {:ok, final_vehicle} ->
+        # Broadcast reload signal to all clients
+        ShotElixirWeb.CampaignChannel.broadcast_entity_reload(vehicle.campaign_id, "Vehicle")
+
         conn
         |> put_view(ShotElixirWeb.Api.V2.VehicleView)
         |> render("show.json", vehicle: final_vehicle)
