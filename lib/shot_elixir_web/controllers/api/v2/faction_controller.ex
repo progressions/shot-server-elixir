@@ -99,11 +99,13 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
                 {:ok, conn} ->
                   # Client needs fresh data
+                  is_gm = is_gm_for_entity?(campaign, current_user)
+
                   conn
                   |> ETag.put_etag(etag)
                   |> put_resp_header("cache-control", @cache_control_header)
                   |> put_view(ShotElixirWeb.Api.V2.FactionView)
-                  |> render("show.json", faction: faction)
+                  |> render("show.json", faction: faction, is_gm: is_gm)
               end
             else
               conn
@@ -585,6 +587,11 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
   end
 
   defp authorize_campaign_modification(campaign, user) do
+    campaign.user_id == user.id || user.admin ||
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+  end
+
+  defp is_gm_for_entity?(campaign, user) do
     campaign.user_id == user.id || user.admin ||
       (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end

@@ -6,8 +6,13 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
     }
   end
 
+  def render("show.json", %{faction: faction, is_gm: is_gm}) do
+    render_faction(faction, is_gm)
+  end
+
   def render("show.json", %{faction: faction}) do
-    render_faction(faction)
+    # Default to false for backwards compatibility - non-GM users don't see GM-only content
+    render_faction(faction, false)
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -21,10 +26,10 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
   Render a faction for search results or index listings.
   Public function for use by SearchView and other views.
   """
-  def render_for_index(faction), do: render_faction(faction)
+  def render_for_index(faction), do: render_faction(faction, false)
 
-  defp render_faction(faction) do
-    %{
+  defp render_faction(faction, is_gm \\ false) do
+    base = %{
       id: faction.id,
       name: faction.name,
       description: faction.description,
@@ -51,6 +56,13 @@ defmodule ShotElixirWeb.Api.V2.FactionView do
       mentions: faction.mentions,
       entity_class: "Faction"
     }
+
+    # Only include GM-only content for gamemasters
+    if is_gm do
+      Map.put(base, :rich_description_gm_only, faction.rich_description_gm_only)
+    else
+      base
+    end
   end
 
   defp translate_errors(changeset) when is_map(changeset) do

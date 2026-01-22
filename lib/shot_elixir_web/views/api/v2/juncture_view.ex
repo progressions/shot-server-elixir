@@ -6,8 +6,13 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
     }
   end
 
+  def render("show.json", %{juncture: juncture, is_gm: is_gm}) do
+    render_juncture(juncture, is_gm)
+  end
+
   def render("show.json", %{juncture: juncture}) do
-    render_juncture(juncture)
+    # Default to false for backwards compatibility - non-GM users don't see GM-only content
+    render_juncture(juncture, false)
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -21,10 +26,10 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
   Render a juncture for search results or index listings.
   Public function for use by SearchView and other views.
   """
-  def render_for_index(juncture), do: render_juncture(juncture)
+  def render_for_index(juncture), do: render_juncture(juncture, false)
 
-  defp render_juncture(juncture) do
-    %{
+  defp render_juncture(juncture, is_gm \\ false) do
+    base = %{
       id: juncture.id,
       name: juncture.name,
       description: juncture.description,
@@ -46,6 +51,13 @@ defmodule ShotElixirWeb.Api.V2.JunctureView do
       image_positions: render_image_positions_if_loaded(juncture),
       entity_class: "Juncture"
     }
+
+    # Only include GM-only content for gamemasters
+    if is_gm do
+      Map.put(base, :rich_description_gm_only, juncture.rich_description_gm_only)
+    else
+      base
+    end
   end
 
   defp translate_errors(changeset) when is_map(changeset) do

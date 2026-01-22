@@ -69,7 +69,8 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              render(conn, :show, juncture: juncture)
+              is_gm = is_gm_for_entity?(campaign, current_user)
+              render(conn, :show, juncture: juncture, is_gm: is_gm)
             else
               conn
               |> put_status(:not_found)
@@ -486,6 +487,11 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
   end
 
   defp authorize_campaign_modification(campaign, user) do
+    campaign.user_id == user.id || user.admin ||
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+  end
+
+  defp is_gm_for_entity?(campaign, user) do
     campaign.user_id == user.id || user.admin ||
       (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
