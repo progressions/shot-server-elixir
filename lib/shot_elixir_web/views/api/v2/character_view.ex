@@ -105,8 +105,15 @@ defmodule ShotElixirWeb.Api.V2.CharacterView do
     }
   end
 
-  # Rails CharacterSerializer format (full detail)
-  # is_gm parameter controls whether GM-only content is included
+  # Renders a character with full details for show/update responses.
+  #
+  # Parameters:
+  # - `character` - The character struct with associations preloaded
+  # - `is_gm` - Boolean indicating if the requesting user is a GM for this character's campaign.
+  #             When true, includes `rich_description_gm_only` field in the response.
+  #             Defaults to false to protect GM-only content from non-GM users.
+  #
+  # The `rich_description_gm_only` field is only included when `is_gm` is true.
   defp render_character_full(character, is_gm \\ false) do
     base = %{
       id: character.id,

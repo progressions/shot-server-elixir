@@ -71,7 +71,12 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user) do
-      etag = ETag.generate_etag(character)
+      # Determine GM status early so it can be included in ETag
+      is_gm = is_gm_for_character?(character, current_user)
+
+      # Include is_gm in ETag to prevent cache poisoning between GM and non-GM users
+      # Without this, a GM's cached response could be served to a non-GM user
+      etag = ETag.generate_etag(character, suffix: "gm:#{is_gm}")
 
       case ETag.check_stale(conn, etag) do
         {:not_modified, conn} ->
@@ -83,8 +88,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
         {:ok, conn} ->
           # Client needs fresh data
-          is_gm = is_gm_for_character?(character, current_user)
-
           conn
           |> ETag.put_etag(etag)
           |> put_resp_header("cache-control", @cache_control_header)
@@ -785,9 +788,23 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     end
   end
 
-  # Helper to determine if user can see GM-only content for a character
+  # Determines if a user can see GM-only content for a character.
+  #
+  # Returns true if the user is:
+  # - An admin
+  # - The gamemaster (owner) of the character's campaign
+  # - A user flagged as gamemaster who is a member of the campaign
+  #
+  # Expects the character to have the :campaign association preloaded to avoid N+1 queries.
+  # Falls back to fetching the campaign if not preloaded.
   defp is_gm_for_character?(character, user) do
-    campaign = Campaigns.get_campaign(character.campaign_id)
+    # Use preloaded campaign to avoid extra query, fall back to fetch if not preloaded
+    campaign =
+      case character.campaign do
+        %Ecto.Association.NotLoaded{} -> Campaigns.get_campaign(character.campaign_id)
+        nil -> Campaigns.get_campaign(character.campaign_id)
+        campaign -> campaign
+      end
 
     cond do
       # Admin can see everything

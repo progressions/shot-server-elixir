@@ -35,9 +35,17 @@ defmodule ShotElixirWeb.Plugs.ETag do
   providing a stable identifier that changes when the resource changes.
 
   Returns nil if the struct lacks required fields.
+
+  ## Options
+
+  - `:suffix` - Additional string to append to ETag source (e.g., for role-based variants)
   """
-  @spec generate_etag(struct()) :: String.t() | nil
-  def generate_etag(%{updated_at: updated_at, id: id}) when not is_nil(updated_at) do
+  @spec generate_etag(struct(), keyword()) :: String.t() | nil
+  def generate_etag(entity, opts \\ [])
+
+  def generate_etag(%{updated_at: updated_at, id: id}, opts) when not is_nil(updated_at) do
+    suffix = Keyword.get(opts, :suffix, "")
+
     timestamp =
       case updated_at do
         %DateTime{} -> DateTime.to_unix(updated_at)
@@ -45,11 +53,11 @@ defmodule ShotElixirWeb.Plugs.ETag do
         _ -> to_string(updated_at)
       end
 
-    :crypto.hash(:md5, "#{id}-#{timestamp}")
+    :crypto.hash(:md5, "#{id}-#{timestamp}-#{suffix}")
     |> Base.encode16(case: :lower)
   end
 
-  def generate_etag(_), do: nil
+  def generate_etag(_, _), do: nil
 
   @doc """
   Checks if the client's If-None-Match header matches the current ETag.
