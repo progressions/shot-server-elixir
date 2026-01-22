@@ -45,10 +45,14 @@ defmodule ShotElixir.Models.Broadcastable do
           end
 
         # Serialize entity using appropriate view
+        # Pass is_gm: true for entities with rich_description_gm_only field
         serialized_entity =
           case entity_name_lower do
             "character" ->
-              ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
+              ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{
+                character: entity,
+                is_gm: true
+              })
 
             "weapon" ->
               ShotElixirWeb.Api.V2.WeaponView.render("show.json", %{weapon: entity})
@@ -57,25 +61,31 @@ defmodule ShotElixir.Models.Broadcastable do
               ShotElixirWeb.Api.V2.SchticksView.render("show.json", %{schtick: entity})
 
             "site" ->
-              ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity})
+              ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity, is_gm: true})
 
             "vehicle" ->
               ShotElixirWeb.Api.V2.VehicleView.render("show.json", %{vehicle: entity})
 
             "party" ->
-              ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity})
+              ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity, is_gm: true})
 
             "faction" ->
-              ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity})
+              ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity, is_gm: true})
 
             "juncture" ->
-              ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{juncture: entity})
+              ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{
+                juncture: entity,
+                is_gm: true
+              })
 
             "fight" ->
               ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
 
             "adventure" ->
-              ShotElixirWeb.Api.V2.AdventureView.render("show.json", %{adventure: entity})
+              ShotElixirWeb.Api.V2.AdventureView.render("show.json", %{
+                adventure: entity,
+                is_gm: true
+              })
 
             "campaign" ->
               ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
@@ -165,10 +175,14 @@ defmodule ShotElixir.Models.Broadcastable do
       end
 
     # Serialize entity using appropriate view
+    # Pass is_gm: true for entities with rich_description_gm_only field
     serialized_entity =
       case entity_name_lower do
         "character" ->
-          ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{character: entity})
+          ShotElixirWeb.Api.V2.CharacterView.render("show.json", %{
+            character: entity,
+            is_gm: true
+          })
 
         "weapon" ->
           ShotElixirWeb.Api.V2.WeaponView.render("show.json", %{weapon: entity})
@@ -177,25 +191,31 @@ defmodule ShotElixir.Models.Broadcastable do
           ShotElixirWeb.Api.V2.SchticksView.render("show.json", %{schtick: entity})
 
         "site" ->
-          ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity})
+          ShotElixirWeb.Api.V2.SiteView.render("show.json", %{site: entity, is_gm: true})
 
         "vehicle" ->
           ShotElixirWeb.Api.V2.VehicleView.render("show.json", %{vehicle: entity})
 
         "party" ->
-          ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity})
+          ShotElixirWeb.Api.V2.PartyView.render("show.json", %{party: entity, is_gm: true})
 
         "faction" ->
-          ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity})
+          ShotElixirWeb.Api.V2.FactionView.render("show.json", %{faction: entity, is_gm: true})
 
         "juncture" ->
-          ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{juncture: entity})
+          ShotElixirWeb.Api.V2.JunctureView.render("show.json", %{
+            juncture: entity,
+            is_gm: true
+          })
 
         "fight" ->
           ShotElixirWeb.Api.V2.FightView.render("show.json", %{fight: entity})
 
         "adventure" ->
-          ShotElixirWeb.Api.V2.AdventureView.render("show.json", %{adventure: entity})
+          ShotElixirWeb.Api.V2.AdventureView.render("show.json", %{
+            adventure: entity,
+            is_gm: true
+          })
 
         "campaign" ->
           ShotElixirWeb.Api.V2.CampaignView.render("show.json", %{campaign: entity})
