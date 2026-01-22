@@ -489,7 +489,8 @@ defmodule ShotElixir.Characters do
         left_join: f in assoc(c, :faction),
         left_join: j in assoc(c, :juncture),
         left_join: u in assoc(c, :user),
-        preload: [faction: f, juncture: j, user: u]
+        left_join: ca in assoc(c, :campaign),
+        preload: [faction: f, juncture: j, user: u, campaign: ca]
 
     case Repo.one(query) do
       nil ->

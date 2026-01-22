@@ -211,8 +211,24 @@ defmodule ShotElixir.Services.Notion.Blocks do
 
     case response do
       %{"results" => blocks} when is_list(blocks) ->
-        {markdown, mentions} = blocks_to_markdown_with_mentions(blocks, campaign_id)
-        {:ok, %{markdown: markdown, mentions: mentions}}
+        # Split blocks at "GM Only" heading
+        {public_blocks, gm_only_blocks} = split_at_gm_only_heading(blocks)
+
+        # Convert each set to markdown
+        {markdown, public_mentions} = blocks_to_markdown_with_mentions(public_blocks, campaign_id)
+
+        {gm_only_markdown, gm_only_mentions} =
+          blocks_to_markdown_with_mentions(gm_only_blocks, campaign_id)
+
+        # Merge mentions from both sections
+        all_mentions = merge_mentions(public_mentions, gm_only_mentions)
+
+        {:ok,
+         %{
+           markdown: markdown,
+           mentions: all_mentions,
+           gm_only_markdown: if(gm_only_markdown == "", do: nil, else: gm_only_markdown)
+         }}
 
       %{"code" => error_code, "message" => message} ->
         {:error, {:notion_api_error, error_code, message}}
@@ -225,6 +241,45 @@ defmodule ShotElixir.Services.Notion.Blocks do
       Logger.error("Failed to fetch rich description: #{Exception.message(error)}")
       {:error, error}
   end
+
+  @doc """
+  Split blocks at a heading_1 with text "GM Only" (case-insensitive).
+  Returns {public_blocks, gm_only_blocks} where gm_only_blocks excludes the heading itself.
+  """
+  def split_at_gm_only_heading(blocks) do
+    gm_only_index =
+      Enum.find_index(blocks, fn block ->
+        block["type"] == "heading_1" &&
+          is_gm_only_heading?(block)
+      end)
+
+    case gm_only_index do
+      nil ->
+        # No GM Only section found
+        {blocks, []}
+
+      idx ->
+        # Split at the heading, exclude the "GM Only" heading itself from gm_only section
+        public_blocks = Enum.take(blocks, idx)
+        # Skip the heading itself (+1) when taking GM-only blocks
+        gm_only_blocks = Enum.drop(blocks, idx + 1)
+        {public_blocks, gm_only_blocks}
+    end
+  end
+
+  defp is_gm_only_heading?(block) do
+    heading_text = extract_heading_text(block)
+    normalized = heading_text |> String.downcase() |> String.trim()
+    normalized == "gm only"
+  end
+
+  defp extract_heading_text(%{"heading_1" => %{"rich_text" => rich_text}}) do
+    rich_text
+    |> Enum.map(& &1["plain_text"])
+    |> Enum.join("")
+  end
+
+  defp extract_heading_text(_), do: ""
 
   # ---------------------------------------------------------------------------
   # Block parsing helpers
