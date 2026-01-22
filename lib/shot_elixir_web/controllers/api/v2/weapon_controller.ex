@@ -140,9 +140,6 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
 
         case Weapons.create_weapon(params) do
           {:ok, weapon} ->
-            # Broadcast reload signal to all clients
-            ShotElixirWeb.CampaignChannel.broadcast_entity_reload(current_user.current_campaign_id, "Weapon")
-
             # Handle image upload if present
             case conn.params["image"] do
               %Plug.Upload{} = upload ->
@@ -220,9 +217,6 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
                     # Continue with weapon update
                     case Weapons.update_weapon(weapon, params) do
                       {:ok, weapon} ->
-                        # Broadcast reload signal to all clients
-                        ShotElixirWeb.CampaignChannel.broadcast_entity_reload(weapon.campaign_id, "Weapon")
-
                         conn
                         |> put_view(ShotElixirWeb.Api.V2.WeaponView)
                         |> render("show.json", weapon: weapon)
@@ -251,9 +245,6 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
             # No image upload, just update weapon
             case Weapons.update_weapon(weapon, params) do
               {:ok, weapon} ->
-                # Broadcast reload signal to all clients
-                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(weapon.campaign_id, "Weapon")
-
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.WeaponView)
                 |> render("show.json", weapon: weapon)
@@ -281,8 +272,6 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
       true ->
         case Weapons.delete_weapon(weapon) do
           {:ok, _weapon} ->
-            # Broadcast reload signal to all clients
-            ShotElixirWeb.CampaignChannel.broadcast_entity_reload(weapon.campaign_id, "Weapon")
             send_resp(conn, :no_content, "")
 
           {:error, _} ->
@@ -341,9 +330,6 @@ defmodule ShotElixirWeb.Api.V2.WeaponController do
          %{} = weapon <- Weapons.get_weapon(id),
          true <- weapon.campaign_id == campaign_id,
          {:ok, new_weapon} <- Weapons.duplicate_weapon(weapon) do
-      # Broadcast reload signal to all clients
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Weapon")
-
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.WeaponView)

@@ -133,9 +133,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
       case Characters.create_character(params) do
         {:ok, character} ->
-          # Broadcast reload signal to all clients
-          ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Character")
-
           # Handle image upload if present
           case conn.params["image"] do
             %Plug.Upload{} = upload ->
@@ -262,9 +259,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       # Perform smart two-way merge when linking to Notion
       case ShotElixir.Services.NotionService.merge_with_notion(character, new_notion_page_id) do
         {:ok, final_character} ->
-          # Broadcast reload signal
-          ShotElixirWeb.CampaignChannel.broadcast_entity_reload(character.campaign_id, "Character")
-
           # Queue Notion sync after successful merge/link
           %{"character_id" => final_character.id}
           |> SyncCharacterToNotionWorker.new()
@@ -293,8 +287,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
       # Normal update flow
       case Characters.update_character(character, parsed_params) do
         {:ok, final_character} ->
-          # Broadcast reload signal to all clients
-          ShotElixirWeb.CampaignChannel.broadcast_entity_reload(character.campaign_id, "Character")
+          # Broadcasting now happens automatically in Characters context
 
           # Queue Notion sync
           %{"character_id" => final_character.id}
@@ -320,8 +313,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_edit(character, current_user),
          {:ok, _} <- Characters.delete_character(character) do
-      # Broadcast reload signal to all clients
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(character.campaign_id, "Character")
+      # Broadcasting now happens automatically in Characters context
       send_resp(conn, :no_content, "")
     else
       nil -> {:error, :not_found}
@@ -336,9 +328,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user),
          {:ok, new_character} <- Characters.duplicate_character(character, current_user) do
-      # Broadcast reload signal to all clients
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(character.campaign_id, "Character")
-
       # Queue Notion sync
       %{"character_id" => new_character.id}
       |> SyncCharacterToNotionWorker.new()
@@ -637,9 +626,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
                 # Reload character with associations for proper JSON rendering
                 character = Characters.get_character!(character.id)
 
-                # Broadcast reload signal to all clients
-                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Character")
-
                 # Queue Notion sync to keep it in sync
                 %{"character_id" => character.id}
                 |> SyncCharacterToNotionWorker.new()
@@ -731,9 +717,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
                   # Reload character with associations
                   character = Characters.get_character(character.id)
-
-                  # Broadcast reload signal to all clients
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Character")
 
                   conn
                   |> put_status(:created)

@@ -301,7 +301,6 @@ defmodule ShotElixirWeb.CampaignChannel do
       "faction" -> "factions"
       "fight" -> "fights"
       "image" -> "images"
-      "juncture" -> "junctures"
       "party" -> "parties"
       "schtick" -> "schticks"
       "site" -> "sites"

@@ -147,9 +147,6 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
           if authorize_campaign_modification(campaign, current_user) do
             case Parties.create_party(party_params) do
               {:ok, party} ->
-                # Broadcast reload signal to all clients
-                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(current_user.current_campaign_id, "Party")
-
                 # Handle image upload if present
                 case conn.params["image"] do
                   %Plug.Upload{} = upload ->
@@ -270,9 +267,6 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                             # Continue with party update
                             case Parties.update_party(party, parsed_params) do
                               {:ok, party} ->
-                                # Broadcast reload signal to all clients
-                                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(party.campaign_id, "Party")
-
                                 conn
                                 |> put_view(ShotElixirWeb.Api.V2.PartyView)
                                 |> render("show.json", party: party)
@@ -301,9 +295,6 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
                     # No image upload, just update party
                     case Parties.update_party(party, parsed_params) do
                       {:ok, party} ->
-                        # Broadcast reload signal to all clients
-                        ShotElixirWeb.CampaignChannel.broadcast_entity_reload(party.campaign_id, "Party")
-
                         conn
                         |> put_view(ShotElixirWeb.Api.V2.PartyView)
                         |> render("show.json", party: party)
@@ -347,8 +338,6 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
             if authorize_campaign_modification(campaign, current_user) do
               case Parties.delete_party(party) do
                 {:ok, _party} ->
-                  # Broadcast reload signal to all clients
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(party.campaign_id, "Party")
                   send_resp(conn, :no_content, "")
 
                 {:error, _} ->
@@ -506,9 +495,6 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
          campaign <- Campaigns.get_campaign(campaign_id),
          true <- authorize_campaign_modification(campaign, current_user),
          {:ok, new_party} <- Parties.duplicate_party(party) do
-      # Broadcast reload signal to all clients
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Party")
-
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.PartyView)

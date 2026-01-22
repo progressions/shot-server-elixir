@@ -126,9 +126,6 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
           if authorize_campaign_modification(campaign, current_user) do
             case Junctures.create_juncture(juncture_params) do
               {:ok, juncture} ->
-                # Broadcast reload signal to all clients
-                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(current_user.current_campaign_id, "Juncture")
-
                 # Handle image upload if present
                 case conn.params["image"] do
                   %Plug.Upload{} = upload ->
@@ -244,8 +241,6 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
                             # Continue with juncture update
                             case Junctures.update_juncture(juncture, parsed_params) do
                               {:ok, updated_juncture} ->
-                                # Broadcast reload signal to all clients
-                                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(juncture.campaign_id, "Juncture")
                                 render(conn, :show, juncture: updated_juncture)
 
                               {:error, changeset} ->
@@ -270,8 +265,6 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
                     # No image upload, just update juncture
                     case Junctures.update_juncture(juncture, parsed_params) do
                       {:ok, juncture} ->
-                        # Broadcast reload signal to all clients
-                        ShotElixirWeb.CampaignChannel.broadcast_entity_reload(juncture.campaign_id, "Juncture")
                         render(conn, :show, juncture: juncture)
 
                       {:error, changeset} ->
@@ -312,8 +305,6 @@ defmodule ShotElixirWeb.Api.V2.JunctureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Junctures.delete_juncture(juncture) do
                 {:ok, _juncture} ->
-                  # Broadcast reload signal to all clients
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(juncture.campaign_id, "Juncture")
                   send_resp(conn, :no_content, "")
 
                 {:error, _} ->

@@ -157,9 +157,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.create_adventure(adventure_params) do
                 {:ok, adventure} ->
-                  # Broadcast reload signal to all clients
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(current_user.current_campaign_id, "Adventure")
-
                   adventure = maybe_handle_image_upload(conn, adventure)
 
                   conn
@@ -233,9 +230,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
 
                 case Adventures.update_adventure(adventure, parsed_params) do
                   {:ok, updated_adventure} ->
-                    # Broadcast reload signal to all clients
-                    ShotElixirWeb.CampaignChannel.broadcast_entity_reload(adventure.campaign_id, "Adventure")
-
                     conn
                     |> put_view(ShotElixirWeb.Api.V2.AdventureView)
                     |> render("show.json", adventure: updated_adventure)
@@ -277,8 +271,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
             if authorize_campaign_modification(campaign, current_user) do
               case Adventures.delete_adventure(adventure) do
                 {:ok, _deleted_adventure} ->
-                  # Broadcast reload signal to all clients
-                  ShotElixirWeb.CampaignChannel.broadcast_entity_reload(adventure.campaign_id, "Adventure")
                   send_resp(conn, :no_content, "")
 
                 {:error, _} ->
@@ -347,9 +339,6 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
          campaign <- Campaigns.get_campaign(campaign_id),
          true <- authorize_campaign_modification(campaign, current_user),
          {:ok, new_adventure} <- Adventures.duplicate_adventure(adventure) do
-      # Broadcast reload signal to all clients
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Adventure")
-
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.AdventureView)

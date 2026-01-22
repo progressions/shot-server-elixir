@@ -149,8 +149,6 @@ defmodule ShotElixirWeb.Api.V2.FightController do
                   # Continue with fight update
                   case Fights.update_fight(fight, parse_json_params(fight_params)) do
                     {:ok, updated_fight} ->
-                      # Broadcast reload signal to all clients
-                      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(fight.campaign_id, "Fight")
                       Notifications.maybe_notify_discord(updated_fight)
 
                       conn
@@ -181,8 +179,6 @@ defmodule ShotElixirWeb.Api.V2.FightController do
           # No image upload, just update fight
           case Fights.update_fight(fight, parse_json_params(fight_params)) do
             {:ok, updated_fight} ->
-              # Broadcast reload signal to all clients
-              ShotElixirWeb.CampaignChannel.broadcast_entity_reload(fight.campaign_id, "Fight")
               Notifications.maybe_notify_discord(updated_fight)
 
               conn
@@ -221,8 +217,6 @@ defmodule ShotElixirWeb.Api.V2.FightController do
     with %Fight{} = fight <- Fights.get_fight(id),
          :ok <- authorize_fight_edit(fight, current_user),
          {:ok, _} <- Fights.delete_fight(fight) do
-      # Broadcast reload signal to all clients
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(fight.campaign_id, "Fight")
       send_resp(conn, :no_content, "")
     else
       nil ->

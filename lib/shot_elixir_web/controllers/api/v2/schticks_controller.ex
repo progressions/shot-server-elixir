@@ -211,9 +211,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
 
           case Schticks.create_schtick(schtick_params) do
             {:ok, schtick} ->
-              # Broadcast reload signal to all clients
-              ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign.id, "Schtick")
-
               # Handle image upload if present
               case conn.params["image"] do
                 %Plug.Upload{} = upload ->
@@ -327,9 +324,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
                           # Continue with schtick update
                           case Schticks.update_schtick(schtick, parsed_params) do
                             {:ok, updated_schtick} ->
-                              # Broadcast reload signal to all clients
-                              ShotElixirWeb.CampaignChannel.broadcast_entity_reload(schtick.campaign_id, "Schtick")
-
                               conn
                               |> put_view(ShotElixirWeb.Api.V2.SchticksView)
                               |> render("show.json", schtick: updated_schtick)
@@ -358,9 +352,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
                   # No image upload, just update schtick
                   case Schticks.update_schtick(schtick, parsed_params) do
                     {:ok, updated_schtick} ->
-                      # Broadcast reload signal to all clients
-                      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(schtick.campaign_id, "Schtick")
-
                       conn
                       |> put_view(ShotElixirWeb.Api.V2.SchticksView)
                       |> render("show.json", schtick: updated_schtick)
@@ -471,8 +462,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
           schtick ->
             case Schticks.delete_schtick(schtick) do
               {:ok, _schtick} ->
-                # Broadcast reload signal to all clients
-                ShotElixirWeb.CampaignChannel.broadcast_entity_reload(schtick.campaign_id, "Schtick")
                 send_resp(conn, :no_content, "")
 
               {:error, :has_dependents} ->
@@ -497,9 +486,6 @@ defmodule ShotElixirWeb.Api.V2.SchticksController do
          %{} = schtick <- Schticks.get_schtick(id),
          true <- schtick.campaign_id == campaign_id,
          {:ok, new_schtick} <- Schticks.duplicate_schtick(schtick) do
-      # Broadcast reload signal to all clients
-      ShotElixirWeb.CampaignChannel.broadcast_entity_reload(campaign_id, "Schtick")
-
       conn
       |> put_status(:created)
       |> put_view(ShotElixirWeb.Api.V2.SchticksView)
