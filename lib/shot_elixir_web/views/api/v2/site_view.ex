@@ -7,8 +7,13 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
     }
   end
 
+  def render("show.json", %{site: site, is_gm: is_gm}) do
+    render_site(site, is_gm)
+  end
+
   def render("show.json", %{site: site}) do
-    render_site(site)
+    # Default to false for backwards compatibility - non-GM users don't see GM-only content
+    render_site(site, false)
   end
 
   def render("error.json", %{changeset: changeset}) do
@@ -22,10 +27,10 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
   Render a site for search results or index listings.
   Public function for use by SearchView and other views.
   """
-  def render_for_index(site), do: render_site(site)
+  def render_for_index(site), do: render_site(site, false)
 
-  defp render_site(site) do
-    %{
+  defp render_site(site, is_gm \\ false) do
+    base = %{
       id: site.id,
       name: site.name,
       description: site.description,
@@ -49,6 +54,13 @@ defmodule ShotElixirWeb.Api.V2.SiteView do
       mentions: site.mentions,
       entity_class: "Site"
     }
+
+    # Only include GM-only content for gamemasters
+    if is_gm do
+      Map.put(base, :rich_description_gm_only, site.rich_description_gm_only)
+    else
+      base
+    end
   end
 
   defp translate_errors(changeset) when is_map(changeset) do

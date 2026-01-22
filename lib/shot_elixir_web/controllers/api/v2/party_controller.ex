@@ -85,10 +85,12 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
+              is_gm = is_gm_for_entity?(campaign, current_user)
+
               ETag.with_caching(conn, party, [cache_control: @cache_control_header], fn conn ->
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.PartyView)
-                |> render("show.json", party: party)
+                |> render("show.json", party: party, is_gm: is_gm)
               end)
             else
               conn
@@ -966,5 +968,10 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
     else
       {:error, :different_campaigns}
     end
+  end
+
+  defp is_gm_for_entity?(campaign, user) do
+    campaign.user_id == user.id || user.admin ||
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
 end

@@ -91,9 +91,11 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
                   user_character_ids: user_character_ids
                 )
               else
+                is_gm = is_gm_for_entity?(campaign, current_user)
+
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.AdventureView)
-                |> render("show.json", adventure: adventure)
+                |> render("show.json", adventure: adventure, is_gm: is_gm)
               end
             else
               conn
@@ -789,5 +791,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureController do
       not (campaign.user_id == user.id ||
              user.admin ||
              (user.gamemaster && membership))
+  end
+
+  defp is_gm_for_entity?(campaign, user) do
+    campaign.user_id == user.id || user.admin ||
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end
 end

@@ -27,6 +27,7 @@ defmodule ShotElixir.Factions.Faction do
 
     # Rich content from Notion (read-only in chi-war)
     field :rich_description, :string
+    field :rich_description_gm_only, :string
     field :mentions, :map, default: %{}
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
@@ -55,6 +56,7 @@ defmodule ShotElixir.Factions.Faction do
       :notion_page_id,
       :last_synced_to_notion_at,
       :rich_description,
+      :rich_description_gm_only,
       :mentions
     ])
     |> validate_required([:name, :campaign_id])

@@ -81,10 +81,12 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
+              is_gm = is_gm_for_entity?(campaign, current_user)
+
               ETag.with_caching(conn, site, [cache_control: @cache_control_header], fn conn ->
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.SiteView)
-                |> render("show.json", site: site)
+                |> render("show.json", site: site, is_gm: is_gm)
               end)
             else
               conn
@@ -652,6 +654,11 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   end
 
   defp authorize_campaign_modification(campaign, user) do
+    campaign.user_id == user.id || user.admin ||
+      (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
+  end
+
+  defp is_gm_for_entity?(campaign, user) do
     campaign.user_id == user.id || user.admin ||
       (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
   end

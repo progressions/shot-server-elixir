@@ -6,8 +6,13 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
     }
   end
 
+  def render("show.json", %{adventure: adventure, is_gm: is_gm}) do
+    render_adventure(adventure, is_gm)
+  end
+
   def render("show.json", %{adventure: adventure}) do
-    render_adventure(adventure)
+    # Default to false for backwards compatibility - non-GM users don't see GM-only content
+    render_adventure(adventure, false)
   end
 
   @doc """
@@ -30,10 +35,10 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
   Render an adventure for search results or index listings.
   Public function for use by SearchView and other views.
   """
-  def render_for_index(adventure), do: render_adventure(adventure)
+  def render_for_index(adventure), do: render_adventure(adventure, false)
 
-  defp render_adventure(adventure) do
-    %{
+  defp render_adventure(adventure, is_gm \\ false) do
+    base = %{
       id: adventure.id,
       name: adventure.name,
       description: adventure.description,
@@ -61,6 +66,13 @@ defmodule ShotElixirWeb.Api.V2.AdventureView do
       mentions: adventure.mentions,
       entity_class: "Adventure"
     }
+
+    # Only include GM-only content for gamemasters
+    if is_gm do
+      Map.put(base, :rich_description_gm_only, adventure.rich_description_gm_only)
+    else
+      base
+    end
   end
 
   # Player-restricted view - excludes rich_description, mentions, villains, fights, notion fields

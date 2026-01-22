@@ -7,8 +7,13 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
     }
   end
 
+  def render("show.json", %{party: party, is_gm: is_gm}) do
+    render_party(party, is_gm)
+  end
+
   def render("show.json", %{party: party}) do
-    render_party(party)
+    # Default to false for backwards compatibility - non-GM users don't see GM-only content
+    render_party(party, false)
   end
 
   def render("templates.json", %{templates: templates}) do
@@ -28,12 +33,12 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
   Render a party for search results or index listings.
   Public function for use by SearchView and other views.
   """
-  def render_for_index(party), do: render_party(party)
+  def render_for_index(party), do: render_party(party, false)
 
-  defp render_party(party) do
+  defp render_party(party, is_gm \\ false) do
     slots = render_slots_if_loaded(party)
 
-    %{
+    base = %{
       id: party.id,
       name: party.name,
       description: party.description,
@@ -60,6 +65,13 @@ defmodule ShotElixirWeb.Api.V2.PartyView do
       mentions: party.mentions,
       entity_class: "Party"
     }
+
+    # Only include GM-only content for gamemasters
+    if is_gm do
+      Map.put(base, :rich_description_gm_only, party.rich_description_gm_only)
+    else
+      base
+    end
   end
 
   defp translate_errors(changeset) when is_map(changeset) do
