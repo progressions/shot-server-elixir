@@ -5,7 +5,7 @@ defmodule ShotElixir.NotionSyncOnUpdateTest do
   use ShotElixir.DataCase, async: true
   use Oban.Testing, repo: ShotElixir.Repo
 
-  alias ShotElixir.{Characters, Sites, Parties, Factions}
+  alias ShotElixir.{Characters, Sites, Parties, Factions, Junctures}
   alias ShotElixir.Campaigns.Campaign
   alias ShotElixir.Accounts
 
@@ -13,7 +13,8 @@ defmodule ShotElixir.NotionSyncOnUpdateTest do
     SyncCharacterToNotionWorker,
     SyncSiteToNotionWorker,
     SyncPartyToNotionWorker,
-    SyncFactionToNotionWorker
+    SyncFactionToNotionWorker,
+    SyncJunctureToNotionWorker
   }
 
   setup do
@@ -183,6 +184,62 @@ defmodule ShotElixir.NotionSyncOnUpdateTest do
         {:ok, _updated} = Factions.update_faction(faction, %{name: "Updated Faction Name"})
 
         refute_enqueued(worker: SyncFactionToNotionWorker)
+      end)
+    end
+  end
+
+  describe "Juncture sync on update" do
+    test "enqueues sync job when Notion-linked juncture is updated", %{campaign: campaign} do
+      notion_page_id = Ecto.UUID.generate()
+
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Linked Juncture",
+          campaign_id: campaign.id,
+          notion_page_id: notion_page_id
+        })
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _updated} = Junctures.update_juncture(juncture, %{name: "Updated Juncture Name"})
+
+        assert_enqueued(
+          worker: SyncJunctureToNotionWorker,
+          args: %{juncture_id: juncture.id}
+        )
+      end)
+    end
+
+    test "does not enqueue sync job when non-Notion-linked juncture is updated", %{
+      campaign: campaign
+    } do
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Unlinked Juncture",
+          campaign_id: campaign.id
+        })
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _updated} = Junctures.update_juncture(juncture, %{name: "Updated Juncture Name"})
+
+        refute_enqueued(worker: SyncJunctureToNotionWorker)
+      end)
+    end
+
+    test "does not enqueue sync job when skip_notion_sync option is passed", %{campaign: campaign} do
+      notion_page_id = Ecto.UUID.generate()
+
+      {:ok, juncture} =
+        Junctures.create_juncture(%{
+          name: "Linked Juncture",
+          campaign_id: campaign.id,
+          notion_page_id: notion_page_id
+        })
+
+      Oban.Testing.with_testing_mode(:manual, fn ->
+        {:ok, _updated} =
+          Junctures.update_juncture(juncture, %{name: "Updated Name"}, skip_notion_sync: true)
+
+        refute_enqueued(worker: SyncJunctureToNotionWorker)
       end)
     end
   end
