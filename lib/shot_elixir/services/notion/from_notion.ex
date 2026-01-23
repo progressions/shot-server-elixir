@@ -71,7 +71,15 @@ defmodule ShotElixir.Services.Notion.FromNotion do
 
         %{"code" => error_code, "message" => message} = response ->
           Logger.error("Notion API error: #{error_code} - #{message}")
-          log_sync_error(entity_type, entity.id, payload, response, "Notion API error: #{error_code} - #{message}")
+
+          log_sync_error(
+            entity_type,
+            entity.id,
+            payload,
+            response,
+            "Notion API error: #{error_code} - #{message}"
+          )
+
           {:error, {:notion_api_error, error_code, message}}
 
         page when is_map(page) ->
@@ -82,7 +90,15 @@ defmodule ShotElixir.Services.Notion.FromNotion do
     error ->
       entity_type = Map.get(config, :entity_type, "unknown")
       Logger.error("Failed to update #{entity_type} from Notion: #{Exception.message(error)}")
-      log_sync_error(entity_type, entity.id, %{"page_id" => entity.notion_page_id}, %{}, "Exception: #{Exception.message(error)}")
+
+      log_sync_error(
+        entity_type,
+        entity.id,
+        %{"page_id" => entity.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
+
       {:error, error}
   end
 
@@ -91,7 +107,10 @@ defmodule ShotElixir.Services.Notion.FromNotion do
     force = Keyword.get(opts, :force, false)
 
     if Config.skip_bot_update?(page, opts) and not force do
-      Logger.info("Skipping update for #{entity_type} #{entity.id} as it was last edited by the bot")
+      Logger.info(
+        "Skipping update for #{entity_type} #{entity.id} as it was last edited by the bot"
+      )
+
       {:ok, entity}
     else
       token = Keyword.fetch!(opts, :token)
@@ -114,7 +133,14 @@ defmodule ShotElixir.Services.Notion.FromNotion do
           {:ok, updated_entity}
 
         {:error, changeset} = error ->
-          log_sync_error(entity_type, entity.id, payload, page, "Failed to update #{entity_type} from Notion: #{inspect(changeset)}")
+          log_sync_error(
+            entity_type,
+            entity.id,
+            payload,
+            page,
+            "Failed to update #{entity_type} from Notion: #{inspect(changeset)}"
+          )
+
           error
       end
     end

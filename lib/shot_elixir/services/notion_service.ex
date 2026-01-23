@@ -615,12 +615,16 @@ defmodule ShotElixir.Services.NotionService do
     do: {:error, :no_page_id}
 
   def update_character_from_notion(%Character{} = character, opts) do
-    FromNotion.update_from_notion(character, %{
-      entity_type: "character",
-      update_fn: &Characters.update_character/3,
-      extract_attributes_fn: &extract_character_attributes/2,
-      add_image: true
-    }, opts)
+    FromNotion.update_from_notion(
+      character,
+      %{
+        entity_type: "character",
+        update_fn: &Characters.update_character/3,
+        extract_attributes_fn: &extract_character_attributes/2,
+        add_image: true
+      },
+      opts
+    )
   end
 
   defp extract_character_attributes(page, entity) do
@@ -789,11 +793,15 @@ defmodule ShotElixir.Services.NotionService do
   def update_site_from_notion(%Site{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
 
   def update_site_from_notion(%Site{} = site, opts) do
-    FromNotion.update_from_notion(site, %{
-      entity_type: "site",
-      update_fn: &Sites.update_site/3,
-      extract_attributes_fn: &extract_site_attributes/2
-    }, opts)
+    FromNotion.update_from_notion(
+      site,
+      %{
+        entity_type: "site",
+        update_fn: &Sites.update_site/3,
+        extract_attributes_fn: &extract_site_attributes/2
+      },
+      opts
+    )
   end
 
   defp extract_site_attributes(page, entity) do
@@ -813,11 +821,15 @@ defmodule ShotElixir.Services.NotionService do
   def update_party_from_notion(%Party{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
 
   def update_party_from_notion(%Party{} = party, opts) do
-    FromNotion.update_from_notion(party, %{
-      entity_type: "party",
-      update_fn: &Parties.update_party/3,
-      post_update_fn: &sync_party_memberships_from_notion/2
-    }, opts)
+    FromNotion.update_from_notion(
+      party,
+      %{
+        entity_type: "party",
+        update_fn: &Parties.update_party/3,
+        post_update_fn: &sync_party_memberships_from_notion/2
+      },
+      opts
+    )
   end
 
   # Sync party memberships from Notion character relations
@@ -953,11 +965,15 @@ defmodule ShotElixir.Services.NotionService do
   def update_faction_from_notion(%Faction{notion_page_id: nil}, _opts), do: {:error, :no_page_id}
 
   def update_faction_from_notion(%Faction{} = faction, opts) do
-    FromNotion.update_from_notion(faction, %{
-      entity_type: "faction",
-      update_fn: &Factions.update_faction/3,
-      post_update_fn: &sync_faction_members_from_notion/2
-    }, opts)
+    FromNotion.update_from_notion(
+      faction,
+      %{
+        entity_type: "faction",
+        update_fn: &Factions.update_faction/3,
+        post_update_fn: &sync_faction_members_from_notion/2
+      },
+      opts
+    )
   end
 
   @doc """
@@ -969,11 +985,15 @@ defmodule ShotElixir.Services.NotionService do
     do: {:error, :no_page_id}
 
   def update_juncture_from_notion(%Juncture{} = juncture, opts) do
-    FromNotion.update_from_notion(juncture, %{
-      entity_type: "juncture",
-      update_fn: &Junctures.update_juncture/3,
-      extract_attributes_fn: &extract_juncture_attributes/2
-    }, opts)
+    FromNotion.update_from_notion(
+      juncture,
+      %{
+        entity_type: "juncture",
+        update_fn: &Junctures.update_juncture/3,
+        extract_attributes_fn: &extract_juncture_attributes/2
+      },
+      opts
+    )
   end
 
   defp extract_juncture_attributes(page, entity) do
@@ -1000,11 +1020,15 @@ defmodule ShotElixir.Services.NotionService do
     do: {:error, :no_page_id}
 
   def update_adventure_from_notion(%Adventure{} = adventure, opts) do
-    FromNotion.update_from_notion(adventure, %{
-      entity_type: "adventure",
-      update_fn: &Adventures.update_adventure/3,
-      extract_attributes_fn: &extract_adventure_attributes/2
-    }, opts)
+    FromNotion.update_from_notion(
+      adventure,
+      %{
+        entity_type: "adventure",
+        update_fn: &Adventures.update_adventure/3,
+        extract_attributes_fn: &extract_adventure_attributes/2
+      },
+      opts
+    )
   end
 
   defp extract_adventure_attributes(page, entity) do
