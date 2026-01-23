@@ -28,20 +28,22 @@ defmodule ShotElixir.Services.Notion.FromNotion do
 
   Required:
   - `:entity_type` - String for logging (e.g., "site", "party")
-  - `:update_fn` - Function to update the entity, arity 3: (entity, attrs, opts)
+  - `:update_fn` - Function to update the entity, arity 2 or 3: (entity, attrs) or (entity, attrs, opts)
 
   Optional:
   - `:extract_attributes_fn` - Function to extract attributes from page, arity 2: (page, entity)
     Defaults to `entity_attributes_from_notion(page, entity.campaign_id)`
   - `:post_update_fn` - Function called after successful update, arity 2: (updated_entity, page)
   - `:add_image` - Boolean, whether to call add_image(page, entity) after update
+  - `:skip_notion_sync` - Boolean, whether to pass skip_notion_sync: true to update_fn (default: true)
+    Set to false for entities whose update_fn doesn't support the opts argument.
 
   ## Examples
 
-      update_from_notion(site, %{
-        entity_type: "site",
-        update_fn: &Sites.update_site/3,
-        post_update_fn: &sync_site_attunements_from_notion/2
+      update_from_notion(party, %{
+        entity_type: "party",
+        update_fn: &Parties.update_party/3,
+        post_update_fn: &sync_party_memberships_from_notion/2
       })
 
   """

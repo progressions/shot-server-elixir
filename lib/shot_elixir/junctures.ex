@@ -8,6 +8,7 @@ defmodule ShotElixir.Junctures do
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.ImageLoader
   alias ShotElixir.Slug
+  alias ShotElixir.Workers.SyncJunctureToNotionWorker
   use ShotElixir.Models.Broadcastable
 
   def list_junctures(campaign_id) do
@@ -449,8 +450,6 @@ defmodule ShotElixir.Junctures do
   defp maybe_enqueue_notion_sync(%Juncture{notion_page_id: nil}), do: :ok
 
   defp maybe_enqueue_notion_sync(%Juncture{id: id, notion_page_id: _page_id}) do
-    alias ShotElixir.Workers.SyncJunctureToNotionWorker
-
     %{juncture_id: id}
     |> SyncJunctureToNotionWorker.new()
     |> Oban.insert()
