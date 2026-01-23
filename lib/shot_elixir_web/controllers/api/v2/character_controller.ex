@@ -10,11 +10,6 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   alias ShotElixirWeb.Api.V2.NotionPage
   alias ShotElixirWeb.Plugs.ETag
 
-  # Cache-Control header value for character responses
-  # Use no-cache to force browser revalidation on every request while still
-  # allowing efficient 304 Not Modified responses when data hasn't changed.
-  @cache_control_header "private, no-cache, must-revalidate"
-
   action_fallback ShotElixirWeb.FallbackController
 
   def index(conn, params) do
@@ -57,7 +52,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   Implements ETag-based conditional requests for efficient caching:
   - Returns 304 Not Modified if client's cached version is current
   - Includes Cache-Control and ETag headers for browser caching
-  - Cache-Control: private, no-cache, must-revalidate
+  - ETag includes is_gm suffix to prevent cache poisoning between user roles
 
   ## ETag Limitation
 
@@ -73,29 +68,14 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
 
     with %Character{} = character <- Characters.get_character(id),
          :ok <- authorize_character_access(character, current_user) do
-      # Determine GM status early so it can be included in ETag
       is_gm = is_gm_for_character?(character, current_user)
 
       # Include is_gm in ETag to prevent cache poisoning between GM and non-GM users
-      # Without this, a GM's cached response could be served to a non-GM user
-      etag = ETag.generate_etag(character, suffix: "gm:#{is_gm}")
-
-      case ETag.check_stale(conn, etag) do
-        {:not_modified, conn} ->
-          # Client has current version - return 304 without body
-          conn
-          |> ETag.put_etag(etag)
-          |> put_resp_header("cache-control", @cache_control_header)
-          |> send_resp(304, "")
-
-        {:ok, conn} ->
-          # Client needs fresh data
-          conn
-          |> ETag.put_etag(etag)
-          |> put_resp_header("cache-control", @cache_control_header)
-          |> put_view(ShotElixirWeb.Api.V2.CharacterView)
-          |> render("show.json", character: character, is_gm: is_gm)
-      end
+      ETag.with_caching(conn, character, [etag_suffix: "gm:#{is_gm}"], fn conn ->
+        conn
+        |> put_view(ShotElixirWeb.Api.V2.CharacterView)
+        |> render("show.json", character: character, is_gm: is_gm)
+      end)
     else
       nil -> {:error, :not_found}
       {:error, reason} -> {:error, reason}

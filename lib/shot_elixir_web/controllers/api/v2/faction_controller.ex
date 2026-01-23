@@ -10,11 +10,6 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
   alias ShotElixirWeb.Api.V2.SyncFromNotion
   alias ShotElixirWeb.Plugs.ETag
 
-  # Cache-Control header value for faction responses
-  # Use no-cache to force browser revalidation on every request while still
-  # allowing efficient 304 Not Modified responses when data hasn't changed.
-  @cache_control_header "private, no-cache, must-revalidate"
-
   action_fallback ShotElixirWeb.FallbackController
 
   # GET /api/v2/factions
@@ -60,7 +55,6 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
   Implements ETag-based conditional requests for efficient caching:
   - Returns 304 Not Modified if client's cached version is current
   - Includes Cache-Control and ETag headers for browser caching
-  - Cache-Control: private, no-cache, must-revalidate
 
   ## ETag Limitation
 
@@ -89,26 +83,13 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
 
           campaign ->
             if authorize_campaign_access(campaign, current_user) do
-              etag = ETag.generate_etag(faction)
+              is_gm = is_gm_for_entity?(campaign, current_user)
 
-              case ETag.check_stale(conn, etag) do
-                {:not_modified, conn} ->
-                  # Client has current version - return 304 without body
-                  conn
-                  |> ETag.put_etag(etag)
-                  |> put_resp_header("cache-control", @cache_control_header)
-                  |> send_resp(304, "")
-
-                {:ok, conn} ->
-                  # Client needs fresh data
-                  is_gm = is_gm_for_entity?(campaign, current_user)
-
-                  conn
-                  |> ETag.put_etag(etag)
-                  |> put_resp_header("cache-control", @cache_control_header)
-                  |> put_view(ShotElixirWeb.Api.V2.FactionView)
-                  |> render("show.json", faction: faction, is_gm: is_gm)
-              end
+              ETag.with_caching(conn, faction, fn conn ->
+                conn
+                |> put_view(ShotElixirWeb.Api.V2.FactionView)
+                |> render("show.json", faction: faction, is_gm: is_gm)
+              end)
             else
               conn
               |> put_status(:not_found)
