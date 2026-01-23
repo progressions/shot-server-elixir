@@ -14,7 +14,10 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   action_fallback ShotElixirWeb.FallbackController
 
   # Cache-Control header value for party responses
-  @cache_control_header "private, max-age=60, must-revalidate"
+  # Use no-cache to force browser revalidation on every request while still
+  # allowing efficient 304 Not Modified responses when data hasn't changed.
+  # This ensures mutations (like adding slots) are immediately visible on refresh.
+  @cache_control_header "private, no-cache, must-revalidate"
 
   # GET /api/v2/parties
   def index(conn, params) do
@@ -63,7 +66,7 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
   Implements ETag-based conditional requests for efficient caching:
   - Returns 304 Not Modified if client's cached version is current
   - Includes Cache-Control and ETag headers for browser caching
-  - Cache-Control: private, max-age=60, must-revalidate
+  - Cache-Control: private, no-cache, must-revalidate
   """
   # GET /api/v2/parties/:id
   def show(conn, %{"id" => id}) do

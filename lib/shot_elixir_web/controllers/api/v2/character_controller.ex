@@ -11,7 +11,9 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   alias ShotElixirWeb.Plugs.ETag
 
   # Cache-Control header value for character responses
-  @cache_control_header "private, max-age=60, must-revalidate"
+  # Use no-cache to force browser revalidation on every request while still
+  # allowing efficient 304 Not Modified responses when data hasn't changed.
+  @cache_control_header "private, no-cache, must-revalidate"
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -55,7 +57,7 @@ defmodule ShotElixirWeb.Api.V2.CharacterController do
   Implements ETag-based conditional requests for efficient caching:
   - Returns 304 Not Modified if client's cached version is current
   - Includes Cache-Control and ETag headers for browser caching
-  - Cache-Control: private, max-age=60, must-revalidate
+  - Cache-Control: private, no-cache, must-revalidate
 
   ## ETag Limitation
 
