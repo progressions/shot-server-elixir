@@ -808,7 +808,7 @@ defmodule ShotElixir.Services.NotionService do
     attributes = entity_attributes_from_notion(page, entity.campaign_id)
 
     case character_ids_from_notion(page, entity.campaign_id) do
-      {:ok, character_ids} -> Map.put(attributes, "character_ids", character_ids)
+      {:ok, character_ids} -> Map.put(attributes, :character_ids, character_ids)
       :skip -> attributes
     end
   end
