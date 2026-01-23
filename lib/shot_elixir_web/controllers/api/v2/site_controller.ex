@@ -13,9 +13,6 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
 
   action_fallback ShotElixirWeb.FallbackController
 
-  # Cache-Control header value for site responses
-  @cache_control_header "private, max-age=60, must-revalidate"
-
   # GET /api/v2/sites
   def index(conn, params) do
     current_user = Guardian.Plug.current_resource(conn)
@@ -59,7 +56,6 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
   Implements ETag-based conditional requests for efficient caching:
   - Returns 304 Not Modified if client's cached version is current
   - Includes Cache-Control and ETag headers for browser caching
-  - Cache-Control: private, max-age=60, must-revalidate
   """
   # GET /api/v2/sites/:id
   def show(conn, %{"id" => id}) do
@@ -83,7 +79,8 @@ defmodule ShotElixirWeb.Api.V2.SiteController do
             if authorize_campaign_access(campaign, current_user) do
               is_gm = is_gm_for_entity?(campaign, current_user)
 
-              ETag.with_caching(conn, site, [cache_control: @cache_control_header], fn conn ->
+              # Include is_gm in ETag to prevent cache poisoning between GM and non-GM users
+              ETag.with_caching(conn, site, [etag_suffix: "gm:#{is_gm}"], fn conn ->
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.SiteView)
                 |> render("show.json", site: site, is_gm: is_gm)

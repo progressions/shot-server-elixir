@@ -28,6 +28,10 @@ defmodule ShotElixirWeb.Plugs.ETag do
   """
   import Plug.Conn
 
+  # Default Cache-Control for mutable entities. Uses no-cache to force browser
+  # revalidation on every request while still allowing efficient 304 responses.
+  @default_cache_control "private, no-cache, must-revalidate"
+
   @doc """
   Generates an ETag from a struct with `updated_at` and `id` fields.
 
@@ -101,23 +105,44 @@ defmodule ShotElixirWeb.Plugs.ETag do
 
   ## Options
 
-  - `:cache_control` - The Cache-Control header value (required)
+  - `:cache_control` - Override the default Cache-Control header value
+    (default: "private, no-cache, must-revalidate")
+  - `:etag_suffix` - Additional string to include in ETag generation
+    (e.g., for role-based cache variants like "gm:true")
 
   ## Examples
 
-      # In a controller action:
-      ETag.with_caching(conn, site, cache_control: "private, max-age=60, must-revalidate", fn conn ->
+      # Simple usage with defaults:
+      ETag.with_caching(conn, site, fn conn ->
         conn
         |> put_view(ShotElixirWeb.Api.V2.SiteView)
         |> render("show.json", site: site)
       end)
 
+      # With ETag suffix for role-based caching:
+      ETag.with_caching(conn, character, [etag_suffix: "gm:\#{is_gm}"], fn conn ->
+        conn |> render("show.json", character: character, is_gm: is_gm)
+      end)
+
+      # With custom cache control (e.g., for reference data):
+      ETag.with_caching(conn, weapon, [cache_control: "public, max-age=3600"], fn conn ->
+        conn |> render("show.json", weapon: weapon)
+      end)
+
   """
-  @spec with_caching(Plug.Conn.t(), struct(), keyword(), (Plug.Conn.t() -> Plug.Conn.t())) ::
+  @spec with_caching(Plug.Conn.t(), struct(), keyword() | function(), function() | nil) ::
           Plug.Conn.t()
-  def with_caching(conn, entity, opts, render_fn) do
-    cache_control = Keyword.fetch!(opts, :cache_control)
-    etag = generate_etag(entity)
+  def with_caching(conn, entity, opts_or_render_fn, render_fn \\ nil)
+
+  def with_caching(conn, entity, render_fn, nil) when is_function(render_fn) do
+    with_caching(conn, entity, [], render_fn)
+  end
+
+  def with_caching(conn, entity, opts, render_fn) when is_list(opts) and is_function(render_fn) do
+    cache_control = Keyword.get(opts, :cache_control, @default_cache_control)
+    etag_suffix = Keyword.get(opts, :etag_suffix)
+    etag_opts = if is_nil(etag_suffix), do: [], else: [suffix: etag_suffix]
+    etag = generate_etag(entity, etag_opts)
 
     case check_stale(conn, etag) do
       {:not_modified, conn} ->

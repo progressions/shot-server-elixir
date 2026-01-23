@@ -71,7 +71,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerCachingTest do
 
       assert conn.status == 200
       [cache_control] = get_resp_header(conn, "cache-control")
-      assert cache_control == "private, max-age=60, must-revalidate"
+      assert cache_control == "private, no-cache, must-revalidate"
     end
 
     test "returns 304 Not Modified when If-None-Match matches ETag", %{
@@ -98,7 +98,7 @@ defmodule ShotElixirWeb.Api.V2.VehicleControllerCachingTest do
       assert get_resp_header(conn2, "etag") == [etag]
       # Still returns Cache-Control on 304
       [cache_control] = get_resp_header(conn2, "cache-control")
-      assert cache_control == "private, max-age=60, must-revalidate"
+      assert cache_control == "private, no-cache, must-revalidate"
     end
 
     test "returns 200 when If-None-Match does not match current ETag", %{
