@@ -141,7 +141,8 @@ defmodule ShotElixirWeb.Plugs.ETag do
   def with_caching(conn, entity, opts, render_fn) when is_list(opts) and is_function(render_fn) do
     cache_control = Keyword.get(opts, :cache_control, @default_cache_control)
     etag_suffix = Keyword.get(opts, :etag_suffix)
-    etag = generate_etag(entity, suffix: etag_suffix)
+    etag_opts = if is_nil(etag_suffix), do: [], else: [suffix: etag_suffix]
+    etag = generate_etag(entity, etag_opts)
 
     case check_stale(conn, etag) do
       {:not_modified, conn} ->

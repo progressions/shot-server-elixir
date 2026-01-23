@@ -85,7 +85,8 @@ defmodule ShotElixirWeb.Api.V2.FactionController do
             if authorize_campaign_access(campaign, current_user) do
               is_gm = is_gm_for_entity?(campaign, current_user)
 
-              ETag.with_caching(conn, faction, fn conn ->
+              # Include is_gm in ETag to prevent cache poisoning between GM and non-GM users
+              ETag.with_caching(conn, faction, [etag_suffix: "gm:#{is_gm}"], fn conn ->
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.FactionView)
                 |> render("show.json", faction: faction, is_gm: is_gm)

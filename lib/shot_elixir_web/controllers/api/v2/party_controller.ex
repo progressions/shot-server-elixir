@@ -83,7 +83,8 @@ defmodule ShotElixirWeb.Api.V2.PartyController do
             if authorize_campaign_access(campaign, current_user) do
               is_gm = is_gm_for_entity?(campaign, current_user)
 
-              ETag.with_caching(conn, party, fn conn ->
+              # Include is_gm in ETag to prevent cache poisoning between GM and non-GM users
+              ETag.with_caching(conn, party, [etag_suffix: "gm:#{is_gm}"], fn conn ->
                 conn
                 |> put_view(ShotElixirWeb.Api.V2.PartyView)
                 |> render("show.json", party: party, is_gm: is_gm)
