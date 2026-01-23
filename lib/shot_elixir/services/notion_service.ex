@@ -253,7 +253,6 @@ defmodule ShotElixir.Services.NotionService do
       {:error, error}
   end
 
-
   @doc """
   Create a new Notion page from character data.
   """
