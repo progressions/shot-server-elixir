@@ -407,44 +407,52 @@ defmodule ShotElixir.Parties do
   end
 
   # Syncs party character memberships to match the provided character_ids list.
-  # Adds missing memberships and removes memberships for characters not in the list
-  # (covers both regular and slot-based).
+  # Supports duplicate character IDs (e.g., multiple mook slots with the same character).
+  # Compares counts per character ID to add/remove the right number of memberships.
   defp sync_character_memberships(party, character_ids) when is_list(character_ids) do
     # Normalize incoming ids to strings to match stored binary_ids
     desired_character_ids = Enum.map(character_ids, &to_string/1)
 
+    # Count how many times each character ID appears in the desired list
+    desired_counts = Enum.frequencies(desired_character_ids)
+
     # Get current character memberships (all memberships with a character_id)
+    # Sort by position to ensure consistent removal order (remove higher positions first)
     current_memberships =
       from(m in Membership,
-        where: m.party_id == ^party.id and not is_nil(m.character_id)
+        where: m.party_id == ^party.id and not is_nil(m.character_id),
+        order_by: [desc: m.position, desc: m.created_at]
       )
       |> Repo.all()
 
-    current_character_ids = Enum.map(current_memberships, & &1.character_id)
+    # Group current memberships by character_id
+    memberships_by_character = Enum.group_by(current_memberships, & &1.character_id)
 
-    # Find memberships to remove (characters not in the new list)
-    memberships_to_remove =
-      Enum.filter(current_memberships, fn m ->
-        m.character_id not in desired_character_ids
-      end)
+    # For each character, determine how many memberships to remove
+    Enum.each(memberships_by_character, fn {character_id, memberships} ->
+      current_count = length(memberships)
+      desired_count = Map.get(desired_counts, character_id, 0)
+      to_remove_count = max(0, current_count - desired_count)
 
-    # Delete memberships for removed characters
-    Enum.each(memberships_to_remove, fn membership ->
-      Repo.delete!(membership)
+      # Remove excess memberships (from highest position first due to sort order)
+      memberships
+      |> Enum.take(to_remove_count)
+      |> Enum.each(&Repo.delete!/1)
     end)
 
-    # Add memberships for any missing characters
-    desired_character_ids
-    |> Enum.uniq()
-    |> Enum.reject(&(&1 in current_character_ids))
-    |> Enum.each(fn character_id ->
-      %Membership{}
-      |> Membership.changeset(%{
-        party_id: party.id,
-        character_id: character_id
-      })
-      # Use bang to surface validation/constraint errors instead of silently ignoring them
-      |> Repo.insert!()
+    # Add memberships for characters that need more instances
+    Enum.each(desired_counts, fn {character_id, desired_count} ->
+      current_count = length(Map.get(memberships_by_character, character_id, []))
+      to_add_count = max(0, desired_count - current_count)
+
+      Enum.each(1..to_add_count//1, fn _ ->
+        %Membership{}
+        |> Membership.changeset(%{
+          party_id: party.id,
+          character_id: character_id
+        })
+        |> Repo.insert!()
+      end)
     end)
 
     party
@@ -453,24 +461,52 @@ defmodule ShotElixir.Parties do
   defp sync_character_memberships(party, _), do: party
 
   # Syncs party vehicle memberships to match the provided vehicle_ids list.
-  # Removes memberships for vehicles not in the list (both regular and slot-based).
+  # Supports duplicate vehicle IDs (e.g., multiple slots with the same vehicle).
+  # Compares counts per vehicle ID to add/remove the right number of memberships.
   defp sync_vehicle_memberships(party, vehicle_ids) when is_list(vehicle_ids) do
+    # Normalize incoming ids to strings to match stored binary_ids
+    desired_vehicle_ids = Enum.map(vehicle_ids, &to_string/1)
+
+    # Count how many times each vehicle ID appears in the desired list
+    desired_counts = Enum.frequencies(desired_vehicle_ids)
+
     # Get current vehicle memberships (all memberships with a vehicle_id)
+    # Sort by position to ensure consistent removal order (remove higher positions first)
     current_memberships =
       from(m in Membership,
-        where: m.party_id == ^party.id and not is_nil(m.vehicle_id)
+        where: m.party_id == ^party.id and not is_nil(m.vehicle_id),
+        order_by: [desc: m.position, desc: m.created_at]
       )
       |> Repo.all()
 
-    # Find memberships to remove (vehicles not in the new list)
-    memberships_to_remove =
-      Enum.filter(current_memberships, fn m ->
-        m.vehicle_id not in vehicle_ids
-      end)
+    # Group current memberships by vehicle_id
+    memberships_by_vehicle = Enum.group_by(current_memberships, & &1.vehicle_id)
 
-    # Delete memberships for removed vehicles
-    Enum.each(memberships_to_remove, fn membership ->
-      Repo.delete(membership)
+    # For each vehicle, determine how many memberships to remove
+    Enum.each(memberships_by_vehicle, fn {vehicle_id, memberships} ->
+      current_count = length(memberships)
+      desired_count = Map.get(desired_counts, vehicle_id, 0)
+      to_remove_count = max(0, current_count - desired_count)
+
+      # Remove excess memberships (from highest position first due to sort order)
+      memberships
+      |> Enum.take(to_remove_count)
+      |> Enum.each(&Repo.delete!/1)
+    end)
+
+    # Add memberships for vehicles that need more instances
+    Enum.each(desired_counts, fn {vehicle_id, desired_count} ->
+      current_count = length(Map.get(memberships_by_vehicle, vehicle_id, []))
+      to_add_count = max(0, desired_count - current_count)
+
+      Enum.each(1..to_add_count//1, fn _ ->
+        %Membership{}
+        |> Membership.changeset(%{
+          party_id: party.id,
+          vehicle_id: vehicle_id
+        })
+        |> Repo.insert!()
+      end)
     end)
 
     party
