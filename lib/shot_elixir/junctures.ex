@@ -322,7 +322,11 @@ defmodule ShotElixir.Junctures do
     end
   end
 
-  def update_juncture(%Juncture{} = juncture, attrs) do
+  def update_juncture(juncture, attrs, opts \\ [])
+
+  def update_juncture(%Juncture{} = juncture, attrs, opts) do
+    skip_notion_sync = Keyword.get(opts, :skip_notion_sync, false)
+
     juncture
     |> Juncture.changeset(attrs)
     |> Repo.update()
@@ -354,6 +358,11 @@ defmodule ShotElixir.Junctures do
 
         juncture = Repo.preload(juncture, [:faction, :characters, :image_positions], force: true)
         broadcast_change(juncture, :update)
+
+        unless skip_notion_sync do
+          maybe_enqueue_notion_sync(juncture)
+        end
+
         {:ok, juncture}
 
       error ->
@@ -435,5 +444,17 @@ defmodule ShotElixir.Junctures do
 
   def get_juncture_by_name(campaign_id, name) do
     Repo.get_by(Juncture, campaign_id: campaign_id, name: name)
+  end
+
+  defp maybe_enqueue_notion_sync(%Juncture{notion_page_id: nil}), do: :ok
+
+  defp maybe_enqueue_notion_sync(%Juncture{id: id, notion_page_id: _page_id}) do
+    alias ShotElixir.Workers.SyncJunctureToNotionWorker
+
+    %{juncture_id: id}
+    |> SyncJunctureToNotionWorker.new()
+    |> Oban.insert()
+
+    :ok
   end
 end
