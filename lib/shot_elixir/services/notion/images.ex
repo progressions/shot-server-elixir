@@ -162,6 +162,7 @@ defmodule ShotElixir.Services.Notion.Images do
 
       {acc, visited} =
         import_child_block_images(notion_page_id, block, token, acc, visited, opts)
+
       {acc, visited}
     end
   end
@@ -198,12 +199,12 @@ defmodule ShotElixir.Services.Notion.Images do
                upload_image(image_url, notion_block_id, is_notion_file, token) do
           case Notion.create_image_mapping(
                  %{
-                  notion_page_id: notion_page_id,
-                  notion_block_id: notion_block_id,
-                  imagekit_file_id: upload_result.file_id,
-                  imagekit_url: upload_result.url,
-                  imagekit_file_path: upload_result.name
-                },
+                   notion_page_id: notion_page_id,
+                   notion_block_id: notion_block_id,
+                   imagekit_file_id: upload_result.file_id,
+                   imagekit_url: upload_result.url,
+                   imagekit_file_path: upload_result.name
+                 },
                  opts
                ) do
             {:ok, _mapping} ->

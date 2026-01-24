@@ -5,6 +5,7 @@ defmodule ShotElixir.Services.Notion.ImagesTest do
 
   defmodule NotionClientStub do
     def get_block_children(block_id, opts \\ [])
+
     def get_block_children("parent-1", _opts) do
       %{
         "results" => [
@@ -32,6 +33,7 @@ defmodule ShotElixir.Services.Notion.ImagesTest do
     original_imagekit_config = Application.get_env(:shot_elixir, :imagekit)
 
     Application.put_env(:shot_elixir, :notion_client, NotionClientStub)
+
     Application.put_env(:shot_elixir, :imagekit,
       private_key: "test_private_key",
       public_key: "test_public_key",
