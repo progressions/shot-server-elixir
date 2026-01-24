@@ -10,6 +10,7 @@ defmodule ShotElixir.Services.Notion.Images do
   require Logger
 
   alias ShotElixir.Characters.Character
+  alias ShotElixir.Media
   alias ShotElixir.Notion
   alias ShotElixir.Services.ImageUploader
   alias ShotElixir.Services.ImagekitService
@@ -21,7 +22,9 @@ defmodule ShotElixir.Services.Notion.Images do
     ~r/^.*\.notion\.so$/,
     ~r/^.*\.notion-static\.com$/,
     ~r/^images\.unsplash\.com$/,
-    ~r/^.*\.cloudfront\.net$/
+    ~r/^.*\.cloudfront\.net$/,
+    # ImageKit - for images already hosted on our CDN
+    ~r/^ik\.imagekit\.io$/
   ]
 
   # ---------------------------------------------------------------------------
@@ -264,40 +267,76 @@ defmodule ShotElixir.Services.Notion.Images do
 
     case Notion.get_image_mapping(notion_page_id, notion_block_id, opts) do
       nil ->
-        with {image_url, is_notion_file} when is_binary(image_url) <-
-               extract_image_url_with_type(block),
-             :ok <- validate_image_url(image_url),
-             {:ok, upload_result} <-
-               upload_image(image_url, notion_block_id, is_notion_file, token) do
-          case Notion.create_image_mapping(
-                 %{
-                   notion_page_id: notion_page_id,
-                   notion_block_id: notion_block_id,
-                   imagekit_file_id: upload_result.file_id,
-                   imagekit_url: upload_result.url,
-                   imagekit_file_path: upload_result.name
-                 },
-                 opts
-               ) do
-            {:ok, _mapping} ->
-              {:ok, %{url: upload_result.url}}
+        # Extract URL from block
+        {image_url, is_notion_file} = extract_image_url_with_type(block)
 
-            {:error, _changeset} ->
-              case Notion.get_image_mapping(notion_page_id, notion_block_id, opts) do
-                nil ->
-                  {:error, :mapping_create_failed}
+        # If image is already on ImageKit, validate and use it directly without re-uploading
+        if is_binary(image_url) and already_on_imagekit?(image_url) do
+          case validate_image_url(image_url) do
+            :ok ->
+              {:ok, %{url: image_url}}
 
-                mapping ->
-                  {:ok, %{url: mapping.imagekit_url}}
-              end
+            {:error, _reason} = error ->
+              error
           end
         else
-          {:error, reason} = error ->
-            Logger.warning("Failed to import Notion image: #{inspect(reason)}")
-            error
+          with {url, is_file} when is_binary(url) <- {image_url, is_notion_file},
+               :ok <- validate_image_url(url),
+               {:ok, upload_result} <-
+                 upload_image(url, notion_block_id, is_file, token) do
+            case Notion.create_image_mapping(
+                   %{
+                     notion_page_id: notion_page_id,
+                     notion_block_id: notion_block_id,
+                     imagekit_file_id: upload_result.file_id,
+                     imagekit_url: upload_result.url,
+                     imagekit_file_path: upload_result.name
+                   },
+                   opts
+                 ) do
+              {:ok, _mapping} ->
+                # Also add to Media Library if campaign_id is provided
+                campaign_id = Keyword.get(opts, :campaign_id)
 
-          _ ->
-            {:error, :invalid_image_block}
+                if campaign_id do
+                  media_attrs = %{
+                    campaign_id: campaign_id,
+                    source: "notion_import",
+                    status: "orphan",
+                    imagekit_file_id: upload_result.file_id,
+                    imagekit_url: upload_result.url,
+                    imagekit_file_path: upload_result.name,
+                    filename: Path.basename(upload_result.name),
+                    byte_size: upload_result.size,
+                    width: upload_result.width,
+                    height: upload_result.height,
+                    content_type: upload_result.metadata["fileType"] || "image/jpeg"
+                  }
+
+                  Media.create_image(media_attrs)
+                end
+
+                {:ok, %{url: upload_result.url}}
+
+              {:error, _changeset} ->
+                case Notion.get_image_mapping(notion_page_id, notion_block_id, opts) do
+                  nil ->
+                    {:error, :mapping_create_failed}
+
+                  mapping ->
+                    {:ok, %{url: mapping.imagekit_url}}
+                end
+            end
+          else
+            {:error, _reason} = error ->
+              error
+
+            {nil, _} ->
+              {:error, :invalid_image_block}
+
+            _other ->
+              {:error, :invalid_image_block}
+          end
         end
 
       mapping ->
@@ -305,9 +344,12 @@ defmodule ShotElixir.Services.Notion.Images do
     end
   end
 
-  defp import_block_image(_notion_page_id, _block, _token, _opts), do: {:error, :not_image}
+  defp import_block_image(_notion_page_id, _block, _token, _opts) do
+    # Not an image block - this is normal, don't log
+    {:error, :not_image}
+  end
 
-  defp upload_image(url, notion_block_id, is_notion_file, token) do
+  defp upload_image(url, notion_block_id, _is_notion_file, _token) do
     extension = url |> URI.parse() |> Map.get(:path, "") |> Path.extname()
     extension = if extension == "", do: ".jpg", else: extension
 
@@ -317,20 +359,14 @@ defmodule ShotElixir.Services.Notion.Images do
         file_name: "#{notion_block_id}#{extension}"
       })
     else
-      extra_headers =
-        if is_notion_file and is_binary(token) do
-          [{"Authorization", "Bearer #{token}"}]
-        else
-          []
-        end
+      # Note: Notion file URLs are S3 pre-signed URLs with auth built into query params.
+      # Do NOT add Bearer token - it causes S3 to reject with 400 error.
+      case ImageUploader.download_image(url, allowed_hosts: @trusted_image_domains) do
+        {:ok, temp_path} ->
+          upload_imagekit_with_cleanup(temp_path, notion_block_id, extension)
 
-      with {:ok, temp_path} <-
-             ImageUploader.download_image(url,
-               allowed_hosts: @trusted_image_domains,
-               extra_headers: extra_headers
-             ),
-           result <- upload_imagekit_with_cleanup(temp_path, notion_block_id, extension) do
-        result
+        {:error, _reason} = error ->
+          error
       end
     end
   end
@@ -364,13 +400,22 @@ defmodule ShotElixir.Services.Notion.Images do
   defp validate_image_url(url) when is_binary(url) do
     uri = URI.parse(url)
 
-    cond do
-      uri.scheme != "https" -> {:error, :not_https}
-      is_nil(uri.host) -> {:error, :no_host}
-      not trusted_domain?(uri.host) -> {:error, :untrusted_domain}
-      internal_address?(uri.host) -> {:error, :internal_address}
-      true -> :ok
+    result =
+      cond do
+        uri.scheme != "https" -> {:error, :not_https}
+        is_nil(uri.host) -> {:error, :no_host}
+        not trusted_domain?(uri.host) -> {:error, :untrusted_domain}
+        internal_address?(uri.host) -> {:error, :internal_address}
+        true -> :ok
+      end
+
+    if result != :ok do
+      Logger.warning(
+        "[NotionImages] URL validation failed: #{inspect(result)}, host=#{uri.host}, scheme=#{uri.scheme}"
+      )
     end
+
+    result
   end
 
   defp validate_image_url(_), do: {:error, :invalid_url}
@@ -388,6 +433,16 @@ defmodule ShotElixir.Services.Notion.Images do
       String.ends_with?(host, ".local") or
       String.ends_with?(host, ".internal")
   end
+
+  # Check if URL is already hosted on ImageKit - no need to re-upload
+  defp already_on_imagekit?(url) when is_binary(url) do
+    case URI.parse(url) do
+      %{host: "ik.imagekit.io"} -> true
+      _ -> false
+    end
+  end
+
+  defp already_on_imagekit?(_), do: false
 
   defp do_download_with_temp_file(url, character) do
     unique_id = :erlang.unique_integer([:positive])

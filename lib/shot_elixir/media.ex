@@ -59,6 +59,7 @@ defmodule ShotElixir.Media do
       case params["source"] do
         "upload" -> from i in query, where: i.source == "upload"
         "ai_generated" -> from i in query, where: i.source == "ai_generated"
+        "notion_import" -> from i in query, where: i.source == "notion_import"
         _ -> query
       end
 
@@ -119,6 +120,10 @@ defmodule ShotElixir.Media do
       from(i in query, where: i.source == "ai_generated")
       |> Repo.aggregate(:count, :id)
 
+    notion_imported =
+      from(i in query, where: i.source == "notion_import")
+      |> Repo.aggregate(:count, :id)
+
     total_size =
       from(i in query, where: not is_nil(i.byte_size))
       |> Repo.aggregate(:sum, :byte_size) || 0
@@ -129,6 +134,7 @@ defmodule ShotElixir.Media do
       attached: attached,
       uploaded: uploaded,
       ai_generated: ai_generated,
+      notion_imported: notion_imported,
       total_size_bytes: total_size
     }
   end
