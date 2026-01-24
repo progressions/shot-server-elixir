@@ -324,7 +324,9 @@ defmodule ShotElixir.Services.Notion.Images do
                    opts
                  ) do
               {:ok, _mapping} ->
-                Logger.info("[NotionImages] Block #{notion_block_id}: Mapping created successfully")
+                Logger.info(
+                  "[NotionImages] Block #{notion_block_id}: Mapping created successfully"
+                )
 
                 # Also add to Media Library if campaign_id is provided
                 campaign_id = Keyword.get(opts, :campaign_id)
@@ -381,9 +383,7 @@ defmodule ShotElixir.Services.Notion.Images do
               error
 
             {nil, _} ->
-              Logger.warning(
-                "[NotionImages] Block #{notion_block_id}: URL is nil, cannot import"
-              )
+              Logger.warning("[NotionImages] Block #{notion_block_id}: URL is nil, cannot import")
 
               {:error, :invalid_image_block}
 
@@ -397,15 +397,13 @@ defmodule ShotElixir.Services.Notion.Images do
         end
 
       mapping ->
-        Logger.info(
-          "[NotionImages] Block #{notion_block_id}: Already imported, using cached URL"
-        )
+        Logger.info("[NotionImages] Block #{notion_block_id}: Already imported, using cached URL")
 
         {:ok, %{url: mapping.imagekit_url}}
     end
   end
 
-  defp import_block_image(_notion_page_id, block, _token, _opts) do
+  defp import_block_image(_notion_page_id, _block, _token, _opts) do
     # Not an image block - this is normal, don't log
     {:error, :not_image}
   end
@@ -430,7 +428,9 @@ defmodule ShotElixir.Services.Notion.Images do
       # Note: Notion file URLs are S3 pre-signed URLs with auth built into query params.
       # Do NOT add Bearer token - it causes S3 to reject with 400 error.
       # External URLs don't need auth headers either.
-      Logger.info("[NotionImages] Downloading image (no extra headers - S3 pre-signed URLs are self-authenticating)")
+      Logger.info(
+        "[NotionImages] Downloading image (no extra headers - S3 pre-signed URLs are self-authenticating)"
+      )
 
       case ImageUploader.download_image(url, allowed_hosts: @trusted_image_domains) do
         {:ok, temp_path} ->
