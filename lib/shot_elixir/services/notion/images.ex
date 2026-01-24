@@ -208,10 +208,11 @@ defmodule ShotElixir.Services.Notion.Images do
                allowed_hosts: @trusted_image_domains,
                extra_headers: extra_headers
              ),
-           {:ok, upload_result} <- ImagekitService.upload_file(temp_path, %{
-             file_name: "#{notion_block_id}#{extension}",
-             folder: "/chi-war-#{Mix.env()}/notion"
-           }) do
+           {:ok, upload_result} <-
+             ImagekitService.upload_file(temp_path, %{
+               file_name: "#{notion_block_id}#{extension}",
+               folder: "/chi-war-#{Mix.env()}/notion"
+             }) do
         File.rm(temp_path)
         {:ok, upload_result}
       end

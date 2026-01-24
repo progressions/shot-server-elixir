@@ -431,7 +431,9 @@ defmodule ShotElixir.Services.Notion.Blocks do
 
   @doc false
   def blocks_to_markdown(blocks, campaign_id, token, image_urls \\ %{}) do
-    {markdown, mentions} = blocks_to_markdown_with_mentions(blocks, campaign_id, token, image_urls)
+    {markdown, mentions} =
+      blocks_to_markdown_with_mentions(blocks, campaign_id, token, image_urls)
+
     {markdown, mentions}
   end
 
