@@ -37,6 +37,7 @@ defmodule ShotElixir.Services.ImageUploader do
     - opts: Optional keyword list
       - :validate_host - when true (default), enforce allowlist/SSRF checks
       - :allowed_hosts - override allowlisted hosts/patterns for this call
+      - :extra_headers - list of headers forwarded to Req (e.g. [{"Authorization", "Bearer token"}])
 
   ## Returns
     - `{:ok, temp_path}` on success with the path to the temporary file
@@ -57,10 +58,13 @@ defmodule ShotElixir.Services.ImageUploader do
       create_stub_file(url)
     else
       with :ok <- validate_download_url(url, opts) do
+        extra_headers = Keyword.get(opts, :extra_headers, [])
+
         case Req.get(url,
                redirect: true,
                max_redirects: @max_redirects,
-               receive_timeout: @default_timeout
+               receive_timeout: @default_timeout,
+               headers: extra_headers
              ) do
           {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
             extension = extract_extension(url)
