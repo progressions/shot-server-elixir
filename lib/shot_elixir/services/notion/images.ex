@@ -14,7 +14,6 @@ defmodule ShotElixir.Services.Notion.Images do
   alias ShotElixir.Services.ImageUploader
   alias ShotElixir.Services.ImagekitService
   alias ShotElixir.Services.Notion.Config
-  alias ShotElixir.Services.NotionClient
 
   @trusted_image_domains [
     ~r/^prod-files-secure\.s3\.us-west-2\.amazonaws\.com$/,
@@ -69,7 +68,7 @@ defmodule ShotElixir.Services.Notion.Images do
       }
     }
 
-    NotionClient.append_block_children(page_id, [child])
+    notion_client().append_block_children(page_id, [child])
   rescue
     error ->
       Logger.warning("Failed to add image to Notion: #{Exception.message(error)}")
@@ -130,39 +129,88 @@ defmodule ShotElixir.Services.Notion.Images do
   defp extract_image_url_with_type(_), do: {nil, false}
 
   def import_block_images(notion_page_id, blocks, token) when is_list(blocks) do
-    Enum.reduce(blocks, %{}, fn block, acc ->
-      case import_block_image(notion_page_id, block, token) do
-        {:ok, %{url: url}} ->
-          Map.put(acc, block["id"], url)
-
-        _ ->
-          acc
-      end
-    end)
+    import_block_images(notion_page_id, blocks, token, [])
   end
 
-  defp import_block_image(notion_page_id, %{"type" => "image"} = block, token) do
+  def import_block_images(notion_page_id, blocks, token, opts) when is_list(blocks) do
+    opts =
+      Keyword.put_new_lazy(opts, :repo, fn ->
+        Application.get_env(:shot_elixir, :notion_repo)
+      end)
+
+    {image_urls, _visited} =
+      Enum.reduce(blocks, {%{}, MapSet.new()}, fn block, {acc, visited} ->
+        import_block_image_with_children(notion_page_id, block, token, acc, visited, opts)
+      end)
+
+    image_urls
+  end
+
+  defp import_block_image_with_children(notion_page_id, block, token, acc, visited, opts) do
+    block_id = block["id"]
+
+    if is_binary(block_id) and MapSet.member?(visited, block_id) do
+      {acc, visited}
+    else
+      visited = if is_binary(block_id), do: MapSet.put(visited, block_id), else: visited
+
+      acc =
+        case import_block_image(notion_page_id, block, token, opts) do
+          {:ok, %{url: url}} -> Map.put(acc, block_id, url)
+          _ -> acc
+        end
+
+      {acc, visited} =
+        import_child_block_images(notion_page_id, block, token, acc, visited, opts)
+      {acc, visited}
+    end
+  end
+
+  defp import_child_block_images(notion_page_id, block, token, acc, visited, opts) do
+    if block["has_children"] == true && is_binary(token) do
+      case notion_client().get_block_children(block["id"], token: token) do
+        %{"results" => children} when is_list(children) ->
+          Enum.reduce(children, {acc, visited}, fn child, {acc, visited} ->
+            import_block_image_with_children(notion_page_id, child, token, acc, visited, opts)
+          end)
+
+        _ ->
+          {acc, visited}
+      end
+    else
+      {acc, visited}
+    end
+  end
+
+  defp notion_client do
+    Application.get_env(:shot_elixir, :notion_client, NotionClient)
+  end
+
+  defp import_block_image(notion_page_id, %{"type" => "image"} = block, token, opts) do
     notion_block_id = block["id"]
 
-    case Notion.get_image_mapping(notion_page_id, notion_block_id) do
+    case Notion.get_image_mapping(notion_page_id, notion_block_id, opts) do
       nil ->
         with {image_url, is_notion_file} when is_binary(image_url) <-
                extract_image_url_with_type(block),
              :ok <- validate_image_url(image_url),
              {:ok, upload_result} <-
                upload_image(image_url, notion_block_id, is_notion_file, token) do
-          case Notion.create_image_mapping(%{
-                 notion_page_id: notion_page_id,
-                 notion_block_id: notion_block_id,
-                 imagekit_file_id: upload_result.file_id,
-                 imagekit_url: upload_result.url,
-                 imagekit_file_path: upload_result.name
-               }) do
+          case Notion.create_image_mapping(
+                 %{
+                  notion_page_id: notion_page_id,
+                  notion_block_id: notion_block_id,
+                  imagekit_file_id: upload_result.file_id,
+                  imagekit_url: upload_result.url,
+                  imagekit_file_path: upload_result.name
+                },
+                 opts
+               ) do
             {:ok, _mapping} ->
               {:ok, %{url: upload_result.url}}
 
             {:error, _changeset} ->
-              case Notion.get_image_mapping(notion_page_id, notion_block_id) do
+              case Notion.get_image_mapping(notion_page_id, notion_block_id, opts) do
                 nil ->
                   {:error, :mapping_create_failed}
 
@@ -184,7 +232,7 @@ defmodule ShotElixir.Services.Notion.Images do
     end
   end
 
-  defp import_block_image(_notion_page_id, _block, _token), do: {:error, :not_image}
+  defp import_block_image(_notion_page_id, _block, _token, _opts), do: {:error, :not_image}
 
   defp upload_image(url, notion_block_id, is_notion_file, token) do
     extension = url |> URI.parse() |> Map.get(:path, "") |> Path.extname()
@@ -208,14 +256,20 @@ defmodule ShotElixir.Services.Notion.Images do
                allowed_hosts: @trusted_image_domains,
                extra_headers: extra_headers
              ),
-           {:ok, upload_result} <-
-             ImagekitService.upload_file(temp_path, %{
-               file_name: "#{notion_block_id}#{extension}",
-               folder: "/chi-war-#{Mix.env()}/notion"
-             }) do
-        File.rm(temp_path)
-        {:ok, upload_result}
+           result <- upload_imagekit_with_cleanup(temp_path, notion_block_id, extension) do
+        result
       end
+    end
+  end
+
+  defp upload_imagekit_with_cleanup(temp_path, notion_block_id, extension) do
+    try do
+      ImagekitService.upload_file(temp_path, %{
+        file_name: "#{notion_block_id}#{extension}",
+        folder: "/chi-war-#{Mix.env()}/notion"
+      })
+    after
+      File.rm(temp_path)
     end
   end
 

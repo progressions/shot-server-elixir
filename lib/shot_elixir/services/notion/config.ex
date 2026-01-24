@@ -147,7 +147,8 @@ defmodule ShotElixir.Services.Notion.Config do
     end
   end
 
-  def client(opts \\ []), do: Keyword.get(opts, :client, NotionClient)
+  def client(opts \\ []),
+    do: Keyword.get(opts, :client, Application.get_env(:shot_elixir, :notion_client, NotionClient))
 
   # ---------------------------------------------------------------------------
   # Private helpers

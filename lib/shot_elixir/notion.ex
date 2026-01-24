@@ -147,17 +147,21 @@ defmodule ShotElixir.Notion do
     })
   end
 
-  def get_image_mapping(notion_page_id, notion_block_id) do
-    Repo.get_by(NotionImageMapping,
+  def get_image_mapping(notion_page_id, notion_block_id, opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo
+
+    repo.get_by(NotionImageMapping,
       notion_page_id: notion_page_id,
       notion_block_id: notion_block_id
     )
   end
 
-  def create_image_mapping(attrs) do
+  def create_image_mapping(attrs, opts \\ []) do
+    repo = Keyword.get(opts, :repo) || Repo
+
     %NotionImageMapping{}
     |> NotionImageMapping.changeset(attrs)
-    |> Repo.insert()
+    |> repo.insert()
   end
 
   @doc """

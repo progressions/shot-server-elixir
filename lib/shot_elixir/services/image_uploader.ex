@@ -37,6 +37,7 @@ defmodule ShotElixir.Services.ImageUploader do
     - opts: Optional keyword list
       - :validate_host - when true (default), enforce allowlist/SSRF checks
       - :allowed_hosts - override allowlisted hosts/patterns for this call
+      - :extra_headers - list of headers forwarded to Req (e.g. [{"Authorization", "Bearer token"}])
 
   ## Returns
     - `{:ok, temp_path}` on success with the path to the temporary file
