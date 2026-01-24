@@ -15,7 +15,7 @@ defmodule ShotElixir.Media.MediaImage do
   @foreign_key_type :binary_id
 
   @statuses ["orphan", "attached"]
-  @sources ["upload", "ai_generated"]
+  @sources ["upload", "ai_generated", "notion_import"]
 
   schema "media_images" do
     # Source: "upload" or "ai_generated"

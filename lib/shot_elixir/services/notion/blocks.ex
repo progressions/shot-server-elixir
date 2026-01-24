@@ -252,7 +252,9 @@ defmodule ShotElixir.Services.Notion.Blocks do
     {public_blocks, gm_only_blocks} = split_at_gm_only_heading(blocks)
 
     {image_urls, children_by_id} =
-      Images.import_block_images_with_children(page_id, public_blocks ++ gm_only_blocks, token)
+      Images.import_block_images_with_children(page_id, public_blocks ++ gm_only_blocks, token,
+        campaign_id: campaign_id
+      )
 
     # Convert each set to markdown (pass token for recursive child fetching)
     {markdown, public_mentions} =
