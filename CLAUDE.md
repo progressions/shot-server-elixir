@@ -432,6 +432,63 @@ This error is returned when:
    - Gets database ID: `get_database_id_for_entity(entity.campaign, "entity_type")`
    - Calls `sync_entity/2` with the database ID
 
+### Local Testing with Production Notion Settings
+
+To test Notion syncs locally, copy OAuth settings from production to your local database:
+
+**1. Query production database for Notion settings:**
+```bash
+fly postgres connect -a shot-counter-db -d shot_counter <<< "SELECT id, name, notion_access_token, notion_database_ids, notion_workspace_name FROM campaigns WHERE name ILIKE '%your-campaign-name%';"
+```
+
+**2. Update local database with production values:**
+```bash
+mix run -e '
+import Ecto.Query
+alias ShotElixir.Repo
+alias ShotElixir.Campaigns.Campaign
+
+campaign = Repo.one(from c in Campaign, where: ilike(c.name, "%your-campaign-name%"))
+
+# Copy these values from the production query result
+notion_database_ids = %{
+  "sites" => "production-sites-db-id",
+  "parties" => "production-parties-db-id",
+  "factions" => "production-factions-db-id",
+  "junctures" => "production-junctures-db-id",
+  "adventures" => "production-adventures-db-id",
+  "characters" => "production-characters-db-id"
+}
+
+notion_access_token = "XCP.your-production-token-here"
+
+changeset = Campaign.changeset(campaign, %{
+  notion_access_token: notion_access_token,
+  notion_database_ids: notion_database_ids,
+  notion_workspace_name: "Your Workspace Name",
+  notion_status: "working"
+})
+
+Repo.update!(changeset)
+IO.puts("✓ Updated Notion settings for #{campaign.name}")
+'
+```
+
+**3. Verify the settings:**
+```bash
+mix run -e '
+import Ecto.Query
+alias ShotElixir.Repo
+alias ShotElixir.Campaigns.Campaign
+
+campaign = Repo.one(from c in Campaign, where: ilike(c.name, "%your-campaign-name%"))
+IO.puts("notion_access_token: #{if campaign.notion_access_token, do: "✓ Set", else: "✗ Not set"}")
+IO.puts("notion_database_ids: #{inspect(campaign.notion_database_ids)}")
+'
+```
+
+**Note:** Local syncs will write to the same Notion databases as production. This is useful for testing but be aware that changes are real.
+
 ## Migration Path
 
 1. Phoenix API runs alongside Rails API
