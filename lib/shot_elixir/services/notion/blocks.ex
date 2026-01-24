@@ -16,6 +16,43 @@ defmodule ShotElixir.Services.Notion.Blocks do
   alias ShotElixir.Sites.Site
 
   # ---------------------------------------------------------------------------
+  # Pagination helpers
+  # ---------------------------------------------------------------------------
+
+  @doc """
+  Fetches all blocks for a page, handling Notion API pagination.
+  Returns all blocks as a flat list.
+  """
+  def fetch_all_blocks(page_id, token) do
+    fetch_all_blocks(page_id, token, nil, [])
+  end
+
+  defp fetch_all_blocks(page_id, token, cursor, acc) do
+    opts =
+      if cursor do
+        [token: token, start_cursor: cursor]
+      else
+        [token: token]
+      end
+
+    case NotionClient.get_block_children(page_id, opts) do
+      %{"results" => blocks, "has_more" => true, "next_cursor" => next_cursor}
+      when is_list(blocks) ->
+        fetch_all_blocks(page_id, token, next_cursor, acc ++ blocks)
+
+      %{"results" => blocks} when is_list(blocks) ->
+        acc ++ blocks
+
+      %{"code" => _error_code} = error ->
+        Logger.warning("Error fetching blocks for page #{page_id}: #{inspect(error)}")
+        acc
+
+      _ ->
+        acc
+    end
+  end
+
+  # ---------------------------------------------------------------------------
   # Session helpers
   # ---------------------------------------------------------------------------
 
@@ -207,36 +244,28 @@ defmodule ShotElixir.Services.Notion.Blocks do
   end
 
   def fetch_rich_description(page_id, campaign_id, token) do
-    response = NotionClient.get_block_children(page_id, token: token)
+    # Fetch ALL blocks with pagination support
+    blocks = fetch_all_blocks(page_id, token)
 
-    case response do
-      %{"results" => blocks} when is_list(blocks) ->
-        # Split blocks at "GM Only" heading
-        {public_blocks, gm_only_blocks} = split_at_gm_only_heading(blocks)
+    # Split blocks at "GM Only" heading
+    {public_blocks, gm_only_blocks} = split_at_gm_only_heading(blocks)
 
-        # Convert each set to markdown (pass token for recursive child fetching)
-        {markdown, public_mentions} =
-          blocks_to_markdown_with_mentions(public_blocks, campaign_id, token)
+    # Convert each set to markdown (pass token for recursive child fetching)
+    {markdown, public_mentions} =
+      blocks_to_markdown_with_mentions(public_blocks, campaign_id, token)
 
-        {gm_only_markdown, gm_only_mentions} =
-          blocks_to_markdown_with_mentions(gm_only_blocks, campaign_id, token)
+    {gm_only_markdown, gm_only_mentions} =
+      blocks_to_markdown_with_mentions(gm_only_blocks, campaign_id, token)
 
-        # Merge mentions from both sections
-        all_mentions = merge_mentions(public_mentions, gm_only_mentions)
+    # Merge mentions from both sections
+    all_mentions = merge_mentions(public_mentions, gm_only_mentions)
 
-        {:ok,
-         %{
-           markdown: markdown,
-           mentions: all_mentions,
-           gm_only_markdown: if(gm_only_markdown == "", do: nil, else: gm_only_markdown)
-         }}
-
-      %{"code" => error_code, "message" => message} ->
-        {:error, {:notion_api_error, error_code, message}}
-
-      _ ->
-        {:error, :unexpected_notion_response}
-    end
+    {:ok,
+     %{
+       markdown: markdown,
+       mentions: all_mentions,
+       gm_only_markdown: if(gm_only_markdown == "", do: nil, else: gm_only_markdown)
+     }}
   rescue
     error ->
       Logger.error("Failed to fetch rich description: #{Exception.message(error)}")
