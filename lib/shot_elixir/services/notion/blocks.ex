@@ -251,14 +251,29 @@ defmodule ShotElixir.Services.Notion.Blocks do
     # Split blocks at "GM Only" heading
     {public_blocks, gm_only_blocks} = split_at_gm_only_heading(blocks)
 
-    image_urls = Images.import_block_images(page_id, public_blocks ++ gm_only_blocks, token)
+    {image_urls, children_by_id} =
+      Images.import_block_images_with_children(page_id, public_blocks ++ gm_only_blocks, token)
 
     # Convert each set to markdown (pass token for recursive child fetching)
     {markdown, public_mentions} =
-      blocks_to_markdown_with_mentions(public_blocks, campaign_id, token, image_urls)
+      blocks_to_markdown_with_mentions(
+        public_blocks,
+        campaign_id,
+        token,
+        image_urls,
+        0,
+        children_by_id
+      )
 
     {gm_only_markdown, gm_only_mentions} =
-      blocks_to_markdown_with_mentions(gm_only_blocks, campaign_id, token, image_urls)
+      blocks_to_markdown_with_mentions(
+        gm_only_blocks,
+        campaign_id,
+        token,
+        image_urls,
+        0,
+        children_by_id
+      )
 
     # Merge mentions from both sections
     all_mentions = merge_mentions(public_mentions, gm_only_mentions)
@@ -430,19 +445,26 @@ defmodule ShotElixir.Services.Notion.Blocks do
   # ---------------------------------------------------------------------------
 
   @doc false
-  def blocks_to_markdown(blocks, campaign_id, token, image_urls \\ %{}) do
+  def blocks_to_markdown(blocks, campaign_id, token, image_urls \\ %{}, children_by_id \\ %{}) do
     {markdown, mentions} =
-      blocks_to_markdown_with_mentions(blocks, campaign_id, token, image_urls)
+      blocks_to_markdown_with_mentions(blocks, campaign_id, token, image_urls, 0, children_by_id)
 
     {markdown, mentions}
   end
 
-  defp blocks_to_markdown_with_mentions(blocks, campaign_id, token, image_urls, indent_level \\ 0) do
+  defp blocks_to_markdown_with_mentions(
+         blocks,
+         campaign_id,
+         token,
+         image_urls,
+         indent_level,
+         children_by_id
+       ) do
     {text_parts, all_mentions} =
       blocks
       |> Enum.reduce({[], %{}}, fn block, {texts, mentions} ->
         {text, block_mentions} =
-          block_to_markdown(block, campaign_id, token, image_urls, indent_level)
+          block_to_markdown(block, campaign_id, token, image_urls, indent_level, children_by_id)
 
         if text do
           merged_mentions = merge_mentions(mentions, block_mentions)
@@ -456,7 +478,14 @@ defmodule ShotElixir.Services.Notion.Blocks do
     {markdown, all_mentions}
   end
 
-  defp block_to_markdown(%{"type" => type} = block, campaign_id, token, image_urls, indent_level) do
+  defp block_to_markdown(
+         %{"type" => type} = block,
+         campaign_id,
+         token,
+         image_urls,
+         indent_level,
+         children_by_id
+       ) do
     indent = String.duplicate("  ", indent_level)
 
     case type do
@@ -492,7 +521,14 @@ defmodule ShotElixir.Services.Notion.Blocks do
 
         # Fetch and process nested children if present
         {children_text, children_mentions} =
-          fetch_and_process_children(block, campaign_id, token, image_urls, indent_level)
+          fetch_and_process_children(
+            block,
+            campaign_id,
+            token,
+            image_urls,
+            indent_level,
+            children_by_id
+          )
 
         merged_mentions = merge_mentions(mentions, children_mentions)
 
@@ -513,7 +549,14 @@ defmodule ShotElixir.Services.Notion.Blocks do
 
         # Fetch and process nested children if present
         {children_text, children_mentions} =
-          fetch_and_process_children(block, campaign_id, token, image_urls, indent_level)
+          fetch_and_process_children(
+            block,
+            campaign_id,
+            token,
+            image_urls,
+            indent_level,
+            children_by_id
+          )
 
         merged_mentions = merge_mentions(mentions, children_mentions)
 
@@ -604,36 +647,64 @@ defmodule ShotElixir.Services.Notion.Blocks do
     end
   end
 
-  defp block_to_markdown(_, _campaign_id, _token, _image_urls, _indent_level), do: {nil, %{}}
+  defp block_to_markdown(_, _campaign_id, _token, _image_urls, _indent_level, _children_by_id),
+    do: {nil, %{}}
 
   # Fetch and process child blocks if the block has children
-  defp fetch_and_process_children(block, campaign_id, token, image_urls, indent_level) do
+  defp fetch_and_process_children(
+         block,
+         campaign_id,
+         token,
+         image_urls,
+         indent_level,
+         children_by_id
+       ) do
     if block["has_children"] == true && token do
       block_id = block["id"]
 
-      case NotionClient.get_block_children(block_id, token: token) do
-        %{"results" => children} when is_list(children) and children != [] ->
-          # Process children with increased indent level
-          # Use single newline join for list items to keep them compact
-          {text_parts, all_mentions} =
-            children
-            |> Enum.reduce({[], %{}}, fn child_block, {texts, mentions} ->
-              {text, block_mentions} =
-                block_to_markdown(child_block, campaign_id, token, image_urls, indent_level + 1)
+      {children, children_by_id} =
+        case Map.fetch(children_by_id, block_id) do
+          {:ok, children} ->
+            {children, children_by_id}
 
-              if text do
-                merged_mentions = merge_mentions(mentions, block_mentions)
-                {[text | texts], merged_mentions}
-              else
-                {texts, mentions}
-              end
-            end)
+          :error ->
+            case NotionClient.get_block_children(block_id, token: token) do
+              %{"results" => children} when is_list(children) ->
+                {children, Map.put(children_by_id, block_id, children)}
 
-          children_text = text_parts |> Enum.reverse() |> Enum.join("\n")
-          {children_text, all_mentions}
+              _ ->
+                {[], Map.put(children_by_id, block_id, [])}
+            end
+        end
 
-        _ ->
-          {"", %{}}
+      if children == [] do
+        {"", %{}}
+      else
+        # Process children with increased indent level
+        # Use single newline join for list items to keep them compact
+        {text_parts, all_mentions} =
+          children
+          |> Enum.reduce({[], %{}}, fn child_block, {texts, mentions} ->
+            {text, block_mentions} =
+              block_to_markdown(
+                child_block,
+                campaign_id,
+                token,
+                image_urls,
+                indent_level + 1,
+                children_by_id
+              )
+
+            if text do
+              merged_mentions = merge_mentions(mentions, block_mentions)
+              {[text | texts], merged_mentions}
+            else
+              {texts, mentions}
+            end
+          end)
+
+        children_text = text_parts |> Enum.reverse() |> Enum.join("\n")
+        {children_text, all_mentions}
       end
     else
       {"", %{}}

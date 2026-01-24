@@ -129,7 +129,10 @@ defmodule ShotElixir.Services.Notion.Images do
   defp extract_image_url_with_type(_), do: {nil, false}
 
   def import_block_images(notion_page_id, blocks, token) when is_list(blocks) do
-    import_block_images(notion_page_id, blocks, token, [])
+    {image_urls, _children_by_id} =
+      import_block_images_with_children(notion_page_id, blocks, token, [])
+
+    image_urls
   end
 
   def import_block_images(notion_page_id, blocks, token, opts) when is_list(blocks) do
@@ -138,19 +141,48 @@ defmodule ShotElixir.Services.Notion.Images do
         Application.get_env(:shot_elixir, :notion_repo)
       end)
 
-    {image_urls, _visited} =
-      Enum.reduce(blocks, {%{}, MapSet.new()}, fn block, {acc, visited} ->
-        import_block_image_with_children(notion_page_id, block, token, acc, visited, opts)
-      end)
+    {image_urls, _children_by_id} =
+      import_block_images_with_children(notion_page_id, blocks, token, opts)
 
     image_urls
   end
 
-  defp import_block_image_with_children(notion_page_id, block, token, acc, visited, opts) do
+  def import_block_images_with_children(notion_page_id, blocks, token, opts \\ [])
+      when is_list(blocks) do
+    opts =
+      Keyword.put_new_lazy(opts, :repo, fn ->
+        Application.get_env(:shot_elixir, :notion_repo)
+      end)
+
+    {image_urls, children_by_id, _visited} =
+      Enum.reduce(blocks, {%{}, %{}, MapSet.new()}, fn block, {acc, children, visited} ->
+        import_block_image_with_children(
+          notion_page_id,
+          block,
+          token,
+          acc,
+          children,
+          visited,
+          opts
+        )
+      end)
+
+    {image_urls, children_by_id}
+  end
+
+  defp import_block_image_with_children(
+         notion_page_id,
+         block,
+         token,
+         acc,
+         children_by_id,
+         visited,
+         opts
+       ) do
     block_id = block["id"]
 
     if is_binary(block_id) and MapSet.member?(visited, block_id) do
-      {acc, visited}
+      {acc, children_by_id, visited}
     else
       visited = if is_binary(block_id), do: MapSet.put(visited, block_id), else: visited
 
@@ -160,31 +192,71 @@ defmodule ShotElixir.Services.Notion.Images do
           _ -> acc
         end
 
-      {acc, visited} =
-        import_child_block_images(notion_page_id, block, token, acc, visited, opts)
+      {acc, children_by_id, visited} =
+        import_child_block_images(
+          notion_page_id,
+          block,
+          token,
+          acc,
+          children_by_id,
+          visited,
+          opts
+        )
 
-      {acc, visited}
+      {acc, children_by_id, visited}
     end
   end
 
-  defp import_child_block_images(notion_page_id, block, token, acc, visited, opts) do
+  defp import_child_block_images(
+         notion_page_id,
+         block,
+         token,
+         acc,
+         children_by_id,
+         visited,
+         opts
+       ) do
     if block["has_children"] == true && is_binary(token) do
-      case notion_client().get_block_children(block["id"], token: token) do
-        %{"results" => children} when is_list(children) ->
-          Enum.reduce(children, {acc, visited}, fn child, {acc, visited} ->
-            import_block_image_with_children(notion_page_id, child, token, acc, visited, opts)
-          end)
+      block_id = block["id"]
 
-        _ ->
-          {acc, visited}
+      {children, children_by_id} =
+        case Map.fetch(children_by_id, block_id) do
+          {:ok, children} ->
+            {children, children_by_id}
+
+          :error ->
+            case notion_client().get_block_children(block_id, token: token) do
+              %{"results" => children} when is_list(children) ->
+                {children, Map.put(children_by_id, block_id, children)}
+
+              _ ->
+                {[], Map.put(children_by_id, block_id, [])}
+            end
+        end
+
+      if children == [] do
+        {acc, children_by_id, visited}
+      else
+        Enum.reduce(children, {acc, children_by_id, visited}, fn child,
+                                                                 {acc, children_by_id, visited} ->
+          import_block_image_with_children(
+            notion_page_id,
+            child,
+            token,
+            acc,
+            children_by_id,
+            visited,
+            opts
+          )
+        end)
       end
     else
-      {acc, visited}
+      {acc, children_by_id, visited}
     end
   end
 
   defp notion_client do
-    Application.get_env(:shot_elixir, :notion_client, NotionClient)
+    Application.get_env(:shot_elixir, :notion_client, ShotElixir.Services.NotionClient)
   end
 
   defp import_block_image(notion_page_id, %{"type" => "image"} = block, token, opts) do
@@ -241,7 +313,7 @@ defmodule ShotElixir.Services.Notion.Images do
 
     if ImagekitService.imagekit_disabled?() do
       ImagekitService.upload_from_url(url, %{
-        folder: "/chi-war-#{Mix.env()}/notion",
+        folder: "/chi-war-#{environment()}/notion",
         file_name: "#{notion_block_id}#{extension}"
       })
     else
@@ -267,11 +339,15 @@ defmodule ShotElixir.Services.Notion.Images do
     try do
       ImagekitService.upload_file(temp_path, %{
         file_name: "#{notion_block_id}#{extension}",
-        folder: "/chi-war-#{Mix.env()}/notion"
+        folder: "/chi-war-#{environment()}/notion"
       })
     after
       File.rm(temp_path)
     end
+  end
+
+  defp environment do
+    Application.get_env(:shot_elixir, :environment) || "dev"
   end
 
   defp download_and_attach_image(url, %Character{} = character) do
