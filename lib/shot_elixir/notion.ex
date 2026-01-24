@@ -6,7 +6,7 @@ defmodule ShotElixir.Notion do
   import Ecto.Query, warn: false
   require Logger
   alias ShotElixir.Repo
-  alias ShotElixir.Notion.NotionSyncLog
+  alias ShotElixir.Notion.{NotionImageMapping, NotionSyncLog}
   alias ShotElixir.Adventures
   alias ShotElixir.Campaigns
   alias ShotElixir.Characters
@@ -145,6 +145,19 @@ defmodule ShotElixir.Notion do
       response: response,
       error_message: error_message
     })
+  end
+
+  def get_image_mapping(notion_page_id, notion_block_id) do
+    Repo.get_by(NotionImageMapping,
+      notion_page_id: notion_page_id,
+      notion_block_id: notion_block_id
+    )
+  end
+
+  def create_image_mapping(attrs) do
+    %NotionImageMapping{}
+    |> NotionImageMapping.changeset(attrs)
+    |> Repo.insert()
   end
 
   @doc """

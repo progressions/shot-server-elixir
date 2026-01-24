@@ -10,6 +10,9 @@ defmodule ShotElixir.Services.Notion.Images do
   require Logger
 
   alias ShotElixir.Characters.Character
+  alias ShotElixir.Notion
+  alias ShotElixir.Services.ImageUploader
+  alias ShotElixir.Services.ImagekitService
   alias ShotElixir.Services.Notion.Config
   alias ShotElixir.Services.NotionClient
 
@@ -125,6 +128,95 @@ defmodule ShotElixir.Services.Notion.Images do
   end
 
   defp extract_image_url_with_type(_), do: {nil, false}
+
+  def import_block_images(notion_page_id, blocks, token) when is_list(blocks) do
+    Enum.reduce(blocks, %{}, fn block, acc ->
+      case import_block_image(notion_page_id, block, token) do
+        {:ok, %{url: url}} ->
+          Map.put(acc, block["id"], url)
+
+        _ ->
+          acc
+      end
+    end)
+  end
+
+  defp import_block_image(notion_page_id, %{"type" => "image"} = block, token) do
+    notion_block_id = block["id"]
+
+    case Notion.get_image_mapping(notion_page_id, notion_block_id) do
+      nil ->
+        with {image_url, is_notion_file} when is_binary(image_url) <-
+               extract_image_url_with_type(block),
+             :ok <- validate_image_url(image_url),
+             {:ok, upload_result} <-
+               upload_image(image_url, notion_block_id, is_notion_file, token) do
+          case Notion.create_image_mapping(%{
+                 notion_page_id: notion_page_id,
+                 notion_block_id: notion_block_id,
+                 imagekit_file_id: upload_result.file_id,
+                 imagekit_url: upload_result.url,
+                 imagekit_file_path: upload_result.name
+               }) do
+            {:ok, _mapping} ->
+              {:ok, %{url: upload_result.url}}
+
+            {:error, _changeset} ->
+              case Notion.get_image_mapping(notion_page_id, notion_block_id) do
+                nil ->
+                  {:error, :mapping_create_failed}
+
+                mapping ->
+                  {:ok, %{url: mapping.imagekit_url}}
+              end
+          end
+        else
+          {:error, reason} = error ->
+            Logger.warning("Failed to import Notion image: #{inspect(reason)}")
+            error
+
+          _ ->
+            {:error, :invalid_image_block}
+        end
+
+      mapping ->
+        {:ok, %{url: mapping.imagekit_url}}
+    end
+  end
+
+  defp import_block_image(_notion_page_id, _block, _token), do: {:error, :not_image}
+
+  defp upload_image(url, notion_block_id, is_notion_file, token) do
+    extension = url |> URI.parse() |> Map.get(:path, "") |> Path.extname()
+    extension = if extension == "", do: ".jpg", else: extension
+
+    if ImagekitService.imagekit_disabled?() do
+      ImagekitService.upload_from_url(url, %{
+        folder: "/chi-war-#{Mix.env()}/notion",
+        file_name: "#{notion_block_id}#{extension}"
+      })
+    else
+      extra_headers =
+        if is_notion_file and is_binary(token) do
+          [{"Authorization", "Bearer #{token}"}]
+        else
+          []
+        end
+
+      with {:ok, temp_path} <-
+             ImageUploader.download_image(url,
+               allowed_hosts: @trusted_image_domains,
+               extra_headers: extra_headers
+             ),
+           {:ok, upload_result} <- ImagekitService.upload_file(temp_path, %{
+             file_name: "#{notion_block_id}#{extension}",
+             folder: "/chi-war-#{Mix.env()}/notion"
+           }) do
+        File.rm(temp_path)
+        {:ok, upload_result}
+      end
+    end
+  end
 
   defp download_and_attach_image(url, %Character{} = character) do
     case validate_image_url(url) do

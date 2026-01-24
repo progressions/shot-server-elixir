@@ -57,10 +57,13 @@ defmodule ShotElixir.Services.ImageUploader do
       create_stub_file(url)
     else
       with :ok <- validate_download_url(url, opts) do
+        extra_headers = Keyword.get(opts, :extra_headers, [])
+
         case Req.get(url,
                redirect: true,
                max_redirects: @max_redirects,
-               receive_timeout: @default_timeout
+               receive_timeout: @default_timeout,
+               headers: extra_headers
              ) do
           {:ok, %{status: 200, body: body}} when is_binary(body) and byte_size(body) > 0 ->
             extension = extract_extension(url)

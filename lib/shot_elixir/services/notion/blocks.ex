@@ -12,6 +12,7 @@ defmodule ShotElixir.Services.Notion.Blocks do
   alias ShotElixir.Junctures.Juncture
   alias ShotElixir.Parties.Party
   alias ShotElixir.Repo
+  alias ShotElixir.Services.Notion.Images
   alias ShotElixir.Services.NotionClient
   alias ShotElixir.Sites.Site
 
@@ -250,12 +251,14 @@ defmodule ShotElixir.Services.Notion.Blocks do
     # Split blocks at "GM Only" heading
     {public_blocks, gm_only_blocks} = split_at_gm_only_heading(blocks)
 
+    image_urls = Images.import_block_images(page_id, public_blocks ++ gm_only_blocks, token)
+
     # Convert each set to markdown (pass token for recursive child fetching)
     {markdown, public_mentions} =
-      blocks_to_markdown_with_mentions(public_blocks, campaign_id, token)
+      blocks_to_markdown_with_mentions(public_blocks, campaign_id, token, image_urls)
 
     {gm_only_markdown, gm_only_mentions} =
-      blocks_to_markdown_with_mentions(gm_only_blocks, campaign_id, token)
+      blocks_to_markdown_with_mentions(gm_only_blocks, campaign_id, token, image_urls)
 
     # Merge mentions from both sections
     all_mentions = merge_mentions(public_mentions, gm_only_mentions)
@@ -426,11 +429,18 @@ defmodule ShotElixir.Services.Notion.Blocks do
   # Markdown with mentions
   # ---------------------------------------------------------------------------
 
-  defp blocks_to_markdown_with_mentions(blocks, campaign_id, token, indent_level \\ 0) do
+  @doc false
+  def blocks_to_markdown(blocks, campaign_id, token, image_urls \\ %{}) do
+    {markdown, mentions} = blocks_to_markdown_with_mentions(blocks, campaign_id, token, image_urls)
+    {markdown, mentions}
+  end
+
+  defp blocks_to_markdown_with_mentions(blocks, campaign_id, token, image_urls, indent_level \\ 0) do
     {text_parts, all_mentions} =
       blocks
       |> Enum.reduce({[], %{}}, fn block, {texts, mentions} ->
-        {text, block_mentions} = block_to_markdown(block, campaign_id, token, indent_level)
+        {text, block_mentions} =
+          block_to_markdown(block, campaign_id, token, image_urls, indent_level)
 
         if text do
           merged_mentions = merge_mentions(mentions, block_mentions)
@@ -444,7 +454,7 @@ defmodule ShotElixir.Services.Notion.Blocks do
     {markdown, all_mentions}
   end
 
-  defp block_to_markdown(%{"type" => type} = block, campaign_id, token, indent_level) do
+  defp block_to_markdown(%{"type" => type} = block, campaign_id, token, image_urls, indent_level) do
     indent = String.duplicate("  ", indent_level)
 
     case type do
@@ -480,7 +490,7 @@ defmodule ShotElixir.Services.Notion.Blocks do
 
         # Fetch and process nested children if present
         {children_text, children_mentions} =
-          fetch_and_process_children(block, campaign_id, token, indent_level)
+          fetch_and_process_children(block, campaign_id, token, image_urls, indent_level)
 
         merged_mentions = merge_mentions(mentions, children_mentions)
 
@@ -501,7 +511,7 @@ defmodule ShotElixir.Services.Notion.Blocks do
 
         # Fetch and process nested children if present
         {children_text, children_mentions} =
-          fetch_and_process_children(block, campaign_id, token, indent_level)
+          fetch_and_process_children(block, campaign_id, token, image_urls, indent_level)
 
         merged_mentions = merge_mentions(mentions, children_mentions)
 
@@ -547,7 +557,20 @@ defmodule ShotElixir.Services.Notion.Blocks do
         {nil, %{}}
 
       "image" ->
-        {nil, %{}}
+        {caption, mentions} =
+          extract_rich_text_with_mentions(get_in(block, ["image", "caption"]), campaign_id)
+
+        image_url =
+          Map.get(image_urls, block["id"]) ||
+            get_in(block, ["image", "external", "url"]) ||
+            get_in(block, ["image", "file", "url"])
+
+        if image_url do
+          alt_text = if caption == "", do: "", else: caption
+          {"![#{alt_text}](#{image_url})", mentions}
+        else
+          {nil, %{}}
+        end
 
       "video" ->
         {"[Video]", %{}}
@@ -579,10 +602,10 @@ defmodule ShotElixir.Services.Notion.Blocks do
     end
   end
 
-  defp block_to_markdown(_, _campaign_id, _token, _indent_level), do: {nil, %{}}
+  defp block_to_markdown(_, _campaign_id, _token, _image_urls, _indent_level), do: {nil, %{}}
 
   # Fetch and process child blocks if the block has children
-  defp fetch_and_process_children(block, campaign_id, token, indent_level) do
+  defp fetch_and_process_children(block, campaign_id, token, image_urls, indent_level) do
     if block["has_children"] == true && token do
       block_id = block["id"]
 
@@ -594,7 +617,7 @@ defmodule ShotElixir.Services.Notion.Blocks do
             children
             |> Enum.reduce({[], %{}}, fn child_block, {texts, mentions} ->
               {text, block_mentions} =
-                block_to_markdown(child_block, campaign_id, token, indent_level + 1)
+                block_to_markdown(child_block, campaign_id, token, image_urls, indent_level + 1)
 
               if text do
                 merged_mentions = merge_mentions(mentions, block_mentions)

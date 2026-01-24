@@ -648,6 +648,22 @@ CREATE TABLE public.notifications (
 
 
 --
+-- Name: notion_image_mappings; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.notion_image_mappings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    notion_page_id character varying(255) NOT NULL,
+    notion_block_id character varying(255) NOT NULL,
+    imagekit_file_id character varying(255) NOT NULL,
+    imagekit_url character varying(255) NOT NULL,
+    imagekit_file_path character varying(255),
+    inserted_at timestamp(0) without time zone NOT NULL,
+    updated_at timestamp(0) without time zone NOT NULL
+);
+
+
+--
 -- Name: notion_sync_logs; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -2335,6 +2351,20 @@ CREATE INDEX media_images_status_index ON public.media_images USING btree (statu
 
 
 --
+-- Name: notion_image_mappings_notion_page_id_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX notion_image_mappings_notion_page_id_index ON public.notion_image_mappings USING btree (notion_page_id);
+
+
+--
+-- Name: notion_image_mappings_page_block_index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX notion_image_mappings_page_block_index ON public.notion_image_mappings USING btree (notion_page_id, notion_block_id);
+
+
+--
 -- Name: memberships_party_id_position_index; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -3045,6 +3075,14 @@ ALTER TABLE ONLY public.media_images
 
 
 --
+-- Name: notion_image_mappings notion_image_mappings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.notion_image_mappings
+    ADD CONSTRAINT notion_image_mappings_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: notifications notifications_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -3153,3 +3191,4 @@ INSERT INTO public."ecto_migrations" (version) VALUES (20260113120000);
 INSERT INTO public."ecto_migrations" (version) VALUES (20260113143744);
 INSERT INTO public."ecto_migrations" (version) VALUES (20260114000000);
 INSERT INTO public."ecto_migrations" (version) VALUES (20260114013100);
+INSERT INTO public."ecto_migrations" (version) VALUES (20260124163640);
