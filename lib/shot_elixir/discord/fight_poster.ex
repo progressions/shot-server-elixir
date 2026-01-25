@@ -60,6 +60,7 @@ defmodule ShotElixir.Discord.FightPoster do
         :character,
         :vehicle,
         :character_effects,
+        :location_ref,
         driver: :character,
         driving: :vehicle
       ]
@@ -214,8 +215,9 @@ defmodule ShotElixir.Discord.FightPoster do
   end
 
   # Format a character entry
-  defp format_character(%Shot{character: char, location: location} = shot, _fight) do
-    location_str = if location && location != "", do: " (#{location})", else: ""
+  defp format_character(%Shot{character: char} = shot, _fight) do
+    location_name = get_location_name(shot)
+    location_str = if location_name && location_name != "", do: " (#{location_name})", else: ""
     wounds_impairments = wounds_and_impairments(char)
 
     action_values_line = format_character_action_values(char)
@@ -232,10 +234,11 @@ defmodule ShotElixir.Discord.FightPoster do
   # Format a vehicle entry
   defp format_vehicle(
          %Shot{vehicle: vehicle} = _vehicle_shot,
-         %Shot{location: location} = shot,
+         shot,
          _fight
        ) do
-    location_str = if location && location != "", do: " (#{location})", else: ""
+    location_name = get_location_name(shot)
+    location_str = if location_name && location_name != "", do: " (#{location_name})", else: ""
 
     pursuer_evader =
       if get_in(vehicle.action_values, ["Pursuer"]) == "true", do: "Pursuer", else: "Evader"
@@ -524,4 +527,13 @@ defmodule ShotElixir.Discord.FightPoster do
   # Helper to pluralize
   defp pluralize(word, 1), do: word
   defp pluralize(word, _), do: "#{word}s"
+
+  # Get the location name from the shot's location_ref association
+  defp get_location_name(shot) do
+    case Map.get(shot, :location_ref) do
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
+      location -> location.name
+    end
+  end
 end

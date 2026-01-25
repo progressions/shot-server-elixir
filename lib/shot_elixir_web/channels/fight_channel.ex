@@ -310,7 +310,6 @@ defmodule ShotElixirWeb.FightChannel do
     broadcast_fight_update(fight_id, "shot_location_changed", %{
       shot_id: shot.id,
       location_id: shot.location_id,
-      location: shot.location,
       location_name:
         case shot.location_ref do
           nil -> nil

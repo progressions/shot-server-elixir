@@ -11,7 +11,6 @@ defmodule ShotElixir.Fights.Shot do
     field :count, :integer, default: 0
     field :color, :string
     field :impairments, :integer, default: 0
-    field :location, :string
     field :was_rammed_or_damaged, :boolean, default: false
 
     belongs_to :fight, ShotElixir.Fights.Fight
@@ -36,7 +35,6 @@ defmodule ShotElixir.Fights.Shot do
       :count,
       :color,
       :impairments,
-      :location,
       :location_id,
       :was_rammed_or_damaged,
       :fight_id,
