@@ -223,8 +223,13 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
          :ok <- authorize_campaign_member(campaign, current_user) do
       case Fights.set_shot_location(shot, location_name) do
         {:ok, updated_shot, created} ->
-          # Broadcast the location change
-          broadcast_location_change(fight, updated_shot)
+          # Broadcast the full encounter update to CampaignChannel
+          # This is what the frontend actually listens for
+          fight_with_associations = Fights.get_fight_with_shots(fight.id)
+          ShotElixirWeb.CampaignChannel.broadcast_encounter_update(
+            campaign.id,
+            fight_with_associations
+          )
 
           conn
           |> put_view(ShotElixirWeb.Api.V2.ShotView)
@@ -293,21 +298,4 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     end
   end
 
-  defp broadcast_location_change(fight, shot) do
-    # Broadcast via FightChannel
-    ShotElixirWeb.Endpoint.broadcast(
-      "fight:#{fight.id}",
-      "shot_location_changed",
-      %{
-        shot_id: shot.id,
-        location_id: shot.location_id,
-        location: shot.location,
-        location_name:
-          case shot.location_ref do
-            nil -> nil
-            loc -> loc.name
-          end
-      }
-    )
-  end
 end
