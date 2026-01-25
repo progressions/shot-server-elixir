@@ -13,7 +13,7 @@ defmodule ShotElixir.Repo.Migrations.CreateLocationConnections do
 
       add :bidirectional, :boolean, default: true
       add :label, :string
-      timestamps(inserted_at: :created_at)
+      timestamps(type: :utc_datetime, inserted_at: :created_at, updated_at: :updated_at)
     end
 
     create index(:location_connections, [:from_location_id])

@@ -152,4 +152,39 @@ defmodule ShotElixir.Factory do
     {:ok, shot} = Fights.create_shot(Map.merge(defaults, attrs_cleaned))
     shot
   end
+
+  def insert(:location, attrs) do
+    # Convert keyword list to map if necessary
+    attrs = Enum.into(attrs, %{})
+
+    # Location must belong to either a fight or a site
+    fight = attrs[:fight]
+    site = attrs[:site]
+
+    # Remove :fight and :site from attrs to avoid conflicts
+    attrs_cleaned = attrs |> Map.delete(:fight) |> Map.delete(:site)
+
+    defaults = %{
+      "name" => "Test Location #{System.unique_integer([:positive])}"
+    }
+
+    # Convert atom keys to strings for Ecto
+    string_attrs =
+      Enum.into(attrs_cleaned, %{}, fn
+        {k, v} when is_atom(k) -> {Atom.to_string(k), v}
+        {k, v} -> {k, v}
+      end)
+
+    attrs_with_defaults = Map.merge(defaults, string_attrs)
+
+    # Create via the appropriate context function
+    {:ok, location} =
+      cond do
+        fight -> Fights.create_fight_location(fight.id, attrs_with_defaults)
+        site -> Fights.create_site_location(site.id, attrs_with_defaults)
+        true -> raise "Location must belong to a fight or site"
+      end
+
+    location
+  end
 end

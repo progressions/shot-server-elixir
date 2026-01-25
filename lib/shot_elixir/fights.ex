@@ -370,7 +370,7 @@ defmodule ShotElixir.Fights do
 
       fight ->
         fight
-        |> Repo.preload(shots: [:character, :vehicle, :character_effects])
+        |> Repo.preload(shots: [:character, :vehicle, :character_effects, :location_ref])
         |> Repo.preload([
           :characters,
           :vehicles,
@@ -1023,6 +1023,19 @@ defmodule ShotElixir.Fights do
   end
 
   @doc """
+  Lists all location connections for a site.
+  """
+  def list_site_location_connections(site_id) do
+    from(lc in LocationConnection,
+      join: l in Location,
+      on: lc.from_location_id == l.id,
+      where: l.site_id == ^site_id,
+      preload: [:from_location, :to_location]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
   Gets a single location connection by ID.
   """
   def get_location_connection(id) do
@@ -1031,12 +1044,81 @@ defmodule ShotElixir.Fights do
   end
 
   @doc """
-  Creates a location connection.
+  Creates a location connection for a fight.
+  Validates that both locations belong to the same fight.
   """
-  def create_location_connection(attrs) do
-    %LocationConnection{}
+  def create_fight_location_connection(fight_id, attrs) do
+    # First validate the locations belong to the fight
+    from_id = attrs["from_location_id"] || attrs[:from_location_id]
+    to_id = attrs["to_location_id"] || attrs[:to_location_id]
+
+    with {:ok, _from_loc} <- validate_location_in_fight(from_id, fight_id),
+         {:ok, _to_loc} <- validate_location_in_fight(to_id, fight_id) do
+      changeset = LocationConnection.changeset(%LocationConnection{}, attrs)
+
+      case LocationConnection.validate_same_scope(changeset) do
+        {:ok, validated_changeset} ->
+          validated_changeset
+          |> Repo.insert()
+          |> case do
+            {:ok, connection} ->
+              {:ok, Repo.preload(connection, [:from_location, :to_location])}
+
+            error ->
+              error
+          end
+
+        {:error, changeset} ->
+          {:error, changeset}
+      end
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Creates a location connection for a site.
+  Validates that both locations belong to the same site.
+  """
+  def create_site_location_connection(site_id, attrs) do
+    from_id = attrs["from_location_id"] || attrs[:from_location_id]
+    to_id = attrs["to_location_id"] || attrs[:to_location_id]
+
+    with {:ok, _from_loc} <- validate_location_in_site(from_id, site_id),
+         {:ok, _to_loc} <- validate_location_in_site(to_id, site_id) do
+      changeset = LocationConnection.changeset(%LocationConnection{}, attrs)
+
+      case LocationConnection.validate_same_scope(changeset) do
+        {:ok, validated_changeset} ->
+          validated_changeset
+          |> Repo.insert()
+          |> case do
+            {:ok, connection} ->
+              {:ok, Repo.preload(connection, [:from_location, :to_location])}
+
+            error ->
+              error
+          end
+
+        {:error, changeset} ->
+          {:error, changeset}
+      end
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc """
+  Updates a location connection.
+  """
+  def update_location_connection(%LocationConnection{} = connection, attrs) do
+    connection
     |> LocationConnection.changeset(attrs)
-    |> Repo.insert()
+    |> Repo.update()
+    |> case do
+      {:ok, updated} -> {:ok, Repo.preload(updated, [:from_location, :to_location])}
+      error -> error
+    end
   end
 
   @doc """
@@ -1044,6 +1126,34 @@ defmodule ShotElixir.Fights do
   """
   def delete_location_connection(%LocationConnection{} = connection) do
     Repo.delete(connection)
+  end
+
+  defp validate_location_in_fight(location_id, fight_id) do
+    case get_location(location_id) do
+      nil ->
+        {:error, "location not found"}
+
+      location ->
+        if location.fight_id == fight_id do
+          {:ok, location}
+        else
+          {:error, "location does not belong to this fight"}
+        end
+    end
+  end
+
+  defp validate_location_in_site(location_id, site_id) do
+    case get_location(location_id) do
+      nil ->
+        {:error, "location not found"}
+
+      location ->
+        if location.site_id == site_id do
+          {:ok, location}
+        else
+          {:error, "location does not belong to this site"}
+        end
+    end
   end
 
   # =============================================================================

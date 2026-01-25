@@ -210,4 +210,61 @@ defmodule ShotElixirWeb.FightChannelTest do
       assert %{status: "ok"} = reply
     end
   end
+
+  describe "location broadcasts" do
+    test "broadcast_location_created sends location data", %{socket: socket, fight: fight} do
+      {:ok, _reply, _socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
+
+      location = insert(:location, fight: fight, name: "The Rooftop")
+
+      FightChannel.broadcast_location_created(fight.id, location)
+
+      assert_push "location_created", payload
+      assert payload.location.id == location.id
+      assert payload.location.name == "The Rooftop"
+      assert payload.location.fight_id == fight.id
+    end
+
+    test "broadcast_location_updated sends updated location data", %{socket: socket, fight: fight} do
+      {:ok, _reply, _socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
+
+      location = insert(:location, fight: fight, name: "The Basement")
+
+      FightChannel.broadcast_location_updated(fight.id, location)
+
+      assert_push "location_updated", payload
+      assert payload.location.id == location.id
+      assert payload.location.name == "The Basement"
+    end
+
+    test "broadcast_location_deleted sends location_id", %{socket: socket, fight: fight} do
+      {:ok, _reply, _socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
+
+      location = insert(:location, fight: fight)
+
+      FightChannel.broadcast_location_deleted(fight.id, location.id)
+
+      assert_push "location_deleted", payload
+      assert payload.location_id == location.id
+    end
+
+    test "broadcast_shot_location_changed sends shot and location info", %{
+      socket: socket,
+      fight: fight
+    } do
+      {:ok, _reply, _socket} = subscribe_and_join(socket, FightChannel, "fight:#{fight.id}")
+
+      location = insert(:location, fight: fight, name: "The Alley")
+      character = insert(:character)
+      shot = insert(:shot, fight: fight, character: character, location_id: location.id)
+      shot = ShotElixir.Repo.preload(shot, :location_ref)
+
+      FightChannel.broadcast_shot_location_changed(fight.id, shot)
+
+      assert_push "shot_location_changed", payload
+      assert payload.shot_id == shot.id
+      assert payload.location_id == location.id
+      assert payload.location_name == "The Alley"
+    end
+  end
 end

@@ -217,7 +217,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           impairments: 0,
           shot_id: shot.id,
           current_shot: shot.shot,
-          location: shot.location,
+          location: get_location_name(shot),
           driving_id: shot.driving_id,
           driving: nil,
           status: [],
@@ -254,7 +254,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           impairments: get_character_impairments(character, shot),
           shot_id: shot.id,
           current_shot: shot.shot,
-          location: shot.location,
+          location: get_location_name(shot),
           driving_id: shot.driving_id,
           driving: driving_vehicle,
           status: character.status,
@@ -348,7 +348,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       action_values: vehicle.action_values,
       shot_id: shot.id,
       current_shot: shot.shot,
-      location: shot.location,
+      location: get_location_name(shot),
       driver_id: shot.driver_id,
       driver: get_vehicle_driver(shot, fight),
       was_rammed_or_damaged: shot.was_rammed_or_damaged,
@@ -484,4 +484,14 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
   end
 
   defp to_integer(_), do: 0
+
+  # Get the location name from the shot's location_ref association
+  # Falls back to the legacy location string field for backwards compatibility
+  defp get_location_name(shot) do
+    case Map.get(shot, :location_ref) do
+      %Ecto.Association.NotLoaded{} -> shot.location
+      nil -> shot.location
+      location -> location.name
+    end
+  end
 end
