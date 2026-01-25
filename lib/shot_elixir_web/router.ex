@@ -220,10 +220,17 @@ defmodule ShotElixirWeb.Router do
       # Locations for fights
       get "/locations", LocationController, :index_for_fight
       post "/locations", LocationController, :create_for_fight
+
+      # Location connections for fights
+      get "/location_connections", LocationConnectionController, :index_for_fight
+      post "/location_connections", LocationConnectionController, :create_for_fight
     end
 
     # Standalone location routes (for update/delete without parent context)
     resources "/locations", LocationController, only: [:show, :update, :delete]
+
+    # Standalone location connection routes (for show/delete without parent context)
+    resources "/location_connections", LocationConnectionController, only: [:show, :delete]
 
     # Quick-set location for shots (any campaign member can use)
     post "/shots/:id/set_location", ShotController, :set_location
@@ -278,6 +285,10 @@ defmodule ShotElixirWeb.Router do
       # Locations for sites (templates)
       get "/locations", LocationController, :index_for_site
       post "/locations", LocationController, :create_for_site
+
+      # Location connections for sites (templates)
+      get "/location_connections", LocationConnectionController, :index_for_site
+      post "/location_connections", LocationConnectionController, :create_for_site
     end
 
     # Parties with membership
