@@ -925,4 +925,124 @@ defmodule ShotElixir.Fights do
       shot -> shot.fight_id
     end
   end
+
+  # =============================================================================
+  # Location Functions
+  # =============================================================================
+
+  alias ShotElixir.Fights.Location
+  alias ShotElixir.Fights.LocationConnection
+
+  @doc """
+  Lists all locations for a fight.
+  """
+  def list_fight_locations(fight_id) do
+    from(l in Location, where: l.fight_id == ^fight_id, order_by: [asc: l.name])
+    |> Repo.all()
+    |> Repo.preload([:shots, :from_connections, :to_connections])
+  end
+
+  @doc """
+  Lists all locations for a site (templates).
+  """
+  def list_site_locations(site_id) do
+    from(l in Location, where: l.site_id == ^site_id, order_by: [asc: l.name])
+    |> Repo.all()
+    |> Repo.preload([:from_connections, :to_connections])
+  end
+
+  @doc """
+  Gets a single location by ID.
+  """
+  def get_location(id) do
+    Repo.get(Location, id)
+    |> Repo.preload([:fight, :site, :shots, :from_connections, :to_connections])
+  end
+
+  @doc """
+  Gets a location by ID, raises if not found.
+  """
+  def get_location!(id) do
+    Repo.get!(Location, id)
+    |> Repo.preload([:fight, :site, :shots, :from_connections, :to_connections])
+  end
+
+  @doc """
+  Creates a location for a fight.
+  """
+  def create_fight_location(fight_id, attrs) do
+    attrs = Map.put(attrs, "fight_id", fight_id)
+
+    %Location{}
+    |> Location.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Creates a location for a site (template).
+  """
+  def create_site_location(site_id, attrs) do
+    attrs = Map.put(attrs, "site_id", site_id)
+
+    %Location{}
+    |> Location.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a location.
+  """
+  def update_location(%Location{} = location, attrs) do
+    location
+    |> Location.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a location. Shots with this location will have location_id set to nil.
+  """
+  def delete_location(%Location{} = location) do
+    Repo.delete(location)
+  end
+
+  # =============================================================================
+  # LocationConnection Functions
+  # =============================================================================
+
+  @doc """
+  Lists all location connections for a fight.
+  """
+  def list_fight_location_connections(fight_id) do
+    from(lc in LocationConnection,
+      join: l in Location,
+      on: lc.from_location_id == l.id,
+      where: l.fight_id == ^fight_id,
+      preload: [:from_location, :to_location]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single location connection by ID.
+  """
+  def get_location_connection(id) do
+    Repo.get(LocationConnection, id)
+    |> Repo.preload([:from_location, :to_location])
+  end
+
+  @doc """
+  Creates a location connection.
+  """
+  def create_location_connection(attrs) do
+    %LocationConnection{}
+    |> LocationConnection.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Deletes a location connection.
+  """
+  def delete_location_connection(%LocationConnection{} = connection) do
+    Repo.delete(connection)
+  end
 end
