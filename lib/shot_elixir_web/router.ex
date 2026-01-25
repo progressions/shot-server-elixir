@@ -225,6 +225,9 @@ defmodule ShotElixirWeb.Router do
     # Standalone location routes (for update/delete without parent context)
     resources "/locations", LocationController, only: [:show, :update, :delete]
 
+    # Quick-set location for shots (any campaign member can use)
+    post "/shots/:id/set_location", ShotController, :set_location
+
     # Weapons with custom routes
     post "/weapons/batch", WeaponController, :batch
     get "/weapons/junctures", WeaponController, :junctures

@@ -1045,4 +1045,75 @@ defmodule ShotElixir.Fights do
   def delete_location_connection(%LocationConnection{} = connection) do
     Repo.delete(connection)
   end
+
+  # =============================================================================
+  # Quick-Set Location Functions
+  # =============================================================================
+
+  @doc """
+  Sets the location for a shot, creating the location if it doesn't exist.
+  Returns {:ok, shot, created} where created is true if a new location was created.
+
+  Handles dual-write: updates both location_id and legacy location string.
+  """
+  def set_shot_location(shot, nil), do: clear_shot_location(shot)
+  def set_shot_location(shot, ""), do: clear_shot_location(shot)
+
+  def set_shot_location(shot, name) when is_binary(name) do
+    name = String.trim(name)
+
+    if name == "" do
+      clear_shot_location(shot)
+    else
+      Repo.transaction(fn ->
+        {location, created} = find_or_create_fight_location(shot.fight_id, name)
+
+        {:ok, updated_shot} =
+          shot
+          |> Shot.changeset(%{location_id: location.id, location: name})
+          |> Repo.update()
+
+        updated_shot = Repo.preload(updated_shot, [:location_ref, :character, :vehicle])
+        {updated_shot, created}
+      end)
+      |> case do
+        {:ok, {shot, created}} -> {:ok, shot, created}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  @doc """
+  Clears the location from a shot.
+  """
+  def clear_shot_location(shot) do
+    {:ok, updated_shot} =
+      shot
+      |> Shot.changeset(%{location_id: nil, location: nil})
+      |> Repo.update()
+
+    updated_shot = Repo.preload(updated_shot, [:location_ref, :character, :vehicle])
+    {:ok, updated_shot, false}
+  end
+
+  @doc """
+  Finds an existing location by name (case-insensitive) or creates a new one.
+  Returns {location, created} where created is a boolean.
+  """
+  def find_or_create_fight_location(fight_id, name) do
+    # Try to find existing location (case-insensitive)
+    query =
+      from l in Location,
+        where: l.fight_id == ^fight_id and fragment("lower(?)", l.name) == ^String.downcase(name)
+
+    case Repo.one(query) do
+      nil ->
+        # Create new location
+        {:ok, location} = create_fight_location(fight_id, %{"name" => name})
+        {location, true}
+
+      location ->
+        {location, false}
+    end
+  end
 end
