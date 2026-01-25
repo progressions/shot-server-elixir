@@ -293,8 +293,11 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
 
       %{"location" => location_data} when is_binary(location_data) ->
         case Jason.decode(location_data) do
-          {:ok, decoded} -> decoded
-          {:error, _} -> %{}
+          {:ok, decoded} ->
+            decoded
+
+          {:error, _} ->
+            raise Phoenix.BadRequestError, message: "Invalid location data format"
         end
 
       _ ->

@@ -14,7 +14,7 @@ defmodule ShotElixir.Repo.Migrations.CreateLocations do
 
       add :fight_id, references(:fights, type: :binary_id, on_delete: :delete_all)
       add :site_id, references(:sites, type: :binary_id, on_delete: :delete_all)
-      timestamps(inserted_at: :created_at)
+      timestamps(type: :utc_datetime, inserted_at: :created_at, updated_at: :updated_at)
     end
 
     # Case-insensitive unique indexes (one location name per fight/site)
