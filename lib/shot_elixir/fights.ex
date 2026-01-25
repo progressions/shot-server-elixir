@@ -925,4 +925,195 @@ defmodule ShotElixir.Fights do
       shot -> shot.fight_id
     end
   end
+
+  # =============================================================================
+  # Location Functions
+  # =============================================================================
+
+  alias ShotElixir.Fights.Location
+  alias ShotElixir.Fights.LocationConnection
+
+  @doc """
+  Lists all locations for a fight.
+  """
+  def list_fight_locations(fight_id) do
+    from(l in Location, where: l.fight_id == ^fight_id, order_by: [asc: l.name])
+    |> Repo.all()
+    |> Repo.preload([:shots, :from_connections, :to_connections])
+  end
+
+  @doc """
+  Lists all locations for a site (templates).
+  """
+  def list_site_locations(site_id) do
+    from(l in Location, where: l.site_id == ^site_id, order_by: [asc: l.name])
+    |> Repo.all()
+    |> Repo.preload([:from_connections, :to_connections])
+  end
+
+  @doc """
+  Gets a single location by ID.
+  """
+  def get_location(id) do
+    Repo.get(Location, id)
+    |> Repo.preload([:fight, :site, :shots, :from_connections, :to_connections])
+  end
+
+  @doc """
+  Gets a location by ID, raises if not found.
+  """
+  def get_location!(id) do
+    Repo.get!(Location, id)
+    |> Repo.preload([:fight, :site, :shots, :from_connections, :to_connections])
+  end
+
+  @doc """
+  Creates a location for a fight.
+  """
+  def create_fight_location(fight_id, attrs) do
+    attrs = Map.put(attrs, "fight_id", fight_id)
+
+    %Location{}
+    |> Location.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Creates a location for a site (template).
+  """
+  def create_site_location(site_id, attrs) do
+    attrs = Map.put(attrs, "site_id", site_id)
+
+    %Location{}
+    |> Location.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a location.
+  """
+  def update_location(%Location{} = location, attrs) do
+    location
+    |> Location.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a location. Shots with this location will have location_id set to nil.
+  """
+  def delete_location(%Location{} = location) do
+    Repo.delete(location)
+  end
+
+  # =============================================================================
+  # LocationConnection Functions
+  # =============================================================================
+
+  @doc """
+  Lists all location connections for a fight.
+  """
+  def list_fight_location_connections(fight_id) do
+    from(lc in LocationConnection,
+      join: l in Location,
+      on: lc.from_location_id == l.id,
+      where: l.fight_id == ^fight_id,
+      preload: [:from_location, :to_location]
+    )
+    |> Repo.all()
+  end
+
+  @doc """
+  Gets a single location connection by ID.
+  """
+  def get_location_connection(id) do
+    Repo.get(LocationConnection, id)
+    |> Repo.preload([:from_location, :to_location])
+  end
+
+  @doc """
+  Creates a location connection.
+  """
+  def create_location_connection(attrs) do
+    %LocationConnection{}
+    |> LocationConnection.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Deletes a location connection.
+  """
+  def delete_location_connection(%LocationConnection{} = connection) do
+    Repo.delete(connection)
+  end
+
+  # =============================================================================
+  # Quick-Set Location Functions
+  # =============================================================================
+
+  @doc """
+  Sets the location for a shot, creating the location if it doesn't exist.
+  Returns {:ok, shot, created} where created is true if a new location was created.
+
+  Handles dual-write: updates both location_id and legacy location string.
+  """
+  def set_shot_location(shot, nil), do: clear_shot_location(shot)
+  def set_shot_location(shot, ""), do: clear_shot_location(shot)
+
+  def set_shot_location(shot, name) when is_binary(name) do
+    name = String.trim(name)
+
+    if name == "" do
+      clear_shot_location(shot)
+    else
+      Repo.transaction(fn ->
+        {location, created} = find_or_create_fight_location(shot.fight_id, name)
+
+        {:ok, updated_shot} =
+          shot
+          |> Shot.changeset(%{location_id: location.id, location: name})
+          |> Repo.update()
+
+        updated_shot = Repo.preload(updated_shot, [:location_ref, :character, :vehicle])
+        {updated_shot, created}
+      end)
+      |> case do
+        {:ok, {shot, created}} -> {:ok, shot, created}
+        {:error, reason} -> {:error, reason}
+      end
+    end
+  end
+
+  @doc """
+  Clears the location from a shot.
+  """
+  def clear_shot_location(shot) do
+    {:ok, updated_shot} =
+      shot
+      |> Shot.changeset(%{location_id: nil, location: nil})
+      |> Repo.update()
+
+    updated_shot = Repo.preload(updated_shot, [:location_ref, :character, :vehicle])
+    {:ok, updated_shot, false}
+  end
+
+  @doc """
+  Finds an existing location by name (case-insensitive) or creates a new one.
+  Returns {location, created} where created is a boolean.
+  """
+  def find_or_create_fight_location(fight_id, name) do
+    # Try to find existing location (case-insensitive)
+    query =
+      from l in Location,
+        where: l.fight_id == ^fight_id and fragment("lower(?)", l.name) == ^String.downcase(name)
+
+    case Repo.one(query) do
+      nil ->
+        # Create new location
+        {:ok, location} = create_fight_location(fight_id, %{"name" => name})
+        {location, true}
+
+      location ->
+        {location, false}
+    end
+  end
 end

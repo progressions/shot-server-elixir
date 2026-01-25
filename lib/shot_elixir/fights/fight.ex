@@ -36,6 +36,7 @@ defmodule ShotElixir.Fights.Fight do
     belongs_to :user, ShotElixir.Accounts.User
 
     has_many :shots, ShotElixir.Fights.Shot
+    has_many :locations, ShotElixir.Fights.Location
     has_many :fight_events, ShotElixir.Fights.FightEvent
     has_many :effects, ShotElixir.Effects.Effect
     has_many :chase_relationships, ShotElixir.Chases.ChaseRelationship

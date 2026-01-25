@@ -216,7 +216,17 @@ defmodule ShotElixirWeb.Router do
       post "/solo/advance", SoloController, :advance
       post "/solo/action", SoloController, :player_action
       post "/solo/roll_initiative", SoloController, :roll_initiative
+
+      # Locations for fights
+      get "/locations", LocationController, :index_for_fight
+      post "/locations", LocationController, :create_for_fight
     end
+
+    # Standalone location routes (for update/delete without parent context)
+    resources "/locations", LocationController, only: [:show, :update, :delete]
+
+    # Quick-set location for shots (any campaign member can use)
+    post "/shots/:id/set_location", ShotController, :set_location
 
     # Weapons with custom routes
     post "/weapons/batch", WeaponController, :batch
@@ -264,6 +274,10 @@ defmodule ShotElixirWeb.Router do
       get "/notion_page", SiteController, :notion_page
       resources "/notion_sync_logs", NotionSyncLogController, only: [:index]
       delete "/notion_sync_logs/prune", NotionSyncLogController, :prune
+
+      # Locations for sites (templates)
+      get "/locations", LocationController, :index_for_site
+      post "/locations", LocationController, :create_for_site
     end
 
     # Parties with membership

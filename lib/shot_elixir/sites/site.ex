@@ -29,6 +29,7 @@ defmodule ShotElixir.Sites.Site do
     belongs_to :faction, ShotElixir.Factions.Faction
     belongs_to :juncture, ShotElixir.Junctures.Juncture
     has_many :attunements, ShotElixir.Sites.Attunement
+    has_many :locations, ShotElixir.Fights.Location
 
     has_many :image_positions, ImagePosition,
       foreign_key: :positionable_id,

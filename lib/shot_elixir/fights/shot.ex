@@ -20,6 +20,9 @@ defmodule ShotElixir.Fights.Shot do
     belongs_to :driver, __MODULE__
     belongs_to :driving, __MODULE__
 
+    # Location association (new model) - named location_ref to avoid conflict with legacy :location string
+    belongs_to :location_ref, ShotElixir.Fights.Location, foreign_key: :location_id
+
     has_many :character_effects, ShotElixir.Effects.CharacterEffect
 
     timestamps(inserted_at: :created_at, updated_at: :updated_at, type: :utc_datetime)
@@ -34,6 +37,7 @@ defmodule ShotElixir.Fights.Shot do
       :color,
       :impairments,
       :location,
+      :location_id,
       :was_rammed_or_damaged,
       :fight_id,
       :character_id,

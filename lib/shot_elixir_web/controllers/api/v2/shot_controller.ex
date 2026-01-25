@@ -211,6 +211,43 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     end
   end
 
+  # POST /api/v2/shots/:id/set_location
+  # Any campaign member can set locations (not gamemaster-only)
+  def set_location(conn, %{"id" => id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+    location_name = params["location_name"]
+
+    with %Shot{} = shot <- Fights.get_shot(id),
+         %{} = fight <- Fights.get_fight(shot.fight_id),
+         %{} = campaign <- Campaigns.get_campaign(fight.campaign_id),
+         :ok <- authorize_campaign_member(campaign, current_user) do
+      case Fights.set_shot_location(shot, location_name) do
+        {:ok, updated_shot, created} ->
+          # Broadcast the location change
+          broadcast_location_change(fight, updated_shot)
+
+          conn
+          |> put_view(ShotElixirWeb.Api.V2.ShotView)
+          |> render("set_location.json", shot: updated_shot, created: created)
+
+        {:error, reason} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Failed to set location", reason: inspect(reason)})
+      end
+    else
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Shot not found"})
+
+      {:error, :not_member} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "You must be a campaign member to set locations"})
+    end
+  end
+
   # Private helper functions
   defp validate_shot_belongs_to_fight(shot, fight) do
     if shot.fight_id == fight.id do
@@ -246,5 +283,31 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
         Fights.assign_driver(driver_shot, shot.id)
       end
     end
+  end
+
+  defp authorize_campaign_member(campaign, user) do
+    if Campaigns.is_member?(campaign.id, user.id) || campaign.user_id == user.id || user.admin do
+      :ok
+    else
+      {:error, :not_member}
+    end
+  end
+
+  defp broadcast_location_change(fight, shot) do
+    # Broadcast via FightChannel
+    ShotElixirWeb.Endpoint.broadcast(
+      "fight:#{fight.id}",
+      "shot_location_changed",
+      %{
+        shot_id: shot.id,
+        location_id: shot.location_id,
+        location: shot.location,
+        location_name:
+          case shot.location_ref do
+            nil -> nil
+            loc -> loc.name
+          end
+      }
+    )
   end
 end
