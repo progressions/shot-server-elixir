@@ -230,7 +230,10 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
 
                   # Broadcast location update if it belongs to a fight
                   if updated_location.fight_id do
-                    FightChannel.broadcast_location_updated(updated_location.fight_id, updated_location)
+                    FightChannel.broadcast_location_updated(
+                      updated_location.fight_id,
+                      updated_location
+                    )
                   end
 
                   conn
@@ -277,7 +280,10 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
                 {:ok, deleted_location} ->
                   # Broadcast location deletion if it belonged to a fight
                   if deleted_location.fight_id do
-                    FightChannel.broadcast_location_deleted(deleted_location.fight_id, deleted_location.id)
+                    FightChannel.broadcast_location_deleted(
+                      deleted_location.fight_id,
+                      deleted_location.id
+                    )
                   end
 
                   send_resp(conn, :no_content, "")
