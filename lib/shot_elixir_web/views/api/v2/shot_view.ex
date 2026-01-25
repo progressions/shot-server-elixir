@@ -14,7 +14,6 @@ defmodule ShotElixirWeb.Api.V2.ShotView do
       count: shot.count,
       color: shot.color,
       impairments: shot.impairments,
-      location: shot.location,
       location_id: shot.location_id,
       location_data: render_location(shot.location_ref),
       was_rammed_or_damaged: shot.was_rammed_or_damaged,

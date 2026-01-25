@@ -486,11 +486,10 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
   defp to_integer(_), do: 0
 
   # Get the location name from the shot's location_ref association
-  # Falls back to the legacy location string field for backwards compatibility
   defp get_location_name(shot) do
     case Map.get(shot, :location_ref) do
-      %Ecto.Association.NotLoaded{} -> shot.location
-      nil -> shot.location
+      %Ecto.Association.NotLoaded{} -> nil
+      nil -> nil
       location -> location.name
     end
   end

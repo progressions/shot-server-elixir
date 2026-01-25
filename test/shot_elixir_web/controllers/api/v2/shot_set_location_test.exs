@@ -106,7 +106,6 @@ defmodule ShotElixirWeb.Api.V2.ShotSetLocationTest do
 
       response = json_response(conn, 200)
       assert response["created"] == true
-      assert response["shot"]["location"] == "Kitchen"
       assert response["shot"]["location_id"] != nil
       assert response["shot"]["location_data"]["name"] == "Kitchen"
     end
@@ -143,7 +142,8 @@ defmodule ShotElixirWeb.Api.V2.ShotSetLocationTest do
 
       response = json_response(conn, 200)
       assert response["created"] == true
-      assert response["shot"]["location"] == "Balcony"
+      assert response["shot"]["location_id"] != nil
+      assert response["shot"]["location_data"]["name"] == "Balcony"
     end
 
     test "non-member cannot set location", %{
@@ -176,7 +176,6 @@ defmodule ShotElixirWeb.Api.V2.ShotSetLocationTest do
       response = json_response(conn, 200)
       assert response["created"] == false
       assert response["shot"]["location_id"] == nil
-      assert response["shot"]["location"] == nil
       assert response["shot"]["location_data"] == nil
     end
 
@@ -205,28 +204,6 @@ defmodule ShotElixirWeb.Api.V2.ShotSetLocationTest do
         })
 
       assert json_response(conn, 404)["error"] == "Shot not found"
-    end
-
-    test "dual-writes to both location_id and location string", %{
-      conn: conn,
-      gamemaster: gm,
-      shot: shot
-    } do
-      conn =
-        conn
-        |> authenticate(gm)
-        |> post(~p"/api/v2/shots/#{shot.id}/set_location", %{location_name: "Rooftop"})
-
-      response = json_response(conn, 200)
-
-      # Both fields should be set
-      assert response["shot"]["location"] == "Rooftop"
-      assert response["shot"]["location_id"] != nil
-
-      # Verify in database
-      updated_shot = Fights.get_shot(shot.id)
-      assert updated_shot.location == "Rooftop"
-      assert updated_shot.location_id != nil
     end
 
     test "trims whitespace from location name", %{conn: conn, gamemaster: gm, shot: shot} do

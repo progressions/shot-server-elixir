@@ -509,12 +509,15 @@ defmodule ShotElixir.Discord.FightPosterTest do
           campaign_id: campaign.id
         })
 
+      # Create location
+      {:ok, control_room} = Fights.create_fight_location(fight.id, %{"name" => "Control Room"})
+
       %Shot{}
       |> Shot.changeset(%{
         fight_id: fight.id,
         character_id: brick.id,
         shot: 12,
-        location: "Control Room"
+        location_id: control_room.id
       })
       |> Repo.insert!()
 
@@ -878,6 +881,10 @@ defmodule ShotElixir.Discord.FightPosterTest do
           campaign_id: campaign.id
         })
 
+      # Create locations
+      {:ok, control_room} = Fights.create_fight_location(fight.id, %{"name" => "Control Room"})
+      {:ok, highway} = Fights.create_fight_location(fight.id, %{"name" => "Highway"})
+
       # Create shots
       %Shot{}
       |> Shot.changeset(%{fight_id: fight.id, character_id: mook.id, shot: nil})
@@ -901,7 +908,7 @@ defmodule ShotElixir.Discord.FightPosterTest do
           fight_id: fight.id,
           character_id: brick.id,
           shot: 12,
-          location: "Control Room"
+          location_id: control_room.id
         })
         |> Repo.insert()
 
@@ -924,7 +931,7 @@ defmodule ShotElixir.Discord.FightPosterTest do
           fight_id: fight.id,
           vehicle_id: pc_vehicle.id,
           shot: 8,
-          location: "Highway"
+          location_id: highway.id
         })
         |> Repo.insert()
 

@@ -1163,8 +1163,6 @@ defmodule ShotElixir.Fights do
   @doc """
   Sets the location for a shot, creating the location if it doesn't exist.
   Returns {:ok, shot, created} where created is true if a new location was created.
-
-  Handles dual-write: updates both location_id and legacy location string.
   """
   def set_shot_location(shot, nil), do: clear_shot_location(shot)
   def set_shot_location(shot, ""), do: clear_shot_location(shot)
@@ -1180,7 +1178,7 @@ defmodule ShotElixir.Fights do
 
         {:ok, updated_shot} =
           shot
-          |> Shot.changeset(%{location_id: location.id, location: name})
+          |> Shot.changeset(%{location_id: location.id})
           |> Repo.update()
 
         updated_shot = Repo.preload(updated_shot, [:location_ref, :character, :vehicle])
@@ -1199,7 +1197,7 @@ defmodule ShotElixir.Fights do
   def clear_shot_location(shot) do
     {:ok, updated_shot} =
       shot
-      |> Shot.changeset(%{location_id: nil, location: nil})
+      |> Shot.changeset(%{location_id: nil})
       |> Repo.update()
 
     updated_shot = Repo.preload(updated_shot, [:location_ref, :character, :vehicle])
