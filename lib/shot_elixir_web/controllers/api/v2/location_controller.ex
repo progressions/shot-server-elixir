@@ -5,6 +5,7 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
   alias ShotElixir.Sites
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
+  alias ShotElixirWeb.FightChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -132,6 +133,9 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
                 {:ok, location} ->
                   location = Fights.get_location(location.id)
 
+                  # Broadcast location creation to connected clients
+                  FightChannel.broadcast_location_created(fight_id, location)
+
                   conn
                   |> put_status(:created)
                   |> put_view(ShotElixirWeb.Api.V2.LocationView)
@@ -221,12 +225,17 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
               location_params = extract_location_params(params)
 
               case Fights.update_location(location, location_params) do
-                {:ok, location} ->
-                  location = Fights.get_location(location.id)
+                {:ok, updated_location} ->
+                  updated_location = Fights.get_location(updated_location.id)
+
+                  # Broadcast location update if it belongs to a fight
+                  if updated_location.fight_id do
+                    FightChannel.broadcast_location_updated(updated_location.fight_id, updated_location)
+                  end
 
                   conn
                   |> put_view(ShotElixirWeb.Api.V2.LocationView)
-                  |> render("show.json", location: location)
+                  |> render("show.json", location: updated_location)
 
                 {:error, changeset} ->
                   conn
@@ -265,7 +274,12 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
               case Fights.delete_location(location) do
-                {:ok, _location} ->
+                {:ok, deleted_location} ->
+                  # Broadcast location deletion if it belonged to a fight
+                  if deleted_location.fight_id do
+                    FightChannel.broadcast_location_deleted(deleted_location.fight_id, deleted_location.id)
+                  end
+
                   send_resp(conn, :no_content, "")
 
                 {:error, _} ->
@@ -297,7 +311,7 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
             decoded
 
           {:error, _} ->
-            raise Phoenix.BadRequestError, message: "Invalid location data format"
+            raise Plug.BadRequestError, message: "Invalid location data format"
         end
 
       _ ->

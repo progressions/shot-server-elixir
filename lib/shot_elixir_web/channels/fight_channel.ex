@@ -271,4 +271,62 @@ defmodule ShotElixirWeb.FightChannel do
       timestamp: DateTime.utc_now()
     })
   end
+
+  # =============================================================================
+  # Location Broadcasts
+  # =============================================================================
+
+  @doc """
+  Broadcasts that a location was created in the fight.
+  """
+  def broadcast_location_created(fight_id, location) do
+    broadcast_fight_update(fight_id, "location_created", %{
+      location: serialize_location(location)
+    })
+  end
+
+  @doc """
+  Broadcasts that a location was updated.
+  """
+  def broadcast_location_updated(fight_id, location) do
+    broadcast_fight_update(fight_id, "location_updated", %{
+      location: serialize_location(location)
+    })
+  end
+
+  @doc """
+  Broadcasts that a location was deleted.
+  """
+  def broadcast_location_deleted(fight_id, location_id) do
+    broadcast_fight_update(fight_id, "location_deleted", %{
+      location_id: location_id
+    })
+  end
+
+  @doc """
+  Broadcasts that a shot's location changed.
+  """
+  def broadcast_shot_location_changed(fight_id, shot) do
+    broadcast_fight_update(fight_id, "shot_location_changed", %{
+      shot_id: shot.id,
+      location_id: shot.location_id,
+      location: shot.location,
+      location_name:
+        case shot.location_ref do
+          nil -> nil
+          loc -> loc.name
+        end
+    })
+  end
+
+  defp serialize_location(location) do
+    %{
+      id: location.id,
+      name: location.name,
+      description: location.description,
+      color: location.color,
+      fight_id: location.fight_id,
+      site_id: location.site_id
+    }
+  end
 end
