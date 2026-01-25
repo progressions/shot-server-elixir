@@ -313,6 +313,6 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
 
   defp serialize_connection(connection) do
     # Use the view's rendering logic to avoid duplication
-    ShotElixirWeb.Api.V2.LocationConnectionView.render("show.json", connection: connection)
+    ShotElixirWeb.Api.V2.LocationConnectionView.render("show.json", %{connection: connection})
   end
 end
