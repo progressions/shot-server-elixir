@@ -370,7 +370,7 @@ defmodule ShotElixir.Fights do
 
       fight ->
         fight
-        |> Repo.preload(shots: [:character, :vehicle, :character_effects])
+        |> Repo.preload(shots: [:character, :vehicle, :character_effects, :location_ref])
         |> Repo.preload([
           :characters,
           :vehicles,

@@ -226,6 +226,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
           # Broadcast the full encounter update to CampaignChannel
           # This is what the frontend actually listens for
           fight_with_associations = Fights.get_fight_with_shots(fight.id)
+
           ShotElixirWeb.CampaignChannel.broadcast_encounter_update(
             campaign.id,
             fight_with_associations
@@ -297,5 +298,4 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
       {:error, :not_member}
     end
   end
-
 end
