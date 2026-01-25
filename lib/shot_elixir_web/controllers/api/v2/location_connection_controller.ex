@@ -284,9 +284,6 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
     end
   end
 
-  defp get_campaign_id(%{from_location: %{fight: %{campaign_id: id}}}) when not is_nil(id), do: id
-  defp get_campaign_id(%{from_location: %{site: %{campaign_id: id}}}) when not is_nil(id), do: id
-
   defp get_campaign_id(%{from_location: %{fight_id: fight_id}}) when not is_nil(fight_id) do
     case Fights.get_fight(fight_id) do
       nil -> nil
@@ -315,20 +312,7 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
   end
 
   defp serialize_connection(connection) do
-    %{
-      id: connection.id,
-      from_location_id: connection.from_location_id,
-      to_location_id: connection.to_location_id,
-      bidirectional: connection.bidirectional,
-      label: connection.label,
-      from_location:
-        if connection.from_location do
-          %{id: connection.from_location.id, name: connection.from_location.name}
-        end,
-      to_location:
-        if connection.to_location do
-          %{id: connection.to_location.id, name: connection.to_location.name}
-        end
-    }
+    # Use the view's rendering logic to avoid duplication
+    ShotElixirWeb.Api.V2.LocationConnectionView.render("show.json", connection: connection)
   end
 end

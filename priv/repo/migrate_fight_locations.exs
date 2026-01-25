@@ -2,7 +2,17 @@ import Ecto.Query
 alias ShotElixir.Repo
 alias ShotElixir.Fights.{Shot, Location}
 
-fight_id = "4fff0fac-8add-424b-b1b6-c2ae7044f23b"
+args = System.argv()
+
+fight_id =
+  case args do
+    [id | _] ->
+      id
+
+    _ ->
+      IO.puts(:stderr, "Usage: mix run priv/repo/migrate_fight_locations.exs <fight_id>")
+      System.halt(1)
+  end
 
 # Get unique location strings from shots in this fight
 location_strings = Repo.all(
