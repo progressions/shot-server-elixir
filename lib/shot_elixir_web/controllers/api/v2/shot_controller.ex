@@ -24,8 +24,10 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
         handle_driver_linkage(fight, shot, shot_params["driver_id"])
       end
 
-      # Check if location_id is being changed for WebSocket broadcast
-      location_changed? = Map.has_key?(shot_params, "location_id")
+      # Check if location_id is actually changing for WebSocket broadcast
+      location_changed? =
+        Map.has_key?(shot_params, "location_id") &&
+          shot_params["location_id"] != shot.location_id
 
       case Fights.update_shot(shot, shot_params) do
         {:ok, _shot} ->
@@ -320,7 +322,10 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
   defp broadcast_location_changes(campaign_id, fight_id) do
     # Broadcast full encounter update so all clients see the character's new location
     fight_with_associations = Fights.get_fight_with_shots(fight_id)
-    CampaignChannel.broadcast_encounter_update(campaign_id, fight_with_associations)
+
+    if fight_with_associations do
+      CampaignChannel.broadcast_encounter_update(campaign_id, fight_with_associations)
+    end
 
     # Also broadcast locations update so LocationsPanel can update dynamically
     CampaignChannel.broadcast_locations_update(campaign_id, fight_id)
