@@ -336,6 +336,46 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionControllerTest do
 
       assert json_response(conn, 403)["error"] =~ "gamemaster"
     end
+
+    test "ignores attempts to change location IDs", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      # Create a third location to try changing to
+      {:ok, location3} = Fights.create_fight_location(fight.id, %{"name" => "Patio"})
+
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id,
+          "bidirectional" => false
+        })
+
+      # Capture original location IDs
+      original_from_id = connection.from_location_id
+      original_to_id = connection.to_location_id
+
+      # Attempt to change from_location_id and to_location_id
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{
+            "from_location_id" => location3.id,
+            "to_location_id" => location3.id,
+            "label" => "Updated Label"
+          }
+        })
+
+      response = json_response(conn, 200)
+
+      # Label should be updated
+      assert response["label"] == "Updated Label"
+
+      # Location IDs should NOT be changed (security: prevent moving connections)
+      assert response["from_location_id"] == original_from_id
+      assert response["to_location_id"] == original_to_id
+    end
   end
 
   describe "delete" do

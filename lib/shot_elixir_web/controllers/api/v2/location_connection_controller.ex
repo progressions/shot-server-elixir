@@ -233,7 +233,8 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
 
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
-              connection_params = extract_connection_params(params)
+              # Only allow updating label and bidirectional, not location IDs
+              connection_params = extract_update_params(params)
 
               case Fights.update_location_connection(connection, connection_params) do
                 {:ok, updated_connection} ->
@@ -328,6 +329,26 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
         |> Enum.reject(fn {_k, v} -> is_nil(v) end)
         |> Map.new()
     end
+  end
+
+  # Only allow updating label and bidirectional - never allow changing location IDs
+  defp extract_update_params(params) do
+    raw_params =
+      case params do
+        %{"location_connection" => connection_data} when is_map(connection_data) ->
+          connection_data
+
+        %{"connection" => connection_data} when is_map(connection_data) ->
+          connection_data
+
+        _ ->
+          params
+      end
+
+    raw_params
+    |> Map.take(["bidirectional", "label"])
+    |> Enum.reject(fn {_k, v} -> is_nil(v) end)
+    |> Map.new()
   end
 
   defp get_campaign_id(%{from_location: %{fight_id: fight_id}}) when not is_nil(fight_id) do
