@@ -212,6 +212,57 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
     end
   end
 
+  # PATCH /api/v2/location_connections/:id
+  def update(conn, %{"id" => id} = params) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    case Fights.get_location_connection(id) do
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Connection not found"})
+
+      connection ->
+        campaign_id = get_campaign_id(connection)
+
+        case Campaigns.get_campaign(campaign_id) do
+          nil ->
+            conn
+            |> put_status(:not_found)
+            |> json(%{error: "Connection not found"})
+
+          campaign ->
+            if authorize_campaign_modification(campaign, current_user) do
+              connection_params = extract_connection_params(params)
+
+              case Fights.update_location_connection(connection, connection_params) do
+                {:ok, updated_connection} ->
+                  # Broadcast connections update if it was in a fight
+                  fight_id = connection.from_location && connection.from_location.fight_id
+
+                  if fight_id do
+                    CampaignChannel.broadcast_location_connections_update(campaign.id, fight_id)
+                  end
+
+                  conn
+                  |> put_view(ShotElixirWeb.Api.V2.LocationConnectionView)
+                  |> render("show.json", connection: updated_connection)
+
+                {:error, %Ecto.Changeset{} = changeset} ->
+                  conn
+                  |> put_status(:unprocessable_entity)
+                  |> put_view(ShotElixirWeb.Api.V2.LocationConnectionView)
+                  |> render("error.json", changeset: changeset)
+              end
+            else
+              conn
+              |> put_status(:forbidden)
+              |> json(%{error: "Only gamemaster can update connections"})
+            end
+        end
+    end
+  end
+
   # DELETE /api/v2/location_connections/:id
   def delete(conn, %{"id" => id}) do
     current_user = Guardian.Plug.current_resource(conn)

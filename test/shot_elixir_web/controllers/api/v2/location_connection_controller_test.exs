@@ -257,6 +257,87 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionControllerTest do
     end
   end
 
+  describe "update" do
+    test "updates a connection label", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id,
+          "label" => "Old Label"
+        })
+
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{"label" => "New Label"}
+        })
+
+      response = json_response(conn, 200)
+      assert response["label"] == "New Label"
+    end
+
+    test "updates bidirectional flag", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id,
+          "bidirectional" => true
+        })
+
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{"bidirectional" => false}
+        })
+
+      response = json_response(conn, 200)
+      assert response["bidirectional"] == false
+    end
+
+    test "returns 404 for non-existent connection", %{conn: conn} do
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{Ecto.UUID.generate()}", %{
+          "connection" => %{"label" => "Test"}
+        })
+
+      assert json_response(conn, 404)["error"] == "Connection not found"
+    end
+
+    test "rejects non-gamemaster", %{
+      conn: conn,
+      fight: fight,
+      campaign: campaign,
+      location1: location1,
+      location2: location2
+    } do
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id
+        })
+
+      player = insert(:user, gamemaster: false)
+      insert(:campaign_user, campaign: campaign, user: player)
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> patch(~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{"label" => "Test"}
+        })
+
+      assert json_response(conn, 403)["error"] =~ "gamemaster"
+    end
+  end
+
   describe "delete" do
     test "deletes a connection", %{
       conn: conn,
