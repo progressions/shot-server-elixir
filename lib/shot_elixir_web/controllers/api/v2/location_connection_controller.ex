@@ -10,7 +10,6 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
   alias ShotElixir.Sites
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
-  alias ShotElixirWeb.FightChannel
   alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
@@ -305,10 +304,5 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
   defp authorize_campaign_modification(campaign, user) do
     campaign.user_id == user.id || user.admin ||
       (user.gamemaster && Campaigns.is_member?(campaign.id, user.id))
-  end
-
-  defp serialize_connection(connection) do
-    # Use the view's rendering logic to avoid duplication
-    ShotElixirWeb.Api.V2.LocationConnectionView.render("show.json", %{connection: connection})
   end
 end

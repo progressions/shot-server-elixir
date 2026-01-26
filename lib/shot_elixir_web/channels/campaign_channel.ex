@@ -301,7 +301,8 @@ defmodule ShotElixirWeb.CampaignChannel do
     Phoenix.PubSub.broadcast!(
       ShotElixir.PubSub,
       "campaign:#{campaign_id}",
-      {:campaign_broadcast, %{location_connections: connections_data.location_connections, fight_id: fight_id}}
+      {:campaign_broadcast,
+       %{location_connections: connections_data.location_connections, fight_id: fight_id}}
     )
 
     Logger.info("✅ Location connections update broadcasted to campaign:#{campaign_id}")
