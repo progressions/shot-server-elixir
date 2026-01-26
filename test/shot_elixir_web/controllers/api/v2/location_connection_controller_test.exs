@@ -200,6 +200,32 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionControllerTest do
 
       assert json_response(conn, 403)["error"] =~ "gamemaster"
     end
+
+    test "accepts params under location_connection key", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      # Frontend sends params under "location_connection" key
+      conn =
+        post(conn, ~p"/api/v2/fights/#{fight.id}/location_connections", %{
+          "location_connection" => %{
+            "from_location_id" => location1.id,
+            "to_location_id" => location2.id,
+            "bidirectional" => true,
+            "label" => "Stairs"
+          }
+        })
+
+      response = json_response(conn, 201)
+
+      assert Enum.sort([response["from_location_id"], response["to_location_id"]]) ==
+               Enum.sort([location1.id, location2.id])
+
+      assert response["bidirectional"] == true
+      assert response["label"] == "Stairs"
+    end
   end
 
   describe "show" do

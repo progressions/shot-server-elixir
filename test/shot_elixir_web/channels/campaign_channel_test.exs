@@ -108,6 +108,55 @@ defmodule ShotElixirWeb.CampaignChannelTest do
     end
   end
 
+  describe "broadcast_location_connections_update/2" do
+    test "broadcasts location connections to campaign channel", %{
+      socket: socket,
+      campaign: campaign
+    } do
+      # Create fight and locations BEFORE joining channel to avoid extra broadcast noise
+      fight = insert(:fight, campaign: campaign)
+      {:ok, location1} = ShotElixir.Fights.create_fight_location(fight.id, %{"name" => "Kitchen"})
+      {:ok, location2} = ShotElixir.Fights.create_fight_location(fight.id, %{"name" => "Bar"})
+
+      {:ok, _connection} =
+        ShotElixir.Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id,
+          "bidirectional" => true
+        })
+
+      # Now join the channel
+      {:ok, _reply, _socket} =
+        subscribe_and_join(socket, CampaignChannel, "campaign:#{campaign.id}")
+
+      # Broadcast the update
+      CampaignChannel.broadcast_location_connections_update(campaign.id, fight.id)
+
+      # Assert we receive the push with location_connections and fight_id
+      assert_push "message", %{location_connections: connections, fight_id: received_fight_id}
+
+      assert received_fight_id == fight.id
+      assert is_list(connections)
+      assert length(connections) == 1
+    end
+
+    test "broadcasts empty list when no connections exist", %{socket: socket, campaign: campaign} do
+      # Create fight BEFORE joining channel to avoid extra broadcast noise
+      fight = insert(:fight, campaign: campaign)
+
+      # Now join the channel
+      {:ok, _reply, _socket} =
+        subscribe_and_join(socket, CampaignChannel, "campaign:#{campaign.id}")
+
+      CampaignChannel.broadcast_location_connections_update(campaign.id, fight.id)
+
+      assert_push "message", %{location_connections: connections, fight_id: received_fight_id}
+
+      assert connections == []
+      assert received_fight_id == fight.id
+    end
+  end
+
   describe "authorization" do
     test "gamemaster can join any campaign channel", %{socket: _socket} do
       gm_user = insert(:user, gamemaster: true)
