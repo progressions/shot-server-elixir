@@ -200,6 +200,32 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionControllerTest do
 
       assert json_response(conn, 403)["error"] =~ "gamemaster"
     end
+
+    test "accepts params under location_connection key", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      # Frontend sends params under "location_connection" key
+      conn =
+        post(conn, ~p"/api/v2/fights/#{fight.id}/location_connections", %{
+          "location_connection" => %{
+            "from_location_id" => location1.id,
+            "to_location_id" => location2.id,
+            "bidirectional" => true,
+            "label" => "Stairs"
+          }
+        })
+
+      response = json_response(conn, 201)
+
+      assert Enum.sort([response["from_location_id"], response["to_location_id"]]) ==
+               Enum.sort([location1.id, location2.id])
+
+      assert response["bidirectional"] == true
+      assert response["label"] == "Stairs"
+    end
   end
 
   describe "show" do
@@ -228,6 +254,127 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionControllerTest do
     test "returns 404 for non-existent connection", %{conn: conn} do
       conn = get(conn, ~p"/api/v2/location_connections/#{Ecto.UUID.generate()}")
       assert json_response(conn, 404)["error"] == "Connection not found"
+    end
+  end
+
+  describe "update" do
+    test "updates a connection label", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id,
+          "label" => "Old Label"
+        })
+
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{"label" => "New Label"}
+        })
+
+      response = json_response(conn, 200)
+      assert response["label"] == "New Label"
+    end
+
+    test "updates bidirectional flag", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id,
+          "bidirectional" => true
+        })
+
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{"bidirectional" => false}
+        })
+
+      response = json_response(conn, 200)
+      assert response["bidirectional"] == false
+    end
+
+    test "returns 404 for non-existent connection", %{conn: conn} do
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{Ecto.UUID.generate()}", %{
+          "connection" => %{"label" => "Test"}
+        })
+
+      assert json_response(conn, 404)["error"] == "Connection not found"
+    end
+
+    test "rejects non-gamemaster", %{
+      conn: conn,
+      fight: fight,
+      campaign: campaign,
+      location1: location1,
+      location2: location2
+    } do
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id
+        })
+
+      player = insert(:user, gamemaster: false)
+      insert(:campaign_user, campaign: campaign, user: player)
+
+      conn =
+        conn
+        |> authenticate(player)
+        |> patch(~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{"label" => "Test"}
+        })
+
+      assert json_response(conn, 403)["error"] =~ "gamemaster"
+    end
+
+    test "ignores attempts to change location IDs", %{
+      conn: conn,
+      fight: fight,
+      location1: location1,
+      location2: location2
+    } do
+      # Create a third location to try changing to
+      {:ok, location3} = Fights.create_fight_location(fight.id, %{"name" => "Patio"})
+
+      {:ok, connection} =
+        Fights.create_fight_location_connection(fight.id, %{
+          "from_location_id" => location1.id,
+          "to_location_id" => location2.id,
+          "bidirectional" => false
+        })
+
+      # Capture original location IDs
+      original_from_id = connection.from_location_id
+      original_to_id = connection.to_location_id
+
+      # Attempt to change from_location_id and to_location_id
+      conn =
+        patch(conn, ~p"/api/v2/location_connections/#{connection.id}", %{
+          "connection" => %{
+            "from_location_id" => location3.id,
+            "to_location_id" => location3.id,
+            "label" => "Updated Label"
+          }
+        })
+
+      response = json_response(conn, 200)
+
+      # Label should be updated
+      assert response["label"] == "Updated Label"
+
+      # Location IDs should NOT be changed (security: prevent moving connections)
+      assert response["from_location_id"] == original_from_id
+      assert response["to_location_id"] == original_to_id
     end
   end
 
