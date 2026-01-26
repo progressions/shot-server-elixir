@@ -277,7 +277,9 @@ defmodule ShotElixir.Models.Broadcastable do
             # Check first shot to see if location_ref needs preloading
             needs_preload =
               case shots do
-                [] -> false
+                [] ->
+                  false
+
                 [first | _] ->
                   case Map.get(first, :location_ref) do
                     %Ecto.Association.NotLoaded{} -> true
@@ -286,7 +288,14 @@ defmodule ShotElixir.Models.Broadcastable do
               end
 
             if needs_preload do
-              preloaded_shots = ShotElixir.Repo.preload(shots, [:location_ref, :character, :vehicle, :character_effects])
+              preloaded_shots =
+                ShotElixir.Repo.preload(shots, [
+                  :location_ref,
+                  :character,
+                  :vehicle,
+                  :character_effects
+                ])
+
               Map.put(entity, :shots, preloaded_shots)
             else
               entity
