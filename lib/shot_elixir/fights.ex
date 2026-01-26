@@ -893,6 +893,7 @@ defmodule ShotElixir.Fights do
         :character,
         :vehicle,
         :character_effects,
+        :location_ref,
         character: [:faction, :character_schticks, :carries],
         vehicle: [:faction]
       ]

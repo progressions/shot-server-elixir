@@ -262,14 +262,25 @@ defmodule ShotElixir.Models.Broadcastable do
   @doc """
   Helper to add "encounter" key for fight broadcasts.
   Ensures shots are preloaded before rendering with EncounterView.
+
+  Note: The primary preloading happens in Fights.fight_broadcast_preloads/0 which
+  includes :location_ref. This function handles edge cases where shots might not
+  be preloaded yet. Repo.preload/2 is idempotent for already-loaded associations.
   """
   def add_encounter_key_if_fight(base_payload, entity_name_lower, entity) do
     if entity_name_lower == "fight" do
-      # Ensure shots are preloaded before rendering, or pass empty list
       encounter =
         case Map.get(entity, :shots) do
           %Ecto.Association.NotLoaded{} ->
             Map.put(entity, :shots, [])
+
+          nil ->
+            Map.put(entity, :shots, [])
+
+          shots when is_list(shots) ->
+            # Repo.preload is idempotent - safe to call even if already loaded
+            preloaded_shots = ShotElixir.Repo.preload(shots, [:location_ref])
+            Map.put(entity, :shots, preloaded_shots)
 
           _ ->
             entity
