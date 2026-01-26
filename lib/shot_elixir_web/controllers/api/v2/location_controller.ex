@@ -6,6 +6,7 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixirWeb.FightChannel
+  alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -136,6 +137,9 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
                   # Broadcast location creation to connected clients
                   FightChannel.broadcast_location_created(fight_id, location)
 
+                  # Broadcast full locations update to campaign channel for dynamic UI updates
+                  CampaignChannel.broadcast_locations_update(campaign.id, fight_id)
+
                   conn
                   |> put_status(:created)
                   |> put_view(ShotElixirWeb.Api.V2.LocationView)
@@ -234,6 +238,12 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
                       updated_location.fight_id,
                       updated_location
                     )
+
+                    # Broadcast full locations update to campaign channel for dynamic UI updates
+                    CampaignChannel.broadcast_locations_update(
+                      campaign.id,
+                      updated_location.fight_id
+                    )
                   end
 
                   conn
@@ -283,6 +293,12 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
                     FightChannel.broadcast_location_deleted(
                       deleted_location.fight_id,
                       deleted_location.id
+                    )
+
+                    # Broadcast full locations update to campaign channel for dynamic UI updates
+                    CampaignChannel.broadcast_locations_update(
+                      campaign.id,
+                      deleted_location.fight_id
                     )
                   end
 
