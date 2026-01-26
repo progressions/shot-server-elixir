@@ -325,7 +325,11 @@ defmodule ShotElixirWeb.FightChannel do
       description: location.description,
       color: location.color,
       fight_id: location.fight_id,
-      site_id: location.site_id
+      site_id: location.site_id,
+      position_x: location.position_x,
+      position_y: location.position_y,
+      width: location.width,
+      height: location.height
     }
   end
 end
