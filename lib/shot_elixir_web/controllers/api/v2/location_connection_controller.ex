@@ -11,6 +11,7 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixirWeb.FightChannel
+  alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -136,10 +137,8 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
 
               case Fights.create_fight_location_connection(fight_id, connection_params) do
                 {:ok, connection} ->
-                  # Broadcast connection creation
-                  FightChannel.broadcast_fight_update(fight_id, "location_connection_created", %{
-                    connection: serialize_connection(connection)
-                  })
+                  # Broadcast connections update via campaign channel
+                  CampaignChannel.broadcast_location_connections_update(campaign.id, fight_id)
 
                   conn
                   |> put_status(:created)
@@ -240,15 +239,9 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
 
               case Fights.delete_location_connection(connection) do
                 {:ok, _} ->
-                  # Broadcast connection deletion if it was in a fight
+                  # Broadcast connections update if it was in a fight
                   if fight_id do
-                    FightChannel.broadcast_fight_update(
-                      fight_id,
-                      "location_connection_deleted",
-                      %{
-                        connection_id: id
-                      }
-                    )
+                    CampaignChannel.broadcast_location_connections_update(campaign.id, fight_id)
                   end
 
                   send_resp(conn, :no_content, "")
@@ -273,6 +266,9 @@ defmodule ShotElixirWeb.Api.V2.LocationConnectionController do
 
   defp extract_connection_params(params) do
     case params do
+      %{"location_connection" => connection_data} when is_map(connection_data) ->
+        connection_data
+
       %{"connection" => connection_data} when is_map(connection_data) ->
         connection_data
 
