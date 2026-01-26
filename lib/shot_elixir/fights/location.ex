@@ -45,6 +45,10 @@ defmodule ShotElixir.Fights.Location do
       :height
     ])
     |> validate_required([:name])
+    |> validate_number(:position_x, greater_than_or_equal_to: 0)
+    |> validate_number(:position_y, greater_than_or_equal_to: 0)
+    |> validate_number(:width, greater_than: 0)
+    |> validate_number(:height, greater_than: 0)
     |> validate_scope()
     |> unique_constraint(:name, name: :locations_fight_name_idx)
     |> unique_constraint(:name, name: :locations_site_name_idx)
