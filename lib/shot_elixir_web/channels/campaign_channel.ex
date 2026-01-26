@@ -258,7 +258,7 @@ defmodule ShotElixirWeb.CampaignChannel do
 
   @doc """
   Broadcasts locations update to all clients subscribed to this campaign.
-  Sends full locations data in format: {locations: <data>, fight_id: <id>}
+  Sends data in format: {locations: [location, ...], fight_id: <id>}
   """
   def broadcast_locations_update(campaign_id, fight_id) do
     Logger.info("🔄 WEBSOCKET: broadcast_locations_update called for fight #{fight_id}")
@@ -271,10 +271,11 @@ defmodule ShotElixirWeb.CampaignChannel do
       ShotElixirWeb.Api.V2.LocationView.render("index.json", %{locations: locations})
 
     # Broadcast to campaign channel
+    # locations_data is %{locations: [...]} from LocationView, so use .locations to avoid nesting
     Phoenix.PubSub.broadcast!(
       ShotElixir.PubSub,
       "campaign:#{campaign_id}",
-      {:campaign_broadcast, %{locations: locations_data, fight_id: fight_id}}
+      {:campaign_broadcast, %{locations: locations_data.locations, fight_id: fight_id}}
     )
 
     Logger.info("✅ Locations update broadcasted to campaign:#{campaign_id}")
