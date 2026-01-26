@@ -257,6 +257,30 @@ defmodule ShotElixirWeb.CampaignChannel do
   end
 
   @doc """
+  Broadcasts locations update to all clients subscribed to this campaign.
+  Sends full locations data in format: {locations: <data>, fight_id: <id>}
+  """
+  def broadcast_locations_update(campaign_id, fight_id) do
+    Logger.info("🔄 WEBSOCKET: broadcast_locations_update called for fight #{fight_id}")
+
+    # Fetch locations for this fight
+    locations = ShotElixir.Fights.list_fight_locations(fight_id)
+
+    # Format locations data using the LocationView
+    locations_data =
+      ShotElixirWeb.Api.V2.LocationView.render("index.json", %{locations: locations})
+
+    # Broadcast to campaign channel
+    Phoenix.PubSub.broadcast!(
+      ShotElixir.PubSub,
+      "campaign:#{campaign_id}",
+      {:campaign_broadcast, %{locations: locations_data, fight_id: fight_id}}
+    )
+
+    Logger.info("✅ Locations update broadcasted to campaign:#{campaign_id}")
+  end
+
+  @doc """
   Broadcasts encounter update to all clients subscribed to this campaign.
   Sends full encounter data in Rails-compatible format: {encounter: <data>}
   """

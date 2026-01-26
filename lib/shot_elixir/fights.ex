@@ -370,13 +370,7 @@ defmodule ShotElixir.Fights do
 
       fight ->
         fight
-        |> Repo.preload(shots: [:character, :vehicle, :character_effects, :location_ref])
-        |> Repo.preload([
-          :characters,
-          :vehicles,
-          :image_positions,
-          adventure_fights: [:adventure]
-        ])
+        |> Repo.preload(fight_broadcast_preloads())
         |> ImageLoader.load_image_url("Fight")
     end
   end

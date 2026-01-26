@@ -232,6 +232,12 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
             fight_with_associations
           )
 
+          # Also broadcast locations update so LocationsPanel can update dynamically
+          ShotElixirWeb.CampaignChannel.broadcast_locations_update(
+            campaign.id,
+            fight.id
+          )
+
           conn
           |> put_view(ShotElixirWeb.Api.V2.ShotView)
           |> render("set_location.json", shot: updated_shot, created: created)
