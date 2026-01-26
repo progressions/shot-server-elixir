@@ -262,44 +262,25 @@ defmodule ShotElixir.Models.Broadcastable do
   @doc """
   Helper to add "encounter" key for fight broadcasts.
   Ensures shots are preloaded before rendering with EncounterView.
+
+  Note: The primary preloading happens in Fights.fight_broadcast_preloads/0 which
+  includes :location_ref. This function handles edge cases where shots might not
+  be preloaded yet. Repo.preload/2 is idempotent for already-loaded associations.
   """
   def add_encounter_key_if_fight(base_payload, entity_name_lower, entity) do
     if entity_name_lower == "fight" do
-      # Ensure shots AND their location_ref are preloaded before rendering
-      # This is critical for location data to appear in the broadcast
       encounter =
         case Map.get(entity, :shots) do
           %Ecto.Association.NotLoaded{} ->
             Map.put(entity, :shots, [])
 
+          nil ->
+            Map.put(entity, :shots, [])
+
           shots when is_list(shots) ->
-            # Preload location_ref on shots if not already loaded
-            # Check first shot to see if location_ref needs preloading
-            needs_preload =
-              case shots do
-                [] ->
-                  false
-
-                [first | _] ->
-                  case Map.get(first, :location_ref) do
-                    %Ecto.Association.NotLoaded{} -> true
-                    _ -> false
-                  end
-              end
-
-            if needs_preload do
-              preloaded_shots =
-                ShotElixir.Repo.preload(shots, [
-                  :location_ref,
-                  :character,
-                  :vehicle,
-                  :character_effects
-                ])
-
-              Map.put(entity, :shots, preloaded_shots)
-            else
-              entity
-            end
+            # Repo.preload is idempotent - safe to call even if already loaded
+            preloaded_shots = ShotElixir.Repo.preload(shots, [:location_ref])
+            Map.put(entity, :shots, preloaded_shots)
 
           _ ->
             entity
