@@ -11,6 +11,10 @@ defmodule ShotElixir.Fights.Location do
     field :color, :string
     field :image_url, :string
     field :copied_from_location_id, :binary_id
+    field :position_x, :integer, default: 0
+    field :position_y, :integer, default: 0
+    field :width, :integer, default: 200
+    field :height, :integer, default: 150
 
     belongs_to :fight, ShotElixir.Fights.Fight
     belongs_to :site, ShotElixir.Sites.Site
@@ -34,7 +38,11 @@ defmodule ShotElixir.Fights.Location do
       :image_url,
       :fight_id,
       :site_id,
-      :copied_from_location_id
+      :copied_from_location_id,
+      :position_x,
+      :position_y,
+      :width,
+      :height
     ])
     |> validate_required([:name])
     |> validate_scope()
