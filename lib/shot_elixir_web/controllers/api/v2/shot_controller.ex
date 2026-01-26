@@ -6,6 +6,7 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
   alias ShotElixir.Campaigns
   alias ShotElixir.Guardian
   alias ShotElixir.Discord.Notifications
+  alias ShotElixirWeb.CampaignChannel
 
   action_fallback ShotElixirWeb.FallbackController
 
@@ -16,16 +17,27 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     with %Shot{} = shot <- Fights.get_shot(id),
          %{} = fight <- Fights.get_fight(fight_id),
          :ok <- validate_shot_belongs_to_fight(shot, fight),
-         %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
+         %{} = campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user) do
       # Handle driver linkage if updating a vehicle shot
       if shot.vehicle_id && Map.has_key?(shot_params, "driver_id") do
         handle_driver_linkage(fight, shot, shot_params["driver_id"])
       end
 
+      # Check if location_id is actually changing for WebSocket broadcast
+      location_changed? =
+        Map.has_key?(shot_params, "location_id") &&
+          shot_params["location_id"] != shot.location_id
+
       case Fights.update_shot(shot, shot_params) do
         {:ok, _shot} ->
           Notifications.maybe_notify_discord(fight)
+
+          # Broadcast location changes via WebSocket for real-time sync
+          if location_changed? do
+            broadcast_location_changes(campaign.id, fight.id)
+          end
+
           json(conn, %{success: true})
 
         {:error, changeset} ->
@@ -303,5 +315,19 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     else
       {:error, :not_member}
     end
+  end
+
+  # Broadcasts location-related updates to all connected clients via CampaignChannel.
+  # This enables real-time sync when characters are moved between locations.
+  defp broadcast_location_changes(campaign_id, fight_id) do
+    # Broadcast full encounter update so all clients see the character's new location
+    fight_with_associations = Fights.get_fight_with_shots(fight_id)
+
+    if fight_with_associations do
+      CampaignChannel.broadcast_encounter_update(campaign_id, fight_with_associations)
+    end
+
+    # Also broadcast locations update so LocationsPanel can update dynamically
+    CampaignChannel.broadcast_locations_update(campaign_id, fight_id)
   end
 end
