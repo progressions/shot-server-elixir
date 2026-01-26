@@ -286,19 +286,25 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
 
           campaign ->
             if authorize_campaign_modification(campaign, current_user) do
+              # Store fight_id before deletion for broadcasting
+              fight_id = location.fight_id
+
               case Fights.delete_location(location) do
                 {:ok, deleted_location} ->
-                  # Broadcast location deletion if it belonged to a fight
-                  if deleted_location.fight_id do
-                    FightChannel.broadcast_location_deleted(
-                      deleted_location.fight_id,
-                      deleted_location.id
-                    )
+                  # Broadcast updates if it belonged to a fight
+                  if fight_id do
+                    FightChannel.broadcast_location_deleted(fight_id, deleted_location.id)
 
                     # Broadcast full locations update to campaign channel for dynamic UI updates
-                    CampaignChannel.broadcast_locations_update(
+                    CampaignChannel.broadcast_locations_update(campaign.id, fight_id)
+
+                    # Broadcast encounter update so shots move to Unassigned in the UI
+                    # (database ON DELETE SET NULL already set location_id to nil)
+                    fight_with_associations = Fights.get_fight_with_shots(fight_id)
+
+                    CampaignChannel.broadcast_encounter_update(
                       campaign.id,
-                      deleted_location.fight_id
+                      fight_with_associations
                     )
                   end
 
