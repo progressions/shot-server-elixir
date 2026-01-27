@@ -882,6 +882,7 @@ defmodule ShotElixir.Fights do
       :image_positions,
       :characters,
       :vehicles,
+      :effects,
       [adventure_fights: [:adventure]],
       shots: [
         :character,

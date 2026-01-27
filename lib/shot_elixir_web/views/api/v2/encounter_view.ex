@@ -31,6 +31,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       vehicle_ids: get_vehicle_ids(fight),
       action_id: fight.action_id,
       shots: render_shots(fight),
+      effects: render_fight_effects(fight),
       character_effects: get_character_effects_map(fight),
       vehicle_effects: get_vehicle_effects_map(fight),
       # Solo play fields
@@ -105,6 +106,34 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
         shots
         |> Enum.filter(& &1.vehicle_id)
         |> Enum.map(& &1.vehicle_id)
+    end
+  end
+
+  # Render fight-level effects (not per-character, but for the entire fight)
+  defp render_fight_effects(fight) do
+    case Map.get(fight, :effects) do
+      %Ecto.Association.NotLoaded{} ->
+        []
+
+      nil ->
+        []
+
+      effects ->
+        Enum.map(effects, fn effect ->
+          %{
+            id: effect.id,
+            name: effect.name,
+            description: effect.description,
+            severity: effect.severity,
+            start_sequence: effect.start_sequence,
+            end_sequence: effect.end_sequence,
+            start_shot: effect.start_shot,
+            end_shot: effect.end_shot,
+            fight_id: effect.fight_id,
+            user_id: effect.user_id,
+            created_at: effect.created_at
+          }
+        end)
     end
   end
 
