@@ -962,11 +962,25 @@ defmodule ShotElixir.Fights do
     |> Repo.preload([:fight, :site, :shots, :from_connections, :to_connections])
   end
 
+  # Location layout constants (matching frontend)
+  @default_location_width 200
+  @default_location_height 150
+  @location_spacing 20
+  @grid_columns 5
+  @grid_rows 10
+
   @doc """
   Creates a location for a fight.
+  Automatically calculates a non-overlapping position if not provided.
   """
   def create_fight_location(fight_id, attrs) do
     attrs = Map.put(attrs, "fight_id", fight_id)
+
+    # Calculate position if not explicitly provided
+    attrs =
+      maybe_calculate_position(attrs, fn ->
+        list_fight_locations(fight_id)
+      end)
 
     %Location{}
     |> Location.changeset(attrs)
@@ -975,13 +989,80 @@ defmodule ShotElixir.Fights do
 
   @doc """
   Creates a location for a site (template).
+  Automatically calculates a non-overlapping position if not provided.
   """
   def create_site_location(site_id, attrs) do
     attrs = Map.put(attrs, "site_id", site_id)
 
+    # Calculate position if not explicitly provided
+    attrs =
+      maybe_calculate_position(attrs, fn ->
+        list_site_locations(site_id)
+      end)
+
     %Location{}
     |> Location.changeset(attrs)
     |> Repo.insert()
+  end
+
+  # Calculate position for a new location if not explicitly provided
+  defp maybe_calculate_position(attrs, get_existing_locations_fn) do
+    # Check if position was explicitly provided (handle both string and atom keys)
+    has_position_x = Map.has_key?(attrs, "position_x") or Map.has_key?(attrs, :position_x)
+    has_position_y = Map.has_key?(attrs, "position_y") or Map.has_key?(attrs, :position_y)
+
+    # Only auto-calculate if NEITHER position coordinate was provided
+    # This allows explicit (0, 0) placement when desired
+    if has_position_x or has_position_y do
+      attrs
+    else
+      existing_locations = get_existing_locations_fn.()
+      {pos_x, pos_y} = calculate_non_overlapping_position(existing_locations)
+
+      attrs
+      |> Map.put("position_x", pos_x)
+      |> Map.put("position_y", pos_y)
+    end
+  end
+
+  @doc """
+  Calculates a position for a new location that doesn't overlap with existing locations.
+  Uses a grid-based approach, trying positions left-to-right, top-to-bottom.
+  """
+  def calculate_non_overlapping_position(existing_locations) do
+    cell_width = @default_location_width + @location_spacing
+    cell_height = @default_location_height + @location_spacing
+
+    # Try each grid position
+    Enum.find_value(0..(@grid_rows - 1), {0, 0}, fn row ->
+      Enum.find_value(0..(@grid_columns - 1), nil, fn col ->
+        candidate_x = col * cell_width
+        candidate_y = row * cell_height
+
+        if position_is_clear?(candidate_x, candidate_y, existing_locations) do
+          {candidate_x, candidate_y}
+        else
+          nil
+        end
+      end)
+    end)
+  end
+
+  # Check if a position doesn't overlap with any existing locations
+  defp position_is_clear?(x, y, existing_locations) do
+    new_width = @default_location_width
+    new_height = @default_location_height
+
+    not Enum.any?(existing_locations, fn loc ->
+      loc_width = loc.width || @default_location_width
+      loc_height = loc.height || @default_location_height
+
+      # Check for overlap (with spacing buffer)
+      x < loc.position_x + loc_width + @location_spacing and
+        x + new_width + @location_spacing > loc.position_x and
+        y < loc.position_y + loc_height + @location_spacing and
+        y + new_height + @location_spacing > loc.position_y
+    end)
   end
 
   @doc """
