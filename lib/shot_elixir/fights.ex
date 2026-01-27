@@ -971,15 +971,18 @@ defmodule ShotElixir.Fights do
 
   @doc """
   Creates a location for a fight.
-  Automatically calculates a non-overlapping position if not provided.
+
+  Automatically calculates a non-overlapping position when neither `position_x` nor
+  `position_y` is provided. If either coordinate is provided, both should be provided
+  or the unprovided coordinate will default to 0.
   """
   def create_fight_location(fight_id, attrs) do
     attrs = Map.put(attrs, "fight_id", fight_id)
 
-    # Calculate position if not explicitly provided
+    # Calculate position if not explicitly provided (lightweight query for position only)
     attrs =
       maybe_calculate_position(attrs, fn ->
-        list_fight_locations(fight_id)
+        list_locations_for_position_calc(:fight, fight_id)
       end)
 
     %Location{}
@@ -989,20 +992,50 @@ defmodule ShotElixir.Fights do
 
   @doc """
   Creates a location for a site (template).
-  Automatically calculates a non-overlapping position if not provided.
+
+  Automatically calculates a non-overlapping position when neither `position_x` nor
+  `position_y` is provided. If either coordinate is provided, both should be provided
+  or the unprovided coordinate will default to 0.
   """
   def create_site_location(site_id, attrs) do
     attrs = Map.put(attrs, "site_id", site_id)
 
-    # Calculate position if not explicitly provided
+    # Calculate position if not explicitly provided (lightweight query for position only)
     attrs =
       maybe_calculate_position(attrs, fn ->
-        list_site_locations(site_id)
+        list_locations_for_position_calc(:site, site_id)
       end)
 
     %Location{}
     |> Location.changeset(attrs)
     |> Repo.insert()
+  end
+
+  # Lightweight query for position calculation - only fetches position/size fields
+  defp list_locations_for_position_calc(:fight, fight_id) do
+    from(l in Location,
+      where: l.fight_id == ^fight_id,
+      select: %{
+        position_x: l.position_x,
+        position_y: l.position_y,
+        width: l.width,
+        height: l.height
+      }
+    )
+    |> Repo.all()
+  end
+
+  defp list_locations_for_position_calc(:site, site_id) do
+    from(l in Location,
+      where: l.site_id == ^site_id,
+      select: %{
+        position_x: l.position_x,
+        position_y: l.position_y,
+        width: l.width,
+        height: l.height
+      }
+    )
+    |> Repo.all()
   end
 
   # Calculate position for a new location if not explicitly provided
@@ -1028,24 +1061,30 @@ defmodule ShotElixir.Fights do
   @doc """
   Calculates a position for a new location that doesn't overlap with existing locations.
   Uses a grid-based approach, trying positions left-to-right, top-to-bottom.
+  If the grid is full, places the location below the grid to avoid overlap.
   """
   def calculate_non_overlapping_position(existing_locations) do
     cell_width = @default_location_width + @location_spacing
     cell_height = @default_location_height + @location_spacing
 
-    # Try each grid position
-    Enum.find_value(0..(@grid_rows - 1), {0, 0}, fn row ->
-      Enum.find_value(0..(@grid_columns - 1), nil, fn col ->
-        candidate_x = col * cell_width
-        candidate_y = row * cell_height
+    # Build all grid positions in row-major order
+    grid_positions =
+      for row <- 0..(@grid_rows - 1),
+          col <- 0..(@grid_columns - 1) do
+        {col * cell_width, row * cell_height}
+      end
 
-        if position_is_clear?(candidate_x, candidate_y, existing_locations) do
-          {candidate_x, candidate_y}
-        else
-          nil
-        end
-      end)
-    end)
+    # Find the first clear position within the grid
+    case Enum.find(grid_positions, fn {x, y} ->
+           position_is_clear?(x, y, existing_locations)
+         end) do
+      nil ->
+        # If the grid is completely full, place the new location just below the grid
+        {0, @grid_rows * cell_height}
+
+      {x, y} ->
+        {x, y}
+    end
   end
 
   # Check if a position doesn't overlap with any existing locations

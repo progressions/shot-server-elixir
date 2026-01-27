@@ -360,5 +360,42 @@ defmodule ShotElixirWeb.Api.V2.LocationControllerTest do
       assert second.position_x == 220
       assert second.position_y == 0
     end
+
+    test "partial position (only position_x) uses default for position_y", %{fight: fight} do
+      # When only one coordinate is provided, the other defaults to 0 from schema
+      {:ok, location} =
+        Fights.create_fight_location(fight.id, %{
+          "name" => "PartialX",
+          "position_x" => 500
+        })
+
+      assert location.position_x == 500
+      assert location.position_y == 0
+    end
+
+    test "partial position (only position_y) uses default for position_x", %{fight: fight} do
+      {:ok, location} =
+        Fights.create_fight_location(fight.id, %{
+          "name" => "PartialY",
+          "position_y" => 300
+        })
+
+      assert location.position_x == 0
+      assert location.position_y == 300
+    end
+
+    test "when grid is full (50 locations), new location placed below grid", %{fight: fight} do
+      # Create 50 locations to fill the entire 5x10 grid
+      for i <- 1..50 do
+        {:ok, _} = Fights.create_fight_location(fight.id, %{"name" => "Loc#{i}"})
+      end
+
+      # 51st location should be placed below the grid
+      {:ok, overflow_location} = Fights.create_fight_location(fight.id, %{"name" => "Overflow"})
+
+      # Grid height = 10 rows * (150 height + 20 spacing) = 1700
+      assert overflow_location.position_x == 0
+      assert overflow_location.position_y == 1700
+    end
   end
 end
