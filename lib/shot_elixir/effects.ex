@@ -68,12 +68,13 @@ defmodule ShotElixir.Effects do
   @doc """
   Finds and removes expired character effects for a fight.
   Creates a FightEvent for each expired effect.
-  Returns {:ok, expired_effects} with the list of expired effect names.
+  Returns {:ok, deleted_effects} with the list of successfully deleted effects.
 
   Expiry logic (shots count DOWN from 18 to 0):
-  - If end_sequence is set and current_sequence > end_sequence: expired
-  - If end_sequence matches and current shot < end_shot: expired
-  - If only end_shot is set (no end_sequence): expires when current shot < end_shot
+  - Effects expire when the current shot is less than the `end_shot` value.
+  - `end_sequence` is stored for future use but is not currently used to determine expiry.
+
+  Note: Works for both character and vehicle effects.
   """
   def expire_effects_for_fight(%Fight{} = fight) do
     # Find all character effects for this fight with expiry set
@@ -89,49 +90,57 @@ defmodule ShotElixir.Effects do
         is_expired?(effect, fight)
       end)
 
-    # Process each expired effect
-    Enum.each(expired_effects, fn effect ->
-      # Get the character or vehicle name
-      entity_name = get_entity_name(effect)
+    # Process each expired effect, tracking successful deletions
+    deleted_effects =
+      Enum.reduce(expired_effects, [], fn effect, acc ->
+        # Get the character or vehicle name
+        entity_name = get_entity_name(effect)
 
-      # Create FightEvent for the expiry
-      description =
-        if effect.name do
-          "Effect '#{effect.name}' expired on #{entity_name}"
-        else
-          "Effect expired on #{entity_name}"
+        # Create FightEvent for the expiry
+        description =
+          if effect.name do
+            "Effect '#{effect.name}' expired on #{entity_name}"
+          else
+            "Effect expired on #{entity_name}"
+          end
+
+        # Create the fight event (log errors but don't fail)
+        case Fights.create_fight_event(
+               %{
+                 fight_id: fight.id,
+                 event_type: "effect_expired",
+                 description: description,
+                 details: %{
+                   "effect_name" => effect.name,
+                   "effect_id" => effect.id,
+                   "character_id" => effect.character_id,
+                   "vehicle_id" => effect.vehicle_id,
+                   "entity_name" => entity_name,
+                   "end_sequence" => effect.end_sequence,
+                   "end_shot" => effect.end_shot
+                 }
+               },
+               broadcast: false
+             ) do
+          {:ok, _event} -> :ok
+          {:error, _reason} -> :ok
         end
 
-      Fights.create_fight_event(
-        %{
-          fight_id: fight.id,
-          event_type: "effect_expired",
-          description: description,
-          details: %{
-            "effect_name" => effect.name,
-            "effect_id" => effect.id,
-            "character_id" => effect.character_id,
-            "vehicle_id" => effect.vehicle_id,
-            "entity_name" => entity_name,
-            "end_sequence" => effect.end_sequence,
-            "end_shot" => effect.end_shot
-          }
-        },
-        broadcast: false
-      )
+        # Delete the effect and track successful deletions
+        case Repo.delete(effect) do
+          {:ok, _deleted} -> [effect | acc]
+          {:error, _changeset} -> acc
+        end
+      end)
 
-      # Delete the effect
-      Repo.delete(effect)
-    end)
-
-    {:ok, expired_effects}
+    {:ok, Enum.reverse(deleted_effects)}
   end
 
   defp is_expired?(%CharacterEffect{} = effect, %Fight{} = fight) do
     current_shot = fight.sequence
 
-    # If end_sequence is set, we'd need to track sequence number
-    # For now, we only check end_shot against current shot
+    # Currently only checks end_shot against current shot.
+    # end_sequence is stored for future use when sequence_number tracking is added to Fight.
     # Shots count DOWN, so effect expires when current_shot < end_shot
     case {effect.end_sequence, effect.end_shot} do
       {nil, nil} ->
@@ -144,7 +153,7 @@ defmodule ShotElixir.Effects do
 
       {_end_sequence, end_shot} ->
         # Both set - for now, just check end_shot
-        # TODO: Add sequence_number tracking to Fight for full support
+        # end_sequence will be used when Fight tracks sequence_number
         current_shot < end_shot
     end
   end

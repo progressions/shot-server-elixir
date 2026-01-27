@@ -345,4 +345,112 @@ defmodule ShotElixir.EffectsTest do
       assert String.contains?(expiry_event.description, "Will Expire")
     end
   end
+
+  describe "vehicle effects" do
+    setup %{campaign: campaign, fight: fight} do
+      # Create a vehicle with required action_values
+      {:ok, vehicle} =
+        ShotElixir.Vehicles.create_vehicle(%{
+          name: "Test Vehicle",
+          campaign_id: campaign.id,
+          action_values: %{
+            "Acceleration" => 5,
+            "Handling" => 5,
+            "Frame" => 5,
+            "Crunch" => 5
+          }
+        })
+
+      # Add the vehicle to the fight (creates a shot)
+      {:ok, vehicle_shot} =
+        Fights.create_shot(%{
+          fight_id: fight.id,
+          vehicle_id: vehicle.id,
+          shot: 15
+        })
+
+      {:ok, vehicle: vehicle, vehicle_shot: vehicle_shot}
+    end
+
+    test "expires vehicle effects when current shot passes end_shot", %{
+      fight: fight,
+      vehicle: vehicle,
+      vehicle_shot: vehicle_shot
+    } do
+      # Create a vehicle effect that expires at shot 16 (fight is at shot 15, so this should be expired)
+      {:ok, effect} =
+        Effects.create_character_effect(%{
+          name: "Vehicle Stunned",
+          severity: "warning",
+          vehicle_id: vehicle.id,
+          shot_id: vehicle_shot.id,
+          end_shot: 16
+        })
+
+      # Verify the effect exists
+      assert Effects.get_character_effect(effect.id)
+
+      # Call expire_effects_for_fight
+      {:ok, expired} = Effects.expire_effects_for_fight(fight)
+
+      # The effect should have been expired
+      assert length(expired) == 1
+      assert hd(expired).id == effect.id
+
+      # The effect should be deleted
+      refute Effects.get_character_effect(effect.id)
+    end
+
+    test "creates FightEvent with vehicle name when vehicle effect expires", %{
+      fight: fight,
+      vehicle: vehicle,
+      vehicle_shot: vehicle_shot
+    } do
+      # Create a vehicle effect that will expire
+      {:ok, _effect} =
+        Effects.create_character_effect(%{
+          name: "Engine Damage",
+          severity: "error",
+          vehicle_id: vehicle.id,
+          shot_id: vehicle_shot.id,
+          end_shot: 16
+        })
+
+      # Expire effects
+      {:ok, _expired} = Effects.expire_effects_for_fight(fight)
+
+      # Check that a fight event was created with vehicle name
+      events = Fights.list_fight_events(fight.id)
+      event = Enum.find(events, &(&1.event_type == "effect_expired"))
+      assert event
+      assert String.contains?(event.description, "Engine Damage")
+      assert String.contains?(event.description, "Test Vehicle")
+      assert event.details["vehicle_id"] == vehicle.id
+    end
+
+    test "does not expire vehicle effects when current shot has not passed end_shot", %{
+      fight: fight,
+      vehicle: vehicle,
+      vehicle_shot: vehicle_shot
+    } do
+      # Create a vehicle effect that expires at shot 10 (fight is at shot 15, so not expired yet)
+      {:ok, effect} =
+        Effects.create_character_effect(%{
+          name: "Speed Boost",
+          severity: "success",
+          vehicle_id: vehicle.id,
+          shot_id: vehicle_shot.id,
+          end_shot: 10
+        })
+
+      # Call expire_effects_for_fight
+      {:ok, expired} = Effects.expire_effects_for_fight(fight)
+
+      # No effects should be expired
+      assert expired == []
+
+      # The effect should still exist
+      assert Effects.get_character_effect(effect.id)
+    end
+  end
 end
