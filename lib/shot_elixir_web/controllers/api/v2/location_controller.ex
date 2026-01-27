@@ -244,6 +244,15 @@ defmodule ShotElixirWeb.Api.V2.LocationController do
                       campaign.id,
                       updated_location.fight_id
                     )
+
+                    # Broadcast encounter update so character location names update in the UI
+                    fight_with_associations =
+                      Fights.get_fight_with_shots(updated_location.fight_id)
+
+                    CampaignChannel.broadcast_encounter_update(
+                      campaign.id,
+                      fight_with_associations
+                    )
                   end
 
                   conn
