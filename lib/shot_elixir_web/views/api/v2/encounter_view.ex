@@ -406,7 +406,9 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
             change: effect.change,
             shot_id: effect.shot_id,
             character_id: effect.character_id,
-            vehicle_id: effect.vehicle_id
+            vehicle_id: effect.vehicle_id,
+            end_sequence: effect.end_sequence,
+            end_shot: effect.end_shot
           }
         end)
     end

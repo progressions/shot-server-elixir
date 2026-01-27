@@ -28,6 +28,8 @@ defmodule ShotElixirWeb.Api.V2.CharacterEffectView do
       character_id: character_effect.character_id,
       vehicle_id: character_effect.vehicle_id,
       shot_id: character_effect.shot_id,
+      end_sequence: character_effect.end_sequence,
+      end_shot: character_effect.end_shot,
       created_at: character_effect.created_at,
       updated_at: character_effect.updated_at
     }
