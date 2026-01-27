@@ -6,6 +6,7 @@ defmodule ShotElixir.Effects do
   import Ecto.Query, warn: false
   alias ShotElixir.Repo
   alias ShotElixir.Effects.CharacterEffect
+  alias ShotElixir.Effects.Effect
 
   @doc """
   Gets a single character_effect.
@@ -58,6 +59,61 @@ defmodule ShotElixir.Effects do
       join: s in assoc(ce, :shot),
       where: s.fight_id == ^fight_id,
       preload: [:character, :vehicle, :shot]
+    )
+    |> Repo.all()
+  end
+
+  # Fight-level Effects (Effect schema)
+
+  @doc """
+  Gets a single fight effect.
+  Returns nil if the Effect does not exist.
+  """
+  def get_effect(id), do: Repo.get(Effect, id)
+
+  @doc """
+  Gets a single fight effect belonging to a specific fight.
+  Returns nil if not found.
+  """
+  def get_effect_for_fight(fight_id, effect_id) do
+    from(e in Effect,
+      where: e.id == ^effect_id and e.fight_id == ^fight_id
+    )
+    |> Repo.one()
+  end
+
+  @doc """
+  Creates a fight effect.
+  """
+  def create_effect(attrs \\ %{}) do
+    %Effect{}
+    |> Effect.changeset(attrs)
+    |> Repo.insert()
+  end
+
+  @doc """
+  Updates a fight effect.
+  """
+  def update_effect(%Effect{} = effect, attrs) do
+    effect
+    |> Effect.changeset(attrs)
+    |> Repo.update()
+  end
+
+  @doc """
+  Deletes a fight effect.
+  """
+  def delete_effect(%Effect{} = effect) do
+    Repo.delete(effect)
+  end
+
+  @doc """
+  Returns a list of all fight effects for a given fight.
+  """
+  def list_effects_for_fight(fight_id) do
+    from(e in Effect,
+      where: e.fight_id == ^fight_id,
+      order_by: [asc: e.created_at]
     )
     |> Repo.all()
   end

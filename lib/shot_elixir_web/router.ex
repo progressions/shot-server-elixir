@@ -206,6 +206,9 @@ defmodule ShotElixirWeb.Router do
       resources "/character_effects", CharacterEffectController,
         only: [:index, :create, :update, :delete]
 
+      # Fight-level effects (apply to entire fight, e.g., "Building On Fire")
+      resources "/effects", EffectController, only: [:index, :create, :update, :delete]
+
       # Fight events - combat action log
       resources "/fight_events", FightEventController, only: [:index]
 
