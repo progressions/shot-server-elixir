@@ -92,11 +92,14 @@ defmodule ShotElixirWeb.Api.V2.EffectController do
     conn = put_view(conn, ShotElixirWeb.Api.V2.EffectView)
     current_user = Guardian.Plug.current_resource(conn)
 
+    # Prevent clients from changing ownership/scoping fields
+    sanitized_params = Map.drop(effect_params, ["fight_id", "user_id"])
+
     with %{} = fight <- Fights.get_fight(fight_id),
          %{} = _campaign <- Campaigns.get_campaign(fight.campaign_id),
          :ok <- authorize_fight_edit(fight, current_user),
          %{} = effect <- Effects.get_effect_for_fight(fight_id, id) do
-      case Effects.update_effect(effect, effect_params) do
+      case Effects.update_effect(effect, sanitized_params) do
         {:ok, updated_effect} ->
           # Touch the fight to update timestamp
           Fights.touch_fight(fight)
