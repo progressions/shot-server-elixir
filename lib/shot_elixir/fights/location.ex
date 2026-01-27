@@ -50,8 +50,14 @@ defmodule ShotElixir.Fights.Location do
     |> validate_number(:width, greater_than: 0)
     |> validate_number(:height, greater_than: 0)
     |> validate_scope()
-    |> unique_constraint(:name, name: :locations_fight_name_idx)
-    |> unique_constraint(:name, name: :locations_site_name_idx)
+    |> unique_constraint(:name,
+      name: :locations_fight_name_idx,
+      message: "already exists in this fight"
+    )
+    |> unique_constraint(:name,
+      name: :locations_site_name_idx,
+      message: "already exists in this site"
+    )
   end
 
   defp validate_scope(changeset) do

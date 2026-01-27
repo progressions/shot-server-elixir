@@ -165,7 +165,7 @@ defmodule ShotElixirWeb.Api.V2.LocationControllerTest do
       assert %{"errors" => %{"name" => _}} = json_response(conn, 422)
     end
 
-    test "prevents duplicate names (case-insensitive)", %{
+    test "prevents duplicate names (case-insensitive) with clear error message", %{
       conn: conn,
       gamemaster: gm,
       fight: fight
@@ -179,7 +179,9 @@ defmodule ShotElixirWeb.Api.V2.LocationControllerTest do
           location: %{name: "KITCHEN"}
         })
 
-      assert %{"errors" => _} = json_response(conn, 422)
+      response = json_response(conn, 422)
+      assert %{"errors" => %{"name" => [error_message]}} = response
+      assert error_message =~ "already exists"
     end
   end
 
