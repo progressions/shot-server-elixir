@@ -7,6 +7,8 @@ defmodule ShotElixir.Effects do
   alias ShotElixir.Repo
   alias ShotElixir.Effects.CharacterEffect
   alias ShotElixir.Effects.Effect
+  alias ShotElixir.Fights
+  alias ShotElixir.Fights.Fight
 
   @doc """
   Gets a single character_effect.
@@ -61,6 +63,107 @@ defmodule ShotElixir.Effects do
       preload: [:character, :vehicle, :shot]
     )
     |> Repo.all()
+  end
+
+  @doc """
+  Finds and removes expired character effects for a fight.
+  Creates a FightEvent for each expired effect.
+  Returns {:ok, deleted_effects} with the list of successfully deleted effects.
+
+  Expiry logic (shots count DOWN from 18 to 0):
+  - Effects expire when the current shot is less than the `end_shot` value.
+  - `end_sequence` is stored for future use but is not currently used to determine expiry.
+
+  Note: Works for both character and vehicle effects.
+  """
+  def expire_effects_for_fight(%Fight{} = fight) do
+    # Find all character effects for this fight with expiry set
+    expired_effects =
+      from(ce in CharacterEffect,
+        join: s in assoc(ce, :shot),
+        where: s.fight_id == ^fight.id,
+        where: not is_nil(ce.end_shot),
+        preload: [:character, :vehicle, :shot]
+      )
+      |> Repo.all()
+      |> Enum.filter(fn effect ->
+        is_expired?(effect, fight)
+      end)
+
+    # Process each expired effect, tracking successful deletions
+    deleted_effects =
+      Enum.reduce(expired_effects, [], fn effect, acc ->
+        # Get the character or vehicle name
+        entity_name = get_entity_name(effect)
+
+        # Create FightEvent for the expiry
+        description =
+          if effect.name do
+            "Effect '#{effect.name}' expired on #{entity_name}"
+          else
+            "Effect expired on #{entity_name}"
+          end
+
+        # Create the fight event (log errors but don't fail)
+        case Fights.create_fight_event(
+               %{
+                 fight_id: fight.id,
+                 event_type: "effect_expired",
+                 description: description,
+                 details: %{
+                   "effect_name" => effect.name,
+                   "effect_id" => effect.id,
+                   "character_id" => effect.character_id,
+                   "vehicle_id" => effect.vehicle_id,
+                   "entity_name" => entity_name,
+                   "end_sequence" => effect.end_sequence,
+                   "end_shot" => effect.end_shot
+                 }
+               },
+               broadcast: false
+             ) do
+          {:ok, _event} -> :ok
+          {:error, _reason} -> :ok
+        end
+
+        # Delete the effect and track successful deletions
+        case Repo.delete(effect) do
+          {:ok, _deleted} -> [effect | acc]
+          {:error, _changeset} -> acc
+        end
+      end)
+
+    {:ok, Enum.reverse(deleted_effects)}
+  end
+
+  defp is_expired?(%CharacterEffect{} = effect, %Fight{} = fight) do
+    current_shot = fight.sequence
+
+    # Currently only checks end_shot against current shot.
+    # end_sequence is stored for future use when sequence_number tracking is added to Fight.
+    # Shots count DOWN, so effect expires when current_shot < end_shot
+    case {effect.end_sequence, effect.end_shot} do
+      {nil, nil} ->
+        # No expiry set
+        false
+
+      {nil, end_shot} ->
+        # Only end_shot set - expires when current shot passes it
+        current_shot < end_shot
+
+      {_end_sequence, end_shot} ->
+        # Both set - for now, just check end_shot
+        # end_sequence will be used when Fight tracks sequence_number
+        current_shot < end_shot
+    end
+  end
+
+  defp get_entity_name(%CharacterEffect{} = effect) do
+    cond do
+      effect.character && effect.character.name -> effect.character.name
+      effect.vehicle && effect.vehicle.name -> effect.vehicle.name
+      true -> "unknown"
+    end
   end
 
   # Fight-level Effects (Effect schema)

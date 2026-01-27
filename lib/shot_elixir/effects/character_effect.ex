@@ -11,6 +11,8 @@ defmodule ShotElixir.Effects.CharacterEffect do
     field :severity, :string
     field :action_value, :string
     field :change, :string
+    field :end_sequence, :integer
+    field :end_shot, :integer
 
     belongs_to :character, ShotElixir.Characters.Character
     belongs_to :vehicle, ShotElixir.Vehicles.Vehicle
@@ -29,7 +31,9 @@ defmodule ShotElixir.Effects.CharacterEffect do
       :change,
       :character_id,
       :vehicle_id,
-      :shot_id
+      :shot_id,
+      :end_sequence,
+      :end_shot
     ])
     |> validate_required([:shot_id])
     |> validate_at_least_one_present([:character_id, :vehicle_id])

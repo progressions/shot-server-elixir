@@ -9,6 +9,7 @@ defmodule ShotElixir.Fights do
   alias ShotElixir.Adventures.AdventureFight
   alias ShotElixir.ImageLoader
   alias ShotElixir.Slug
+  alias ShotElixir.Effects
   use ShotElixir.Models.Broadcastable
 
   def list_fights(campaign_id) do
@@ -621,11 +622,23 @@ defmodule ShotElixir.Fights do
 
   @doc """
   Advance the shot counter for a fight.
+  Also checks for and removes any expired character effects.
   """
   def advance_shot_counter(%Fight{} = fight) do
     # Using sequence field as the shot counter
     new_counter = if fight.sequence > 0, do: fight.sequence - 1, else: 18
-    update_fight(fight, %{sequence: new_counter})
+
+    case update_fight(fight, %{sequence: new_counter}) do
+      {:ok, updated_fight} ->
+        # Check for expired effects after advancing the shot
+        # Result is intentionally discarded - effect expiry is best-effort
+        # and should not fail the shot advancement
+        {:ok, _expired_effects} = Effects.expire_effects_for_fight(updated_fight)
+        {:ok, updated_fight}
+
+      error ->
+        error
+    end
   end
 
   @doc """
