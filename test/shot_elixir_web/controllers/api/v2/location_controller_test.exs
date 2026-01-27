@@ -281,4 +281,121 @@ defmodule ShotElixirWeb.Api.V2.LocationControllerTest do
       assert json_response(conn, 403)["error"] == "Only gamemaster can delete locations"
     end
   end
+
+  describe "automatic position calculation" do
+    test "first location gets position (0, 0)", %{fight: fight} do
+      {:ok, location} = Fights.create_fight_location(fight.id, %{"name" => "First"})
+
+      assert location.position_x == 0
+      assert location.position_y == 0
+    end
+
+    test "second location gets offset position to avoid overlap", %{fight: fight} do
+      {:ok, _first} = Fights.create_fight_location(fight.id, %{"name" => "First"})
+      {:ok, second} = Fights.create_fight_location(fight.id, %{"name" => "Second"})
+
+      # Second location should be offset (next grid cell)
+      # Grid cell width = 200 (default width) + 20 (spacing) = 220
+      assert second.position_x == 220
+      assert second.position_y == 0
+    end
+
+    test "locations fill grid left-to-right then top-to-bottom", %{fight: fight} do
+      # Create 5 locations to fill the first row
+      {:ok, loc1} = Fights.create_fight_location(fight.id, %{"name" => "Loc1"})
+      {:ok, loc2} = Fights.create_fight_location(fight.id, %{"name" => "Loc2"})
+      {:ok, loc3} = Fights.create_fight_location(fight.id, %{"name" => "Loc3"})
+      {:ok, loc4} = Fights.create_fight_location(fight.id, %{"name" => "Loc4"})
+      {:ok, loc5} = Fights.create_fight_location(fight.id, %{"name" => "Loc5"})
+
+      # Sixth location should wrap to second row
+      {:ok, loc6} = Fights.create_fight_location(fight.id, %{"name" => "Loc6"})
+
+      # First row (y=0)
+      assert loc1.position_y == 0
+      assert loc2.position_y == 0
+      assert loc3.position_y == 0
+      assert loc4.position_y == 0
+      assert loc5.position_y == 0
+
+      # Second row (y = 150 + 20 = 170)
+      assert loc6.position_x == 0
+      assert loc6.position_y == 170
+    end
+
+    test "explicit position is preserved when provided", %{fight: fight} do
+      {:ok, location} =
+        Fights.create_fight_location(fight.id, %{
+          "name" => "Custom",
+          "position_x" => 500,
+          "position_y" => 300
+        })
+
+      assert location.position_x == 500
+      assert location.position_y == 300
+    end
+
+    test "explicit (0, 0) position is preserved when provided", %{fight: fight} do
+      # Create a location at (0,0) first
+      {:ok, _first} = Fights.create_fight_location(fight.id, %{"name" => "First"})
+
+      # Explicitly request (0,0) - should be allowed even though it overlaps
+      {:ok, explicit_zero} =
+        Fights.create_fight_location(fight.id, %{
+          "name" => "ExplicitZero",
+          "position_x" => 0,
+          "position_y" => 0
+        })
+
+      assert explicit_zero.position_x == 0
+      assert explicit_zero.position_y == 0
+    end
+
+    test "site locations also get auto-calculated positions", %{site: site} do
+      {:ok, first} = Fights.create_site_location(site.id, %{"name" => "First"})
+      {:ok, second} = Fights.create_site_location(site.id, %{"name" => "Second"})
+
+      assert first.position_x == 0
+      assert first.position_y == 0
+      assert second.position_x == 220
+      assert second.position_y == 0
+    end
+
+    test "partial position (only position_x) uses default for position_y", %{fight: fight} do
+      # When only one coordinate is provided, the other defaults to 0 from schema
+      {:ok, location} =
+        Fights.create_fight_location(fight.id, %{
+          "name" => "PartialX",
+          "position_x" => 500
+        })
+
+      assert location.position_x == 500
+      assert location.position_y == 0
+    end
+
+    test "partial position (only position_y) uses default for position_x", %{fight: fight} do
+      {:ok, location} =
+        Fights.create_fight_location(fight.id, %{
+          "name" => "PartialY",
+          "position_y" => 300
+        })
+
+      assert location.position_x == 0
+      assert location.position_y == 300
+    end
+
+    test "when grid is full (50 locations), new location placed below grid", %{fight: fight} do
+      # Create 50 locations to fill the entire 5x10 grid
+      for i <- 1..50 do
+        {:ok, _} = Fights.create_fight_location(fight.id, %{"name" => "Loc#{i}"})
+      end
+
+      # 51st location should be placed below the grid
+      {:ok, overflow_location} = Fights.create_fight_location(fight.id, %{"name" => "Overflow"})
+
+      # Grid height = 10 rows * (150 height + 20 spacing) = 1700
+      assert overflow_location.position_x == 0
+      assert overflow_location.position_y == 1700
+    end
+  end
 end

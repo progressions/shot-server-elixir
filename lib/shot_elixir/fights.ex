@@ -962,11 +962,28 @@ defmodule ShotElixir.Fights do
     |> Repo.preload([:fight, :site, :shots, :from_connections, :to_connections])
   end
 
+  # Location layout constants (matching frontend)
+  @default_location_width 200
+  @default_location_height 150
+  @location_spacing 20
+  @grid_columns 5
+  @grid_rows 10
+
   @doc """
   Creates a location for a fight.
+
+  Automatically calculates a non-overlapping position when neither `position_x` nor
+  `position_y` is provided. If either coordinate is provided, both should be provided
+  or the unprovided coordinate will default to 0.
   """
   def create_fight_location(fight_id, attrs) do
     attrs = Map.put(attrs, "fight_id", fight_id)
+
+    # Calculate position if not explicitly provided (lightweight query for position only)
+    attrs =
+      maybe_calculate_position(attrs, fn ->
+        list_locations_for_position_calc(:fight, fight_id)
+      end)
 
     %Location{}
     |> Location.changeset(attrs)
@@ -975,13 +992,116 @@ defmodule ShotElixir.Fights do
 
   @doc """
   Creates a location for a site (template).
+
+  Automatically calculates a non-overlapping position when neither `position_x` nor
+  `position_y` is provided. If either coordinate is provided, both should be provided
+  or the unprovided coordinate will default to 0.
   """
   def create_site_location(site_id, attrs) do
     attrs = Map.put(attrs, "site_id", site_id)
 
+    # Calculate position if not explicitly provided (lightweight query for position only)
+    attrs =
+      maybe_calculate_position(attrs, fn ->
+        list_locations_for_position_calc(:site, site_id)
+      end)
+
     %Location{}
     |> Location.changeset(attrs)
     |> Repo.insert()
+  end
+
+  # Lightweight query for position calculation - only fetches position/size fields
+  defp list_locations_for_position_calc(:fight, fight_id) do
+    from(l in Location,
+      where: l.fight_id == ^fight_id,
+      select: %{
+        position_x: l.position_x,
+        position_y: l.position_y,
+        width: l.width,
+        height: l.height
+      }
+    )
+    |> Repo.all()
+  end
+
+  defp list_locations_for_position_calc(:site, site_id) do
+    from(l in Location,
+      where: l.site_id == ^site_id,
+      select: %{
+        position_x: l.position_x,
+        position_y: l.position_y,
+        width: l.width,
+        height: l.height
+      }
+    )
+    |> Repo.all()
+  end
+
+  # Calculate position for a new location if not explicitly provided
+  defp maybe_calculate_position(attrs, get_existing_locations_fn) do
+    # Check if position was explicitly provided (handle both string and atom keys)
+    has_position_x = Map.has_key?(attrs, "position_x") or Map.has_key?(attrs, :position_x)
+    has_position_y = Map.has_key?(attrs, "position_y") or Map.has_key?(attrs, :position_y)
+
+    # Only auto-calculate if NEITHER position coordinate was provided
+    # This allows explicit (0, 0) placement when desired
+    if has_position_x or has_position_y do
+      attrs
+    else
+      existing_locations = get_existing_locations_fn.()
+      {pos_x, pos_y} = calculate_non_overlapping_position(existing_locations)
+
+      attrs
+      |> Map.put("position_x", pos_x)
+      |> Map.put("position_y", pos_y)
+    end
+  end
+
+  @doc """
+  Calculates a position for a new location that doesn't overlap with existing locations.
+  Uses a grid-based approach, trying positions left-to-right, top-to-bottom.
+  If the grid is full, places the location below the grid to avoid overlap.
+  """
+  def calculate_non_overlapping_position(existing_locations) do
+    cell_width = @default_location_width + @location_spacing
+    cell_height = @default_location_height + @location_spacing
+
+    # Build all grid positions in row-major order
+    grid_positions =
+      for row <- 0..(@grid_rows - 1),
+          col <- 0..(@grid_columns - 1) do
+        {col * cell_width, row * cell_height}
+      end
+
+    # Find the first clear position within the grid
+    case Enum.find(grid_positions, fn {x, y} ->
+           position_is_clear?(x, y, existing_locations)
+         end) do
+      nil ->
+        # If the grid is completely full, place the new location just below the grid
+        {0, @grid_rows * cell_height}
+
+      {x, y} ->
+        {x, y}
+    end
+  end
+
+  # Check if a position doesn't overlap with any existing locations
+  defp position_is_clear?(x, y, existing_locations) do
+    new_width = @default_location_width
+    new_height = @default_location_height
+
+    not Enum.any?(existing_locations, fn loc ->
+      loc_width = loc.width || @default_location_width
+      loc_height = loc.height || @default_location_height
+
+      # Check for overlap (with spacing buffer)
+      x < loc.position_x + loc_width + @location_spacing and
+        x + new_width + @location_spacing > loc.position_x and
+        y < loc.position_y + loc_height + @location_spacing and
+        y + new_height + @location_spacing > loc.position_y
+    end)
   end
 
   @doc """
