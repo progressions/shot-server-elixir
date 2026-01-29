@@ -86,4 +86,48 @@ defmodule ShotElixir.SchticksTest do
       assert updated_image.entity_id == nil
     end
   end
+
+  describe "metadata" do
+    test "defaults to empty map and accepts map values", %{
+      campaign: campaign,
+      character: character
+    } do
+      {:ok, schtick} =
+        Schticks.create_schtick(%{
+          name: "Metadata Schtick",
+          character_id: character.id,
+          campaign_id: campaign.id,
+          category: "Guns",
+          path: "Core",
+          metadata: %{"weapon_sequence" => ["w1", "w2"]}
+        })
+
+      assert schtick.metadata == %{"weapon_sequence" => ["w1", "w2"]}
+
+      {:ok, schtick_no_meta} =
+        Schticks.create_schtick(%{
+          name: "Metadata Default",
+          character_id: character.id,
+          campaign_id: campaign.id,
+          category: "Guns",
+          path: "Core"
+        })
+
+      assert schtick_no_meta.metadata == %{}
+    end
+
+    test "rejects non-map metadata", %{campaign: campaign, character: character} do
+      {:error, changeset} =
+        Schticks.create_schtick(%{
+          name: "Bad Metadata",
+          character_id: character.id,
+          campaign_id: campaign.id,
+          category: "Guns",
+          path: "Core",
+          metadata: "not-a-map"
+        })
+
+      assert "is invalid" in errors_on(changeset).metadata
+    end
+  end
 end

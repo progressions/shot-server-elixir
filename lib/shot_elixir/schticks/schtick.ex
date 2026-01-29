@@ -16,6 +16,7 @@ defmodule ShotElixir.Schticks.Schtick do
     field :archetypes, {:array, :string}
     field :active, :boolean, default: true
     field :at_a_glance, :boolean, default: false
+    field :metadata, :map, default: %{}
 
     belongs_to :campaign, ShotElixir.Campaigns.Campaign
     belongs_to :prerequisite, __MODULE__
@@ -38,10 +39,17 @@ defmodule ShotElixir.Schticks.Schtick do
       :archetypes,
       :active,
       :at_a_glance,
+      :metadata,
       :campaign_id,
       :prerequisite_id
     ])
     |> validate_required([:name, :campaign_id])
+    |> validate_change(:metadata, fn :metadata, value ->
+      cond do
+        is_map(value) -> []
+        true -> [metadata: "must be a map"]
+      end
+    end)
     |> foreign_key_constraint(:prerequisite_id)
     |> unique_constraint([:category, :name, :campaign_id],
       name: :index_schticks_on_category_name_and_campaign
