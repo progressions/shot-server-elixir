@@ -6,7 +6,6 @@ defmodule ShotElixir.Services.UpCheckService do
   require Logger
   alias ShotElixir.{Repo, Fights, Characters}
   alias ShotElixir.Fights.Fight
-  alias ShotElixir.Characters.Character
 
   def apply_up_check(%Fight{} = fight, params) do
     Logger.info("Applying up check for fight #{fight.id}")
@@ -32,10 +31,9 @@ defmodule ShotElixir.Services.UpCheckService do
 
       if character do
         current_status = character.status || []
-        char_type = get_character_type(character)
 
         if params["success"] do
-          handle_up_check_success(fight, character, char_type, current_status)
+          handle_up_check_success(character, current_status)
         else
           handle_up_check_failure(character, current_status)
         end
@@ -52,7 +50,7 @@ defmodule ShotElixir.Services.UpCheckService do
   # Handle successful up check
   # A successful up check only clears the up_check_required status.
   # It does NOT reduce wounds - the character stays up but keeps their wounds.
-  defp handle_up_check_success(_fight, character, _char_type, current_status) do
+  defp handle_up_check_success(character, current_status) do
     new_status = Enum.reject(current_status, &(&1 == "up_check_required"))
     update_character_status(character, new_status, "up check passed")
   end
@@ -86,11 +84,4 @@ defmodule ShotElixir.Services.UpCheckService do
         Repo.rollback(reason)
     end
   end
-
-  # Get character type from action_values
-  defp get_character_type(%Character{action_values: action_values}) when is_map(action_values) do
-    action_values["Type"]
-  end
-
-  defp get_character_type(_), do: nil
 end
