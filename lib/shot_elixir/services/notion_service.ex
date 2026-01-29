@@ -384,7 +384,25 @@ defmodule ShotElixir.Services.NotionService do
         properties
       end
 
-    # Capture payload for logging
+    # Try to update, retrying with missing properties removed
+    do_update_notion_page(character, properties, token, _retries = 5)
+  rescue
+    error ->
+      Logger.error("Failed to update Notion page: #{Exception.message(error)}")
+      # Log error sync
+      Notion.log_error(
+        "character",
+        character.id,
+        %{"page_id" => character.notion_page_id},
+        %{},
+        "Exception: #{Exception.message(error)}"
+      )
+
+      {:error, error}
+  end
+
+  # Helper to update Notion page with retry logic for missing properties
+  defp do_update_notion_page(character, properties, token, retries_remaining) do
     payload = %{
       "page_id" => character.notion_page_id,
       "properties" => properties
@@ -392,26 +410,33 @@ defmodule ShotElixir.Services.NotionService do
 
     response = NotionClient.update_page(character.notion_page_id, properties, %{token: token})
 
-    # Check if Notion returned an error response
     case response do
       # Handle archived/deleted page - unlink from character
       %{"code" => "validation_error", "message" => message}
       when is_binary(message) ->
-        if String.contains?(String.downcase(message), "archived") do
-          handle_archived_page(character, payload, response, message)
-        else
-          # Other validation errors - log and return error
-          Logger.error("Notion API validation error on update: #{message}")
+        cond do
+          String.contains?(String.downcase(message), "archived") ->
+            handle_archived_page(character, payload, response, message)
 
-          Notion.log_error(
-            "character",
-            character.id,
-            payload,
-            response,
-            "Notion API error: validation_error - #{message}"
-          )
+          # Handle "X is not a property that exists" errors by removing the property and retrying
+          retries_remaining > 0 && String.contains?(message, "is not a property that exists") ->
+            case extract_missing_property_name(message) do
+              nil ->
+                # Couldn't parse property name, give up
+                log_validation_error(character, payload, response, message)
 
-          {:error, {:notion_api_error, "validation_error", message}}
+              property_name ->
+                Logger.warning(
+                  "Notion database missing property '#{property_name}', retrying without it"
+                )
+
+                updated_properties = Map.delete(properties, property_name)
+                do_update_notion_page(character, updated_properties, token, retries_remaining - 1)
+            end
+
+          true ->
+            # Other validation errors - log and return error
+            log_validation_error(character, payload, response, message)
         end
 
       # Handle object_not_found - page was deleted, unlink from character
@@ -445,19 +470,28 @@ defmodule ShotElixir.Services.NotionService do
 
         {:ok, page}
     end
-  rescue
-    error ->
-      Logger.error("Failed to update Notion page: #{Exception.message(error)}")
-      # Log error sync
-      Notion.log_error(
-        "character",
-        character.id,
-        %{"page_id" => character.notion_page_id},
-        %{},
-        "Exception: #{Exception.message(error)}"
-      )
+  end
 
-      {:error, error}
+  # Extract property name from error message like "Background is not a property that exists."
+  defp extract_missing_property_name(message) do
+    case Regex.run(~r/^(.+?) is not a property that exists/, message) do
+      [_, property_name] -> property_name
+      _ -> nil
+    end
+  end
+
+  defp log_validation_error(character, payload, response, message) do
+    Logger.error("Notion API validation error on update: #{message}")
+
+    Notion.log_error(
+      "character",
+      character.id,
+      payload,
+      response,
+      "Notion API error: validation_error - #{message}"
+    )
+
+    {:error, {:notion_api_error, "validation_error", message}}
   end
 
   @doc """
