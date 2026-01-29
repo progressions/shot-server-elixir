@@ -14,7 +14,8 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
     image_url: "https://example.com/schtick.jpg",
     bonus: false,
     archetypes: ["martial_artist"],
-    active: true
+    active: true,
+    metadata: %{"foo" => "bar"}
   }
 
   @update_attrs %{
@@ -264,6 +265,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       assert schtick.name == @create_attrs.name
       assert schtick.category == @create_attrs.category
       assert schtick.campaign_id == campaign.id
+      assert schtick.metadata == %{"foo" => "bar"}
     end
 
     test "creates schtick with prerequisite", %{
@@ -343,6 +345,7 @@ defmodule ShotElixirWeb.Api.V2.SchticksControllerTest do
       assert response["name"] == "Updated Schtick"
       assert response["category"] == "guns"
       assert response["path"] == "Path of the Gun"
+      assert response["metadata"] == %{"foo" => "bar"}
     end
 
     test "returns errors with invalid attributes", %{

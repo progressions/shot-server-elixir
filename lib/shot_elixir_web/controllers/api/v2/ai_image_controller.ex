@@ -546,6 +546,7 @@ defmodule ShotElixirWeb.Api.V2.AiImageController do
       active: schtick.active,
       name: schtick.name,
       description: schtick.description,
+      metadata: schtick.metadata,
       campaign_id: schtick.campaign_id,
       created_at: schtick.created_at,
       updated_at: schtick.updated_at
