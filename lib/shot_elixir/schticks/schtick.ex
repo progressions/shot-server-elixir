@@ -44,12 +44,6 @@ defmodule ShotElixir.Schticks.Schtick do
       :prerequisite_id
     ])
     |> validate_required([:name, :campaign_id])
-    |> validate_change(:metadata, fn :metadata, value ->
-      cond do
-        is_map(value) -> []
-        true -> [metadata: "must be a map"]
-      end
-    end)
     |> foreign_key_constraint(:prerequisite_id)
     |> unique_constraint([:category, :name, :campaign_id],
       name: :index_schticks_on_category_name_and_campaign
