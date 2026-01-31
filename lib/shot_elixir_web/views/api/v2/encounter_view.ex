@@ -31,6 +31,7 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       vehicle_ids: get_vehicle_ids(fight),
       action_id: fight.action_id,
       shots: render_shots(fight),
+      schticks: render_schticks(fight),
       effects: render_fight_effects(fight),
       character_effects: get_character_effects_map(fight),
       vehicle_effects: get_vehicle_effects_map(fight),
@@ -39,6 +40,39 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
       solo_player_character_ids: fight.solo_player_character_ids || [],
       solo_behavior_type: fight.solo_behavior_type
     }
+  end
+
+  defp render_schticks(fight) do
+    fight.shots
+    |> Enum.flat_map(fn shot ->
+      case shot.character do
+        %Ecto.Association.NotLoaded{} ->
+          []
+
+        nil ->
+          []
+
+        character ->
+          character.character_schticks
+          |> case do
+            %Ecto.Association.NotLoaded{} -> []
+            nil -> []
+            cs -> cs
+          end
+          |> Enum.map(& &1.schtick)
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq_by(& &1.id)
+    |> Enum.map(fn schtick ->
+      %{
+        id: schtick.id,
+        name: schtick.name,
+        category: schtick.category,
+        path: schtick.path,
+        metadata: schtick.metadata
+      }
+    end)
   end
 
   defp render_shots(fight) do
@@ -294,7 +328,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           schtick_ids: get_schtick_ids(character),
           effects: render_effects(shot),
           user_id: character.user_id,
-          user: render_user_if_loaded(character)
+          user: render_user_if_loaded(character),
+          schtick_state: shot.schtick_state || %{}
         }
     end
   end

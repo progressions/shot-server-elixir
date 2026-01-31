@@ -223,6 +223,73 @@ defmodule ShotElixirWeb.Api.V2.ShotController do
     end
   end
 
+  # POST /api/v2/fights/:fight_id/shots/:id/next_weapon
+  def next_weapon(
+        conn,
+        %{"fight_id" => fight_id, "id" => id, "schtick_id" => schtick_id} = params
+      ) do
+    current_user = Guardian.Plug.current_resource(conn)
+
+    with %Shot{} = shot <- Fights.get_shot(id),
+         %{} = fight <- Fights.get_fight(fight_id),
+         :ok <- validate_shot_belongs_to_fight(shot, fight),
+         :ok <- authorize_fight_edit(fight, current_user) do
+      initialize_only =
+        case Map.get(params, "initialize_only") do
+          v when v in [true, "true", "1", 1] -> true
+          _ -> false
+        end
+
+      case Fights.advance_weapon_sequence(id, schtick_id, initialize_only: initialize_only) do
+        {:ok, result} ->
+          json(conn, %{
+            success: true,
+            current_index: result.current_index,
+            total: result.total,
+            loop: result.loop?,
+            weapon_id: result.weapon.id,
+            weapon_name: result.weapon.name,
+            initialized: result.initialized
+          })
+
+        {:error, :invalid_params} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: "Invalid schtick or weapon sequence"})
+
+        {:error, :weapon_not_found} ->
+          conn
+          |> put_status(:not_found)
+          |> json(%{error: "Weapon not found for sequence"})
+
+        {:error, reason} ->
+          conn
+          |> put_status(:unprocessable_entity)
+          |> json(%{error: inspect(reason)})
+      end
+    else
+      nil ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Shot or fight not found"})
+
+      {:error, :mismatch} ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{error: "Shot does not belong to this fight"})
+
+      {:error, :forbidden} ->
+        conn
+        |> put_status(:forbidden)
+        |> json(%{error: "Only gamemaster can update shots"})
+
+      {:error, :not_found} ->
+        conn
+        |> put_status(:not_found)
+        |> json(%{error: "Shot or fight not found"})
+    end
+  end
+
   # POST /api/v2/shots/:id/set_location
   # Any campaign member can set locations (not gamemaster-only)
   def set_location(conn, %{"id" => id} = params) do

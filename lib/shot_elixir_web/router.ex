@@ -201,6 +201,7 @@ defmodule ShotElixirWeb.Router do
       resources "/shots", ShotController, only: [:update, :delete] do
         post "/assign_driver", ShotController, :assign_driver
         delete "/remove_driver", ShotController, :remove_driver
+        post "/next_weapon", ShotController, :next_weapon
       end
 
       resources "/character_effects", CharacterEffectController,

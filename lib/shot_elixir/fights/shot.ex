@@ -12,6 +12,7 @@ defmodule ShotElixir.Fights.Shot do
     field :color, :string
     field :impairments, :integer, default: 0
     field :was_rammed_or_damaged, :boolean, default: false
+    field :schtick_state, :map, default: %{}
 
     belongs_to :fight, ShotElixir.Fights.Fight
     belongs_to :character, ShotElixir.Characters.Character
@@ -37,6 +38,7 @@ defmodule ShotElixir.Fights.Shot do
       :impairments,
       :location_id,
       :was_rammed_or_damaged,
+      :schtick_state,
       :fight_id,
       :character_id,
       :vehicle_id,
