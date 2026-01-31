@@ -10,6 +10,8 @@ defmodule ShotElixir.Fights do
   alias ShotElixir.ImageLoader
   alias ShotElixir.Slug
   alias ShotElixir.Effects
+  alias ShotElixir.Schticks
+  alias ShotElixir.Weapons
   use ShotElixir.Models.Broadcastable
 
   def list_fights(campaign_id) do
@@ -375,6 +377,88 @@ defmodule ShotElixir.Fights do
         |> ImageLoader.load_image_url("Fight")
     end
   end
+
+  @doc """
+  Advance a weapon sequence for a schtick on the given shot's character.
+
+  If `initialize_only` is true, it sets the current_index to 0 and equips the first weapon without advancing.
+  """
+  def advance_weapon_sequence(shot_id, schtick_id, opts \\ []) do
+    initialize_only = Keyword.get(opts, :initialize_only, false)
+
+    Repo.transaction(fn ->
+      shot_preloads = [
+        :fight,
+        :character,
+        character: [:weapons, [character_schticks: [:schtick]], carries: [:weapon]]
+      ]
+
+      with %Shot{} = shot <- get_shot(shot_id) |> Repo.preload(shot_preloads),
+           %Fight{} = fight <- shot.fight || get_fight(shot.fight_id),
+           %Schticks.Schtick{} = schtick <- Schticks.get_schtick(schtick_id),
+           seq when is_list(seq) and seq != [] <- schtick.metadata["weapon_sequence"],
+           %ShotElixir.Characters.Character{} = character <- shot.character do
+        schtick_key = to_string(schtick.id)
+        loop? = schtick.metadata["loop"] == true
+
+        current_index =
+          shot.schtick_state
+          |> Map.get(schtick_key, %{})
+          |> Map.get("current_index", 0)
+          |> clamp_index(length(seq))
+
+        target_index =
+          cond do
+            initialize_only -> 0
+            current_index < length(seq) - 1 -> current_index + 1
+            loop? -> 0
+            true -> current_index
+          end
+
+        weapon_id = Enum.at(seq, target_index)
+
+        case Weapons.get_weapon(weapon_id) do
+          nil ->
+            Repo.rollback({:error, :weapon_not_found})
+
+          weapon ->
+            schtick_state =
+              (shot.schtick_state || %{})
+              |> Map.put(schtick_key, %{"current_index" => target_index})
+
+            {:ok, updated_shot} =
+              shot
+              |> Shot.changeset(%{schtick_state: schtick_state})
+              |> Repo.update()
+
+            {:ok, updated_character} =
+              ShotElixir.Characters.update_character(character, %{
+                equipped_weapon_id: weapon.id
+              })
+
+            fight = Repo.preload(fight, fight_broadcast_preloads(), force: true)
+            broadcast_change(fight, :update)
+
+            %{
+              shot: updated_shot,
+              character: updated_character,
+              weapon: weapon,
+              current_index: target_index,
+              total: length(seq),
+              loop?: loop?,
+              initialized: initialize_only
+            }
+        end
+      else
+        _ -> Repo.rollback({:error, :invalid_params})
+      end
+    end)
+  end
+
+  defp clamp_index(_idx, len) when len <= 0, do: 0
+  defp clamp_index(idx, _len) when idx < 0, do: 0
+  defp clamp_index(idx, len) when idx >= len, do: len - 1
+  defp clamp_index(idx, _len), do: idx
 
   def create_fight(attrs \\ %{}) do
     result =
@@ -902,7 +986,7 @@ defmodule ShotElixir.Fights do
         :vehicle,
         :character_effects,
         :location_ref,
-        character: [:faction, :character_schticks, :carries],
+        character: [:faction, [character_schticks: [:schtick]], :carries],
         vehicle: [:faction]
       ]
     ]

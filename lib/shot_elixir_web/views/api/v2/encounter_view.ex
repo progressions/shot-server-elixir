@@ -294,7 +294,8 @@ defmodule ShotElixirWeb.Api.V2.EncounterView do
           schtick_ids: get_schtick_ids(character),
           effects: render_effects(shot),
           user_id: character.user_id,
-          user: render_user_if_loaded(character)
+          user: render_user_if_loaded(character),
+          schtick_state: shot.schtick_state || %{}
         }
     end
   end
